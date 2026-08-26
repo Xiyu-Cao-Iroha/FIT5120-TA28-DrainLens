@@ -54,9 +54,9 @@ Both happen before any feature code is written.
 - [x] Mass-balance check — input volume equals captured plus stored plus leaving the window, per position
 - [x] Monotonicity check — ponding extent must not shrink as accumulated rainfall increases
 - [ ] Web Worker skeleton, typed arrays, 500 m window
-- [ ] Each position solved independently from zero, 6–10 positions → *Epic 2 DoD: same inputs, same result*
+- [x] Each position solved independently from zero, 6–10 positions → *Epic 2 DoD: same inputs, same result*
 - [ ] Run once on **Run Scenario**, cache all positions; the slider reads cache only → *2.2.a, 2.2.d*
-- [ ] Output as **difference from the all-clear baseline**, never absolute extent → *2.2.b, 2.2.c*
+- [x] Output as **difference from the all-clear baseline**, never absolute extent → *2.2.b, 2.2.c*
 - [ ] Capture-fraction sensitivity at half, one and two times → decides three bands or two
 - [ ] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
 - [ ] Insufficient-data path returns `insufficient-data`, never a strong band → *2.3.e*
