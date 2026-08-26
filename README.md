@@ -1,0 +1,1 @@
+This is the FIT5120-TA28-DrainLens; this is where we perform the initial Git setup for the project.
