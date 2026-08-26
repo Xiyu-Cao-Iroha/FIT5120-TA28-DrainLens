@@ -28,8 +28,9 @@ Iteration 1 is deterministic. It depends on no machine learning and no live data
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
 apps/web            frontend (React + TypeScript + Vite, MapLibre + deck.gl)      not yet started
 apps/api            backend (Node + TypeScript + Hono on Cloud Run)               not yet started
-pipeline            Python geospatial pipeline and model training, never deployed not yet started
-data                versioned artefact releases and the data manifest             not yet started
+pipeline            Python geospatial pipeline, never deployed — drainage graph done, terrain next
+data                artefact releases — git-ignored, rebuilt locally
+docs                iteration scope, acceptance criteria, development guide
 models              exported ONNX models and evaluation reports                   not yet started
 ```
 
@@ -56,13 +57,13 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 ## Quality gates
 
-These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts`, not just written down.
+These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
 | Gate | Target | Current |
 |---|---|---|
-| Coverage, judgement-carrying modules | ≥ 90% from the first iteration | 100% (`packages/schema`) |
-| Coverage, overall | ≥ 88% | 100% |
-| Suite runtime | < 5 s | ~1.0 s |
+| Coverage, judgement-carrying modules | ≥ 90% from the first iteration | 100% (`packages/schema`, `graph.py`, `classification.py`) |
+| Coverage, overall | ≥ 88% | 100% Node · 99% Python |
+| Suite runtime | < 5 s | ~1.0 s Node · ~0.5 s Python |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | — |
 | CI green rate | ≥ 95% | — |
