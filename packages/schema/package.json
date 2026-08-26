@@ -1,0 +1,18 @@
+{
+  "name": "@drainlens/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared definitions: provenance records, controlled vocabularies, scenario inputs, and every payload that crosses the wire.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build"
+  }
+}

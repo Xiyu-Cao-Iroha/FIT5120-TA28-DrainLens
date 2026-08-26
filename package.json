@@ -1,0 +1,26 @@
+{
+  "name": "drainlens",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DrainLens — stormwater flood risk for Greater Melbourne residents. FIT5120 S2 2026, TA28.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "typecheck": "tsc --build --force",
+    "check": "npm run typecheck && npm run coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

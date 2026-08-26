@@ -1,0 +1,18 @@
+{
+  "name": "@drainlens/scenario",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scenario engine: terrain grids, synthetic verification fixtures, and the checks the engine is held to. Pure computation, no DOM — the Web Worker is a thin wrapper around this.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build"
+  }
+}
