@@ -159,7 +159,9 @@ docs                iteration scope, acceptance criteria, this guide
 The package is not installed into the virtual environment. Run `pip install -e .` from `pipeline/`.
 
 **`npm ci` fails with a lockfile error**
-`package.json` and `package-lock.json` have drifted. Run `npm install` once to reconcile them, check the diff is what you intended, and commit the lockfile.
+`package.json` and `package-lock.json` have drifted. The usual cause is **adding a workspace without re-running `npm install`** — a new `packages/*/package.json` does not reach the lockfile on its own, and `npm ci` refuses to guess. Run `npm install` once to reconcile them, check the diff, and commit the lockfile with the change that caused it.
+
+Do not silence the install while checking this. `npm ci --silent | tail -1` hides the failure, and the run that follows will pass against the `node_modules` you already had — which is how this reaches CI in the first place.
 
 **esbuild warning: "1 package has install scripts not yet covered by allowScripts"**
 npm 11 does not run postinstall scripts by default. It is currently harmless — esbuild's binary comes from a platform-specific package, not the postinstall. If Vitest ever fails to find an esbuild binary, run `npm approve-scripts esbuild`.
