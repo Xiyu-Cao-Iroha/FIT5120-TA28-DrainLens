@@ -47,3 +47,27 @@ jobs:
           path: coverage/
           retention-days: 7
           if-no-files-found: ignore
+
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: pipeline
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pipeline/requirements-dev.txt
+
+      - name: Install
+        run: pip install -e . -r requirements-dev.txt
+
+      # Coverage threshold (90%) is in pyproject.toml, so the gate moves with
+      # the config rather than being restated here.
+      - name: Test with coverage
+        run: pytest
