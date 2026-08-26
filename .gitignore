@@ -1,0 +1,32 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# editors
+.idea/
+.vscode/
+*.swp
+
+# os
+.DS_Store
+Thumbs.db
+
+# large local artefacts — published releases live in /data, not in git
+*.las
+*.laz
+*.tif
+*.pmtiles
+/pipeline/.venv/
+/pipeline/work/
+
+# build products — artefacts are rebuilt, not committed
+/data/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+.coverage.*
+.pytest_cache/
