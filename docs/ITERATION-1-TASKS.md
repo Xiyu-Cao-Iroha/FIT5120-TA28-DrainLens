@@ -34,7 +34,7 @@ Both happen before any feature code is written.
 
 - [ ] **D2 check** — one 500 m tile: does the LAS carry a usable ground classification? *(today; the answer changes Thursday)*
 - [ ] Agree the demonstration address and a 1 km × 1 km build extent
-- [ ] **Drainage graph artefact** — clean self-loops, build the directed graph from `upstr_pit`/`dnstr_pit`, record cycles, derive the narrowing indicator and inlet classification → *1.2.a–d, 1.3.c*
+- [x] **Drainage graph artefact** — clean self-loops, build the directed graph from `upstr_pit`/`dnstr_pit`, record cycles, derive the narrowing indicator and inlet classification → *1.2.a–d, 1.3.c*
 - [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.a, 1.1.e*
 - [ ] Ground classification, if D2 says it is needed
 - [ ] Bare-earth DTM for the build extent
@@ -46,13 +46,13 @@ Both happen before any feature code is written.
 
 > **The fork order is a correctness requirement, not a preference.** Depression filling removes exactly the storage volumes the scenario model needs. Characterise depressions on the raw surface **first**, then produce a separate conditioned surface for routing. Reversing this produces a model that runs, looks plausible, and cannot compute ponding at all.
 
-**Deliver the drainage graph first.** It is low risk and already audited — 13,753 usable edges, 22 back-edges recorded, median path 11 segments — and it unblocks the trace feature entirely.
+**Deliver the drainage graph first.** Done. It unblocks the trace feature entirely, and building it against the full dataset corrected the audit: 12,798 reachable edges and 12,131 fully resolved (70.4%, not the 79.8% recorded), with 18 back-edges across 34 nodes. The audit counted endpoint identifiers that were present; 1,622 pipes name a pit that is not in the export, and for traversal an unresolvable identifier is as useless as a missing one. See pipeline/README.md.
 
 ## W2 · Scenario engine
 
-- [ ] Synthetic terrain fixtures — a known bowl and a known planar slope *(written before the engine)*
-- [ ] Mass-balance check — input volume equals captured plus stored plus leaving the window, per position
-- [ ] Monotonicity check — ponding extent must not shrink as accumulated rainfall increases
+- [x] Synthetic terrain fixtures — a known bowl and a known planar slope *(written before the engine)*
+- [x] Mass-balance check — input volume equals captured plus stored plus leaving the window, per position
+- [x] Monotonicity check — ponding extent must not shrink as accumulated rainfall increases
 - [ ] Web Worker skeleton, typed arrays, 500 m window
 - [ ] Each position solved independently from zero, 6–10 positions → *Epic 2 DoD: same inputs, same result*
 - [ ] Run once on **Run Scenario**, cache all positions; the slider reads cache only → *2.2.a, 2.2.d*
@@ -80,7 +80,7 @@ Both happen before any feature code is written.
 ## W4 · Deployment, CI and quality
 
 - [ ] Branch protection on `main` and `develop`, zero direct pushes
-- [ ] CI: `npm ci` then `npm run check` on every pull request
+- [x] CI: `npm ci` then `npm run check` on every pull request
 - [ ] Artefact contract published in `packages/schema` and frozen after Thursday
 - [ ] Cloud Storage + Cloud CDN for artefacts; confirm range requests pass through (PMTiles depends on them)
 - [ ] Cloud Run service behind the load balancer; one URL map, one origin
