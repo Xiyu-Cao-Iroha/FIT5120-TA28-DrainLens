@@ -39,16 +39,18 @@ models              exported ONNX models and evaluation reports                 
 
 ## Working on it
 
-Node 20 or newer.
+**Start with [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** — setup for both toolchains, everyday commands, how to build artefacts, the pull request workflow, and the gotchas worth knowing before you hit them.
+
+The short version, Node 20 or newer:
 
 ```
 npm ci          # install exactly what the lockfile says — never npm install before a push
-npm test        # run the suite
-npm run coverage
 npm run check   # typecheck, then the suite with coverage thresholds enforced
 ```
 
 `npm ci` rather than `npm install` is deliberate. Lockfile drift breaking CI unnoticed is a defect this team has already had once, and `npm ci` is what catches it.
+
+The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/README.md).
 
 ---
 
@@ -76,6 +78,7 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.2.0 | 26 Aug 2026 | Drainage graph builder and artefact: topology, inlet classification, narrowing indicator, cycle detection. Corrects the audit's traceable share from 79.8% to 70.4% — 1,622 pipes name a pit absent from the export. 48 tests, 100% on the judgement-carrying modules. Development guide added. |
 | 0.1.0 | 26 Aug 2026 | Monorepo skeleton and `packages/schema`: provenance records with a non-optional basis, the blockage and visible-condition vocabularies held apart, scenario run provenance, and the wire payloads with a structural guard against sending a photograph, an address or a coordinate. 22 tests, 100% coverage. |
 | — | 26 Aug 2026 | Initial Git setup. |
 
