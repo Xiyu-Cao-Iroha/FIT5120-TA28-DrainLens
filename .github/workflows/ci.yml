@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# A second push to the same branch cancels the run still in flight, so the
+# green rate reflects the latest commit rather than a queue of stale ones.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci, never npm install. It installs exactly what the lockfile says
+      # and fails if the lockfile and package.json have drifted — which is the
+      # defect this step exists to catch.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
+      # packages/schema. A shortfall fails the job.
+      - name: Test with coverage
+        run: npm run coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
