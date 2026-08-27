@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import * as schema from './index.js';
 import {
   BLOCKAGE_SETTINGS,
+  COMPARISON_BANDS,
+  INSUFFICIENCY_REASONS,
+  RESULT_STATUSES,
+  isComparisonBand,
+  isInsufficiencyReason,
   DEBRIS_TYPES,
   VISIBLE_CONDITIONS,
   isBlockageSetting,
@@ -44,6 +49,25 @@ const V1 = dataVersionId('drainpipes@2023-02-26');
 const V2 = dataVersionId('stormwater-pits@2023-02-26');
 
 describe('vocabulary', () => {
+  it('separates no clear change from insufficient information', () => {
+    // A calculation that ran and found nothing is a band. A calculation that
+    // could not be made is a status. Merging them would let the two print the
+    // same words on the map.
+    expect(COMPARISON_BANDS).toEqual(['no-clear-change', 'higher-than-baseline']);
+    expect(COMPARISON_BANDS).not.toContain('insufficient-data');
+    expect(RESULT_STATUSES).toEqual(['successful', 'insufficient-information']);
+    expect(INSUFFICIENCY_REASONS).toEqual([
+      'terrain_unavailable',
+      'invalid_inlet',
+      'scenario_calculation_failed',
+      'comparison_not_comparable',
+    ]);
+    expect(isComparisonBand('no-clear-change')).toBe(true);
+    expect(isComparisonBand('insufficient-data')).toBe(false);
+    expect(isInsufficiencyReason('invalid_inlet')).toBe(true);
+    expect(isInsufficiencyReason('nope')).toBe(false);
+  });
+
   it('carries the three blockage settings AC 2.1 requires, in order', () => {
     expect(BLOCKAGE_SETTINGS).toEqual(['clear', 'partly-blocked', 'fully-blocked']);
   });
@@ -169,6 +193,17 @@ const positions: readonly PositionResult[] = [
   { accumulatedRainfallMm: 40, band: 'higher-than-baseline' },
 ];
 
+const parts = (over: Record<string, unknown> = {}) => ({
+  inputs: inputs(),
+  window: { metresSquare: 500 },
+  dataVersionIds: [V1, V2],
+  engineVersion: 'engine@0.1.0',
+  assumptionSetVersion: 'assumptions@1',
+  positions,
+  resultStatus: 'successful' as const,
+  ...over,
+});
+
 describe('scenario', () => {
   it('accepts rainfall inside the supported range only', () => {
     expect(isSupportedRainfall(RAINFALL_RANGE_MM.min)).toBe(true);
@@ -179,37 +214,30 @@ describe('scenario', () => {
   });
 
   it('builds a run that records its inputs, versions and positions', () => {
-    const run = buildRunProvenance(
-      inputs(),
-      { metresSquare: 500 },
-      [V1, V2],
-      'engine@0.1.0',
-      'assumptions@1',
-      positions,
-    );
+    const run = buildRunProvenance(parts());
     expect(run.dataVersionIds).toEqual([V1, V2]);
     expect(run.positions).toHaveLength(3);
     expect(run.inputs.rainfallSource.kind).toBe('manual');
+    expect(run.resultStatus).toBe('successful');
+    expect(run.insufficiencyReason).toBeNull();
+    expect(run.networkLimitations).toEqual([]);
   });
 
   it('carries the station and its distance when the value came from an observation', () => {
     const run = buildRunProvenance(
-      inputs({
-        rainfallSource: {
-          kind: 'observation',
-          stationId: stationId('95936'),
-          stationName: 'Melbourne (Olympic Park)',
-          observedFrom: '2026-08-26T09:00:00+10:00',
-          observedTo: '2026-08-26T15:00:00+10:00',
-          upstreamUpdatedAt: '2026-08-26T15:11:00+10:00',
-          distanceFromAddressM: 2400,
-        },
+      parts({
+        inputs: inputs({
+          rainfallSource: {
+            kind: 'observation',
+            stationId: stationId('95936'),
+            stationName: 'Melbourne (Olympic Park)',
+            observedFrom: '2026-08-26T09:00:00+10:00',
+            observedTo: '2026-08-26T15:00:00+10:00',
+            upstreamUpdatedAt: '2026-08-26T15:11:00+10:00',
+            distanceFromAddressM: 2400,
+          },
+        }),
       }),
-      { metresSquare: 500 },
-      [V1],
-      'engine@0.1.0',
-      'assumptions@1',
-      positions,
     );
     if (run.inputs.rainfallSource.kind !== 'observation') throw new Error('unreachable');
     // One gauge describes one point; the distance must survive into the record.
@@ -217,28 +245,78 @@ describe('scenario', () => {
   });
 
   it('refuses a run that cannot be explained or reproduced', () => {
-    const w = { metresSquare: 500 };
     expect(() =>
-      buildRunProvenance(inputs({ accumulatedRainfallMm: 999 }), w, [V1], 'e', 'a', positions),
+      buildRunProvenance(parts({ inputs: inputs({ accumulatedRainfallMm: 999 }) })),
     ).toThrow(ScenarioError);
-    expect(() => buildRunProvenance(inputs(), w, [], 'e', 'a', positions)).toThrow(ScenarioError);
-    expect(() => buildRunProvenance(inputs(), w, [V1], 'e', 'a', [])).toThrow(ScenarioError);
+    expect(() => buildRunProvenance(parts({ dataVersionIds: [] }))).toThrow(ScenarioError);
+    expect(() => buildRunProvenance(parts({ positions: [] }))).toThrow(
+      /successful run must record at least one position/,
+    );
   });
 
   it('refuses positions that are not strictly ascending in rainfall', () => {
-    const w = { metresSquare: 500 };
     const wrong: PositionResult[] = [
       { accumulatedRainfallMm: 25, band: 'no-clear-change' },
       { accumulatedRainfallMm: 10, band: 'no-clear-change' },
     ];
-    expect(() => buildRunProvenance(inputs(), w, [V1], 'e', 'a', wrong)).toThrow(ScenarioError);
+    expect(() => buildRunProvenance(parts({ positions: wrong }))).toThrow(ScenarioError);
   });
 
   it('copies its inputs so a caller cannot mutate a recorded run', () => {
     const versions = [V1];
-    const run = buildRunProvenance(inputs(), { metresSquare: 500 }, versions, 'e', 'a', positions);
+    const run = buildRunProvenance(parts({ dataVersionIds: versions }));
     versions.push(V2);
     expect(run.dataVersionIds).toEqual([V1]);
+  });
+});
+
+describe('a run that could not be compared', () => {
+  const unavailable = (over: Record<string, unknown> = {}) =>
+    parts({
+      resultStatus: 'insufficient-information' as const,
+      insufficiencyReason: 'terrain_unavailable' as const,
+      positions: [],
+      ...over,
+    });
+
+  it('records the reason instead of a result', () => {
+    const run = buildRunProvenance(unavailable());
+    expect(run.resultStatus).toBe('insufficient-information');
+    expect(run.insufficiencyReason).toBe('terrain_unavailable');
+    expect(run.positions).toEqual([]);
+  });
+
+  it('still records the inputs and data versions, because it has to explain itself', () => {
+    const run = buildRunProvenance(unavailable());
+    expect(run.dataVersionIds).toEqual([V1, V2]);
+    expect(run.inputs.pitAssetNumber).toBe(assetNumber('P-1001'));
+  });
+
+  it('refuses to be insufficient without naming a reason', () => {
+    expect(() => buildRunProvenance(unavailable({ insufficiencyReason: null }))).toThrow(
+      /must name the reason/,
+    );
+  });
+
+  it('refuses to carry positions as well as an insufficiency', () => {
+    expect(() => buildRunProvenance(unavailable({ positions }))).toThrow(
+      /cannot also carry comparison positions/,
+    );
+  });
+
+  it('refuses a successful result that also carries a reason', () => {
+    expect(() =>
+      buildRunProvenance(parts({ insufficiencyReason: 'invalid_inlet' as const })),
+    ).toThrow(/cannot carry an insufficiency reason/);
+  });
+
+  it('keeps a network limitation with a successful result rather than instead of one', () => {
+    // Where a pipe leads has no bearing on the surface comparison.
+    const run = buildRunProvenance(
+      parts({ networkLimitations: ['missing_downstream_connection'] as const }),
+    );
+    expect(run.resultStatus).toBe('successful');
+    expect(run.networkLimitations).toEqual(['missing_downstream_connection']);
   });
 });
 

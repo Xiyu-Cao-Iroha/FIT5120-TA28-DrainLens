@@ -10,13 +10,15 @@ What to do. Every task names the criterion it serves in [ITERATION-1-ACCEPTANCE.
 
 ---
 
-## Blocked, needs a decision
+## Resolved 27 August
 
-**AC 2.2.3 — three comparison views — contradicts AD7.** The architecture forbids a standalone ponding layer because the capture fraction is an assumed value; the All clear and Blockage views are exactly that. The engine returns only the difference today.
+**AD7 stands. The three-view requirement is withdrawn** — the result page shows the Difference only. It was never a frontend choice: the worker, the golden path, `result_provenance` and the validation checks are all Difference-only.
 
-A middle path, if the views are wanted: allow all three, but give the two absolute views **no numeric scale of any kind** — relative distribution only, under a heading naming it an indicative distribution under an assumed condition.
+**AC 2.2.3 became the data-sufficiency gate**, which the criteria needed and did not have. It is implemented.
 
-**Owner: product owner with the architecture owner.** It blocks the view switcher and nothing else, so nobody should wait on it.
+**Navigation criteria compressed** to the two that carry state a resident would lose. The rest are in the UI definition of done and covered by Playwright.
+
+Nothing is blocked.
 
 ---
 
@@ -47,7 +49,7 @@ Both happen before any feature code is written.
 - [ ] **D2 check** — one 500 m tile: does the LAS carry a usable ground classification?
 - [ ] Agree the demonstration address and a 1 km × 1 km build extent
 - [x] **Drainage graph artefact** — self-loops excluded, directed graph from `upstr_pit`/`dnstr_pit`, cycles recorded, narrowing indicator, inlet classification → *1.2.1, 1.2.2, 1.3.1.c*
-- [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4, 1.1.6*
+- [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*
 - [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
 - [ ] Ground classification, if D2 says it is needed
 - [ ] Bare-earth DTM for the build extent
@@ -56,7 +58,7 @@ Both happen before any feature code is written.
 - [ ] Pit and pipe geometry tiles → *1.1.2.b, 1.1.3.b*
 - [ ] **Coverage mask** — which cells the terrain artefacts actually cover, so the engine can tell "no clear change" from "we have nothing here" → *2.2.1.f, 2.3.2*
 - [ ] **Data manifest** — per source: name, licence, capture date, modified date, coverage, record count, derivation → *1.1.3.d, 1.2.1.c, 2.3.1.c*
-- [ ] **Assumption register** — capture fraction, window size, rainfall distribution, operator fallback, arrival-time exclusion → *2.3.1.d*
+- [ ] **Assumption register** — capture fraction, window size, rainfall distribution, operator fallback, minimum covered fraction, arrival-time exclusion, and the two AD13 statements the interface must be able to quote → *2.1.2.d, 2.3.1.d*
 
 > **The fork order is a correctness requirement, not a preference.** Depression filling removes exactly the storage volumes the scenario model needs. Characterise depressions on the raw surface **first**, then produce a separate conditioned surface for routing. Reversing this produces a model that runs, looks plausible, and cannot compute ponding at all.
 
@@ -71,12 +73,13 @@ Both happen before any feature code is written.
 - [x] Each position solved independently from zero → *2.2.2*
 - [x] Output as **difference from the all-clear baseline** → *2.2.1.a, 2.2.1.b, 2.2.1.e*
 - [x] The blockage setting is constant for the whole scenario, and tests hold that line → *2.1.2.d*
-- [ ] **Insufficient information on data availability** — no coverage over the window, or a pit with no usable record → *2.2.1.f, 2.3.2.c*
+- [x] `No clear change` and `Insufficient information` kept distinct in the shared vocabulary → *2.2.1.e, 2.2.1.f*
+- [x] A missing downstream connection travels as a network limitation, not an insufficiency → *2.2.1.f*
+- [x] **Data-sufficiency gate** — `SuccessfulComparison` or `InsufficientInformation` with four named reasons, applied in order → *2.2.1.f, 2.2.3, 2.3.2.c*
 - [ ] Web Worker wrapper; run once on **Run comparison**, cache all positions; the control reads cache only → *2.2.1, 2.2.2*
 - [ ] Capture-fraction sensitivity at half, one and two times → decides whether the interface may report three result categories or two
-- [ ] **Insufficient information on result robustness** — threshold set from the sensitivity result, not before it → *2.2.1.f*
+- [ ] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result, once it exists → *2.2.3.b*
 - [ ] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
-- [ ] *(Blocked)* Absolute All clear and Blockage views → *2.2.3* — see the decision above
 
 ## W3 · Frontend
 
@@ -86,7 +89,7 @@ Both happen before any feature code is written.
 - [ ] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*
 - [ ] **Task-selection page** with the three named options → *1.1.1.b, 1.1.1.c*
 - [ ] **Unsupported-address path** — explain, do not fabricate, allow another address → *1.1.4*
-- [ ] **Session state**: address retained for the session and across task changes; "Choose another task" and "Change address" both preserve it → *1.1.1.e, 1.1.5, 1.1.6*
+- [ ] **Session state in memory only** — address, task and scenario inputs held for the tab, written to no `localStorage` key, no `sessionStorage` key, no URL and no history state beyond a screen id → *1.1.1.e, 1.1.5*
 
 ### Map and drainage
 
@@ -103,9 +106,10 @@ Both happen before any feature code is written.
 - [ ] Setup inputs with the two required explanations — **the blockage setting is an assumption, not an observed condition**, and **the rainfall is a user-selected assumption, not an observation or forecast** → *2.1.2.d, 2.1.2.e*
 - [ ] Scenario summary before running → *2.1.2.f*
 - [ ] Difference view by default; pit and downstream path stay visible → *2.2.1.c, 2.2.1.d*
-- [ ] Result categories: No clear change · Higher than baseline · **Insufficient information** → *2.2.1.e, 2.2.1.f*
+- [ ] Result categories: **No clear change** and **Higher than baseline** as bands; **Insufficient information** as a whole-result state with its reason → *2.2.1.e, 2.2.1.f, 2.2.3*
 - [ ] Rainfall control in millimetres, with the "not when water will reach a location" wording → *2.2.2*
-- [ ] **Back and rerun paths** — back to setup, change scenario, contextual back from setup, all retaining state → *2.1.3, 2.2.4, 2.2.5*
+- [ ] Back to setup from a result, inputs intact → *2.2.4*
+- [ ] Remaining back and rerun paths → *UI definition of done, covered by Playwright*
 - [ ] Result explanation panel → *2.3.1.a, 2.3.1.b, 2.3.1.f*
 - [ ] **Provenance display** — recorded data, system-derived results and user assumptions visually separated, driven by the basis carried with each value → *1.1.3.d, 1.2.1.c, 2.3.1.c*
 - [ ] Assumptions and uncertainty surfaced from the assumption register → *2.3.1.d, 2.3.1.e*
@@ -161,7 +165,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | 3 | **Pipe depth in the cross-section** | AC 1.3.1.b already says show only what the data supports |
 | 4 | **Shrink the terrain extent to 500 m** around the demo address | The pilot area is a coverage statement, not a demo requirement |
 | 5 | **Two result categories instead of three** | The sensitivity result may force this anyway |
-| 6 | **The three-view switcher (AC 2.2.3)** | Already blocked on a decision, and AC 2.2.1.c makes Difference the default view regardless |
+| 6 | **The full result explanation panel (AC 2.3.1)** | The result itself and its status carry the honest minimum; the long-form explanation is the part that can be shortened without claiming anything untrue |
 
 **Not on the ladder: AC 2.2.1.** The comparison against a clear-drain baseline is the product. If it cannot be built, the iteration has not met its Must Haves, and that should be said plainly.
 
@@ -187,6 +191,6 @@ Take in order, and take early. Each is already permitted by the criteria.
 
 ## Honest assessment
 
-The revision added roughly a third more frontend work — a task-selection page, an unsupported-address path, five navigation and state-retention criteria, a pit detail panel, and an unavailable state for the cross-section. None of it is hard; all of it is real, and none of it had a task before 27 August.
+The revision added roughly a third more frontend work — a task-selection page, an unsupported-address path, a pit detail panel, an unavailable state for the cross-section, and an insufficient-information state for the result. Compressing three navigation criteria into the UI definition of done gave a little of that back. None of it is hard; all of it is real, and none of it had a task before 27 August.
 
 The failure mode has not changed. It is not running out of time on the frontend — it is the terrain pipeline slipping to Sunday and taking the scenario engine down with it, at which point there is nothing to demonstrate but a map. The two guards are the D2 check and the Saturday-evening go/no-go. Both are cheap. **D2 is still not done.**

@@ -15,7 +15,7 @@
  * positions the interface chooses to show cannot change any of them.
  */
 
-import { type WaterBalance } from './checks.js';
+import { type WaterBalance, checkMassBalance } from './checks.js';
 import {
   LEAVES_WINDOW,
   type DepressionField,
@@ -24,7 +24,12 @@ import {
   rainfallVolumePerCellM3,
 } from './flow.js';
 import type { TerrainGrid } from './terrain.js';
-import type { BlockageSetting, ComparisonBand } from '@drainlens/schema';
+import type {
+  BlockageSetting,
+  ComparisonBand,
+  InsufficiencyReason,
+  NetworkLimitation,
+} from '@drainlens/schema';
 
 export class EngineError extends Error {}
 
@@ -32,6 +37,14 @@ export class EngineError extends Error {}
 export interface Drain {
   readonly assetNumber: string;
   readonly cell: number;
+  /**
+   * Whether this asset is a place surface water enters the network.
+   *
+   * Only an inlet can carry a blockage scenario: setting a Junction or a
+   * Submerged node to "blocked" would answer a question about a pipe the
+   * surface model does not represent. Defaults to true so fixtures stay terse.
+   */
+  readonly isInlet?: boolean;
 }
 
 export interface Assumptions {
@@ -50,11 +63,21 @@ export interface Assumptions {
    * as a result a resident should act on.
    */
   readonly noticeableVolumeM3: number;
+  /**
+   * How much of the calculation window must be covered by terrain artefacts
+   * before a comparison is attempted.
+   *
+   * Defaults to 1: the whole window. A comparison over a partly covered window
+   * is not comparable with one over a full window, and lowering this is an
+   * assumption that belongs in the register rather than in a caller's head.
+   */
+  readonly minimumCoveredFraction: number;
 }
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   captureFraction: 0.6,
   noticeableVolumeM3: 0.05,
+  minimumCoveredFraction: 1,
 };
 
 /**
@@ -88,6 +111,17 @@ export interface SceneInput {
   readonly flow: FlowField;
   readonly depressions: DepressionField;
   readonly drains: readonly Drain[];
+  /**
+   * 1 where a terrain artefact covers the cell, 0 where none does. Absent means
+   * the whole window is covered, which is what every fixture assumes.
+   */
+  readonly coverage?: Uint8Array;
+  /**
+   * Limitations the traversal service found in the recorded network. They
+   * travel with a successful result and never turn one into an insufficiency:
+   * where a pipe leads has no bearing on the surface calculation.
+   */
+  readonly networkLimitations?: readonly NetworkLimitation[];
 }
 
 function validate(scene: SceneInput, assumptions: Assumptions): void {
@@ -279,21 +313,65 @@ export interface ScenarioOptions {
 }
 
 /**
+ * The outcome of a comparison.
+ *
+ * Either the comparison was made, or it could not be — and the second case
+ * carries the reason rather than a shrug. `no-clear-change` and
+ * `insufficient-information` are deliberately different things: the first means
+ * the calculation ran and found no difference, the second means it could not be
+ * made at all. A resident acting on "no clear change" is reasonable; a resident
+ * acting on it when we never looked is not.
+ */
+export type ComparisonOutcome =
+  | {
+      readonly status: 'successful';
+      readonly positions: readonly ScenarioPosition[];
+      readonly networkLimitations: readonly NetworkLimitation[];
+    }
+  | { readonly status: 'insufficient-information'; readonly reason: InsufficiencyReason };
+
+const insufficient = (reason: InsufficiencyReason): ComparisonOutcome => ({
+  status: 'insufficient-information',
+  reason,
+});
+
+/**
+ * Fraction of the window a terrain artefact covers. No coverage mask means the
+ * artefacts cover everything, which is what fixtures assume.
+ */
+function coveredFraction(scene: SceneInput): number {
+  const cells = scene.grid.width * scene.grid.height;
+  if (scene.coverage === undefined) return 1;
+  if (scene.coverage.length !== cells) return 0;
+  let covered = 0;
+  for (const flag of scene.coverage) if (flag !== 0) covered += 1;
+  return cells === 0 ? 0 : covered / cells;
+}
+
+/**
  * Run the comparison: the selected blockage against all drains clear, at each
  * accumulated-rainfall position.
  *
  * The result is the difference. No absolute ponding extent is returned, because
  * an absolute-looking layer invites a reading the model cannot support (AD7).
+ *
+ * Before computing anything it applies a **data-sufficiency gate**. The gate
+ * runs in a deliberate order, cheapest and most decisive first, so the reason a
+ * resident sees is the one that actually stopped the comparison rather than
+ * whichever check happened to run first.
  */
 export function runScenario(
   scene: SceneInput,
   blockage: BlockageSetting,
   blockedDrainCell: number,
   options: ScenarioOptions,
-): readonly ScenarioPosition[] {
+): ComparisonOutcome {
   const assumptions = options.assumptions ?? DEFAULT_ASSUMPTIONS;
   const positions = options.rainfallPositionsMm;
 
+  // Caller errors, not data insufficiency: an empty or unordered position list
+  // is a defect in the code that built it, and hiding it behind a friendly
+  // status would let it ship.
   if (positions.length === 0) {
     throw new EngineError('a scenario must solve at least one rainfall position');
   }
@@ -302,14 +380,39 @@ export function runScenario(
       throw new EngineError('rainfall positions must be strictly ascending');
     }
   }
-  if (!scene.drains.some((d) => d.cell === blockedDrainCell)) {
-    throw new EngineError(`no drain sits at cell ${String(blockedDrainCell)}`);
+
+  // 1. Terrain. Without a covered window there is nothing to route water over.
+  if (coveredFraction(scene) < assumptions.minimumCoveredFraction) {
+    return insufficient('terrain_unavailable');
   }
 
-  return positions.map((rainfallMm) => {
-    const scenario = solvePosition(scene, blockage, blockedDrainCell, rainfallMm, assumptions);
-    const baseline = solvePosition(scene, 'clear', blockedDrainCell, rainfallMm, assumptions);
+  // 2. The selected asset. A pit that is not an inlet cannot carry a surface
+  //    blockage scenario, and neither can a cell with no drain at all.
+  const selected = scene.drains.find((d) => d.cell === blockedDrainCell);
+  if (selected === undefined || selected.isInlet === false) {
+    return insufficient('invalid_inlet');
+  }
 
+  // 3. The calculation itself.
+  let solved: readonly { scenario: PositionSolution; baseline: PositionSolution }[];
+  try {
+    solved = positions.map((rainfallMm) => ({
+      scenario: solvePosition(scene, blockage, blockedDrainCell, rainfallMm, assumptions),
+      baseline: solvePosition(scene, 'clear', blockedDrainCell, rainfallMm, assumptions),
+    }));
+  } catch {
+    return insufficient('scenario_calculation_failed');
+  }
+
+  // 4. Comparability. Both conditions solved, but a result that does not
+  //    conserve water cannot be honestly set beside another one.
+  for (const { scenario, baseline } of solved) {
+    if (!checkMassBalance(scenario.balance).ok || !checkMassBalance(baseline.balance).ok) {
+      return insufficient('comparison_not_comparable');
+    }
+  }
+
+  const results = solved.map(({ scenario, baseline }) => {
     const bands: ComparisonBand[] = [];
     let higher = 0;
     for (let cell = 0; cell < scenario.pondedM3.length; cell += 1) {
@@ -321,11 +424,10 @@ export function runScenario(
         bands.push('no-clear-change');
       }
     }
-
     return {
-      accumulatedRainfallMm: rainfallMm,
+      accumulatedRainfallMm: scenario.accumulatedRainfallMm,
       bands,
-      band: higher > 0 ? 'higher-than-baseline' : 'no-clear-change',
+      band: higher > 0 ? ('higher-than-baseline' as const) : ('no-clear-change' as const),
       cellsHigherThanBaseline: higher,
       scenarioBalance: scenario.balance,
       baselineBalance: baseline.balance,
@@ -333,5 +435,10 @@ export function runScenario(
       baselinePondedCells: baseline.pondedCells,
     };
   });
-}
 
+  return {
+    status: 'successful',
+    positions: results,
+    networkLimitations: [...(scene.networkLimitations ?? [])],
+  };
+}
