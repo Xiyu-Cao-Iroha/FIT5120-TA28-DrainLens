@@ -113,6 +113,26 @@ The push prints a link that opens the pull request. In the description, say what
 
 A subject line in the imperative — "Add the drainage graph builder", not "Added" or "Adding". A body explaining **why**, not what: the diff already says what. Nothing appended — no tool footers, no co-author trailers.
 
+**That last sentence is worth one command before every push**, because the cost of getting it wrong is out of all proportion to the mistake:
+
+```bash
+git log origin/develop..HEAD --format=%B | grep -iE 'co-authored-by|generated with'
+```
+
+One commit reached `develop` with a `Co-Authored-By` trailer on it. By the time anyone noticed, it had been merged to `develop`, then to `main`, and an automated account was showing in the repository's contributor list. Removing it meant rewriting one line of one commit message — and because everything sat on top of it, that changed **all 27 commit SHAs on both branches**, which needed branch protection temporarily disabled, a force-push, and every teammate to `reset --hard`.
+
+The file trees before and after were byte-identical. A one-line mistake, an afternoon to undo. Run the grep.
+
+### When history has to be rewritten anyway
+
+It happens; do it in this order.
+
+1. Verify the rewrite changed nothing but messages: `git diff <backup> <rewritten>` must be empty and the tree hashes must match.
+2. Keep a branch at the pre-rewrite state until everyone has re-synced.
+3. Tell the team **before** pushing, with the `reset --hard` they will need.
+4. Ask the repository owner to lower the ruleset. Nobody else can, and nobody should try — `--force-with-lease`, not `--force`, so a concurrent push refuses rather than being clobbered.
+5. Put the protection back the same minute, and verify it with `gh api repos/:owner/:repo/rules/branches/main` rather than by trying a push. `git push --dry-run` does not run the server's rules, so it proves nothing.
+
 ### What a reviewer is looking for
 
 - A test alongside every component that carries a judgement, written before or with it
@@ -142,7 +162,7 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 ```
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
-apps/web            frontend (React + Vite, MapLibre + deck.gl)              not yet started
+apps/web            frontend (React + Vite) — session state, canvas map. No map library
 apps/api            backend (Node + Hono on Cloud Run)                       not yet started
 pipeline            Python geospatial pipeline and model training, never deployed
 data                artefact releases — git-ignored, rebuilt locally
