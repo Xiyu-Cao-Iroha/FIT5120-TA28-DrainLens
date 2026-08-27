@@ -102,6 +102,96 @@ PDAL ships an SMRF and will not install on the machines this is being built on. 
 
 **The uphill edge is shaved.** Opening returns a plane exactly — that is what stops the filter flattening streets — but only on an unbounded one. Within `max_window_m / 2` of the uphill boundary the structuring element cannot fit, so a band there is lowered. At Kensington's gradients this stays far below the threshold and nothing is flagged. The fix, if an extent ever needs it, is to filter a buffer and crop.
 
+## Depressions and flow routing
+
+Both come out of the same `terrain` command, and the order they come out in is a correctness requirement rather than a preference.
+
+**Depressions are measured on the raw surface. Flow directions come from a separate conditioned one.** Filling a surface removes precisely the storage this model needs — characterise the hollows first, or they are gone and the engine can never report ponding. A build with the two swapped succeeds, renders, and is silently useless. `hydrology.py` says so at the top for whoever edits it next.
+
+### The 0.25 m floor, and why most hollows are not hollows
+
+Filling the demonstration extent finds **8,472 separate hollows whose median maximum depth is 5 cm**. The source is quoted at about 25 cm accuracy, so the great majority of those are the surface's own noise rather than places water collects.
+
+Cutting at the accuracy the publisher quotes keeps **537 hollows — 6.3% of the count — holding 88.8% of the filled volume**. Throwing away 93.7% of the objects costs 11.2% of the water. Two independent arguments land on the same number, which is the reason to trust it: the knee in the volume curve, and the error bar on the measurement that found them.
+
+The discarded water is not lost. It routes downstream instead of ponding, and it is discarded identically in the blocked and all-clear runs, so it largely cancels in the comparison the product actually reports.
+
+The four largest hollows sit at **0.4–2.3 m AHD** — the lowest ground in the extent, the Kensington Banks flats. The biggest storage landing in the known flood-prone corner is the sanity check that matters most.
+
+### The one number that could break everything silently
+
+The D8 code table is a contract between this pipeline and `packages/scenario/src/flow.ts`. If the two ever disagree about what a `1` means, water routes sideways and **nothing objects**: the build succeeds, the tests pass, the map renders, and every answer is wrong.
+
+So `tests/test_d8_contract.py` does not restate the table. It parses the TypeScript declaration and compares it — the only version of the check that can fail when somebody edits one side. Tampering with a single offset trips four of its assertions at once.
+
+### Two invariants held over the whole field, not sampled
+
+- **Zero interior dead ends.** Every cell away from the boundary has somewhere for water to go.
+- **All 998,594 directed cells point strictly downhill**, the smallest step being the conditioning epsilon. That is what makes a cycle impossible: following directions strictly decreases elevation, so every path terminates at the window edge.
+
+## Building footprints, and the cross-check they made possible
+
+Fetched from the City of Melbourne `2020-building-footprints` dataset (CC BY, same 26 February 2023 vintage as the drainage data), clipped to the extent with 100 m of padding — a building straddling the boundary still dams water inside it.
+
+They do **two** jobs, and the second was not planned.
+
+**Barriers.** Water runs between buildings, not through them. 258,754 cells, 25.9% of the extent.
+
+**Repair.** They also fix the ground filter's one known blind spot. An opening cannot reach the middle of a roof wider than its window, so some rooftops survive the filter as "measured ground" — fake plateaus sitting in the flow routing. The footprints identify 20,311 such cells, 2% of the extent, and the build corrects them.
+
+### Two independent sources agreeing
+
+Of the cells the footprint dataset calls a building, the ground filter had **independently removed 92.2%** — a 2020 vector dataset and a morphological filter over a 2018 photogrammetric cloud, arriving at the same answer with nothing in common but the ground itself.
+
+The reverse only holds at **51.9%**, and that asymmetry is the whole argument against the shortcut: **about half of what the filter removes is not a building.** It is tree canopy, and water flows under trees. Using the object mask as a barrier set would wall off every tree-lined street in Kensington, which is most of them.
+
+### The predicted limit, measured
+
+The synthetic test says a roof wider than the window keeps its middle. The real data says exactly how much:
+
+| Distance inside a footprint | Cells | Filter missed |
+|---|---:|---:|
+| more than 5 m | 37,025 | 18.9% |
+| more than 10 m | 12,093 | 41.2% |
+| more than 13 m | 8,643 | 44.7% |
+
+A 26 m window's structuring element reaches 13 m inside a roof. The breakpoint lands where the arithmetic says it should, which is the most convincing form a limitation can take: predicted from theory, pinned by a synthetic test, then confirmed on real ground at the predicted threshold.
+
+### Overhangs are not dams
+
+The dataset models a building as tiers, each with its own base elevation. A tier starting several metres up shades the footpath; it does not dam it. Footprints whose base sits more than 0.5 m above their structure's base are excluded — 683 of 4,552 rings, worth 3.5% of the barrier area. The half-metre absorbs the dataset's own rounding, which comes in half-metre steps.
+
+## Map geometry for the browser
+
+```
+./.venv/Scripts/python.exe -m drainlens_pipeline.network --out ../data/map/map.json
+```
+
+The graph artefact carries topology — which pit feeds which — because that is what a trace needs. This is the other half: where the things are. 220 road polygons, 893 pipes, 895 pits and 163 street labels for the demonstration extent, fetched in about three seconds and written as **318 KB**.
+
+**Coordinates are local metres, not latitude and longitude** — east and north of the extent's south-west corner, to a decimetre. The extent is a north-up square of one-metre cells, so a coordinate becomes a pixel by multiplying by the zoom, and no projection runs in the browser at all. That removes a second place for the map and the model to disagree about where something is, and turns fifteen-digit numbers into four.
+
+**No basemap service.** The streets come from the City's own road-corridor polygons, baked into the artefact. Nothing at runtime depends on a third-party tile server being up, licensed, or free.
+
+The portal is not consistent about how to ask for a bounding box: most datasets carry a `geo_point_2d` that `in_bbox` understands, while the stormwater pits carry bare `lat` and `lon` columns and reject `in_bbox` with a 400. That difference lives in the `Dataset` records so the next layer added does not rediscover it.
+
+The fetch reaches 150 m past the extent, because a pipe with one end outside still runs through it. A vertex survives the clip when it is near the extent **or next to one that is** — dropping the far end of a crossing segment leaves a one-vertex path, and a pipe entering the extent would disappear from the map rather than be drawn to the edge. Fixing that recovered four pipes and five street labels.
+
+## The City's own overland flow routes, and what they do and do not settle
+
+`water-flow-routes-over-land-urban-forest` publishes 173 flow lines across the extent. It is tempting to treat these as ground truth for our surface-water paths. They are not, and the reasons are worth writing down.
+
+They are **derived, not observed** — the dataset's own `source` field says "2008 DEM to stream order using ESRI Spatial Analyst". So the comparison is one derivation against another, from data ten years apart, at different resolutions, for a different purpose (the dataset is scoped to urban forest watering).
+
+Comparing our per-cell D8 directions to their line bearings gives agreement *worse* than random. That test is meaningless: at one metre, a cell's direction is set by kerbs, driveways and the conditioning ramp inside a filled basin, not by a regional channel. Comparing flow **accumulation** is the right question, and it gives:
+
+| Our channels | Median distance from an official vertex | Within 25 m | Random baseline |
+|---|---:|---:|---:|
+| top 0.5% of accumulation | 24.0 m | 51.3% | 30.3% |
+| top 1% | 10.0 m | 75.7% | 53.5% |
+
+So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
+
 ## Still to come
 
-Depressions characterised on the raw surface, then conditioning on a *separate* surface with building footprints as barriers, then the D8 flow-direction grid. The order is a correctness requirement: filling removes exactly the storage volumes the scenario model needs.
+Coverage mask, data manifest and assumption register; pit and pipe geometry tiles; the address index and pilot-area boundary.
