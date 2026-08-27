@@ -129,9 +129,37 @@ So `tests/test_d8_contract.py` does not restate the table. It parses the TypeScr
 - **Zero interior dead ends.** Every cell away from the boundary has somewhere for water to go.
 - **All 998,594 directed cells point strictly downhill**, the smallest step being the conditioning epsilon. That is what makes a cycle impossible: following directions strictly decreases elevation, so every path terminates at the window edge.
 
-### Building footprints are still missing
+## Building footprints, and the cross-check they made possible
 
-`condition()` accepts a barrier mask; the footprints have not been fetched yet, so the current routing has none. **Do not reach for the ground filter's object mask as a substitute.** It includes tree canopy, and water flows under trees — using it would wall off every tree-lined street in Kensington.
+Fetched from the City of Melbourne `2020-building-footprints` dataset (CC BY, same 26 February 2023 vintage as the drainage data), clipped to the extent with 100 m of padding — a building straddling the boundary still dams water inside it.
+
+They do **two** jobs, and the second was not planned.
+
+**Barriers.** Water runs between buildings, not through them. 258,754 cells, 25.9% of the extent.
+
+**Repair.** They also fix the ground filter's one known blind spot. An opening cannot reach the middle of a roof wider than its window, so some rooftops survive the filter as "measured ground" — fake plateaus sitting in the flow routing. The footprints identify 20,311 such cells, 2% of the extent, and the build corrects them.
+
+### Two independent sources agreeing
+
+Of the cells the footprint dataset calls a building, the ground filter had **independently removed 92.2%** — a 2020 vector dataset and a morphological filter over a 2018 photogrammetric cloud, arriving at the same answer with nothing in common but the ground itself.
+
+The reverse only holds at **51.9%**, and that asymmetry is the whole argument against the shortcut: **about half of what the filter removes is not a building.** It is tree canopy, and water flows under trees. Using the object mask as a barrier set would wall off every tree-lined street in Kensington, which is most of them.
+
+### The predicted limit, measured
+
+The synthetic test says a roof wider than the window keeps its middle. The real data says exactly how much:
+
+| Distance inside a footprint | Cells | Filter missed |
+|---|---:|---:|
+| more than 5 m | 37,025 | 18.9% |
+| more than 10 m | 12,093 | 41.2% |
+| more than 13 m | 8,643 | 44.7% |
+
+A 26 m window's structuring element reaches 13 m inside a roof. The breakpoint lands where the arithmetic says it should, which is the most convincing form a limitation can take: predicted from theory, pinned by a synthetic test, then confirmed on real ground at the predicted threshold.
+
+### Overhangs are not dams
+
+The dataset models a building as tiers, each with its own base elevation. A tier starting several metres up shades the footpath; it does not dam it. Footprints whose base sits more than 0.5 m above their structure's base are excluded — 683 of 4,552 rings, worth 3.5% of the barrier area. The half-metre absorbs the dataset's own rounding, which comes in half-metre steps.
 
 ## Still to come
 

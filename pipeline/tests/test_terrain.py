@@ -99,6 +99,47 @@ class TestBuild:
         assert result.seconds > 0
 
 
+class TestBarriers:
+    def barrier_over(self, block) -> np.ndarray:
+        mask = np.zeros((500, 500), dtype=bool)
+        mask[block] = True
+        return mask
+
+    def test_a_roof_the_filter_kept_is_corrected_from_the_footprint(self, tile_dir):
+        # The filter's known blind spot: an opening cannot reach the middle of
+        # a roof wider than its window, so the warehouse interior survives as
+        # "measured ground". The footprint dataset knows better, and the build
+        # takes its word for it.
+        without = terrain.build(tile_dir, EXTENT).surface
+        assert without.observed[330, 330], "the warehouse middle starts out as ground"
+
+        with_footprints = terrain.build(
+            tile_dir, EXTENT, barriers=self.barrier_over(WAREHOUSE)
+        ).surface
+        assert not with_footprints.observed[330, 330], "and is corrected away"
+        assert with_footprints.filled_fraction > without.filled_fraction
+
+    def test_the_ground_under_a_corrected_roof_comes_from_the_street(self, tile_dir):
+        built = terrain.build(tile_dir, EXTENT, barriers=self.barrier_over(WAREHOUSE))
+        under = built.surface.elevation[330, 330]
+        assert under == pytest.approx(8.0 + 0.02 * 330, abs=0.7), "the 2% grade, not the roof"
+
+    def test_routing_without_barriers_is_recorded_as_such(self, tile_dir):
+        manifest = terrain.build(tile_dir, EXTENT).manifest()["barriers"]
+        assert manifest["source"] is None
+        assert manifest["cells"] == 0
+
+    def test_routing_with_barriers_names_the_source_and_counts_them(self, tile_dir):
+        mask = self.barrier_over(WAREHOUSE)
+        manifest = terrain.build(tile_dir, EXTENT, barriers=mask).manifest()["barriers"]
+        assert manifest["source"]["licence"] == "CC BY 4.0"
+        assert manifest["cells"] == int(mask.sum())
+
+    def test_the_manifest_says_why_the_object_mask_is_not_used(self, tile_dir):
+        note = terrain.build(tile_dir, EXTENT).manifest()["barriers"]["note"]
+        assert "canopy" in note and "under trees" in note
+
+
 class TestManifest:
     def test_carries_the_provenance_the_interface_needs(self, tile_dir):
         manifest = terrain.build(tile_dir, EXTENT).manifest()
