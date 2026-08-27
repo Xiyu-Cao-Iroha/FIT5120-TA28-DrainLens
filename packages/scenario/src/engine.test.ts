@@ -332,6 +332,48 @@ describe('overflow from a full depression', () => {
   });
 });
 
+describe('the blockage setting is an assumption, not a state the model evolves', () => {
+  // Asked by a reviewer: "blockage by huge water flow — how do you calculate
+  // the deposit speed?" The answer is that this model cannot, and these tests
+  // are what stop a future change from quietly implying otherwise.
+  //
+  // The independent variable here is accumulated rainfall in millimetres, not
+  // time. A deposit speed is a rate, and no rate can come out of a model whose
+  // independent variable is not time. That is a dimensional fact, not a gap in
+  // the data.
+
+  it('holds the setting the resident chose at every rainfall, however heavy', () => {
+    const scene = slopeScene([9]);
+    for (const mm of [5, 30, 90, 120]) {
+      expect(solvePosition(scene, 'fully-blocked', 9, mm).balance.capturedVolumeM3).toBe(0);
+    }
+  });
+
+  it('does not let a heavier storm change how much a clear drain takes', () => {
+    // If blockage formed with flow, the captured share would fall as rainfall
+    // rose. It does not: the share is constant, because the setting is an
+    // assumption held for the whole scenario.
+    const scene = slopeScene([9]);
+    const shares = [10, 40, 80, 120].map((mm) => {
+      const { balance } = solvePosition(scene, 'clear', 9, mm);
+      return balance.capturedVolumeM3 / balance.rainfallVolumeM3;
+    });
+    for (const share of shares) expect(share).toBeCloseTo(shares[0]!, 12);
+  });
+
+  it('offers no way to make a drain change setting partway through a scenario', () => {
+    // A scenario takes exactly one setting for exactly one drain. There is no
+    // parameter for a setting that varies with rainfall, position or time, and
+    // adding one would be a different model rather than a bigger one.
+    const scene = slopeScene([9]);
+    const result = runScenario(scene, 'partly-blocked', 9, {
+      rainfallPositionsMm: [10, 40, 80],
+    });
+    const captured = result.map((p) => p.scenarioBalance.capturedVolumeM3 / p.scenarioBalance.rainfallVolumeM3);
+    for (const share of captured) expect(share).toBeCloseTo(captured[0]!, 12);
+  });
+});
+
 describe('running a comparison', () => {
   const positions = [10, 25, 40, 60, 90, 120];
 
