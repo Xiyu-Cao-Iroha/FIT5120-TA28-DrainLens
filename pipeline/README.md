@@ -161,6 +161,37 @@ A 26 m window's structuring element reaches 13 m inside a roof. The breakpoint l
 
 The dataset models a building as tiers, each with its own base elevation. A tier starting several metres up shades the footpath; it does not dam it. Footprints whose base sits more than 0.5 m above their structure's base are excluded — 683 of 4,552 rings, worth 3.5% of the barrier area. The half-metre absorbs the dataset's own rounding, which comes in half-metre steps.
 
+## Map geometry for the browser
+
+```
+./.venv/Scripts/python.exe -m drainlens_pipeline.network --out ../data/map/map.json
+```
+
+The graph artefact carries topology — which pit feeds which — because that is what a trace needs. This is the other half: where the things are. 220 road polygons, 893 pipes, 895 pits and 163 street labels for the demonstration extent, fetched in about three seconds and written as **318 KB**.
+
+**Coordinates are local metres, not latitude and longitude** — east and north of the extent's south-west corner, to a decimetre. The extent is a north-up square of one-metre cells, so a coordinate becomes a pixel by multiplying by the zoom, and no projection runs in the browser at all. That removes a second place for the map and the model to disagree about where something is, and turns fifteen-digit numbers into four.
+
+**No basemap service.** The streets come from the City's own road-corridor polygons, baked into the artefact. Nothing at runtime depends on a third-party tile server being up, licensed, or free.
+
+The portal is not consistent about how to ask for a bounding box: most datasets carry a `geo_point_2d` that `in_bbox` understands, while the stormwater pits carry bare `lat` and `lon` columns and reject `in_bbox` with a 400. That difference lives in the `Dataset` records so the next layer added does not rediscover it.
+
+The fetch reaches 150 m past the extent, because a pipe with one end outside still runs through it. A vertex survives the clip when it is near the extent **or next to one that is** — dropping the far end of a crossing segment leaves a one-vertex path, and a pipe entering the extent would disappear from the map rather than be drawn to the edge. Fixing that recovered four pipes and five street labels.
+
+## The City's own overland flow routes, and what they do and do not settle
+
+`water-flow-routes-over-land-urban-forest` publishes 173 flow lines across the extent. It is tempting to treat these as ground truth for our surface-water paths. They are not, and the reasons are worth writing down.
+
+They are **derived, not observed** — the dataset's own `source` field says "2008 DEM to stream order using ESRI Spatial Analyst". So the comparison is one derivation against another, from data ten years apart, at different resolutions, for a different purpose (the dataset is scoped to urban forest watering).
+
+Comparing our per-cell D8 directions to their line bearings gives agreement *worse* than random. That test is meaningless: at one metre, a cell's direction is set by kerbs, driveways and the conditioning ramp inside a filled basin, not by a regional channel. Comparing flow **accumulation** is the right question, and it gives:
+
+| Our channels | Median distance from an official vertex | Within 25 m | Random baseline |
+|---|---:|---:|---:|
+| top 0.5% of accumulation | 24.0 m | 51.3% | 30.3% |
+| top 1% | 10.0 m | 75.7% | 53.5% |
+
+So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
+
 ## Still to come
 
 Coverage mask, data manifest and assumption register; pit and pipe geometry tiles; the address index and pilot-area boundary.
