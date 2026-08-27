@@ -6,7 +6,13 @@
  * a council without us storing anything about who produced it.
  */
 
-import type { BlockageSetting, ComparisonBand } from './vocabulary.js';
+import type {
+  BlockageSetting,
+  ComparisonBand,
+  InsufficiencyReason,
+  NetworkLimitation,
+  ResultStatus,
+} from './vocabulary.js';
 import type { DataVersionId } from './provenance.js';
 
 export type AssetNumber = string & { readonly __brand: 'AssetNumber' };
@@ -70,6 +76,15 @@ export interface ScenarioRunProvenance {
   readonly engineVersion: string;
   readonly assumptionSetVersion: string;
   readonly positions: readonly PositionResult[];
+  /** Whether a comparison could be made at all. */
+  readonly resultStatus: ResultStatus;
+  /** Present only when `resultStatus` is `insufficient-information`. */
+  readonly insufficiencyReason: InsufficiencyReason | null;
+  /**
+   * Limitations of the recorded drainage network that do not prevent the
+   * surface comparison. Reported with a successful result, never instead of one.
+   */
+  readonly networkLimitations: readonly NetworkLimitation[];
 }
 
 export class ScenarioError extends Error {}
@@ -78,14 +93,23 @@ export class ScenarioError extends Error {}
  * Builds the provenance block, refusing anything that would make a result
  * unexplainable or a comparison unsound.
  */
-export function buildRunProvenance(
-  inputs: ScenarioInputs,
-  window: ScenarioWindow,
-  dataVersionIds: readonly DataVersionId[],
-  engineVersion: string,
-  assumptionSetVersion: string,
-  positions: readonly PositionResult[],
-): ScenarioRunProvenance {
+export interface RunProvenanceParts {
+  readonly inputs: ScenarioInputs;
+  readonly window: ScenarioWindow;
+  readonly dataVersionIds: readonly DataVersionId[];
+  readonly engineVersion: string;
+  readonly assumptionSetVersion: string;
+  readonly positions: readonly PositionResult[];
+  readonly resultStatus: ResultStatus;
+  readonly insufficiencyReason?: InsufficiencyReason | null;
+  readonly networkLimitations?: readonly NetworkLimitation[];
+}
+
+export function buildRunProvenance(parts: RunProvenanceParts): ScenarioRunProvenance {
+  const { inputs, window, dataVersionIds, engineVersion, assumptionSetVersion, positions } = parts;
+  const { resultStatus } = parts;
+  const insufficiencyReason = parts.insufficiencyReason ?? null;
+
   if (!isSupportedRainfall(inputs.accumulatedRainfallMm)) {
     throw new ScenarioError(
       `accumulated rainfall ${String(inputs.accumulatedRainfallMm)} mm is outside the supported range`,
@@ -94,14 +118,31 @@ export function buildRunProvenance(
   if (dataVersionIds.length === 0) {
     throw new ScenarioError('a run must record the data version of every artefact it consumed');
   }
-  if (positions.length === 0) {
-    throw new ScenarioError('a run must record at least one position');
+
+  // A run that could not be compared still carries provenance — it has to
+  // explain itself to the resident — but it holds no positions and must name
+  // the reason it could not be produced.
+  if (resultStatus === 'insufficient-information') {
+    if (insufficiencyReason === null) {
+      throw new ScenarioError('an insufficient result must name the reason it could not be produced');
+    }
+    if (positions.length > 0) {
+      throw new ScenarioError('an insufficient result cannot also carry comparison positions');
+    }
+  } else {
+    if (insufficiencyReason !== null) {
+      throw new ScenarioError('a successful result cannot carry an insufficiency reason');
+    }
+    if (positions.length === 0) {
+      throw new ScenarioError('a successful run must record at least one position');
+    }
+    const rainfalls = positions.map((p) => p.accumulatedRainfallMm);
+    const ascending = rainfalls.every((mm, i) => i === 0 || mm > rainfalls[i - 1]!);
+    if (!ascending) {
+      throw new ScenarioError('positions must be strictly ascending in accumulated rainfall');
+    }
   }
-  const rainfalls = positions.map((p) => p.accumulatedRainfallMm);
-  const ascending = rainfalls.every((mm, i) => i === 0 || mm > rainfalls[i - 1]!);
-  if (!ascending) {
-    throw new ScenarioError('positions must be strictly ascending in accumulated rainfall');
-  }
+
   return {
     inputs,
     window,
@@ -109,5 +150,8 @@ export function buildRunProvenance(
     engineVersion,
     assumptionSetVersion,
     positions: [...positions],
+    resultStatus,
+    insufficiencyReason,
+    networkLimitations: [...(parts.networkLimitations ?? [])],
   };
 }

@@ -20,13 +20,15 @@ Three positions shape almost every decision here. They come from the System Arch
 
 Iteration 1 is deterministic. It depends on no machine learning and no live data feed.
 
+A fourth position follows from the third and is worth stating on its own: **the blockage setting is an assumption the resident supposes, not a condition we observed or derived.** The model's independent variable is accumulated rainfall, not time, so it cannot produce a rate — how fast a blockage forms, how long until one does, how quickly water rises. Tests in `packages/scenario` hold that line.
+
 ---
 
 ## Layout
 
 ```
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
-packages/scenario   scenario engine — terrain grids, verification fixtures, checks. No DOM
+packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
 apps/web            frontend (React + TypeScript + Vite, MapLibre + deck.gl)      not yet started
 apps/api            backend (Node + TypeScript + Hono on Cloud Run)               not yet started
 pipeline            Python geospatial pipeline, never deployed — drainage graph done, terrain next
@@ -80,6 +82,10 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.7.0 | 27 Aug 2026 | Ground-surface filtering, the critical path for Iteration 1. A LAS reader and an SMRF written against numpy and scipy, since PDAL will not install here. 6.6 M points over the Kensington square kilometre in 8.9 s; 54.1% of cells measured, the rest buildings, canopy and gaps. The filter window was measured rather than chosen — 26 m is where the marginal hectare stops finding buildings and starts shaving terrain. Two limits are pinned by tests rather than left to be discovered: a roof wider than the window keeps its middle, and the uphill edge of an extent is shaved. The output is never called a LiDAR DTM; the source is photogrammetric and the ground under canopy was not measured at all. 159 tests, 95% coverage. |
+| 0.6.0 | 27 Aug 2026 | Data-sufficiency gate: the worker returns `SuccessfulComparison` or `InsufficientInformation` with one of four named reasons, applied in order. `No clear change` and `Insufficient information` are now different kinds of thing — a band within a comparison that succeeded, and a status saying whether there was one. A missing downstream connection travels as a network limitation rather than an insufficiency. AD7 reaffirmed and the three-view requirement withdrawn. 106 tests, 99% coverage. |
+| 0.5.0 | 27 Aug 2026 | Acceptance criteria re-mapped to the revised criteria document: six broad criteria became twenty, restructured around interactions, with navigation and state-retention requirements that had no tasks before. Two consequences recorded rather than absorbed — `Insufficient information` is now required in two criteria and is not implemented, and AC 2.2.3 contradicts AD7 and needs a decision. |
+| 0.4.0 | 27 Aug 2026 | Scenario engine: D8 routing, depression fill-and-spill, drain capture by blockage setting, and the comparison against an all-clear baseline. Every position solved independently from zero, so the answer at a given rainfall does not depend on how many positions the interface shows. 88 tests, 99% coverage, 1.7s. |
 | 0.3.0 | 26 Aug 2026 | `packages/scenario`: synthetic terrain whose answer is known in advance — a planar slope with nowhere to collect, and a flat-bottomed bowl of exactly stated capacity — plus the mass-balance and monotonicity checks, each tested against results broken in one specific way. Written before the engine, so the engine is never blocked on the terrain pipeline. 56 tests, 100% coverage, 2.4s. |
 | 0.2.0 | 26 Aug 2026 | Drainage graph builder and artefact: topology, inlet classification, narrowing indicator, cycle detection. Corrects the audit's traceable share from 79.8% to 70.4% — 1,622 pipes name a pit absent from the export. 48 tests, 100% on the judgement-carrying modules. Development guide added. |
 | 0.1.0 | 26 Aug 2026 | Monorepo skeleton and `packages/schema`: provenance records with a non-optional basis, the blockage and visible-condition vocabularies held apart, scenario run provenance, and the wire payloads with a structural guard against sending a photograph, an address or a coordinate. 22 tests, 100% coverage. |
