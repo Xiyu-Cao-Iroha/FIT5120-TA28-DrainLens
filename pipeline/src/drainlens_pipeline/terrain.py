@@ -1,0 +1,320 @@
+"""Build the ground-surface artefact for an extent.
+
+Reads the LAS tiles covering the extent, filters them to ground, and writes the
+surface with a manifest describing how it was made and what is wrong with it.
+
+The manifest is not documentation. §5.5 of the architecture requires every
+value the interface shows to carry a basis, and the basis for anything derived
+from terrain is this file. A surface published without it cannot be displayed,
+because there would be nothing truthful to say about where it came from.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+
+from .footprints import SOURCE as FOOTPRINT_SOURCE
+from .footprints import barrier_mask
+from .footprints import fetch as fetch_footprints
+from .geo import DEMONSTRATION_EXTENT, Extent
+from .ground import (
+    DEFAULT_MAX_WINDOW_M,
+    DEFAULT_SLOPE_THRESHOLD,
+    GroundSurface,
+    build_ground_surface,
+    fill_holes,
+)
+from .hydrology import (
+    CONDITIONING_EPSILON_M,
+    MIN_DEPRESSION_DEPTH_M,
+    Depression,
+    cell_labels,
+    condition,
+    d8,
+    find_depressions,
+)
+from .las import read_file
+
+CELL_SIZE_M = 1.0
+# The filter owns these. The build only records which values it used, so the
+# manifest and the code cannot disagree about how a surface was made.
+MAX_WINDOW_M = DEFAULT_MAX_WINDOW_M
+SLOPE_THRESHOLD = DEFAULT_SLOPE_THRESHOLD
+
+#: The source, as the City of Melbourne publishes it.
+SOURCE = {
+    "dataset": "City of Melbourne 3D Point Cloud 2018",
+    "publisher": "City of Melbourne Open Data Portal",
+    "licence": "CC BY 4.0",
+    "crs": "EPSG:28355 (MGA Zone 55)",
+    "vertical_datum": "AHD",
+}
+
+#: Wording the interface may use, and the limitation it must carry with it.
+#: D2 established the cloud is photogrammetric — every point comes from imagery
+#: matched between overlapping photographs, so where a camera cannot see the
+#: ground there is no ground point to keep, only an absence.
+DERIVATION_NOTE = (
+    "Ground surface derived from the City of Melbourne 2018 photogrammetric point cloud "
+    "by morphological filtering. This is not a LiDAR terrain model: the source is imagery, "
+    "so ground beneath dense tree canopy was never observed and is interpolated from the "
+    "nearest measured ground. Streets and open ground, which is where this model routes "
+    "water, are observed directly."
+)
+
+
+@dataclass(frozen=True)
+class TerrainBuild:
+    surface: GroundSurface
+    extent: Extent
+    tiles: list[str]
+    point_count: int
+    seconds: float
+    depressions: list[Depression]
+    direction: np.ndarray
+    """D8 code per cell, from the conditioned surface. Never from the raw one."""
+
+    barriers: np.ndarray | None = None
+    """Building footprints. `None` means the routing let water cross buildings."""
+
+    @property
+    def storage_m3(self) -> float:
+        return sum(d.capacity_m3 for d in self.depressions)
+
+    def manifest(self) -> dict:
+        rows, cols = self.surface.shape
+        elevation = self.surface.elevation
+        return {
+            "artefact": "ground-surface",
+            "version": 1,
+            "extent": {
+                "name": self.extent.name,
+                "min_e": self.extent.min_e,
+                "min_n": self.extent.min_n,
+                "max_e": self.extent.max_e,
+                "max_n": self.extent.max_n,
+            },
+            "grid": {"rows": rows, "cols": cols, "cell_size_m": CELL_SIZE_M, "origin": "north-west"},
+            "source": SOURCE,
+            "tiles": self.tiles,
+            "points_read": self.point_count,
+            "filter": {
+                "method": "simple morphological filter (Pingel, Clarke and McBride, 2013)",
+                "implementation": "drainlens_pipeline.ground",
+                "max_window_m": MAX_WINDOW_M,
+                "slope_threshold": SLOPE_THRESHOLD,
+            },
+            "coverage": {
+                "measured_fraction": round(1.0 - self.surface.filled_fraction, 4),
+                "interpolated_fraction": round(self.surface.filled_fraction, 4),
+            },
+            "elevation_m": {
+                "min": round(float(elevation.min()), 3),
+                "max": round(float(elevation.max()), 3),
+                "mean": round(float(elevation.mean()), 3),
+            },
+            "hydrology": {
+                "depressions": len(self.depressions),
+                "storage_m3": round(self.storage_m3, 1),
+                "min_depression_depth_m": MIN_DEPRESSION_DEPTH_M,
+                "conditioning_epsilon_m": CONDITIONING_EPSILON_M,
+                "fork_order": (
+                    "Depressions are measured on the raw ground surface and the flow "
+                    "directions come from a separate conditioned surface. Filling a "
+                    "surface removes exactly the storage this model needs, so the order "
+                    "is a correctness requirement rather than a preference."
+                ),
+            },
+            "barriers": {
+                "source": FOOTPRINT_SOURCE if self.barriers is not None else None,
+                "cells": int(self.barriers.sum()) if self.barriers is not None else 0,
+                "note": (
+                    "Building footprints are no-flow barriers on the routing surface and "
+                    "the correction for the ground filter's one blind spot: an opening "
+                    "cannot reach the middle of a roof wider than its window. The ground "
+                    "filter's own object mask is not used for this — about half of it is "
+                    "tree canopy, and water flows under trees."
+                ),
+            },
+            "derivation_note": DERIVATION_NOTE,
+            "build_seconds": round(self.seconds, 1),
+        }
+
+
+def load_tiles(
+    tile_dir: Path, extent: Extent, log: Callable[[str], None] = lambda _: None
+) -> tuple[np.ndarray, list[str]]:
+    """Read every tile covering the extent, as one array of points."""
+    names = extent.tile_names()
+    missing = [n for n in names if not (tile_dir / f"{n}.las").exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"{tile_dir} is missing {', '.join(missing)}. Run `python -m drainlens_pipeline.fetch_tiles` first."
+        )
+
+    chunks = []
+    for name in names:
+        header, xyz = read_file(tile_dir / f"{name}.las")
+        log(f"  {name}  {header.point_count:>9,} points  Z {header.min_z:.2f}..{header.max_z:.2f}")
+        chunks.append(xyz)
+    return np.concatenate(chunks), names
+
+
+def build(
+    tile_dir: Path,
+    extent: Extent = DEMONSTRATION_EXTENT,
+    log: Callable[[str], None] = lambda _: None,
+    barriers: np.ndarray | None = None,
+) -> TerrainBuild:
+    started = time.perf_counter()
+    log(f"Reading tiles for {extent.name} ({extent.width_m:.0f} x {extent.height_m:.0f} m)")
+    points, names = load_tiles(tile_dir, extent, log)
+    log(f"  {len(points):,} points in total")
+
+    log(f"Filtering to ground at {CELL_SIZE_M:.0f} m, window {MAX_WINDOW_M:.0f} m, slope {SLOPE_THRESHOLD:.0%}")
+    surface = build_ground_surface(
+        points,
+        extent.min_e,
+        extent.min_n,
+        extent.max_e,
+        extent.max_n,
+        cell_size_m=CELL_SIZE_M,
+        max_window_m=MAX_WINDOW_M,
+        slope_threshold=SLOPE_THRESHOLD,
+    )
+
+    # Footprints do two jobs, and the second one is not obvious. They are the
+    # barriers the routing surface needs; they are also the repair for the
+    # ground filter's one known blind spot. An opening cannot reach the middle
+    # of a roof wider than its window, so 7.8% of building cells survive the
+    # filter as "measured ground" — fake plateaus sitting in the flow routing,
+    # concentrated more than 13 m inside a roof, exactly where the 26 m window
+    # says they would be. The footprint dataset knows they are buildings.
+    if barriers is not None and barriers.any():
+        rescued = barriers & surface.observed
+        if rescued.any():
+            log(f"  {rescued.sum():,} roof cells the filter kept as ground, corrected from footprints")
+            kept = surface.observed & ~barriers
+            surface = GroundSurface(
+                fill_holes(np.where(kept, surface.elevation, np.inf), kept),
+                kept,
+                surface.min_e,
+                surface.min_n,
+                surface.cell_size_m,
+            )
+
+    # Measure on the surface that gets published, not the one in memory. The
+    # artefact is written at single precision, and a hollow sitting within a
+    # rounding step of the depth threshold falls on a different side of it at
+    # each precision — so anyone recomputing from the published file would find
+    # a different number of depressions than the manifest claims.
+    raw = surface.elevation.astype(np.float32).astype(np.float64)
+
+    # The fork. Depressions come off the surface as filtered; the routing grid
+    # comes off a conditioned copy. Swapping these two lines produces a build
+    # that succeeds, renders, and can never report ponding.
+    log(f"Measuring depressions on the raw surface, {MIN_DEPRESSION_DEPTH_M:.2f} m and deeper")
+    depressions = find_depressions(raw, CELL_SIZE_M)
+    log(f"  {len(depressions):,} hollows holding {sum(d.capacity_m3 for d in depressions):,.0f} m3")
+
+    if barriers is None:
+        log("Conditioning a separate surface and routing it — no barriers, water may cross buildings")
+    else:
+        log(f"Conditioning a separate surface and routing it around {barriers.sum():,} barrier cells")
+    direction = d8(condition(raw, barriers))
+
+    return TerrainBuild(
+        surface,
+        extent,
+        names,
+        len(points),
+        time.perf_counter() - started,
+        depressions,
+        direction,
+        barriers,
+    )
+
+
+def write(result: TerrainBuild, out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    np.save(out_dir / "ground-surface.npy", result.surface.elevation.astype(np.float32))
+    np.save(out_dir / "ground-observed.npy", result.surface.observed)
+    np.save(out_dir / "flow-direction.npy", result.direction)
+    if result.barriers is not None:
+        np.save(out_dir / "barriers.npy", result.barriers)
+    # The table and the membership travel separately. Which cells belong to a
+    # hollow is raster-shaped information; writing it as a JSON list of indices
+    # cost two megabytes to say what one byte per cell says, and the browser
+    # would have had to rebuild the raster from it anyway.
+    rows, cols = result.surface.shape
+    np.savez_compressed(
+        out_dir / "depression-cells.npz",
+        labels=cell_labels(result.depressions, rows, cols),
+    )
+    (out_dir / "depressions.json").write_text(
+        json.dumps([d.as_json() for d in result.depressions], indent=2) + "\n", encoding="utf-8"
+    )
+    (out_dir / "terrain.json").write_text(
+        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m drainlens_pipeline.terrain",
+        description="Build the ground-surface artefact from the point-cloud tiles.",
+    )
+    parser.add_argument("--tiles", type=Path, default=Path("../data/pointcloud"))
+    parser.add_argument("--out", type=Path, default=Path("../data/terrain"))
+    parser.add_argument(
+        "--extent",
+        nargs=4,
+        type=float,
+        metavar=("MIN_E", "MIN_N", "MAX_E", "MAX_N"),
+        help="MGA55 bounds; defaults to the Iteration 1 demonstration extent",
+    )
+    parser.add_argument(
+        "--no-footprints",
+        action="store_true",
+        help="skip the footprint fetch; the routing then lets water cross buildings",
+    )
+    args = parser.parse_args(argv)
+
+    extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
+
+    def log(message: str) -> None:
+        print(message, file=sys.stderr)
+
+    barriers = None
+    if not args.no_footprints:
+        log("Fetching building footprints")
+        found = fetch_footprints(extent)
+        on_ground = sum(1 for f in found if f.on_the_ground)
+        log(f"  {len(found):,} rings, {on_ground:,} standing on the ground")
+        barriers = barrier_mask(found, extent, CELL_SIZE_M)
+
+    result = build(args.tiles, extent, log=log, barriers=barriers)
+    write(result, args.out)
+
+    surface = result.surface
+    log("")
+    log(f"  grid            {surface.shape[0]} x {surface.shape[1]} cells")
+    log(f"  elevation       {surface.elevation.min():.2f} to {surface.elevation.max():.2f} m AHD")
+    log(f"  measured        {1 - surface.filled_fraction:.1%} of cells")
+    log(f"  interpolated    {surface.filled_fraction:.1%} — buildings, canopy, and gaps")
+    log(f"  depressions     {len(result.depressions):,} holding {result.storage_m3:,.0f} m3")
+    log(f"  built in        {result.seconds:.1f} s")
+    log(f"  written to      {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
