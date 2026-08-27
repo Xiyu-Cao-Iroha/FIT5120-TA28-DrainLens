@@ -1,0 +1,137 @@
+/**
+ * The canvas, and the gestures that move it.
+ *
+ * There is no map library here on purpose. The extent is a fixed square
+ * kilometre, north-up, shipped in its own metre-based frame — so there is no
+ * global projection to handle, no tile pyramid, no level-of-detail switching
+ * and no third-party basemap to depend on. What is left is an affine transform
+ * and a draw call, and a library for that would be several hundred kilobytes
+ * solving problems this product does not have.
+ */
+
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+import { type MapArtefact, boundsOf } from './artefact.js';
+import { drawMap } from './draw.js';
+import { type Hit, pick } from './hit.js';
+import { type Viewport, clamp, fit, pan, zoomAt } from './viewport.js';
+
+/** Beyond this the pointer was dragging the map, not tapping something on it. */
+const DRAG_SLOP_PX = 4;
+
+export interface MapCanvasProps {
+  readonly artefact: MapArtefact;
+  readonly selectedPit?: number | null;
+  readonly onSelect?: (hit: Hit | null) => void;
+}
+
+export function MapCanvas({ artefact, selectedPit = null, onSelect }: MapCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const dragRef = useRef<{ x: number; y: number; moved: number } | null>(null);
+  const bounds = boundsOf(artefact);
+
+  // Size to the element, in device pixels, so the map is not a blurred
+  // upscale on the screens most people will open it on.
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+
+    const resize = () => {
+      const { width, height } = frame.getBoundingClientRect();
+      if (width < 1 || height < 1) return;
+      setViewport((current) =>
+        current === null
+          ? fit(width, height, bounds)
+          : clamp({ ...current, widthPx: width, heightPx: height }, bounds),
+      );
+    };
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [bounds.widthM, bounds.heightM]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || viewport === null) return;
+
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.round(viewport.widthPx * ratio);
+    canvas.height = Math.round(viewport.heightPx * ratio);
+    canvas.style.width = `${viewport.widthPx}px`;
+    canvas.style.height = `${viewport.heightPx}px`;
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    drawMap(context, artefact, viewport, { selectedPit });
+  }, [artefact, viewport, selectedPit]);
+
+  const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    return [event.clientX - (rect?.left ?? 0), event.clientY - (rect?.top ?? 0)] as const;
+  }, []);
+
+  const onWheel = useCallback(
+    (event: React.WheelEvent) => {
+      if (viewport === null) return;
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      setViewport(clamp(zoomAt(viewport, factor, at(event), bounds), bounds));
+    },
+    [viewport, bounds, at],
+  );
+
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { x: event.clientX, y: event.clientY, moved: 0 };
+  }, []);
+
+  const onPointerMove = useCallback(
+    (event: React.PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || viewport === null) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      setViewport(clamp(pan(viewport, dx, dy), bounds));
+    },
+    [viewport, bounds],
+  );
+
+  const onPointerUp = useCallback(
+    (event: React.PointerEvent) => {
+      const drag = dragRef.current;
+      dragRef.current = null;
+      if (!drag || viewport === null) return;
+      // A drag that ends over a pit is still a drag. Selecting on it would
+      // change what the panel is about every time somebody moved the map.
+      if (drag.moved > DRAG_SLOP_PX) return;
+      onSelect?.(pick(at(event), viewport, artefact.layers));
+    },
+    [viewport, artefact, onSelect, at],
+  );
+
+  return (
+    <div
+      ref={frameRef}
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', touchAction: 'none' }}
+    >
+      <canvas
+        ref={canvasRef}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+        style={{ display: 'block', cursor: 'grab' }}
+      />
+    </div>
+  );
+}
