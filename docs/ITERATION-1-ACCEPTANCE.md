@@ -11,11 +11,11 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 **Scope:** Epic 1 and Epic 2 are Must Have. Epic 3 is Iteration 2.
 **Deliberately out of scope:** machine learning, live rainfall, capacity or bottleneck claims, absolute ponding depth or extent, water arrival time, blockage formation over time.
 
-> ### ⚠ One criterion is unresolved
->
-> **AC 2.2.3 requires three comparison views — All clear, Blockage and Difference. AD7 in the System Architecture forbids exactly that**, on the grounds that the capture fraction is an assumed value and an absolute-looking layer invites a reading the model cannot support. The engine currently returns only the difference.
->
-> One of the two has to move. This is a product decision, not a technical one, and it blocks the view switcher but nothing else. See the note under AC 2.2.3.
+**Resolved 27 August, after the architecture was checked against the revision:**
+
+- **The three-view requirement is withdrawn. AD7 stands** — the result page shows the **Difference only**. This was never a frontend choice: the scenario worker, the golden path, `result_provenance` and the validation checks are all Difference-only, so two standalone maps would have changed the engine's output contract rather than its presentation.
+- **AC 2.2.3 becomes "Handle insufficient comparison data."**
+- **Navigation criteria are compressed.** Two are kept because they carry state the resident would lose: *Choose another task* and *returning from a result to the scenario setup with the inputs intact*. The remaining back-button behaviours move to the UI definition of done at the end of this file and are covered by Playwright rather than by a criterion each.
 
 ---
 
@@ -29,9 +29,9 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 - [ ] **1.1.1.b** Open the task-selection page
 - [ ] **1.1.1.c** Present the options *Follow local water and drainage*, *Compare a drain-blockage scenario* and *Explore the full map*
 - [ ] **1.1.1.d** Allow the user to continue without creating an account
-- [ ] **1.1.1.e** Retain the selected address **only for the current browser session**
+- [ ] **1.1.1.e** Retain the selected address **in memory only, for as long as the tab is open**
 
-> **1.1.1.e is verified by inspection, not by trust:** open the network panel, search an address, and confirm no request carries it. `assertSendable` in `@drainlens/schema` guards the code path; the manual check guards the guard.
+> **1.1.1.e is two claims, and they need different checks.** *The address is never sent* — open the network panel, search, and confirm no request carries it; `assertSendable` in `@drainlens/schema` guards the code path and the manual check guards the guard. *The address is not kept* — confirm it appears in no `localStorage` key, no `sessionStorage` key, no URL and no history state. Navigation state lives in memory only; history state carries a screen identifier and nothing else. `sessionStorage` survives a reload, a URL is shared and logged, and history state is written to disk, so none of them is "only for the session" in the sense this criterion means.
 
 ### AC 1.1.2 — Follow local water and drainage
 
@@ -70,14 +70,6 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 - [ ] **1.1.5.a** Return to the task-selection page
 - [ ] **1.1.5.b** Retain the selected address for the current browser session
-
-### AC 1.1.6 — Change the selected address
-
-*Given an address is selected and the user is on a task page, when they select "Change address", then the system will:*
-
-- [ ] **1.1.6.a** Return to the address search page
-- [ ] **1.1.6.b** Display the current address in the search field
-- [ ] **1.1.6.c** Retain the current address-related state **until a different address is confirmed**
 
 ---
 
@@ -164,14 +156,6 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 >
 > **2.1.2.e** keeps the rainfall field honest while live observation stays a conditional extension outside the MVP.
 
-### AC 2.1.3 — Return from the scenario setup
-
-*Given setup was opened from the task-selection page or the local drainage map, when the user selects the contextual back action, then the system will:*
-
-- [ ] **2.1.3.a** Return to the page it was opened from
-- [ ] **2.1.3.b** Retain the selected address
-- [ ] **2.1.3.c** Restore the previous map layers and selected pit when returning to the map
-
 ---
 
 ## US 2.2 — Compare the blockage scenario
@@ -188,7 +172,11 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 - [ ] **2.2.1.f** Display **Insufficient information** where the data does not support a clear comparison
 - [ ] **2.2.1.g** Describe the result as an indicative comparison based on simplified assumptions, **not a live flood prediction**
 
-> **2.2.1.f is not yet implemented.** The band exists in the shared vocabulary but the engine never emits it. Two distinct triggers were conflated when the engine was written and should not be: **data availability** — no terrain or depression artefact covers the window, or the selected pit has no usable record — which is implementable now; and **result robustness**, which depends on the capture-fraction sensitivity run and cannot be given a threshold before that exists.
+> **2.2.1.f is implemented** by the gate in AC 2.2.3, which runs before anything is computed.
+>
+> **No clear change and Insufficient information are different results and must stay different.** The first means the calculation ran and found nothing; the second means it could not be made. `insufficient-data` has been removed from the comparison-band vocabulary so the two cannot share a word: a band describes an area within a comparison that succeeded, a status describes whether there was one.
+>
+> **A missing downstream connection is a network limitation, not an insufficiency.** Where a pipe leads has no bearing on the surface calculation, so it is reported alongside a successful result rather than replacing one.
 
 ### AC 2.2.2 — Change the accumulated rainfall level
 
@@ -201,20 +189,18 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 > Every position is solved independently from zero, so moving the control cannot make an earlier position disagree with itself. A test asserts that solving four positions and solving one give the same answer at the rainfall they share.
 
-### AC 2.2.3 — Change the comparison view
+### AC 2.2.3 — Handle insufficient comparison data
 
-*Given a completed comparison is displayed, when the user selects "All clear", "Blockage" or "Difference", then the system will:*
+*Given the data-sufficiency gate rejects the comparison, when the user runs it, then the system will:*
 
-- [ ] **2.2.3.a** Display the selected view
-- [ ] **2.2.3.b** Retain the same pit, blockage setting and rainfall level
-- [ ] **2.2.3.c** Clearly identify which view is active
-- [ ] **2.2.3.d** Preserve the distinction between the all-clear baseline and the user-selected scenario
+- [ ] **2.2.3.a** Display **Insufficient information** instead of a result
+- [ ] **2.2.3.b** Name the reason: terrain unavailable, invalid inlet, calculation failed, or results not comparable
+- [ ] **2.2.3.c** **Not** show a partial or placeholder comparison alongside it
+- [ ] **2.2.3.d** Allow the user to change an input and try again
 
-> **⚠ Unresolved: this criterion contradicts AD7.** The architecture forbids a standalone ponding layer because the capture fraction is an assumed value and an absolute-looking map invites a reading the model cannot support. The All clear and Blockage views are exactly that. The engine returns only the difference today.
+> **Implemented.** The worker returns `SuccessfulComparison` or `InsufficientInformation` with one of four reasons — `terrain_unavailable`, `invalid_inlet`, `scenario_calculation_failed`, `comparison_not_comparable` — applied in that order, so the reason shown is the one that actually stopped the comparison rather than whichever check ran first. Nine tests in `packages/scenario` cover the gate.
 >
-> A middle path, if the team wants the views: allow all three, but let the two absolute views carry **no numeric scale of any kind** — no depth, no area, no legend in metres — showing relative distribution only, under a heading that names it an indicative distribution under an assumed condition. That keeps the comparison readable without producing a figure anyone can quote.
->
-> **Needs a decision from the product owner and the architecture owner together. It blocks the view switcher and nothing else.**
+> **This criterion replaces a withdrawn one.** The 27 August revision asked for All clear, Blockage and Difference views. AD7 forbids a standalone ponding layer, and the engine, the golden path, `result_provenance` and the validation checks are all Difference-only — so the change would have altered the output contract rather than the presentation. The architecture owner and the product owner resolved it in favour of AD7 and reused the slot for the gate, which the criteria needed and did not have.
 
 ### AC 2.2.4 — Return to the scenario setup
 
@@ -222,14 +208,6 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 - [ ] **2.2.4.a** Return to the scenario setup page
 - [ ] **2.2.4.b** Retain the previously selected pit, blockage setting and rainfall amount
-
-### AC 2.2.5 — Change and rerun the scenario
-
-*Given a completed comparison is displayed, when the user selects "Change scenario", then the system will:*
-
-- [ ] **2.2.5.a** Return to the scenario setup page
-- [ ] **2.2.5.b** Display the inputs that produced the current result
-- [ ] **2.2.5.c** Allow an input to be changed and a new comparison run
 
 ---
 
@@ -280,6 +258,18 @@ From *Iteration 1 Requirements*. The revised criteria document does not restate 
 - [ ] Storm progress is presented as accumulated rainfall in millimetres, and the interface does not present the result as an exact water depth, an arrival time, or a flood prediction
 - [ ] Assumptions, missing data and uncertainty remain visible, and no strong result is assigned where the information cannot support it
 - [ ] Reviewed and tested across all three blockage conditions and the supported rainfall range, all Epic 2 criteria passed, no unresolved defect preventing the main journey
+
+---
+
+## UI definition of done
+
+Behaviours the revision expressed as one criterion per button. They are real requirements and are covered by Playwright on the golden path rather than by a criterion each — a back button that loses state is a defect, but it is not a separate acceptance conversation.
+
+- [ ] **Change address** returns to search, shows the current address in the field, and keeps address state until a different one is confirmed *(was AC 1.1.6)*
+- [ ] **Contextual back from scenario setup** returns to whichever page opened it, keeps the address, and restores the previous map layers and selected pit *(was AC 2.1.3)*
+- [ ] **Change scenario** returns to setup showing the inputs that produced the current result, and allows a new run *(was AC 2.2.5)*
+- [ ] The browser back button never strands the user on a screen whose state has been lost
+- [ ] No navigation writes the address to `localStorage`, `sessionStorage`, the URL, or history state; history state carries a screen identifier only
 
 ---
 

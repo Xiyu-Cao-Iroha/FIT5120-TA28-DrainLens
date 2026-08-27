@@ -33,13 +33,54 @@ export type VisibleCondition = (typeof VISIBLE_CONDITIONS)[number];
 export const DEBRIS_TYPES = ['leaf-litter', 'rubbish', 'sediment', 'other'] as const;
 export type DebrisType = (typeof DEBRIS_TYPES)[number];
 
-/** Output of a scenario comparison at one accumulated-rainfall position. */
-export const COMPARISON_BANDS = [
-  'no-clear-change',
-  'higher-than-baseline',
-  'insufficient-data',
-] as const;
+/**
+ * How one area compares with the all-clear baseline, **within a comparison that
+ * succeeded**.
+ *
+ * "Insufficient information" is deliberately not a member. A calculation that
+ * ran and found no difference is `no-clear-change`; a calculation that could not
+ * be made at all is a run-level status, not a band. Collapsing the two would let
+ * "we found nothing" and "we could not look" print the same words on the map.
+ */
+export const COMPARISON_BANDS = ['no-clear-change', 'higher-than-baseline'] as const;
 export type ComparisonBand = (typeof COMPARISON_BANDS)[number];
+
+/** Whether a comparison could be made at all. */
+export const RESULT_STATUSES = ['successful', 'insufficient-information'] as const;
+export type ResultStatus = (typeof RESULT_STATUSES)[number];
+
+/**
+ * Why a comparison could not be made.
+ *
+ * Each reason is something the interface must explain in its own words
+ * (AC 2.3.2.b), so the set is small and each member names a distinct cause
+ * rather than a severity.
+ */
+export const INSUFFICIENCY_REASONS = [
+  'terrain_unavailable',
+  'invalid_inlet',
+  'scenario_calculation_failed',
+  'comparison_not_comparable',
+] as const;
+export type InsufficiencyReason = (typeof INSUFFICIENCY_REASONS)[number];
+
+/**
+ * A missing downstream connection is a limitation of the recorded network, not
+ * a reason the surface comparison is unusable: the surface calculation does not
+ * depend on where a pipe leads. Reported alongside a successful result, never
+ * instead of one.
+ */
+export const NETWORK_LIMITATIONS = [
+  'missing_downstream_connection',
+  'trace_reached_data_boundary',
+] as const;
+export type NetworkLimitation = (typeof NETWORK_LIMITATIONS)[number];
+
+export const isComparisonBand = (v: unknown): v is ComparisonBand =>
+  typeof v === 'string' && (COMPARISON_BANDS as readonly string[]).includes(v);
+
+export const isInsufficiencyReason = (v: unknown): v is InsufficiencyReason =>
+  typeof v === 'string' && (INSUFFICIENCY_REASONS as readonly string[]).includes(v);
 
 export const isBlockageSetting = (v: unknown): v is BlockageSetting =>
   typeof v === 'string' && (BLOCKAGE_SETTINGS as readonly string[]).includes(v);

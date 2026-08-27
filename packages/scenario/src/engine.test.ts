@@ -4,7 +4,9 @@ import { checkMassBalance, checkMonotonicity } from './checks.js';
 import {
   DEFAULT_ASSUMPTIONS,
   EngineError,
+  type ComparisonOutcome,
   type SceneInput,
+  type ScenarioPosition,
   blockageMultiplier,
   runScenario,
   solvePosition,
@@ -366,29 +368,142 @@ describe('the blockage setting is an assumption, not a state the model evolves',
     // parameter for a setting that varies with rainfall, position or time, and
     // adding one would be a different model rather than a bigger one.
     const scene = slopeScene([9]);
-    const result = runScenario(scene, 'partly-blocked', 9, {
+    const outcome = runScenario(scene, 'partly-blocked', 9, {
       rainfallPositionsMm: [10, 40, 80],
     });
-    const captured = result.map((p) => p.scenarioBalance.capturedVolumeM3 / p.scenarioBalance.rainfallVolumeM3);
+    if (outcome.status !== 'successful') throw new Error('unreachable');
+    const captured = outcome.positions.map(
+      (p) => p.scenarioBalance.capturedVolumeM3 / p.scenarioBalance.rainfallVolumeM3,
+    );
     for (const share of captured) expect(share).toBeCloseTo(captured[0]!, 12);
   });
 });
 
+describe('the data-sufficiency gate', () => {
+  const positions = [10, 40];
+
+  it('reports terrain_unavailable when the window is not fully covered', () => {
+    const base = bowlScene([12]);
+    const coverage = new Uint8Array(base.grid.width * base.grid.height).fill(1);
+    coverage[0] = 0;
+    const outcome = runScenario({ ...base, coverage }, 'fully-blocked', 12, {
+      rainfallPositionsMm: positions,
+    });
+    expect(outcome).toEqual({ status: 'insufficient-information', reason: 'terrain_unavailable' });
+  });
+
+  it('treats a coverage mask of the wrong length as no coverage at all', () => {
+    const base = bowlScene([12]);
+    const outcome = runScenario({ ...base, coverage: new Uint8Array(3) }, 'clear', 12, {
+      rainfallPositionsMm: positions,
+    });
+    expect(outcome).toEqual({ status: 'insufficient-information', reason: 'terrain_unavailable' });
+  });
+
+  it('proceeds on partial coverage only when the assumption allows it', () => {
+    const base = bowlScene([12]);
+    const coverage = new Uint8Array(base.grid.width * base.grid.height).fill(1);
+    coverage[0] = 0;
+    const outcome = runScenario({ ...base, coverage }, 'clear', 12, {
+      rainfallPositionsMm: positions,
+      assumptions: { ...DEFAULT_ASSUMPTIONS, minimumCoveredFraction: 0.9 },
+    });
+    expect(outcome.status).toBe('successful');
+  });
+
+  it('reports invalid_inlet when no drain sits at the selected cell', () => {
+    const outcome = runScenario(bowlScene([12]), 'fully-blocked', 77, {
+      rainfallPositionsMm: positions,
+    });
+    expect(outcome).toEqual({ status: 'insufficient-information', reason: 'invalid_inlet' });
+  });
+
+  it('reports invalid_inlet when the selected asset is not an inlet', () => {
+    // A Junction or a Submerged node cannot carry a surface blockage scenario.
+    const base = bowlScene();
+    const scene = { ...base, drains: [{ assetNumber: 'J-1', cell: 12, isInlet: false }] };
+    const outcome = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: positions });
+    expect(outcome).toEqual({ status: 'insufficient-information', reason: 'invalid_inlet' });
+  });
+
+  it('reports scenario_calculation_failed when the artefacts do not agree', () => {
+    const base = bowlScene([12]);
+    const broken = { ...base, flow: { ...base.flow, direction: new Int8Array(3) } };
+    const outcome = runScenario(broken, 'clear', 12, { rainfallPositionsMm: positions });
+    expect(outcome).toEqual({
+      status: 'insufficient-information',
+      reason: 'scenario_calculation_failed',
+    });
+  });
+
+  it('applies the gate in order, reporting what actually stopped it', () => {
+    // Both terrain and inlet are wrong. Terrain is the more decisive failure and
+    // is what the resident is told, rather than whichever check ran first.
+    const base = bowlScene();
+    const scene = {
+      ...base,
+      coverage: new Uint8Array(base.grid.width * base.grid.height),
+      drains: [],
+    };
+    const outcome = runScenario(scene, 'clear', 12, { rainfallPositionsMm: positions });
+    expect(outcome).toEqual({ status: 'insufficient-information', reason: 'terrain_unavailable' });
+  });
+
+  it('still throws on a caller error rather than hiding it as insufficiency', () => {
+    // An empty or unordered position list is a defect in the code that built
+    // it. A friendly status here would let it ship.
+    const scene = bowlScene([12]);
+    expect(() => runScenario(scene, 'clear', 12, { rainfallPositionsMm: [] })).toThrow(EngineError);
+    expect(() => runScenario(scene, 'clear', 12, { rainfallPositionsMm: [30, 10] })).toThrow(
+      /strictly ascending/,
+    );
+  });
+});
+
+describe('no clear change is not insufficient information', () => {
+  it('reports a successful comparison that found no difference', () => {
+    // The calculation ran; it simply found nothing. That is a result, and it
+    // must not print the same words as "we could not look".
+    const outcome = runScenario(bowlScene([12]), 'clear', 12, { rainfallPositionsMm: [10, 40] });
+    expect(outcome.status).toBe('successful');
+    if (outcome.status !== 'successful') throw new Error('unreachable');
+    expect(outcome.positions.every((p) => p.band === 'no-clear-change')).toBe(true);
+  });
+
+  it('carries a missing downstream connection as a limitation, not an insufficiency', () => {
+    // Where a pipe leads has no bearing on the surface calculation.
+    const scene = {
+      ...bowlScene([12]),
+      networkLimitations: ['missing_downstream_connection'] as const,
+    };
+    const outcome = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: [10, 40] });
+    expect(outcome.status).toBe('successful');
+    if (outcome.status !== 'successful') throw new Error('unreachable');
+    expect(outcome.networkLimitations).toEqual(['missing_downstream_connection']);
+  });
+});
+
+/** Assert a comparison was made, and hand back its positions. */
+function succeeded(outcome: ComparisonOutcome): readonly ScenarioPosition[] {
+  expect(outcome.status).toBe('successful');
+  if (outcome.status !== 'successful') throw new Error('unreachable');
+  return outcome.positions;
+}
+
 describe('running a comparison', () => {
   const positions = [10, 25, 40, 60, 90, 120];
+  const run = (scene: SceneInput, blockage: Parameters<typeof runScenario>[1]) =>
+    succeeded(runScenario(scene, blockage, 12, { rainfallPositionsMm: positions }));
 
   it('reports no clear change when the blocked drain is clear anyway', () => {
-    const scene = bowlScene([12]);
-    const result = runScenario(scene, 'clear', 12, { rainfallPositionsMm: positions });
+    const result = run(bowlScene([12]), 'clear');
     expect(result).toHaveLength(positions.length);
     expect(result.every((p) => p.band === 'no-clear-change')).toBe(true);
     expect(result.every((p) => p.cellsHigherThanBaseline === 0)).toBe(true);
   });
 
   it('never reports ponding shrinking as the storm gets heavier', () => {
-    const scene = bowlScene([12]);
-    const result = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: positions });
-    const extents = result.map((p) => ({
+    const extents = run(bowlScene([12]), 'fully-blocked').map((p) => ({
       accumulatedRainfallMm: p.accumulatedRainfallMm,
       pondedCells: p.scenarioPondedCells,
     }));
@@ -396,18 +511,14 @@ describe('running a comparison', () => {
   });
 
   it('keeps every position in mass balance, in both the scenario and the baseline', () => {
-    const scene = bowlScene([12, 34]);
-    const result = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: positions });
-    for (const position of result) {
+    for (const position of run(bowlScene([12, 34]), 'fully-blocked')) {
       expect(checkMassBalance(position.scenarioBalance)).toEqual({ ok: true });
       expect(checkMassBalance(position.baselineBalance)).toEqual({ ok: true });
     }
   });
 
   it('blocking a drain never captures more than leaving it clear', () => {
-    const scene = bowlScene([12]);
-    const result = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: positions });
-    for (const position of result) {
+    for (const position of run(bowlScene([12]), 'fully-blocked')) {
       expect(position.scenarioBalance.capturedVolumeM3).toBeLessThanOrEqual(
         position.baselineBalance.capturedVolumeM3 + 1e-9,
       );
@@ -416,38 +527,19 @@ describe('running a comparison', () => {
 
   it('labels every cell with a band', () => {
     const scene = bowlScene([12]);
-    const [first] = runScenario(scene, 'partly-blocked', 12, { rainfallPositionsMm: [30] });
+    const [first] = succeeded(
+      runScenario(scene, 'partly-blocked', 12, { rainfallPositionsMm: [30] }),
+    );
     expect(first?.bands).toHaveLength(scene.grid.width * scene.grid.height);
     expect(first?.bands.every((b) => b === 'no-clear-change' || b === 'higher-than-baseline')).toBe(
       true,
     );
   });
 
-  it('refuses positions that are empty or not ascending', () => {
-    const scene = bowlScene([12]);
-    expect(() => runScenario(scene, 'clear', 12, { rainfallPositionsMm: [] })).toThrow(
-      /at least one rainfall position/,
-    );
-    expect(() => runScenario(scene, 'clear', 12, { rainfallPositionsMm: [30, 10] })).toThrow(
-      /strictly ascending/,
-    );
-    expect(() => runScenario(scene, 'clear', 12, { rainfallPositionsMm: [30, 30] })).toThrow(
-      /strictly ascending/,
-    );
-  });
-
-  it('refuses to block a cell where no drain sits', () => {
-    const scene = bowlScene([12]);
-    expect(() => runScenario(scene, 'fully-blocked', 77, { rainfallPositionsMm: [30] })).toThrow(
-      /no drain sits at cell 77/,
-    );
-  });
-
   it('gives the same comparison twice', () => {
     const scene = bowlScene([12]);
-    const options = { rainfallPositionsMm: positions };
-    const a = runScenario(scene, 'partly-blocked', 12, options);
-    const b = runScenario(scene, 'partly-blocked', 12, options);
+    const a = run(scene, 'partly-blocked');
+    const b = run(scene, 'partly-blocked');
     expect(a.map((p) => p.cellsHigherThanBaseline)).toEqual(b.map((p) => p.cellsHigherThanBaseline));
   });
 
@@ -455,8 +547,10 @@ describe('running a comparison', () => {
     // Positions are solved independently from zero, so a position's answer
     // cannot depend on its neighbours.
     const scene = bowlScene([12]);
-    const many = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: [10, 25, 40, 60] });
-    const few = runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: [40] });
+    const many = succeeded(
+      runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: [10, 25, 40, 60] }),
+    );
+    const few = succeeded(runScenario(scene, 'fully-blocked', 12, { rainfallPositionsMm: [40] }));
     const at40 = many.find((p) => p.accumulatedRainfallMm === 40);
     expect(few[0]?.cellsHigherThanBaseline).toBe(at40?.cellsHigherThanBaseline);
   });
