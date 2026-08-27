@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import heapq
 from dataclasses import dataclass
+from typing import Iterable
 
 import numpy as np
 from scipy import ndimage
@@ -95,13 +96,38 @@ class Depression:
     """Flat index of the cell it overflows into, or `LEAVES_WINDOW`."""
 
     def as_json(self) -> dict:
+        """The table row, without the cell list.
+
+        Listing every cell turns 486 hollows into two megabytes of JSON — 129,683
+        integers, most of a browser's budget spent restating what a raster says
+        in one byte per cell. The membership lives in the companion
+        `depression-cells` raster instead, and `cell_labels` builds it.
+        """
         return {
             "id": self.id,
-            "cells": [int(c) for c in self.cells],
+            "cellCount": int(len(self.cells)),
             "capacityM3": round(self.capacity_m3, 3),
             "spillElevationM": round(self.spill_elevation_m, 3),
             "spillCell": int(self.spill_cell),
         }
+
+
+def cell_labels(
+    depressions: Iterable[Depression], rows: int, cols: int
+) -> np.ndarray:
+    """Depression id per cell, `-1` where the cell is in none.
+
+    The same shape as the engine's `cellDepression`, so the browser can use it
+    as it arrives instead of rebuilding it from a list of cell indices.
+    """
+    labels = np.full(rows * cols, -1, dtype=np.int16)
+    for depression in depressions:
+        if depression.id > np.iinfo(np.int16).max:
+            raise HydrologyError(
+                f"depression id {depression.id} does not fit the label raster's width"
+            )
+        labels[depression.cells] = depression.id
+    return labels.reshape(rows, cols)
 
 
 def fill(elevation: np.ndarray, *, epsilon_m: float = 0.0) -> np.ndarray:

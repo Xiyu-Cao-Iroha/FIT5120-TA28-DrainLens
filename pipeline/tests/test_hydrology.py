@@ -16,7 +16,9 @@ from drainlens_pipeline.hydrology import (
     CONDITIONING_EPSILON_M,
     D8_OFFSETS,
     LEAVES_WINDOW,
+    Depression,
     HydrologyError,
+    cell_labels,
     condition,
     d8,
     fill,
@@ -166,9 +168,54 @@ class TestFindDepressions:
 
     def test_the_json_form_carries_the_engine_field_names(self):
         record = find_depressions(bowl(depth=1.0), CELL)[0].as_json()
-        assert set(record) == {"id", "cells", "capacityM3", "spillElevationM", "spillCell"}
+        assert set(record) == {"id", "cellCount", "capacityM3", "spillElevationM", "spillCell"}
         assert record["capacityM3"] == pytest.approx(9.0)
-        assert all(isinstance(c, int) for c in record["cells"])
+        assert record["cellCount"] == 9
+
+    def test_the_table_does_not_carry_the_cell_list(self):
+        # 486 hollows over the demonstration extent hold 129,683 cells. Writing
+        # those as JSON indices cost two megabytes to say what one byte per
+        # cell says in the companion raster, and the browser would have had to
+        # rebuild the raster from them anyway.
+        assert "cells" not in find_depressions(bowl(depth=1.0), CELL)[0].as_json()
+
+
+class TestCellLabels:
+    def test_each_cell_carries_its_depression_id_and_minus_one_elsewhere(self):
+        surface = np.full((13, 13), 10.0)
+        surface[2:5, 2:5] = 9.0
+        surface[8:11, 8:11] = 9.0
+        found = find_depressions(surface, CELL)
+        labels = cell_labels(found, 13, 13)
+
+        assert labels.shape == (13, 13)
+        assert labels.dtype == np.int16
+        assert set(np.unique(labels)) == {-1, 0, 1}
+        assert (labels[2:5, 2:5] == labels[2, 2]).all()
+        assert labels[0, 0] == -1
+
+    def test_it_round_trips_with_the_cell_lists_it_replaces(self):
+        # The raster has to say exactly what the dropped lists said, or the
+        # packing has quietly lost membership.
+        surface = 10.0 + np.random.default_rng(5).normal(0, 0.6, (40, 40))
+        found = find_depressions(surface, CELL)
+        assert len(found) > 1, "the fixture needs several hollows to be worth checking"
+
+        labels = cell_labels(found, 40, 40).ravel()
+        for depression in found:
+            assert (labels[depression.cells] == depression.id).all()
+        assert int((labels >= 0).sum()) == sum(len(d.cells) for d in found)
+
+    def test_no_depressions_gives_an_empty_field(self):
+        labels = cell_labels([], 5, 5)
+        assert (labels == -1).all()
+
+    def test_refuses_an_id_too_wide_for_the_raster(self):
+        wide = Depression(
+            id=40_000, cells=np.array([0]), capacity_m3=1.0, spill_elevation_m=1.0, spill_cell=1
+        )
+        with pytest.raises(HydrologyError, match="does not fit"):
+            cell_labels([wide], 5, 5)
 
 
 class TestCondition:

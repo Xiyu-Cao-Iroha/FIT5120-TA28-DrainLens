@@ -21,17 +21,22 @@ from typing import Callable
 
 import numpy as np
 
+from .footprints import SOURCE as FOOTPRINT_SOURCE
+from .footprints import barrier_mask
+from .footprints import fetch as fetch_footprints
 from .geo import DEMONSTRATION_EXTENT, Extent
 from .ground import (
     DEFAULT_MAX_WINDOW_M,
     DEFAULT_SLOPE_THRESHOLD,
     GroundSurface,
     build_ground_surface,
+    fill_holes,
 )
 from .hydrology import (
     CONDITIONING_EPSILON_M,
     MIN_DEPRESSION_DEPTH_M,
     Depression,
+    cell_labels,
     condition,
     d8,
     find_depressions,
@@ -76,6 +81,9 @@ class TerrainBuild:
     depressions: list[Depression]
     direction: np.ndarray
     """D8 code per cell, from the conditioned surface. Never from the raw one."""
+
+    barriers: np.ndarray | None = None
+    """Building footprints. `None` means the routing let water cross buildings."""
 
     @property
     def storage_m3(self) -> float:
@@ -125,6 +133,17 @@ class TerrainBuild:
                     "is a correctness requirement rather than a preference."
                 ),
             },
+            "barriers": {
+                "source": FOOTPRINT_SOURCE if self.barriers is not None else None,
+                "cells": int(self.barriers.sum()) if self.barriers is not None else 0,
+                "note": (
+                    "Building footprints are no-flow barriers on the routing surface and "
+                    "the correction for the ground filter's one blind spot: an opening "
+                    "cannot reach the middle of a roof wider than its window. The ground "
+                    "filter's own object mask is not used for this — about half of it is "
+                    "tree canopy, and water flows under trees."
+                ),
+            },
             "derivation_note": DERIVATION_NOTE,
             "build_seconds": round(self.seconds, 1),
         }
@@ -150,7 +169,10 @@ def load_tiles(
 
 
 def build(
-    tile_dir: Path, extent: Extent = DEMONSTRATION_EXTENT, log: Callable[[str], None] = lambda _: None
+    tile_dir: Path,
+    extent: Extent = DEMONSTRATION_EXTENT,
+    log: Callable[[str], None] = lambda _: None,
+    barriers: np.ndarray | None = None,
 ) -> TerrainBuild:
     started = time.perf_counter()
     log(f"Reading tiles for {extent.name} ({extent.width_m:.0f} x {extent.height_m:.0f} m)")
@@ -169,6 +191,26 @@ def build(
         slope_threshold=SLOPE_THRESHOLD,
     )
 
+    # Footprints do two jobs, and the second one is not obvious. They are the
+    # barriers the routing surface needs; they are also the repair for the
+    # ground filter's one known blind spot. An opening cannot reach the middle
+    # of a roof wider than its window, so 7.8% of building cells survive the
+    # filter as "measured ground" — fake plateaus sitting in the flow routing,
+    # concentrated more than 13 m inside a roof, exactly where the 26 m window
+    # says they would be. The footprint dataset knows they are buildings.
+    if barriers is not None and barriers.any():
+        rescued = barriers & surface.observed
+        if rescued.any():
+            log(f"  {rescued.sum():,} roof cells the filter kept as ground, corrected from footprints")
+            kept = surface.observed & ~barriers
+            surface = GroundSurface(
+                fill_holes(np.where(kept, surface.elevation, np.inf), kept),
+                kept,
+                surface.min_e,
+                surface.min_n,
+                surface.cell_size_m,
+            )
+
     # Measure on the surface that gets published, not the one in memory. The
     # artefact is written at single precision, and a hollow sitting within a
     # rounding step of the depth threshold falls on a different side of it at
@@ -183,8 +225,11 @@ def build(
     depressions = find_depressions(raw, CELL_SIZE_M)
     log(f"  {len(depressions):,} hollows holding {sum(d.capacity_m3 for d in depressions):,.0f} m3")
 
-    log("Conditioning a separate surface and routing it")
-    direction = d8(condition(raw))
+    if barriers is None:
+        log("Conditioning a separate surface and routing it — no barriers, water may cross buildings")
+    else:
+        log(f"Conditioning a separate surface and routing it around {barriers.sum():,} barrier cells")
+    direction = d8(condition(raw, barriers))
 
     return TerrainBuild(
         surface,
@@ -194,6 +239,7 @@ def build(
         time.perf_counter() - started,
         depressions,
         direction,
+        barriers,
     )
 
 
@@ -202,6 +248,17 @@ def write(result: TerrainBuild, out_dir: Path) -> None:
     np.save(out_dir / "ground-surface.npy", result.surface.elevation.astype(np.float32))
     np.save(out_dir / "ground-observed.npy", result.surface.observed)
     np.save(out_dir / "flow-direction.npy", result.direction)
+    if result.barriers is not None:
+        np.save(out_dir / "barriers.npy", result.barriers)
+    # The table and the membership travel separately. Which cells belong to a
+    # hollow is raster-shaped information; writing it as a JSON list of indices
+    # cost two megabytes to say what one byte per cell says, and the browser
+    # would have had to rebuild the raster from it anyway.
+    rows, cols = result.surface.shape
+    np.savez_compressed(
+        out_dir / "depression-cells.npz",
+        labels=cell_labels(result.depressions, rows, cols),
+    )
     (out_dir / "depressions.json").write_text(
         json.dumps([d.as_json() for d in result.depressions], indent=2) + "\n", encoding="utf-8"
     )
@@ -224,6 +281,11 @@ def main(argv: list[str] | None = None) -> int:
         metavar=("MIN_E", "MIN_N", "MAX_E", "MAX_N"),
         help="MGA55 bounds; defaults to the Iteration 1 demonstration extent",
     )
+    parser.add_argument(
+        "--no-footprints",
+        action="store_true",
+        help="skip the footprint fetch; the routing then lets water cross buildings",
+    )
     args = parser.parse_args(argv)
 
     extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
@@ -231,7 +293,15 @@ def main(argv: list[str] | None = None) -> int:
     def log(message: str) -> None:
         print(message, file=sys.stderr)
 
-    result = build(args.tiles, extent, log=log)
+    barriers = None
+    if not args.no_footprints:
+        log("Fetching building footprints")
+        found = fetch_footprints(extent)
+        on_ground = sum(1 for f in found if f.on_the_ground)
+        log(f"  {len(found):,} rings, {on_ground:,} standing on the ground")
+        barriers = barrier_mask(found, extent, CELL_SIZE_M)
+
+    result = build(args.tiles, extent, log=log, barriers=barriers)
     write(result, args.out)
 
     surface = result.surface
