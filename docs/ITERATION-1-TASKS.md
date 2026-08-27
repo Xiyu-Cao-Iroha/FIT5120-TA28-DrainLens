@@ -58,8 +58,9 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
 - [x] **Ground-surface filtering** — confirmed necessary by D2. SMRF, written against numpy and scipy rather than PDAL, which will not install on the team's machines. Window set to 26 m by measuring the extent, not by taste; the under-canopy limitation is in `DERIVATION_NOTE` and travels with the artefact
 - [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid in 8.9 s, 54.1% of cells measured, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
-- [ ] **Depressions characterised on the raw surface** → elevation–volume tables → *2.2.1*
-- [ ] **Conditioning on a separate surface**, building footprints as no-flow barriers → D8 flow-direction grid → *1.1.2.b, 2.2.1*
+- [x] **Depressions characterised on the raw surface** → 537 hollows holding 30,593 m³. Cut at 0.25 m: the source quotes 25 cm accuracy and the median untrimmed hollow is 5 cm, so most of the 8,472 raw hollows are the surface's own noise. The four largest sit at 0.4–2.3 m AHD, the Kensington Banks flats → *2.2.1*
+- [x] **Conditioning on a separate surface** → D8 flow-direction grid. Zero interior dead ends; all 998,594 directed cells point strictly downhill, so no trace can cycle → *1.1.2.b, 2.2.1*
+- [ ] **Building footprints** as no-flow barriers — `condition()` takes the mask, the data is not fetched yet. **Do not substitute the ground filter's object mask**: it includes tree canopy, and water flows under trees, so it would wall off every tree-lined street
 - [ ] Pit and pipe geometry tiles → *1.1.2.b, 1.1.3.b*
 - [ ] **Coverage mask** — which cells the terrain artefacts actually cover, so the engine can tell "no clear change" from "we have nothing here" → *2.2.1.f, 2.3.2*
 - [ ] **Data manifest** — per source: name, licence, capture date, modified date, coverage, record count, derivation → *1.1.3.d, 1.2.1.c, 2.3.1.c*
