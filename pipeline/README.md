@@ -76,6 +76,32 @@ Chosen by measurement, not by eye. The reasoning is in `docs/DEMO-EXTENT.md`; th
 
 The projection in `geo.py` is worth trusting: it agrees with the eastings and northings the City of Melbourne publishes alongside latitude and longitude, across all 63,721 address records, to within a millimetre.
 
+## Build the ground surface
+
+```
+./.venv/Scripts/python.exe -m drainlens_pipeline.terrain --out ../data/terrain
+```
+
+6.6 million points to a 1000 × 1000 m grid in about nine seconds. Writes the surface, a mask saying which cells were measured, and a manifest recording how it was made.
+
+**This is not a LiDAR DTM, and must never be called one.** D2 established the source is photogrammetric — imagery matched between overlapping photographs. A laser finds the ground through gaps in a canopy; a camera does not. Under dense trees there are no ground points to keep, only an absence, and the surface there is interpolated from the nearest measured ground. Streets are open to the sky and are measured directly, which is the part the model routes water over. `terrain.json` carries that sentence and a test fails if it goes missing.
+
+### Why a filter of our own
+
+PDAL ships an SMRF and will not install on the machines this is being built on. The algorithm is published, it is about eighty lines against numpy and scipy, and one written here can be tested against surfaces whose answer is known and explained at the showcase. `tests/test_ground.py` checks the case that actually matters — not "a building is removed", which is obvious in any rendering, but "a building is removed *and the street grade underneath survives*", which is the failure that produces a plausible-looking surface where every slope is wrong.
+
+### Two numbers that were measured rather than chosen
+
+**Window 26 m.** Widening it removes steadily more: 12→18 m a further 5.8 ha, 18→26 m a further 2.2 ha, then a near-constant ~1 ha per step, which is terrain being shaved rather than buildings found. Of the 2.2 ha that 26 m removes and 18 m does not, 54% stands over two metres up. The other 46% is ground rejected needlessly — worth it, because a rejected ground cell is interpolated from a neighbour a metre away and lands within centimetres, while a surviving roof is a three- to eight-metre plateau sitting in the middle of the flow routing.
+
+**54.1% of the extent measured.** The rest is buildings, canopy and gaps. Only 1.1% of cells had no point at all; the remaining 44.8% were filtered out, and those cells stood a median 3.5 m and a 90th percentile 8.6 m above the ground kept around them — the height of a house, a terrace roof, a street tree.
+
+### Two limits worth knowing before you trust it
+
+**A roof wider than the window keeps its middle.** Opening leaves a straight edge alone and only rounds convex corners, so an idealised 60 m flat-topped warehouse loses four corners and nothing else. Real roofs are gabled and cluttered at 1 m and give the filter plenty to bite on, which is why 44.8% of the extent came out; but an extent full of large sheds would need the window raised, and would pay for it in shaved landforms.
+
+**The uphill edge is shaved.** Opening returns a plane exactly — that is what stops the filter flattening streets — but only on an unbounded one. Within `max_window_m / 2` of the uphill boundary the structuring element cannot fit, so a band there is lowered. At Kensington's gradients this stays far below the threshold and nothing is flagged. The fix, if an extent ever needs it, is to filter a buffer and crop.
+
 ## Still to come
 
-Terrain — ground-surface filtering, the filtered surface, depressions on the raw surface, conditioning on a separate surface with building footprints as barriers, D8 flow-direction grid. This is the critical path for Iteration 1 and the largest single body of work in the project.
+Depressions characterised on the raw surface, then conditioning on a *separate* surface with building footprints as barriers, then the D8 flow-direction grid. The order is a correctness requirement: filling removes exactly the storage volumes the scenario model needs.
