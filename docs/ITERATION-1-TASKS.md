@@ -57,8 +57,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*  *(all 63,721 addresses already exported while choosing the extent)*
 - [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
 - [x] **Ground-surface filtering** — confirmed necessary by D2. SMRF, written against numpy and scipy rather than PDAL, which will not install on the team's machines. Window set to 26 m by measuring the extent, not by taste; the under-canopy limitation is in `DERIVATION_NOTE` and travels with the artefact
-- [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid in 8.9 s, 54.1% of cells measured, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
-- [x] **Depressions characterised on the raw surface** → 537 hollows holding 30,593 m³. Cut at 0.25 m: the source quotes 25 cm accuracy and the median untrimmed hollow is 5 cm, so most of the 8,472 raw hollows are the surface's own noise. The four largest sit at 0.4–2.3 m AHD, the Kensington Banks flats → *2.2.1*
+- [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid, 52.1% of cells measured after the footprint correction, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
+- [x] **Depressions characterised on the raw surface** → 486 hollows holding 31,364 m³ on the surface as published. Cut at 0.25 m: the source quotes 25 cm accuracy and the median untrimmed hollow is 5 cm, so most of the 8,472 raw hollows are the surface's own noise. The four largest sit at 0.4–2.3 m AHD, the Kensington Banks flats → *2.2.1*
 - [x] **Conditioning on a separate surface** → D8 flow-direction grid. Zero interior dead ends; all 998,594 directed cells point strictly downhill, so no trace can cycle → *1.1.2.b, 2.2.1*
 - [x] **Building footprints** as no-flow barriers — `2020-building-footprints`, CC BY, 258,754 barrier cells. Also the repair for the filter's blind spot: 20,311 roof cells it had kept as ground. The two sources agree 92.2% one way and only 51.9% the other, which is the measured reason the object mask is not a substitute — half of it is canopy, and water flows under trees
 - [x] **Pit and pipe geometry** → `python -m drainlens_pipeline.network`. 220 road polygons, 893 pipes, 895 pits, 163 street labels in 318 KB, as local metres so no projection runs in the browser. Streets come from the City's road-corridor polygons, so nothing at runtime needs a third-party tile server → *1.1.2.b, 1.1.3.b*
@@ -91,14 +91,21 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 
 ### Address and navigation — mostly new since the criteria were revised
 
-- [ ] Vite + React + TypeScript + MapLibre shell, rendering fixture tiles
-- [ ] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*
+- [x] Vite + React + TypeScript shell, rendering the real map geometry. **No MapLibre** — see the note below
+- [x] **Session state in memory only** — address, task and scenario inputs held for the tab, written to no `localStorage` key, no `sessionStorage` key, no URL and no history state beyond a screen id → *1.1.1.e, 1.1.5*. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie`, plays a whole session and asserts nothing was written; sneaking a `setItem` into the address branch fails the suite
+- [ ] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*  *(blocked on the address index, W1)*
 - [ ] **Task-selection page** with the three named options → *1.1.1.b, 1.1.1.c*
 - [ ] **Unsupported-address path** — explain, do not fabricate, allow another address → *1.1.4*
-- [ ] **Session state in memory only** — address, task and scenario inputs held for the tab, written to no `localStorage` key, no `sessionStorage` key, no URL and no history state beyond a screen id → *1.1.1.e, 1.1.5*
+
+> **MapLibre was dropped, deliberately.** The extent is a fixed square kilometre, north-up, and the pipeline ships its geometry in metres from the extent corner — so there is no global projection, no tile pyramid, no level-of-detail switching and no third-party basemap. What is left is an affine transform and a draw call. MapLibre is several hundred kilobytes solving problems this product does not have, and the streets come from the City's own road-corridor polygons, so nothing at runtime depends on a tile server being up or licensed.
+>
+> The cost is that panning, zooming, hit testing and label placement are ours. All four are arithmetic in a metre-based frame, and all four are unit-tested — which is more than could be said for the same behaviour inside a library.
 
 ### Map and drainage
 
+- [x] **Canvas renderer** — roads, pipes, pits and street labels on the real Kensington geometry. Pan, zoom anchored on the cursor, and clamping so the canvas is never full of blank space outside the pilot area
+- [x] **Hit testing** — tap a pit or a pipe. Measured in screen pixels, not metres, so the target does not shrink exactly when the map is zoomed out and a pit is hardest to hit. Pits win ties, because every pit sits on the end of a pipe and pipes would otherwise shadow the whole layer
+- [x] **Street labels** — one per street at its longest visible run, colliding labels dropped rather than overdrawn. The source names every segment and Kensington's blocks are short, so drawing them all wrote the same name six times across four centimetres
 - [ ] Follow-local-water view: surface-water paths and pits **by default**, one next-step instruction, other layers in a **collapsed** section → *1.1.2*
 - [ ] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
 - [ ] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*

@@ -94,7 +94,9 @@ PDAL ships an SMRF and will not install on the machines this is being built on. 
 
 **Window 26 m.** Widening it removes steadily more: 12→18 m a further 5.8 ha, 18→26 m a further 2.2 ha, then a near-constant ~1 ha per step, which is terrain being shaved rather than buildings found. Of the 2.2 ha that 26 m removes and 18 m does not, 54% stands over two metres up. The other 46% is ground rejected needlessly — worth it, because a rejected ground cell is interpolated from a neighbour a metre away and lands within centimetres, while a surviving roof is a three- to eight-metre plateau sitting in the middle of the flow routing.
 
-**54.1% of the extent measured.** The rest is buildings, canopy and gaps. Only 1.1% of cells had no point at all; the remaining 44.8% were filtered out, and those cells stood a median 3.5 m and a 90th percentile 8.6 m above the ground kept around them — the height of a house, a terrace roof, a street tree.
+**52.1% of the extent measured.** The rest is buildings, canopy and gaps. Only 1.1% of cells had no point at all; everything else was filtered out, and those cells stood a median 3.5 m and a 90th percentile 8.6 m above the ground kept around them — the height of a house, a terrace roof, a street tree.
+
+The filter on its own leaves 54.1%. The building footprints then take another 2% away, because they identify roofs the filter had kept as ground — see the cross-check below. **52.1% is the figure that ships**, and it is the one `terrain.json` reports; anything quoting 54.1% is describing the filter in isolation rather than the artefact.
 
 ### Two limits worth knowing before you trust it
 
@@ -112,7 +114,9 @@ Both come out of the same `terrain` command, and the order they come out in is a
 
 Filling the demonstration extent finds **8,472 separate hollows whose median maximum depth is 5 cm**. The source is quoted at about 25 cm accuracy, so the great majority of those are the surface's own noise rather than places water collects.
 
-Cutting at the accuracy the publisher quotes keeps **537 hollows — 6.3% of the count — holding 88.8% of the filled volume**. Throwing away 93.7% of the objects costs 11.2% of the water. Two independent arguments land on the same number, which is the reason to trust it: the knee in the volume curve, and the error bar on the measurement that found them.
+Cutting at the accuracy the publisher quotes keeps **6.3% of the count holding 88.8% of the filled volume**. Throwing away 93.7% of the objects costs 11.2% of the water. Two independent arguments land on the same number, which is the reason to trust it: the knee in the volume curve, and the error bar on the measurement that found them.
+
+On the surface as published — filtered *and* corrected from the building footprints — that leaves **486 hollows holding 31,364 m³**. Slightly fewer than the 537 the filter alone finds, and slightly more water: removing the false rooftop plateaus both deletes the small artificial hollows they created and unblocks real ones they were damming.
 
 The discarded water is not lost. It routes downstream instead of ponding, and it is discarded identically in the blocked and all-clear runs, so it largely cancels in the comparison the product actually reports.
 
