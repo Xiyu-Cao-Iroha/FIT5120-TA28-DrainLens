@@ -20,6 +20,8 @@ Three positions shape almost every decision here. They come from the System Arch
 
 Iteration 1 is deterministic. It depends on no machine learning and no live data feed.
 
+A fourth position follows from the third and is worth stating on its own: **the blockage setting is an assumption the resident supposes, not a condition we observed or derived.** The model's independent variable is accumulated rainfall, not time, so it cannot produce a rate — how fast a blockage forms, how long until one does, how quickly water rises. Tests in `packages/scenario` hold that line.
+
 ---
 
 ## Layout
@@ -80,6 +82,7 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.5.0 | 27 Aug 2026 | Acceptance criteria re-mapped to the revised criteria document: six broad criteria became twenty, restructured around interactions, with navigation and state-retention requirements that had no tasks before. Two consequences recorded rather than absorbed — `Insufficient information` is now required in two criteria and is not implemented, and AC 2.2.3 contradicts AD7 and needs a decision. |
 | 0.4.0 | 27 Aug 2026 | Scenario engine: D8 routing, depression fill-and-spill, drain capture by blockage setting, and the comparison against an all-clear baseline. Every position solved independently from zero, so the answer at a given rainfall does not depend on how many positions the interface shows. 88 tests, 99% coverage, 1.7s. |
 | 0.3.0 | 26 Aug 2026 | `packages/scenario`: synthetic terrain whose answer is known in advance — a planar slope with nowhere to collect, and a flat-bottomed bowl of exactly stated capacity — plus the mass-balance and monotonicity checks, each tested against results broken in one specific way. Written before the engine, so the engine is never blocked on the terrain pipeline. 56 tests, 100% coverage, 2.4s. |
 | 0.2.0 | 26 Aug 2026 | Drainage graph builder and artefact: topology, inlet classification, narrowing indicator, cycle detection. Corrects the audit's traceable share from 79.8% to 70.4% — 1,622 pipes name a pit absent from the export. 48 tests, 100% on the judgement-carrying modules. Development guide added. |
