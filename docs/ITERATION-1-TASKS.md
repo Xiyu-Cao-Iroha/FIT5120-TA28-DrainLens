@@ -56,8 +56,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Drainage graph artefact** — self-loops excluded, directed graph from `upstr_pit`/`dnstr_pit`, cycles recorded, narrowing indicator, inlet classification → *1.2.1, 1.2.2, 1.3.1.c*
 - [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*  *(all 63,721 addresses already exported while choosing the extent)*
 - [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
-- [ ] **Ground-surface filtering** (PDAL SMRF or CSF) — confirmed necessary by D2. Record the under-canopy limitation in the derivation note
-- [ ] Filtered ground surface for the build extent — **not** to be called a LiDAR DTM anywhere
+- [x] **Ground-surface filtering** — confirmed necessary by D2. SMRF, written against numpy and scipy rather than PDAL, which will not install on the team's machines. Window set to 26 m by measuring the extent, not by taste; the under-canopy limitation is in `DERIVATION_NOTE` and travels with the artefact
+- [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid in 8.9 s, 54.1% of cells measured, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
 - [ ] **Depressions characterised on the raw surface** → elevation–volume tables → *2.2.1*
 - [ ] **Conditioning on a separate surface**, building footprints as no-flow barriers → D8 flow-direction grid → *1.1.2.b, 2.2.1*
 - [ ] Pit and pipe geometry tiles → *1.1.2.b, 1.1.3.b*

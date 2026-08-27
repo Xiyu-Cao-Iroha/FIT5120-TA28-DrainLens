@@ -7,7 +7,7 @@ name = "drainlens-pipeline"
 version = "0.1.0"
 description = "Offline geospatial pipeline. Runs on a developer machine and publishes versioned static artefacts; never deployed."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["numpy>=1.26", "scipy>=1.11"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
