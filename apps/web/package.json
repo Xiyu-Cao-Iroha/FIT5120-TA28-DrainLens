@@ -1,0 +1,24 @@
+{
+  "name": "@drainlens/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The browser application. Holds the address, task and scenario inputs in memory for the life of the tab and nowhere else.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --build && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@drainlens/scenario": "0.1.0",
+    "@drainlens/schema": "0.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^6.4.3"
+  }
+}
