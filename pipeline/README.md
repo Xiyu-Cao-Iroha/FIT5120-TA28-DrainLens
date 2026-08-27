@@ -56,6 +56,26 @@ For traversal an unresolvable identifier is exactly as useless as a missing one,
 
 The CLI compares its output against the audit figures on every run and reports drift rather than failing: the rules live in this repository and may legitimately move, but drift should never pass unnoticed.
 
+## Fetch the demonstration tiles
+
+```
+./.venv/Scripts/python.exe -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud
+```
+
+No arguments needed: it defaults to the Iteration 1 demonstration extent. The point cloud is published as one 4.33 GB zip, but S3 serves HTTP range requests and a zip keeps its directory at the end, so the four tiles the extent needs come back in **81.5 MB** — 98.1% of the archive never leaves the server.
+
+That is not a micro-optimisation. It is the difference between a teammate rebuilding the terrain artefacts in a few minutes and having to schedule a download, which on a six-day iteration decides whether anyone reruns the build at all.
+
+`--extent MIN_E MIN_N MAX_E MAX_N` takes any MGA55 bounds; `--force` re-fetches what is already on disk.
+
+## The demonstration extent
+
+Kensington, 1 km², MGA Zone 55 **316,500–317,500 E · 5,814,500–5,815,500 N** — `Tile_+007_+015`, `Tile_+008_+015`, `Tile_+007_+016`, `Tile_+008_+016`. Opening address **46 Gatehouse Drive**.
+
+Chosen by measurement, not by eye. The reasoning is in `docs/DEMO-EXTENT.md`; the extent itself is stated as data in `geo.py` so the three workstreams that need to know "which tiles?" cannot each derive a different answer.
+
+The projection in `geo.py` is worth trusting: it agrees with the eastings and northings the City of Melbourne publishes alongside latitude and longitude, across all 63,721 address records, to within a millimetre.
+
 ## Still to come
 
-Terrain — ground classification, bare-earth DTM, depressions on the raw surface, conditioning on a separate surface with building footprints as barriers, D8 flow-direction grid. This is the critical path for Iteration 1 and the largest single body of work in the project.
+Terrain — ground-surface filtering, the filtered surface, depressions on the raw surface, conditioning on a separate surface with building footprints as barriers, D8 flow-direction grid. This is the critical path for Iteration 1 and the largest single body of work in the project.

@@ -51,7 +51,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 ## W1 · Offline pipeline — *critical path*
 
 - [x] **D2 check** — no classification present; filtering is real work, and the cloud is photogrammetric
-- [ ] Agree the demonstration address and extent — **proposal ready in [DEMO-EXTENT.md](./DEMO-EXTENT.md): Kensington, 46 Gatehouse Drive, four tiles.** Needs a decision today; the terrain build cannot start without it
+- [x] **Demonstration address and extent fixed** — Kensington, 46 Gatehouse Drive, four tiles. Stated as data in `pipeline/geo.py` and reasoned in [DEMO-EXTENT.md](./DEMO-EXTENT.md)
+- [x] **Tiles on disk** — `python -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud` brings back 81.5 MB of the 4.33 GB archive. 6.6 M points over the square kilometre
 - [x] **Drainage graph artefact** — self-loops excluded, directed graph from `upstr_pit`/`dnstr_pit`, cycles recorded, narrowing indicator, inlet classification → *1.2.1, 1.2.2, 1.3.1.c*
 - [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*  *(all 63,721 addresses already exported while choosing the extent)*
 - [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
