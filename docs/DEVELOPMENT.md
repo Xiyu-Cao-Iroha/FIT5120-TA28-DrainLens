@@ -107,7 +107,7 @@ npm run check                                 # and pytest, if you touched pipel
 git push -u origin feat/short-description
 ```
 
-The push prints a link that opens the pull request. In the description, say what changed and why, and **name the acceptance criterion the change serves** — `1.2.d`, `2.1.b`, and so on, from [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md). A change that serves no criterion is worth a conversation before it is worth a review.
+The push prints a link that opens the pull request. In the description, say what changed and why, and **name the acceptance criterion the change serves** — `1.2.2.d`, `2.1.2.e`, and so on, from [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md). A change that serves no criterion is worth a conversation before it is worth a review.
 
 ### Commit messages
 
