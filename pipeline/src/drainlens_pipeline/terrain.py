@@ -28,6 +28,14 @@ from .ground import (
     GroundSurface,
     build_ground_surface,
 )
+from .hydrology import (
+    CONDITIONING_EPSILON_M,
+    MIN_DEPRESSION_DEPTH_M,
+    Depression,
+    condition,
+    d8,
+    find_depressions,
+)
 from .las import read_file
 
 CELL_SIZE_M = 1.0
@@ -65,6 +73,13 @@ class TerrainBuild:
     tiles: list[str]
     point_count: int
     seconds: float
+    depressions: list[Depression]
+    direction: np.ndarray
+    """D8 code per cell, from the conditioned surface. Never from the raw one."""
+
+    @property
+    def storage_m3(self) -> float:
+        return sum(d.capacity_m3 for d in self.depressions)
 
     def manifest(self) -> dict:
         rows, cols = self.surface.shape
@@ -97,6 +112,18 @@ class TerrainBuild:
                 "min": round(float(elevation.min()), 3),
                 "max": round(float(elevation.max()), 3),
                 "mean": round(float(elevation.mean()), 3),
+            },
+            "hydrology": {
+                "depressions": len(self.depressions),
+                "storage_m3": round(self.storage_m3, 1),
+                "min_depression_depth_m": MIN_DEPRESSION_DEPTH_M,
+                "conditioning_epsilon_m": CONDITIONING_EPSILON_M,
+                "fork_order": (
+                    "Depressions are measured on the raw ground surface and the flow "
+                    "directions come from a separate conditioned surface. Filling a "
+                    "surface removes exactly the storage this model needs, so the order "
+                    "is a correctness requirement rather than a preference."
+                ),
             },
             "derivation_note": DERIVATION_NOTE,
             "build_seconds": round(self.seconds, 1),
@@ -141,13 +168,43 @@ def build(
         max_window_m=MAX_WINDOW_M,
         slope_threshold=SLOPE_THRESHOLD,
     )
-    return TerrainBuild(surface, extent, names, len(points), time.perf_counter() - started)
+
+    # Measure on the surface that gets published, not the one in memory. The
+    # artefact is written at single precision, and a hollow sitting within a
+    # rounding step of the depth threshold falls on a different side of it at
+    # each precision — so anyone recomputing from the published file would find
+    # a different number of depressions than the manifest claims.
+    raw = surface.elevation.astype(np.float32).astype(np.float64)
+
+    # The fork. Depressions come off the surface as filtered; the routing grid
+    # comes off a conditioned copy. Swapping these two lines produces a build
+    # that succeeds, renders, and can never report ponding.
+    log(f"Measuring depressions on the raw surface, {MIN_DEPRESSION_DEPTH_M:.2f} m and deeper")
+    depressions = find_depressions(raw, CELL_SIZE_M)
+    log(f"  {len(depressions):,} hollows holding {sum(d.capacity_m3 for d in depressions):,.0f} m3")
+
+    log("Conditioning a separate surface and routing it")
+    direction = d8(condition(raw))
+
+    return TerrainBuild(
+        surface,
+        extent,
+        names,
+        len(points),
+        time.perf_counter() - started,
+        depressions,
+        direction,
+    )
 
 
 def write(result: TerrainBuild, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / "ground-surface.npy", result.surface.elevation.astype(np.float32))
     np.save(out_dir / "ground-observed.npy", result.surface.observed)
+    np.save(out_dir / "flow-direction.npy", result.direction)
+    (out_dir / "depressions.json").write_text(
+        json.dumps([d.as_json() for d in result.depressions], indent=2) + "\n", encoding="utf-8"
+    )
     (out_dir / "terrain.json").write_text(
         json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
     )
@@ -183,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     log(f"  elevation       {surface.elevation.min():.2f} to {surface.elevation.max():.2f} m AHD")
     log(f"  measured        {1 - surface.filled_fraction:.1%} of cells")
     log(f"  interpolated    {surface.filled_fraction:.1%} — buildings, canopy, and gaps")
+    log(f"  depressions     {len(result.depressions):,} holding {result.storage_m3:,.0f} m3")
     log(f"  built in        {result.seconds:.1f} s")
     log(f"  written to      {args.out}")
     return 0

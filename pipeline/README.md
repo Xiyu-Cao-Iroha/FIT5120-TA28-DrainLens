@@ -102,6 +102,37 @@ PDAL ships an SMRF and will not install on the machines this is being built on. 
 
 **The uphill edge is shaved.** Opening returns a plane exactly — that is what stops the filter flattening streets — but only on an unbounded one. Within `max_window_m / 2` of the uphill boundary the structuring element cannot fit, so a band there is lowered. At Kensington's gradients this stays far below the threshold and nothing is flagged. The fix, if an extent ever needs it, is to filter a buffer and crop.
 
+## Depressions and flow routing
+
+Both come out of the same `terrain` command, and the order they come out in is a correctness requirement rather than a preference.
+
+**Depressions are measured on the raw surface. Flow directions come from a separate conditioned one.** Filling a surface removes precisely the storage this model needs — characterise the hollows first, or they are gone and the engine can never report ponding. A build with the two swapped succeeds, renders, and is silently useless. `hydrology.py` says so at the top for whoever edits it next.
+
+### The 0.25 m floor, and why most hollows are not hollows
+
+Filling the demonstration extent finds **8,472 separate hollows whose median maximum depth is 5 cm**. The source is quoted at about 25 cm accuracy, so the great majority of those are the surface's own noise rather than places water collects.
+
+Cutting at the accuracy the publisher quotes keeps **537 hollows — 6.3% of the count — holding 88.8% of the filled volume**. Throwing away 93.7% of the objects costs 11.2% of the water. Two independent arguments land on the same number, which is the reason to trust it: the knee in the volume curve, and the error bar on the measurement that found them.
+
+The discarded water is not lost. It routes downstream instead of ponding, and it is discarded identically in the blocked and all-clear runs, so it largely cancels in the comparison the product actually reports.
+
+The four largest hollows sit at **0.4–2.3 m AHD** — the lowest ground in the extent, the Kensington Banks flats. The biggest storage landing in the known flood-prone corner is the sanity check that matters most.
+
+### The one number that could break everything silently
+
+The D8 code table is a contract between this pipeline and `packages/scenario/src/flow.ts`. If the two ever disagree about what a `1` means, water routes sideways and **nothing objects**: the build succeeds, the tests pass, the map renders, and every answer is wrong.
+
+So `tests/test_d8_contract.py` does not restate the table. It parses the TypeScript declaration and compares it — the only version of the check that can fail when somebody edits one side. Tampering with a single offset trips four of its assertions at once.
+
+### Two invariants held over the whole field, not sampled
+
+- **Zero interior dead ends.** Every cell away from the boundary has somewhere for water to go.
+- **All 998,594 directed cells point strictly downhill**, the smallest step being the conditioning epsilon. That is what makes a cycle impossible: following directions strictly decreases elevation, so every path terminates at the window edge.
+
+### Building footprints are still missing
+
+`condition()` accepts a barrier mask; the footprints have not been fetched yet, so the current routing has none. **Do not reach for the ground filter's object mask as a substitute.** It includes tree canopy, and water flows under trees — using it would wall off every tree-lined street in Kensington.
+
 ## Still to come
 
-Depressions characterised on the raw surface, then conditioning on a *separate* surface with building footprints as barriers, then the D8 flow-direction grid. The order is a correctness requirement: filling removes exactly the storage volumes the scenario model needs.
+Coverage mask, data manifest and assumption register; pit and pipe geometry tiles; the address index and pilot-area boundary.
