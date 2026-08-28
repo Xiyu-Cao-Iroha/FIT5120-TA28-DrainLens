@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { type MapArtefact, boundsOf } from './artefact.js';
+import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
 import { drawMap } from './draw.js';
 import { type Hit, pick } from './hit.js';
 import { type Viewport, clamp, fit, pan, zoomAt } from './viewport.js';
@@ -21,11 +22,19 @@ const DRAG_SLOP_PX = 4;
 
 export interface MapCanvasProps {
   readonly artefact: MapArtefact;
+  readonly derived?: DerivedArtefact | null;
+  readonly show?: DerivedVisibility;
   readonly selectedPit?: number | null;
   readonly onSelect?: (hit: Hit | null) => void;
 }
 
-export function MapCanvas({ artefact, selectedPit = null, onSelect }: MapCanvasProps) {
+export function MapCanvas({
+  artefact,
+  derived = null,
+  show,
+  selectedPit = null,
+  onSelect,
+}: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -67,8 +76,11 @@ export function MapCanvas({ artefact, selectedPit = null, onSelect }: MapCanvasP
     const context = canvas.getContext('2d');
     if (!context) return;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    // Recorded first, derived over it. A derivation drawn under the network it
+    // was calculated from would look like the ground the network sits in.
     drawMap(context, artefact, viewport, { selectedPit });
-  }, [artefact, viewport, selectedPit]);
+    if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
+  }, [artefact, derived, show, viewport, selectedPit]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
