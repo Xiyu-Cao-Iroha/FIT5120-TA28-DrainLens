@@ -13,7 +13,10 @@ import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { MapView } from './screens/MapView.js';
 import { Landing } from './screens/Landing.js';
+import { Result } from './screens/Result.js';
+import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
+import type { Action } from './scenario/outcome.js';
 import { INITIAL_SESSION, reduce } from './session.js';
 import { Shell } from './ui/Shell.js';
 
@@ -135,6 +138,101 @@ export function App() {
         </Shell>
       );
 
+    case 'scenario':
+    case 'result': {
+      const onAction = (action: Action) => {
+        switch (action) {
+          case 'change-scenario':
+          case 'review-scenario':
+            dispatch({ type: 'change-scenario' });
+            return;
+          case 'choose-another-pit':
+            // Keep the rainfall and the blockage: they were the person's own
+            // assumptions and the pit is the thing that did not work.
+            dispatch({ type: 'change-scenario' });
+            return;
+          case 'try-again':
+            dispatch({ type: 'comparison-started' });
+            dispatch({ type: 'comparison-finished', outcome: { kind: 'insufficient', reason: 'scenario_calculation_failed' } });
+            return;
+          case 'change-address':
+            dispatch({ type: 'change-address' });
+            return;
+          case 'return-to-map':
+            dispatch({ type: 'task-chosen', task: 'full-map' });
+            return;
+        }
+      };
+
+      const outcome = session.outcome;
+      return (
+        <Shell
+          crumbs={
+            <>
+              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {separator}
+              {crumb('Choose a task', () => dispatch({ type: 'task-chosen', task: 'compare' }))}
+              {separator}
+              {crumb('Compare scenario', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
+              {session.screen === 'result' && (
+                <>
+                  {separator}
+                  {crumb('Result', undefined, true)}
+                </>
+              )}
+            </>
+          }
+        >
+          <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
+            <div
+              style={{
+                width: 420,
+                flexShrink: 0,
+                overflow: 'auto',
+                borderRight: '1px solid #e6ebe4',
+                background: '#ffffff',
+              }}
+            >
+              {session.screen === 'result' && outcome !== null ? (
+                <Result
+                  outcome={
+                    outcome.kind === 'comparison'
+                      ? { status: 'successful', band: outcome.band }
+                      : { status: 'insufficient-information', reason: outcome.reason }
+                  }
+                  scenario={session.scenario}
+                  onAction={onAction}
+                />
+              ) : (
+                <ScenarioSetup
+                  address={session.address!}
+                  scenario={session.scenario}
+                  suggestedPitId={session.scenario.pitId === null ? 'P-14' : null}
+                  onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
+                  onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
+                  onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
+                  onRun={() => {
+                    dispatch({ type: 'comparison-started' });
+                    // The engine runs behind a worker once the terrain artefact
+                    // is browser-loadable. Until then the screen is wired to
+                    // the real outcome type, not to a different shape.
+                    dispatch({
+                      type: 'comparison-finished',
+                      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
+                    });
+                  }}
+                  onReset={() => dispatch({ type: 'reset-choices' })}
+                />
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+              <MapCanvasPane loaded={loaded} />
+            </div>
+          </div>
+        </Shell>
+      );
+    }
+
     default:
       return (
         <Shell
@@ -158,4 +256,18 @@ export function App() {
         </Shell>
       );
   }
+}
+
+/** The map beside the scenario panel, with everything derived shown. */
+function MapCanvasPane({ loaded }: { readonly loaded: Loaded }) {
+  return (
+    <MapView
+      map={loaded.map}
+      derived={loaded.derived}
+      address={null}
+      task="full-map"
+      onBack={() => undefined}
+      panel={false}
+    />
+  );
 }

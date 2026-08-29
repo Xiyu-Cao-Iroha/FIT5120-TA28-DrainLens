@@ -37,9 +37,11 @@ export interface MapViewProps {
   readonly address: SupportedAddress | null;
   readonly task: Task | null;
   readonly onBack: () => void;
+  /** The side panel is suppressed when the map sits beside another one. */
+  readonly panel?: boolean;
 }
 
-export function MapView({ map, derived, address, task, onBack }: MapViewProps) {
+export function MapView({ map, derived, address, task, onBack, panel = true }: MapViewProps) {
   const guided = task !== 'full-map';
   const [show, setShow] = useState<DerivedVisibility>(guided ? GUIDED : EVERYTHING);
   const [moreOpen, setMoreOpen] = useState(!guided);
@@ -57,6 +59,7 @@ export function MapView({ map, derived, address, task, onBack }: MapViewProps) {
         onSelect={setHit}
       />
 
+      {panel && (
       <aside
         style={{
           position: 'absolute',
@@ -205,6 +208,7 @@ export function MapView({ map, derived, address, task, onBack }: MapViewProps) {
           ← Back to choose a task
         </button>
       </aside>
+      )}
     </>
   );
 }
