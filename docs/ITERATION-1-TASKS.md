@@ -108,8 +108,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Street labels** — one per street at its longest visible run, colliding labels dropped rather than overdrawn. The source names every segment and Kensington's blocks are short, so drawing them all wrote the same name six times across four centimetres
 - [ ] Follow-local-water view: surface-water paths and pits **by default**, one next-step instruction, other layers in a **collapsed** section → *1.1.2*
 - [ ] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
-- [ ] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*
-- [ ] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*
+- [x] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*. Fields the record leaves empty say **Not recorded** rather than showing a blank, and depth is declared absent rather than interpolated
+- [x] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*. Direction is read from the topology, not from vertex order, which carries no meaning in the source
 - [ ] Hand-authored SVG street cross-section, depth only where supported, no capacity claim → *1.3.1*
 - [ ] **Cross-section unavailable state** — say which information is missing rather than filling it → *1.3.2*
 

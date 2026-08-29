@@ -16,6 +16,8 @@ import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './der
 import { drawMap } from './draw.js';
 import { type Hit, pick } from './hit.js';
 import { type Viewport, clamp, fit, pan, zoomAt } from './viewport.js';
+import { drawTrace } from '../trace/draw.js';
+import type { Trace } from '../trace/graph.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
 const DRAG_SLOP_PX = 4;
@@ -25,6 +27,8 @@ export interface MapCanvasProps {
   readonly derived?: DerivedArtefact | null;
   readonly show?: DerivedVisibility;
   readonly selectedPit?: number | null;
+  /** A followed downstream path, drawn over the network it was read from. */
+  readonly trace?: Trace | null;
   readonly onSelect?: (hit: Hit | null) => void;
 }
 
@@ -33,6 +37,7 @@ export function MapCanvas({
   derived = null,
   show,
   selectedPit = null,
+  trace = null,
   onSelect,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -80,7 +85,11 @@ export function MapCanvas({
     // was calculated from would look like the ground the network sits in.
     drawMap(context, artefact, viewport, { selectedPit });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
-  }, [artefact, derived, show, viewport, selectedPit]);
+    // The followed path goes on top of both. It is the answer to the
+    // question the person just asked, and a derived layer drawn over it
+    // would bury the thing they are looking for.
+    if (trace) drawTrace(context, artefact, trace, viewport);
+  }, [artefact, derived, show, viewport, selectedPit, trace]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

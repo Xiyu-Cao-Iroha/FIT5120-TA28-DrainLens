@@ -66,6 +66,7 @@ pipeline/                    Python. Never deployed. Produces artefacts.
   hydrology.py   footprints.py     → depressions, conditioning, D8 routing
   network.py     derived.py        → map geometry, surface-water layers
   addresses.py   scene.py          → address index, browser scene pack
+  trace.py                         → downstream topology, with a reason at every end
 
 packages/schema/             Shared definitions. No logic. The single authority.
   vocabulary.ts  wire.ts  provenance.ts  scenario.ts
@@ -77,6 +78,7 @@ apps/web/                    React + Vite. The only thing deployed.
   session.ts                        state machine
   address/search.ts                 in-memory address search
   map/                              canvas renderer
+  trace/                            downstream traversal and its rendering
   scenario/                         worker, scene loading, wording
   screens/                          five screens
 ```
@@ -87,7 +89,7 @@ apps/web/                    React + Vite. The only thing deployed.
 
 ## 4 · Feature walkthroughs
 
-Six features. Each gives the click, the files in order, and the thing worth understanding.
+Seven features. Each gives the click, the files in order, and the thing worth understanding.
 
 ### 4.1 · Address search and the pilot boundary
 
@@ -261,7 +263,43 @@ Depressions are *measured* on the raw surface, because that is the terrain we pu
 
 ---
 
-### 4.6 · The result screen and its wording
+### 4.6 · Following the drainage downstream
+
+Built 29 August. The best answer in the codebase to "why is there a pipeline stage for this?"
+
+| Step | File · function | What happens |
+|---|---|---|
+| 1 | `pipeline/trace.py` · `build()` | Offline: the extent's downstream links, each with a reason if it stops |
+| 2 | `App.tsx` · `load()` | Fetches `/data/trace.json` (37 KB) |
+| 3 | `trace/graph.ts` · `assertTrace()` | Refuses an artefact not declaring a `sourceProvided` basis |
+| 4 | `screens/PitDetail.tsx` | Shows the recorded fields, and offers the follow action |
+| 5 | `trace/graph.ts` · `traceDownstream()` | Breadth-first over all branches, cycle-guarded |
+| 6 | `trace/draw.ts` · `drawTrace()` | Path, direction arrows, a mark at every stop |
+
+**Why a pipeline stage at all — the question to have ready.** `map.json` already carries every pipe with an `upstr_pit` and a `dnstr_pit`, so the browser could trace without any new artefact. It could not do one thing:
+
+> A pipe whose downstream pit is not among the extent's pits has two completely different explanations, and the map artefact cannot tell them apart. Either the council recorded where it goes and it goes somewhere we clipped off — the path continues, we are simply not drawing it — or the council never recorded where it goes, and the path stops because the record stops. In this extent that is **7 edges of the first kind and 29 of the second**. Showing all 36 as "the pipe goes nowhere" would state something false about the source data. Only the council-wide graph knows which is which, so we resolve it once, offline, and ship the reason.
+
+**There are no recorded outlets, and this is the honest finding worth volunteering.** All 215 extent pits with no downstream pipe are junctions, kerbside inlets or unrecorded types — not one is an outfall, endwall or discharge point. **83 of them are inlets**, and a kerbside grate is not where a drainage system ends; it is where the record does. So the code has no `outlet` termination to return and the interface has none to display. AC 1.2.2.c offers "the recorded outlet or the last known connection"; in this data it is always the second, and a trace that announced an outlet would be inventing the end of a drainage system.
+
+**Direction comes from topology, not geometry.** A pipe's vertices are ordered however the surveyor captured them, so `orientAwayFrom()` decides which end is upstream by asking which is nearer the pit the path arrived from. Reading direction off vertex order would produce arrows that are right about half the time — and a confidently wrong arrow about which way water flows is worse than no arrow.
+
+**Two cycle guards, on purpose.** The artefact marks the council's own back edges (18 across 34 nodes; one of them lies inside the demonstration extent, so the guard is exercised by the demo data itself). The traversal *also* keeps a visited set, because the artefact's marking was computed over the council-wide graph and a loop that only closes within the extent would not appear in it.
+
+**The measured counts**, which the panel's wording depends on:
+
+| | |
+|---|---:|
+| Pits in the extent | 895 |
+| Links that stay inside it | 697 |
+| Pits with no downstream pipe at all | 215 |
+| Pipes whose destination was never recorded | 29 |
+| Pipes continuing past the mapped area | 7 |
+| Back edges inside the extent | 1 |
+
+---
+
+### 4.7 · The result screen and its wording
 
 `scenario/outcome.ts` holds every user-facing sentence as data — `BANDS`, `INSUFFICIENT`, `RESULT_DISCLAIMER`, `HOW_IT_WAS_PRODUCED`. `Result.tsx` chooses from it and renders. Nothing writes a sentence inline.
 
@@ -282,12 +320,13 @@ LiDAR archive          council open data
       ground → hydrology → derived → scene
                │
                ▼   static build products, versioned, replaced wholesale
-      map.json · derived.json · addresses.json · scene.json · *.bin
+      map.json · derived.json · trace.json · addresses.json · scene.json · *.bin
                │
                ▼   plain GET, gzipped, no query about the person
       apps/web  ──► App.tsx load()  ──► assertUsable / assertDerived
                │
                ├──► address/search.ts    (in memory, never fetches)
+               ├──► trace/graph.ts       (downstream traversal, cycle-guarded)
                ├──► map/draw.ts          (canvas, one affine transform)
                └──► scenario/worker.ts   ──► packages/scenario/engine.ts
                               postMessage           runScenario()
@@ -304,6 +343,7 @@ LiDAR archive          council open data
 |---|---:|
 | `map.json` | 318 KB |
 | `derived.json` | 183 KB |
+| `trace.json` | 37 KB |
 | `scene.json` | 92 KB |
 | `scene/*.bin` | 1.28 MB gzipped |
 
@@ -325,6 +365,7 @@ The mentor may ask "why did you choose X". Each of these has a rejected alternat
 | D8 single-flow routing | D-infinity / multiple-flow | D8 is exact for the topological order we need, and the artefact is an `Int8Array` of direction codes rather than eight fractions per cell. |
 | Kahn's algorithm | Sort by elevation | Elevation is a proxy. 509 of a million cells were exactly level at float32. |
 | Discriminated unions for outcomes | Nullable fields / error strings | The compiler forces every screen to handle every case; a new insufficiency reason breaks the build at each site that must change. |
+| An offline trace artefact | Tracing from `map.json` in the browser | The map cannot distinguish a pipe we clipped from one the council never finished recording. 7 edges versus 29, and they are different claims. |
 | Vitest | Jest | Native ESM and TypeScript with no transform config; the suite runs in 1.4 s, which is what keeps it being run. |
 
 ---
@@ -345,15 +386,15 @@ What the mentor can check in the repository, and what lives outside it.
 | Coverage gates | `vitest.config.ts`, `pyproject.toml` | 88% overall, 90% for judgement-carrying modules |
 | Commit messages | prose explaining *why*, not what | see `git log` |
 
-### Numbers, as measured on 29 August 2026
+### Numbers, as measured on 29 August 2026 (after the trace feature landed)
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **278**, 13 files, 1.37 s |
-| Python tests | **308** |
-| TypeScript coverage | **90.04%** statements · 93.67% branches · 95.6% functions |
-| Python coverage | **90.94%** |
-| Source lines, excluding tests | ~16,000 |
+| TypeScript tests | **334**, 16 files, under 2 s |
+| Python tests | **332** |
+| TypeScript coverage | **91.17%** statements · 93.93% branches · 96.15% functions |
+| Python coverage | **91.44%** |
+| Source lines, excluding tests | ~17,000 |
 
 Both suites pass and both are above their gate. The suite is required to finish under five seconds; anything slower belongs behind a separate script.
 
@@ -395,6 +436,7 @@ Fill this in before Tuesday. The person who wrote a piece is asked first; if the
 | Scenario engine | `packages/scenario/` | | |
 | Shared schema | `packages/schema/` | | |
 | Canvas map | `apps/web/src/map/` | | |
+| Downstream trace | `pipeline/trace.py`, `apps/web/src/trace/` | | |
 | Screens, session, wording | `apps/web/src/screens/`, `session.ts` | | |
 | Worker and scene loading | `apps/web/src/scenario/` | | |
 | CI, branching, quality gates | `.github/`, `vitest.config.ts` | | |
@@ -408,6 +450,7 @@ Fill this in before Tuesday. The person who wrote a piece is asked first; if the
 1. `npm run check` and `pytest` — both green, and know the numbers in section 7.
 2. `git log --oneline -10` on `develop` — be able to say what the last three commits did.
 3. Open the app and click through: address → task → scenario → result, including one insufficient state.
+   Then select pit **1145091** and follow it: 33 pipes, 15 steps, stopping in five places for three different reasons.
 4. Have `engine.ts`, `viewport.ts` and `ground.py` open in tabs. They are the three most likely to be pointed at.
 5. Read section 8 aloud once. Those are the things to say before being asked.
 

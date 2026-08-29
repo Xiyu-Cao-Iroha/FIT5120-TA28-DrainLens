@@ -7,13 +7,15 @@
  * opens, and that difference is the whole reason the task question exists.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact, DerivedVisibility } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import type { SupportedAddress, Task } from '../session.js';
+import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
+import { PitDetail } from './PitDetail.js';
 
 const BASIS_STYLE: Readonly<Record<string, { background: string; color: string }>> = {
   'Official recorded data': { background: '#dcece6', color: '#1f5b4e' },
@@ -34,6 +36,7 @@ const EVERYTHING: DerivedVisibility = { channel: true, lowPoint: true, unavailab
 export interface MapViewProps {
   readonly map: MapArtefact;
   readonly derived: DerivedArtefact;
+  readonly trace: TraceArtefact;
   readonly address: SupportedAddress | null;
   readonly task: Task | null;
   readonly onBack: () => void;
@@ -41,13 +44,21 @@ export interface MapViewProps {
   readonly panel?: boolean;
 }
 
-export function MapView({ map, derived, address, task, onBack, panel = true }: MapViewProps) {
+export function MapView({ map, derived, trace, address, task, onBack, panel = true }: MapViewProps) {
   const guided = task !== 'full-map';
   const [show, setShow] = useState<DerivedVisibility>(guided ? GUIDED : EVERYTHING);
   const [moreOpen, setMoreOpen] = useState(!guided);
   const [hit, setHit] = useState<Hit | null>(null);
+  const [following, setFollowing] = useState<string | null>(null);
 
   const selected = hit?.kind === 'pit' ? (hit.feature.asset_number ?? null) : null;
+
+  // Recomputed only when the followed pit changes. The traversal is cheap,
+  // but it runs inside a render that also happens on every pan.
+  const followed = useMemo(
+    () => (following === null ? null : traceDownstream(trace, following)),
+    [trace, following],
+  );
 
   return (
     <>
@@ -56,7 +67,15 @@ export function MapView({ map, derived, address, task, onBack, panel = true }: M
         derived={derived}
         show={show}
         selectedPit={selected}
-        onSelect={setHit}
+        trace={followed}
+        onSelect={(next) => {
+          setHit(next);
+          // Selecting something else abandons the path. Leaving it drawn
+          // would attach the previous answer to the new question.
+          if (next?.kind !== 'pit' || String(next.feature.asset_number) !== following) {
+            setFollowing(null);
+          }
+        }}
       />
 
       {panel && (
@@ -175,11 +194,13 @@ export function MapView({ map, derived, address, task, onBack, panel = true }: M
           {hit === null ? (
             <span style={{ color: '#6b7a88' }}>Select a drainage pit or pipe.</span>
           ) : hit.kind === 'pit' ? (
-            <>
-              <strong>Pit {hit.feature.asset_number}</strong>
-              <div style={{ color: '#6b7a88' }}>{hit.feature.asset_description}</div>
-              <Badge basis="Official recorded data" />
-            </>
+            <PitDetail
+              pit={hit.feature}
+              artefact={trace}
+              trace={followed}
+              onFollow={() => setFollowing(String(hit.feature.asset_number))}
+              onClear={() => setFollowing(null)}
+            />
           ) : (
             <>
               <strong>Pipe {hit.feature.ref}</strong>

@@ -11,6 +11,7 @@ import { useEffect, useReducer, useState } from 'react';
 import type { AddressIndex } from './address/search.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
+import { type TraceArtefact, assertTrace } from './trace/graph.js';
 import { MapView } from './screens/MapView.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
@@ -24,25 +25,28 @@ import { Shell } from './ui/Shell.js';
 interface Loaded {
   readonly map: MapArtefact;
   readonly derived: DerivedArtefact;
+  readonly trace: TraceArtefact;
   readonly index: AddressIndex;
   readonly fixtureNote: string | undefined;
 }
 
 async function load(): Promise<Loaded> {
-  const [map, derived, addresses] = await Promise.all([
+  const [map, derived, trace, addresses] = await Promise.all([
     fetch('/data/map.json').then((r) => r.json()),
     fetch('/data/derived.json').then((r) => r.json()),
+    fetch('/data/trace.json').then((r) => r.json()),
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
   assertUsable(map);
   assertDerived(derived);
+  assertTrace(trace);
 
   const index = addresses as AddressIndex & { fixture?: string };
   if (!Array.isArray(index.addresses)) {
     throw new Error('the address index carries no addresses');
   }
-  return { map, derived, index, fixtureNote: index.fixture };
+  return { map, derived, trace, index, fixtureNote: index.fixture };
 }
 
 export function App() {
@@ -275,6 +279,7 @@ export function App() {
           <MapView
             map={loaded.map}
             derived={loaded.derived}
+            trace={loaded.trace}
             address={session.address}
             task={session.task}
             onBack={() => dispatch({ type: 'back' })}
@@ -290,6 +295,7 @@ function MapCanvasPane({ loaded }: { readonly loaded: Loaded }) {
     <MapView
       map={loaded.map}
       derived={loaded.derived}
+      trace={loaded.trace}
       address={null}
       task="full-map"
       onBack={() => undefined}

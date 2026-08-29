@@ -79,10 +79,10 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given the user is viewing a local map containing recorded drainage pits, when they select a pit, then the system will:*
 
-- [ ] **1.2.1.a** Highlight the selected pit
-- [ ] **1.2.1.b** Display the available recorded information for that pit
-- [ ] **1.2.1.c** **Identify the information as official recorded data**
-- [ ] **1.2.1.d** Provide an option to follow its recorded downstream connection
+- [x] **1.2.1.a** Highlight the selected pit
+- [x] **1.2.1.b** Display the available recorded information for that pit
+- [x] **1.2.1.c** **Identify the information as official recorded data**
+- [x] **1.2.1.d** Provide an option to follow its recorded downstream connection
 
 > 1.2.1.c pushes provenance down to the individual pit. Every value shown here travels with the basis that produced it — see `packages/schema/src/provenance.ts`, where a value without a basis has no constructible shape.
 
@@ -90,12 +90,14 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given a pit with an available recorded downstream connection is selected, when they select "Follow the recorded downstream path", then the system will:*
 
-- [ ] **1.2.2.a** Highlight the selected pit and its available recorded downstream pipes
-- [ ] **1.2.2.b** Show the recorded direction of the drainage path
-- [ ] **1.2.2.c** Continue the path to the recorded outlet or the last known connection
-- [ ] **1.2.2.d** Clearly identify any missing or uncertain connection
-- [ ] **1.2.2.e** **Avoid completing the path using unsupported or inferred pipe connections**
+- [x] **1.2.2.a** Highlight the selected pit and its available recorded downstream pipes
+- [x] **1.2.2.b** Show the recorded direction of the drainage path
+- [x] **1.2.2.c** Continue the path to the recorded outlet or the last known connection
+- [x] **1.2.2.d** Clearly identify any missing or uncertain connection
+- [x] **1.2.2.e** **Avoid completing the path using unsupported or inferred pipe connections**
 
+> **Built 29 August.** The traversal is `apps/web/src/trace/graph.ts`, the rendering `trace/draw.ts`, the panel `screens/PitDetail.tsx`, and the topology comes from `drainlens_pipeline.trace`. 1.2.2.c is satisfied by the *last known connection* in every case: the extent contains no recorded outfall, endwall or discharge point, so no path can reach an outlet and none claims to. See the measured counts below.
+>
 > Three behaviours are load-bearing and each needs its own test: the cycle guard (18 back-edges across 34 nodes exist in the real data, and a trace without a guard would not terminate on them), branch handling (multiple downstream paths are the normal case and must never collapse to one), and the termination reason — outlet, data boundary, or missing connection, and the interface must say which.
 >
 > The graph builder already supports 1.2.2.d and 1.2.2.e: a pipe whose downstream pit is absent from the export becomes an edge with **no destination** rather than no edge at all, so the path reaches it and stops there with that reason.
