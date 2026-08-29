@@ -19,17 +19,35 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 ---
 
+## Where this stands — 29 August 2026
+
+**58 of 77 interaction criteria met.** Every box below was checked against the code today, not assumed from a task list. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
+
+| Not met | Why |
+|---|---|
+| 1.1.2.a, 1.1.3.a | The map neither centres on nor draws a marker at the selected address. The address reaches the panel text only. **Smallest remaining gap, and it blocks two criteria.** |
+| 1.1.2.c | No plain-English sentence about where water near the address may move. The panel gives the next step, not the explanation. |
+| 1.1.3.b | No control for a terrain layer; the four controls cover the network and the three derived layers. |
+| 1.3.1.a–e, 1.3.2.a–c | The street cross-section is not built. |
+| 2.2.1.d | The map beside a result does not keep the selected pit and its downstream path visible — it renders with no selection and no trace. |
+| 2.2.2.a–d | No rainfall control on the result screen. The engine already solves three positions per run, so this is interface work rather than model work. |
+| 2.3.1.c, 2.3.1.e | The result does not visually separate recorded data, derived results and user assumptions, and does not state what is missing or uncertain. |
+
+US 1.2 was completed on 29 August; see the note under AC 1.2.2.
+
+---
+
 ## US 1.1 — Explore water flow near an address
 
 ### AC 1.1.1 — Select a supported address
 
 *Given the user is on the address search page, when they enter and confirm a recognised address within the supported pilot area, then the system will:*
 
-- [ ] **1.1.1.a** Display the selected address
-- [ ] **1.1.1.b** Open the task-selection page
-- [ ] **1.1.1.c** Present the options *Follow local water and drainage*, *Compare a drain-blockage scenario* and *Explore the full map*
-- [ ] **1.1.1.d** Allow the user to continue without creating an account
-- [ ] **1.1.1.e** Retain the selected address **in memory only, for as long as the tab is open**
+- [x] **1.1.1.a** Display the selected address
+- [x] **1.1.1.b** Open the task-selection page
+- [x] **1.1.1.c** Present the options *Follow local water and drainage*, *Compare a drain-blockage scenario* and *Explore the full map*
+- [x] **1.1.1.d** Allow the user to continue without creating an account
+- [x] **1.1.1.e** Retain the selected address **in memory only, for as long as the tab is open**
 
 > **1.1.1.e is two claims, and they need different checks.** *The address is never sent* — open the network panel, search, and confirm no request carries it; `assertSendable` in `@drainlens/schema` guards the code path and the manual check guards the guard. *The address is not kept* — confirm it appears in no `localStorage` key, no `sessionStorage` key, no URL and no history state. Navigation state lives in memory only; history state carries a screen identifier and nothing else. `sessionStorage` survives a reload, a URL is shared and logged, and history state is written to disk, so none of them is "only for the session" in the sense this criterion means.
 
@@ -38,11 +56,11 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 *Given a supported address is selected and the user is on the task-selection page, when they select "Follow local water and drainage", then the system will:*
 
 - [ ] **1.1.2.a** Open a local map centred on and marking the selected address
-- [ ] **1.1.2.b** Show likely surface-water paths and nearby drainage pits **by default**
+- [x] **1.1.2.b** Show likely surface-water paths and nearby drainage pits **by default**
 - [ ] **1.1.2.c** Provide a short plain-English explanation of where water near the address may move
-- [ ] **1.1.2.d** Display **one clear next-step instruction** asking the user to select a surface-water path or drainage pit
-- [ ] **1.1.2.e** Make other layers available through a **collapsed** "More map layers" section
-- [ ] **1.1.2.f** Clearly identify any missing, incomplete or uncertain information
+- [x] **1.1.2.d** Display **one clear next-step instruction** asking the user to select a surface-water path or drainage pit
+- [x] **1.1.2.e** Make other layers available through a **collapsed** "More map layers" section
+- [x] **1.1.2.f** Clearly identify any missing, incomplete or uncertain information
 
 ### AC 1.1.3 — Explore the full map
 
@@ -50,17 +68,17 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 - [ ] **1.1.3.a** Open a local map centred on and marking the selected address
 - [ ] **1.1.3.b** Provide controls for the terrain, surface-water path, low-area, drainage-pit and drainage-pipe layers
-- [ ] **1.1.3.c** Allow individual layers to be turned on or off
-- [ ] **1.1.3.d** **Distinguish official recorded data from system-derived information**
-- [ ] **1.1.3.e** Clearly identify information that is missing, incomplete or uncertain
+- [x] **1.1.3.c** Allow individual layers to be turned on or off
+- [x] **1.1.3.d** **Distinguish official recorded data from system-derived information**
+- [x] **1.1.3.e** Clearly identify information that is missing, incomplete or uncertain
 
 ### AC 1.1.4 — Enter an unsupported address
 
 *Given the user is on the address search page, when they enter and confirm an address outside the supported pilot area, then the system will:*
 
-- [ ] **1.1.4.a** Explain that detailed local drainage information is not available for that address
-- [ ] **1.1.4.b** **Not** present local drainage results as if supported data were available
-- [ ] **1.1.4.c** Allow the user to enter a different address
+- [x] **1.1.4.a** Explain that detailed local drainage information is not available for that address
+- [x] **1.1.4.b** **Not** present local drainage results as if supported data were available
+- [x] **1.1.4.c** Allow the user to enter a different address
 
 > The pilot area is the City of Melbourne, bounded by drainage asset coverage rather than terrain. Most of Greater Melbourne will land here, so this path is a main flow, not an edge case.
 
@@ -68,8 +86,8 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given a supported address is selected and the user is on a task page, when they select "Choose another task", then the system will:*
 
-- [ ] **1.1.5.a** Return to the task-selection page
-- [ ] **1.1.5.b** Retain the selected address for the current browser session
+- [x] **1.1.5.a** Return to the task-selection page
+- [x] **1.1.5.b** Retain the selected address for the current browser session
 
 ---
 
@@ -134,11 +152,11 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given a supported address is selected and the user is on the task-selection page or the local drainage map, when they select "Compare a drain-blockage scenario", then the system will:*
 
-- [ ] **2.1.1.a** Open the scenario setup page
-- [ ] **2.1.1.b** Present the setup in order: select a pit → choose a blockage setting → choose accumulated rainfall → run the comparison
-- [ ] **2.1.1.c** Carry over a drainage pit **only** when the user previously selected that pit
-- [ ] **2.1.1.d** Otherwise present a nearby pit as a **clearly labelled suggestion requiring confirmation**
-- [ ] **2.1.1.e** Leave the blockage setting **unselected** until the user chooses
+- [x] **2.1.1.a** Open the scenario setup page
+- [x] **2.1.1.b** Present the setup in order: select a pit → choose a blockage setting → choose accumulated rainfall → run the comparison
+- [x] **2.1.1.c** Carry over a drainage pit **only** when the user previously selected that pit
+- [x] **2.1.1.d** Otherwise present a nearby pit as a **clearly labelled suggestion requiring confirmation**
+- [x] **2.1.1.e** Leave the blockage setting **unselected** until the user chooses
 
 > 2.1.1.d and 2.1.1.e are the same instinct as the rest of the product: the system may suggest, but it does not decide on the resident's behalf and then present the decision as theirs.
 
@@ -146,13 +164,13 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given the user is on the scenario setup page, when they confirm one pit, select a blockage setting and select an accumulated rainfall within the supported range, then the system will:*
 
-- [ ] **2.1.2.a** Allow only one drainage pit to be changed in the scenario
-- [ ] **2.1.2.b** Allow the blockage setting to be **Clear**, **Partly blocked** or **Fully blocked**
-- [ ] **2.1.2.c** Display the accumulated rainfall in **millimetres**
-- [ ] **2.1.2.d** **Explain that the blockage setting is a scenario assumption, not the pit's observed current condition**
-- [ ] **2.1.2.e** **Explain that the accumulated rainfall is a user-selected assumption, not an observation or a forecast**
-- [ ] **2.1.2.f** Show the selected pit, blockage setting, accumulated rainfall and local calculation area in a scenario summary
-- [ ] **2.1.2.g** Enable the user to run the comparison
+- [x] **2.1.2.a** Allow only one drainage pit to be changed in the scenario
+- [x] **2.1.2.b** Allow the blockage setting to be **Clear**, **Partly blocked** or **Fully blocked**
+- [x] **2.1.2.c** Display the accumulated rainfall in **millimetres**
+- [x] **2.1.2.d** **Explain that the blockage setting is a scenario assumption, not the pit's observed current condition**
+- [x] **2.1.2.e** **Explain that the accumulated rainfall is a user-selected assumption, not an observation or a forecast**
+- [x] **2.1.2.f** Show the selected pit, blockage setting, accumulated rainfall and local calculation area in a scenario summary
+- [x] **2.1.2.g** Enable the user to run the comparison
 
 > **2.1.2.d is the answer to a question a reviewer already asked** — how does the model calculate deposit speed under a large water flow? It does not. The setting is an assumption held constant for the whole scenario, and AD13 records why: the model's independent variable is accumulated rainfall, not time, so no rate can come out of it. Three tests in `packages/scenario` hold that line. This criterion is what makes the interface say so too.
 >
@@ -166,13 +184,13 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given all required inputs are complete, when the user selects "Run comparison", then the system will:*
 
-- [ ] **2.2.1.a** Compare the selected blockage with an all-clear baseline **within the same local calculation area**
-- [ ] **2.2.1.b** Compare both conditions **at the same accumulated rainfall amount**
-- [ ] **2.2.1.c** Open the **Difference** view by default
+- [x] **2.2.1.a** Compare the selected blockage with an all-clear baseline **within the same local calculation area**
+- [x] **2.2.1.b** Compare both conditions **at the same accumulated rainfall amount**
+- [x] **2.2.1.c** Open the **Difference** view by default
 - [ ] **2.2.1.d** Keep the selected pit and its connected downstream path visible
-- [ ] **2.2.1.e** Identify supported result areas as **No clear change** or **Higher than baseline**
-- [ ] **2.2.1.f** Display **Insufficient information** where the data does not support a clear comparison
-- [ ] **2.2.1.g** Describe the result as an indicative comparison based on simplified assumptions, **not a live flood prediction**
+- [x] **2.2.1.e** Identify supported result areas as **No clear change** or **Higher than baseline**
+- [x] **2.2.1.f** Display **Insufficient information** where the data does not support a clear comparison
+- [x] **2.2.1.g** Describe the result as an indicative comparison based on simplified assumptions, **not a live flood prediction**
 
 > **2.2.1.f is implemented** by the gate in AC 2.2.3, which runs before anything is computed.
 >
@@ -195,10 +213,10 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given the data-sufficiency gate rejects the comparison, when the user runs it, then the system will:*
 
-- [ ] **2.2.3.a** Display **Insufficient information** instead of a result
-- [ ] **2.2.3.b** Name the reason: terrain unavailable, invalid inlet, calculation failed, or results not comparable
-- [ ] **2.2.3.c** **Not** show a partial or placeholder comparison alongside it
-- [ ] **2.2.3.d** Allow the user to change an input and try again
+- [x] **2.2.3.a** Display **Insufficient information** instead of a result
+- [x] **2.2.3.b** Name the reason: terrain unavailable, invalid inlet, calculation failed, or results not comparable
+- [x] **2.2.3.c** **Not** show a partial or placeholder comparison alongside it
+- [x] **2.2.3.d** Allow the user to change an input and try again
 
 > **Implemented.** The worker returns `SuccessfulComparison` or `InsufficientInformation` with one of four reasons — `terrain_unavailable`, `invalid_inlet`, `scenario_calculation_failed`, `comparison_not_comparable` — applied in that order, so the reason shown is the one that actually stopped the comparison rather than whichever check ran first. Nine tests in `packages/scenario` cover the gate.
 >
@@ -208,8 +226,8 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given a completed comparison is displayed, when the user selects "Back to scenario setup", then the system will:*
 
-- [ ] **2.2.4.a** Return to the scenario setup page
-- [ ] **2.2.4.b** Retain the previously selected pit, blockage setting and rainfall amount
+- [x] **2.2.4.a** Return to the scenario setup page
+- [x] **2.2.4.b** Retain the previously selected pit, blockage setting and rainfall amount
 
 ---
 
@@ -219,12 +237,12 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given a completed comparison is displayed, when the user opens "How this result was produced", then the system will:*
 
-- [ ] **2.3.1.a** Summarise the selected pit, blockage setting and accumulated rainfall
-- [ ] **2.3.1.b** Explain in plain English how the blockage assumption changes the indicative build-up compared with the all-clear baseline
+- [x] **2.3.1.a** Summarise the selected pit, blockage setting and accumulated rainfall
+- [x] **2.3.1.b** Explain in plain English how the blockage assumption changes the indicative build-up compared with the all-clear baseline
 - [ ] **2.3.1.c** **Distinguish official recorded data, system-derived indicative results and user-selected assumptions**
-- [ ] **2.3.1.d** Explain the simplified assumptions the comparison uses
+- [x] **2.3.1.d** Explain the simplified assumptions the comparison uses
 - [ ] **2.3.1.e** Identify important missing or uncertain information
-- [ ] **2.3.1.f** State that the comparison does not estimate water-routing time, flood arrival time or live flood conditions
+- [x] **2.3.1.f** State that the comparison does not estimate water-routing time, flood arrival time or live flood conditions
 
 > 2.3.1.c is what the provenance record exists for, and it cannot be met by styling text at render time. Every value carries a basis: a data version, a derivation, an entry in the assumption register, or a model version. 2.3.1.d needs that register to exist — it is a build artefact, and without it the "assumed" label points at nothing.
 
@@ -232,10 +250,10 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 *Given the data does not support a clear comparison, when the user opens "How this result was produced", then the system will:*
 
-- [ ] **2.3.2.a** Explain why the comparison is unclear
-- [ ] **2.3.2.b** Identify the missing or uncertain information affecting it
-- [ ] **2.3.2.c** Display **Insufficient information** instead of assigning a strong result category
-- [ ] **2.3.2.d** **Avoid presenting the result as evidence of real-world flood prediction accuracy**
+- [x] **2.3.2.a** Explain why the comparison is unclear
+- [x] **2.3.2.b** Identify the missing or uncertain information affecting it
+- [x] **2.3.2.c** Display **Insufficient information** instead of assigning a strong result category
+- [x] **2.3.2.d** **Avoid presenting the result as evidence of real-world flood prediction accuracy**
 
 > 2.3.2.d is precise and worth keeping precise. The engine's checks — synthetic terrain with a known answer, mass balance, monotonicity — verify it through **internal consistency and controlled test cases**. They establish that it behaves as designed. They do not establish real-world accuracy, and nothing in the interface may imply they do.
 

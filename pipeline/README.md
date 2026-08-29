@@ -23,7 +23,7 @@ py -m venv .venv                      # python3 -m venv .venv on macOS/Linux
 
 Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `stormwater-pits`, both CC BY, last modified 26 February 2023).
 
-**Artefacts are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored. Once the demonstration extent is agreed, the clipped extent for that area is small enough to commit and will be, so the frontend does not need a Python toolchain to have something to render.
+**Full-size artefacts are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
 
 ## What the graph builder does, and what it refuses to do
 
@@ -33,7 +33,7 @@ Three properties of the source data shape the output, and each is **recorded in 
 
 **Self-loops are excluded.** 87 pipes name the same pit at both ends.
 
-**A pipe whose downstream pit is absent from the pit dataset is kept, not dropped.** It becomes an edge with `d: null`. The pipe is real, a trace can reach it, and where it leads is unknown — so the path ends there with that reason. Dropping it would make the network look as though the pipe were not there at all, which is the opposite of what AC 1.2.d asks for. A pipe whose *upstream* pit is absent is a different case: no trace can ever reach it, so it is not an edge, and it is counted separately.
+**A pipe whose downstream pit is absent from the pit dataset is kept, not dropped.** It becomes an edge with `d: null`. The pipe is real, a trace can reach it, and where it leads is unknown — so the path ends there with that reason. Dropping it would make the network look as though the pipe were not there at all, which is the opposite of what AC 1.2.2.d asks for. A pipe whose *upstream* pit is absent is a different case: no trace can ever reach it, so it is not an edge, and it is counted separately.
 
 **Cycles are detected here and counted.** 18 back-edges across 34 nodes. This is what makes the runtime cycle guard a requirement rather than a defensive habit.
 
@@ -181,6 +181,53 @@ The portal is not consistent about how to ask for a bounding box: most datasets 
 
 The fetch reaches 150 m past the extent, because a pipe with one end outside still runs through it. A vertex survives the clip when it is near the extent **or next to one that is** — dropping the far end of a crossing segment leaves a one-vertex path, and a pipe entering the extent would disappear from the map rather than be drawn to the edge. Fixing that recovered four pipes and five street labels.
 
+## The downstream trace artefact
+
+```
+./.venv/Scripts/python.exe -m drainlens_pipeline.trace --out ../apps/web/public/data/trace.json
+```
+
+Reads the map artefact and the council-wide graph, and writes 37 KB: for each of the extent's 895 pits, the pipes leaving it, and for every pipe that cannot be followed, **why**.
+
+### Why this is not done in the browser
+
+`map.json` already carries every pipe with an `upstr_pit` and a `dnstr_pit`, so a trace inside the extent is a dictionary lookup away. It cannot do one thing, and that one thing is the reason this stage exists.
+
+A pipe whose downstream pit is not among the extent's pits has **two entirely different explanations**, and the map artefact cannot tell them apart:
+
+- the council recorded where the pipe goes, and it goes somewhere we clipped off — the path continues, we are simply not drawing it; or
+- the council never recorded where the pipe goes — the path stops, because the record stops.
+
+Here that is **7 edges of the first kind and 29 of the second**. Presenting all 36 as "the pipe goes nowhere" would state something false about the source data, which is what AC 1.2.2.d exists to prevent. Only the council-wide graph knows which is which, so the distinction is resolved here, once, and travels as a reason.
+
+### There are no recorded outlets
+
+All **215** extent pits with no downstream pipe are junctions, kerbside inlets or unrecorded types. Not one is an outfall, an endwall or a discharge point:
+
+| Object type | Pits |
+|---|---:|
+| Junction | 64 |
+| Grated OFK | 49 |
+| Lane Type | 30 |
+| Grated Side Entry | 21 |
+| unrecorded | 15 |
+| everything else | 36 |
+
+**83 of the 215 are inlets.** A kerbside grate is not where a drainage system ends; it is where the record does. So this module never emits an outlet, and the interface must never claim the path reached one. AC 1.2.2.c offers "the recorded outlet or the last known connection"; in this data it is always the second, and a test asserts the word does not appear in the artefact's wording.
+
+### The counts the interface depends on
+
+| | |
+|---|---:|
+| Pits in the extent | 895 |
+| Links that stay inside it | 697 |
+| Pits with no downstream pipe | 215 |
+| Pipes whose destination was never recorded | 29 |
+| Pipes continuing past the mapped area | 7 |
+| Back edges falling inside the extent | 1 |
+
+That last row matters: the cycle guard is exercised by the demonstration data itself rather than only by a fixture.
+
 ## The City's own overland flow routes, and what they do and do not settle
 
 `water-flow-routes-over-land-urban-forest` publishes 173 flow lines across the extent. It is tempting to treat these as ground truth for our surface-water paths. They are not, and the reasons are worth writing down.
@@ -196,6 +243,12 @@ Comparing our per-cell D8 directions to their line bearings gives agreement *wor
 
 So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
 
+## Built since this file was first written
+
+Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), and an address index (`addresses`) with a fixture standing in for it.
+
+**The address index in the repository is the fixture, not the real one.** It carries the real street names taken from the map artefact and the two real recorded demonstration addresses; nothing in it is invented, and it declares `artefact: "address-index-fixture"` so it cannot be mistaken for the real thing. Run `python -m drainlens_pipeline.addresses` to build the real one once the portal's rate limit clears.
+
 ## Still to come
 
-Coverage mask, data manifest and assumption register; pit and pipe geometry tiles; the address index and pilot-area boundary.
+The assumption register and a single data manifest across all artefacts. The coverage mask ships inside the scene pack; it is the assumption register that has no home yet, and the capture fraction is the first thing that belongs in it.

@@ -75,7 +75,9 @@ From `pipeline/`:
 
 ## Building artefacts
 
-Artefacts are **build products and are not committed**. `/data` is ignored. Rebuild them locally when you need them.
+Artefacts are build products. `/data` at the repository root is **ignored** — it holds the full-size intermediates, including a 4 GB point cloud and the council-wide drainage graph.
+
+The clipped, published copies under **`apps/web/public/data/` are committed**, so the frontend runs from a clone with no Python toolchain at all. That is the distinction to keep straight: the pipeline's working directory is ignored, its published output is not.
 
 ```bash
 cd pipeline
@@ -90,7 +92,19 @@ Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `
 
 The build prints a summary and compares it against the figures in the Epic 1 data audit. **Drift is reported, not fatal** — the rules live in this repository and may legitimately change, but a change should never pass unnoticed. If you see drift you did not expect, stop and work out why before building on top of it.
 
-See [pipeline/README.md](../pipeline/README.md) for what the graph builder does and the data findings behind it.
+That builds the council-wide graph. The artefacts the browser actually loads are built separately, and each writes straight into `apps/web/public/data/`:
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.network   # map.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.terrain   # the ground surface and hydrology
+./.venv/Scripts/python.exe -m drainlens_pipeline.derived   # derived.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.trace     # trace.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.scene     # scene.json and the .bin arrays
+```
+
+Order matters for two of them: `derived` and `trace` both read what earlier stages wrote.
+
+See [pipeline/README.md](../pipeline/README.md) for what each stage does and the data findings behind them.
 
 ---
 
@@ -151,7 +165,7 @@ CI runs on every pull request and both jobs must pass. The thresholds live in co
 | Node coverage, overall | `vitest.config.ts` | 88% |
 | Node coverage, `packages/schema` | `vitest.config.ts` | 90% |
 | Python coverage | `pipeline/pyproject.toml` | 90% |
-| Suite runtime | not automated — watch it | under 5 s |
+| Suite runtime | not automated — watch it | under 5 s. **Node holds at 1.4 s; Python is at 88 s and breaches it** — see the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
 
 If a test would push the suite past five seconds, it belongs behind a separate script rather than in this run.
@@ -162,11 +176,13 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 ```
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
+packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
 apps/web            frontend (React + Vite) — session state, canvas map. No map library
 apps/api            backend (Node + Hono on Cloud Run)                       not yet started
 pipeline            Python geospatial pipeline and model training, never deployed
-data                artefact releases — git-ignored, rebuilt locally
-docs                iteration scope, acceptance criteria, this guide
+data                full-size intermediates — git-ignored, rebuilt locally
+docs                iteration scope, acceptance criteria, interface contract, this guide
+models              exported ONNX models and evaluation reports               not yet started
 ```
 
 `packages/schema` is the one place the frontend, the backend and the model output share a definition. Change it deliberately: a change there can affect three workstreams at once.

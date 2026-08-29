@@ -390,13 +390,17 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **334**, 16 files, under 2 s |
-| Python tests | **332** |
+| TypeScript tests | **334**, 16 files, **1.4 s** |
+| Python tests | **332**, **88 s** — over the 5 s gate, see below |
 | TypeScript coverage | **91.17%** statements · 93.93% branches · 96.15% functions |
 | Python coverage | **91.44%** |
 | Source lines, excluding tests | ~17,000 |
 
-Both suites pass and both are above their gate. The suite is required to finish under five seconds; anything slower belongs behind a separate script.
+Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
+
+> The Node suite runs in 1.4 s and holds the five-second rule. The Python suite takes 88 s. One test is 32.7 s of that — a 20,000-vertex zigzag through Douglas–Peucker, which is that algorithm's pathological worst case; it exists to prove `simplify` iterates rather than recurses, and Python's recursion limit of 1,000 means a far shorter path would prove the same thing. Another ~45 s is `test_terrain.py` building real grids. Neither is a product defect, and CI blocks on the Node suite. But the rule is the team's own and we are not quietly exempting the slow half.
+
+Interaction criteria: **58 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
 
 ### Not in the repository — check before Tuesday
 
@@ -420,6 +424,12 @@ Volunteering a limitation reads as understanding. Being caught by it reads as no
 **The address index is a fixture.** It carries 131 real street names taken from the map artefact and the two real recorded addresses; nothing is invented, and it declares `artefact: "address-index-fixture"` so it cannot be mistaken for the real thing. The real index builds from the council portal once the rate limit clears.
 
 **The flow-route cross-check is weak, and we say so.** We compared our channels against the City of Melbourne's published overland flow routes. That layer is itself derived — a 2008 DEM through ESRI Spatial Analyst — so it is one derivation against another. Flow accumulation gave a 24 m median offset and a 1.7× lift over chance. **It is recorded as weaker evidence than the footprint check and is not quoted alongside it.**
+
+**The map does not mark the selected address.** It reaches the panel text and nothing else, so the map neither centres on it nor draws it. That is two criteria (1.1.2.a, 1.1.3.a) and it is the smallest remaining gap in the product — worth naming before a mentor clicks through and finds it.
+
+**The street cross-section (US 1.3) is not built.** Eight criteria. It was always the most likely thing to drop, because pit depth is missing for 95.4% of the record and the surviving fraction is internally inconsistent — so most of the work is the *unavailable* state rather than the drawing.
+
+**The result screen does not separate the three bases visually.** It states its assumptions and disclaims prediction, but recorded data, derived results and user assumptions are not distinguished on screen (2.3.1.c). The map does this correctly; the result does not, and the basis records exist to drive it.
 
 **`apps/api` and `models/` are empty.** Both are in the layout with "not yet started" written beside them. Neither is in Iteration 1 scope.
 

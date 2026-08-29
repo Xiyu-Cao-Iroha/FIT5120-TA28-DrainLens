@@ -1,6 +1,6 @@
 # Interface contract — frontend and backend
 
-DrainLens · TA28 · **current as of 27 August 2026**
+DrainLens · TA28 · **current as of 29 August 2026**
 
 What the browser sends, what the server answers, and what may never cross between them.
 
@@ -24,6 +24,7 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 |---|---:|---|---|
 | `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
 | `/data/derived.json` | 183 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
+| `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
 | `/data/addresses.json` | 3 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
 | `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
 | `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
@@ -116,6 +117,8 @@ email          userId         sessionId      ipAddress
 Listed because each looks like a natural thing to move, and each would break something specific.
 
 **The address search.** The index ships with the site and the search runs in memory. A search box that calls a server sends every keystroke of somebody's home address to it. A test traps `fetch` and asserts the search never reaches for it.
+
+**The downstream trace.** `trace/graph.ts` walks the shipped artefact in memory. It is a graph traversal over 895 pits; a round trip to ask a server which pipe comes next would be slower than the answer and would tell that server which drain outside somebody's house they are looking at.
 
 **The scenario engine.** `@drainlens/scenario` runs in a Web Worker over the shipped scene. Moving it server-side would mean sending the selected pit and rainfall — survivable — but the reason to keep it local is that the answer must be reproducible from artefacts anyone can check, and a service that could quietly change its assumptions between two runs breaks AC 2.2.
 

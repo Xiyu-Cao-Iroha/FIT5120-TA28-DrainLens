@@ -31,9 +31,9 @@ packages/schema     shared definitions — provenance, vocabularies, scenario, w
 packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
 apps/web            frontend (React + TypeScript + Vite) — session state and the canvas map
 apps/api            backend (Node + TypeScript + Hono on Cloud Run)               not yet started
-pipeline            Python geospatial pipeline, never deployed — graph, terrain and map geometry
+pipeline            Python geospatial pipeline, never deployed — graph, terrain, map geometry, trace
 data                artefact releases — git-ignored, rebuilt locally
-docs                iteration scope, acceptance criteria, development guide
+docs                iteration scope, acceptance criteria, development guide, interface contract
 models              exported ONNX models and evaluation reports                   not yet started
 ```
 
@@ -62,15 +62,25 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
+Measured on **29 August 2026**. These are the current figures, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
+
 | Gate | Target | Current |
 |---|---|---|
-| Coverage, judgement-carrying modules | ≥ 90% from the first iteration | 100% (`packages/schema`, `graph.py`, `classification.py`) |
-| Coverage, overall | ≥ 88% | 100% Node · 99% Python |
-| Suite runtime | < 5 s | ~1.0 s Node · ~0.5 s Python |
+| Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
+| Coverage, overall | ≥ 88% | **91.17%** Node · **91.44%** Python |
+| Suite runtime | < 5 s | **1.4 s Node ✓ · 88 s Python ✗** — see below |
+| Tests | 334 TypeScript · 332 Python | 666 in total |
 | Tests written before or alongside the component | every one | met |
-| Merges via pull request with written review | 100% | — |
-| CI green rate | ≥ 95% | — |
-| Direct pushes to `main` | zero | — |
+| Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
+| Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
+| CI green rate | ≥ 95% | tracked on the Actions tab |
+
+**The Python suite breaches this gate and we are recording it rather than rounding it off.** 88 seconds, of which:
+
+- **32.7 s is a single test**, `test_derived.py::TestSimplify::test_it_does_not_recurse`. It builds a 20,000-vertex zigzag, which is the pathological worst case for Douglas–Peucker — every vertex is a candidate, so the algorithm splits at nearly all of them. The test's purpose is to prove `simplify` iterates rather than recurses, and Python's default recursion limit is 1,000, so a far shorter path would prove the same thing in a fraction of the time.
+- **~45 s is `test_terrain.py`**, where each of a dozen tests builds a real grid.
+
+Neither is a defect in the product, and the Node suite — the one the gate was written for, and the one CI blocks on — runs in 1.4 s. But the rule below is the team's own, and a rule quietly exempted for the slow half is not a rule.
 
 A test that would push the suite past five seconds belongs behind a separate script, not in this run.
 
@@ -82,6 +92,11 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.13.0 | 29 Aug 2026 | **US 1.2 complete**: select a pit, read what the council recorded, and follow the drainage downstream. The feature needed a pipeline stage for one reason — `map.json` cannot tell a pipe clipped out of our square kilometre from one the council never finished recording, and here that is **7 edges against 29**. Drawing all 36 as a pipe going nowhere would state something false about the source, so `trace.py` resolves it offline into a 37 KB artefact. The other finding is worth quoting: **there are no recorded outlets**. All 215 extent pits with no downstream pipe are junctions, kerbside inlets or unrecorded types — 83 of them inlets — so no path can reach an outlet and a test asserts none is claimed. Direction is read from the topology rather than the vertex order, which carries no meaning in the export. Two cycle guards, one of the council's eighteen back edges falling inside the demonstration extent. 334 TypeScript tests, 332 Python, 91.17% and 91.44%. |
+| 0.12.0 | 29 Aug 2026 | Documentation for the pre-deployment check: an [interface contract](./docs/INTERFACE-CONTRACT.md) recording that the frontend/backend boundary is deliberately almost empty, and a [walkthrough](./docs/PRE-DEPLOYMENT-WALKTHROUGH.md) that follows one click through file, function and logic. Two drifts found while checking: a docstring pointing at a `preference.ts` that was never written, and a gates table still claiming 99% on both sides. |
+| 0.11.0 | 29 Aug 2026 | **The mass balance closed**, from 71.55% of the water lost to 0.00%, through three separate causes. The pipeline shipped the raw surface while the flow field came from the conditioned one, so water was routed by one terrain and stored by another — 65.8%. Ordering cells by elevation is only a *proxy* for topological order and 509 cells out of a million were exactly level at float32, so `upstreamFirst` now uses Kahn's algorithm — 27.0%. Depressions resolved in a single pass ordered by rim height stranded water in already-resolved stores, because a deep pit in low ground can have a higher rim than the hollow feeding it; the passes now repeat until nothing moves. With it closed, blocking any single inlet produces **no visible difference at any rainfall from 20 to 200 mm** — not a bug, but a redundant recorded network under an assumed 60% capture fraction. **That is an open product decision.** |
+| 0.10.0 | 28 Aug 2026 | The scenario runs in the browser: scene packing to int16 centimetres and bit-packed masks, a Web Worker so a one-million-cell solve does not freeze the map, the setup screen in its required order, and the result with all four insufficient states. Three defects worth recording — a design mock's `P-14` pit id that no real pit matched, so the engine never ran and a fabricated `invalid_inlet` was shown instead; the measured mask passed where the coverage mask belonged, which made *every* scenario return `terrain_unavailable`; and an address resolver that checked the address list rather than the street list, which would have told 129 covered streets they did not exist. |
+| 0.9.1 | 28 Aug 2026 | Terrain-derived layers on the map — surface-water paths, low points, and hatched areas where too little ground was measured to say anything. The simplification tolerance was set by what can be seen rather than by the cell size: 0.25 m preserved every lattice staircase corner, and 1 m took 40,490 vertices to 10,986. |
 | 0.9.0 | 27 Aug 2026 | The browser application starts, and the map draws real Kensington. `apps/web` was written fresh rather than adopted from the Figma Make export: that prototype's stack is the one we would have picked, but its data layer is illustrative SVG and its error handling predates the four reason codes, so most of what would carry over is the part that has to be replaced. **MapLibre was dropped** — a fixed square kilometre, north-up, already in metres from the extent corner, has no global projection, no tile pyramid and no third-party basemap, so a library would be several hundred kilobytes solving problems this product does not have. Pan, zoom, hit testing and label placement are ours, and unit-tested. Two defects were found by looking rather than reasoning: street labels were drawn once per segment and unreadable, and their angle was mirrored. The address never reaches storage, enforced by traps rather than by grep. 201 TypeScript tests at 99.5%, 252 pipeline tests at 94%. |
 | 0.8.1 | 27 Aug 2026 | Building footprints as no-flow barriers, and the cross-check they turned into. Of the cells the published footprint dataset calls a building, the ground filter had independently removed **92.2%**; the reverse holds at only 51.9%, because about half of what the filter removes is tree canopy — which is the measured reason its object mask cannot serve as a barrier set, since water flows under trees. The footprints also repair the filter's one predicted blind spot: 20,311 roof cells it had kept as ground, concentrated more than 13 m inside a roof, exactly the reach of a 26 m window. A limit derived from theory, pinned by a synthetic test, then confirmed on real ground at the predicted threshold. `depressions.json` split into a table and a compressed label raster: 2 MB to 110 KB. Inverse projection added, round-tripping to 0.0007 mm. 155 tests, 96% coverage. |
 | 0.8.0 | 27 Aug 2026 | Depressions, conditioning and D8 routing — the terrain fork the engine has been waiting on. Hollows are measured on the raw surface and directions come from a separate conditioned one, because filling removes exactly the storage the model needs. The 0.25 m depth floor is the source's own quoted accuracy and the knee in the volume curve at once: 537 hollows holding 30,593 m³, from 8,472 whose median depth is 5 cm of noise. The D8 code table is now a checked contract — the test parses `flow.ts` rather than restating the table, so a one-sided edit fails the build instead of routing water sideways in silence. Two whole-field invariants hold: no interior dead ends, and all 998,594 directed cells point strictly downhill, which makes a cycle impossible. The published surface is the one the depressions were measured on, so the manifest reproduces from the artefact exactly. 126 tests, 95% coverage. |
