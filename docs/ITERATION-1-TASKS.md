@@ -189,7 +189,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 99% Node · 99% Python · 1.7 s |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 90.0% Node · 90.9% Python · 1.4 s |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |

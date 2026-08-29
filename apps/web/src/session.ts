@@ -10,13 +10,16 @@
  * accounts and no identity — and an address written to any of those is an
  * identity, sitting on a shared machine after the person has walked away.
  *
- * A guidance preference is different in kind. "I have read the help box" says
- * nothing about who or where someone is, and losing it every reload would be a
- * worse product. It lives in `preference.ts` on its own, so that the rule here
- * stays absolute: **nothing in this file touches storage of any kind.**
- * `session.test.ts` enforces that by running a whole session against traps
- * rather than by reading the source, because a rule checked by grep is a rule
- * that a refactor walks around.
+ * The rule here is absolute: **nothing in this file touches storage of any
+ * kind.** `session.test.ts` enforces it by running a whole session against
+ * traps in place of both storages, `history` and `document.cookie`, rather
+ * than by reading the source — a rule checked by grep is a rule that a
+ * refactor walks around.
+ *
+ * A guidance preference would be different in kind. "I have read the help box"
+ * says nothing about who or where someone is, and if one is ever wanted it
+ * belongs in its own module so that this file's rule stays absolute. Nothing
+ * stores such a preference today.
  */
 
 import type {
