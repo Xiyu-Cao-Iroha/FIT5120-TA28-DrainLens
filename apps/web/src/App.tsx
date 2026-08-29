@@ -1,168 +1,161 @@
-import { useEffect, useState } from 'react';
-
-import { type MapArtefact, assertUsable } from './map/artefact.js';
-import { type DerivedArtefact, type DerivedVisibility, assertDerived } from './map/derived.js';
-import { MapCanvas } from './map/MapCanvas.js';
-import type { Hit } from './map/hit.js';
-
 /**
- * Layers, with the basis each one carries.
+ * The screen the session says we are on, and nothing more.
  *
- * The label is not decoration. §5.5 requires every value the interface shows
- * to carry a basis, and a map layer is a value like any other: the drainage
- * network is published record, the water paths are a calculation over a
- * filtered surface, and drawing them side by side without saying which is
- * which lends one the authority of the other.
+ * All navigation goes through the reducer in `session.ts`, so the rule that
+ * the address never reaches storage is enforced in one tested place rather
+ * than at every screen that happens to touch it.
  */
-const LAYERS = [
-  { key: 'network', label: 'Drainage pits and pipes', basis: 'Official recorded data' },
-  { key: 'channel', label: 'Likely surface water paths', basis: 'System-derived result' },
-  { key: 'lowPoint', label: 'Low points and depressions', basis: 'System-derived result' },
-  { key: 'unavailable', label: 'Not enough ground measured', basis: 'System-derived result' },
-] as const;
 
-const BASIS_STYLE: Record<string, { background: string; color: string }> = {
-  'Official recorded data': { background: '#dcece6', color: '#1f5b4e' },
-  'System-derived result': { background: '#dde8f2', color: '#2a5678' },
-};
+import { useEffect, useReducer, useState } from 'react';
+
+import type { AddressIndex } from './address/search.js';
+import { type MapArtefact, assertUsable } from './map/artefact.js';
+import { type DerivedArtefact, assertDerived } from './map/derived.js';
+import { MapView } from './screens/MapView.js';
+import { Landing } from './screens/Landing.js';
+import { TaskSelect } from './screens/TaskSelect.js';
+import { INITIAL_SESSION, reduce } from './session.js';
+import { Shell } from './ui/Shell.js';
+
+interface Loaded {
+  readonly map: MapArtefact;
+  readonly derived: DerivedArtefact;
+  readonly index: AddressIndex;
+  readonly fixtureNote: string | undefined;
+}
+
+async function load(): Promise<Loaded> {
+  const [map, derived, addresses] = await Promise.all([
+    fetch('/data/map.json').then((r) => r.json()),
+    fetch('/data/derived.json').then((r) => r.json()),
+    fetch('/data/addresses.json').then((r) => r.json()),
+  ]);
+
+  assertUsable(map);
+  assertDerived(derived);
+
+  const index = addresses as AddressIndex & { fixture?: string };
+  if (!Array.isArray(index.addresses)) {
+    throw new Error('the address index carries no addresses');
+  }
+  return { map, derived, index, fixtureNote: index.fixture };
+}
 
 export function App() {
-  const [artefact, setArtefact] = useState<MapArtefact | null>(null);
-  const [derived, setDerived] = useState<DerivedArtefact | null>(null);
+  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [hit, setHit] = useState<Hit | null>(null);
-  const [show, setShow] = useState<DerivedVisibility>({
-    channel: true,
-    lowPoint: true,
-    unavailable: true,
-  });
 
   useEffect(() => {
-    Promise.all([
-      fetch('/data/map.json').then((r) => r.json()),
-      fetch('/data/derived.json').then((r) => r.json()),
-    ])
-      .then(([map, layers]: [unknown, unknown]) => {
-        assertUsable(map);
-        assertDerived(layers);
-        setArtefact(map);
-        setDerived(layers);
-      })
+    load()
+      .then(setLoaded)
       .catch((error: unknown) => setProblem(String(error)));
   }, []);
 
-  if (problem !== null) return <p style={{ padding: 24 }}>{problem}</p>;
-  if (artefact === null || derived === null) {
-    return <p style={{ padding: 24 }}>Loading the pilot area…</p>;
+  if (problem !== null) {
+    return (
+      <Shell>
+        <p style={{ padding: 24 }}>{problem}</p>
+      </Shell>
+    );
+  }
+  if (loaded === null) {
+    return (
+      <Shell>
+        <p style={{ padding: 24 }}>Loading the pilot area…</p>
+      </Shell>
+    );
   }
 
-  const selected = hit?.kind === 'pit' ? (hit.feature.asset_number ?? null) : null;
-
-  return (
-    <main style={{ position: 'fixed', inset: 0, font: '14px system-ui, sans-serif' }}>
-      <MapCanvas
-        artefact={artefact}
-        derived={derived}
-        show={show}
-        selectedPit={selected}
-        onSelect={setHit}
-      />
-
-      <aside
+  const crumb = (label: string, onClick?: () => void, current = false) =>
+    onClick && !current ? (
+      <button
+        key={label}
+        type="button"
+        onClick={onClick}
         style={{
-          position: 'absolute',
-          left: 16,
-          top: 16,
-          width: 300,
-          padding: '14px 16px',
-          background: 'rgba(255,255,255,0.95)',
-          borderRadius: 10,
-          boxShadow: '0 2px 14px rgba(0,0,0,0.12)',
-          lineHeight: 1.45,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          color: '#1f6f5c',
+          cursor: 'pointer',
         }}
       >
-        <strong>{artefact.extent.name} pilot</strong>
-        <div style={{ color: '#5b6b7a', fontSize: 13 }}>
-          {artefact.layers.pit?.length ?? 0} pits · {artefact.layers.pipe?.length ?? 0} pipes ·{' '}
-          {derived.layers['low-point']?.length ?? 0} low points
-        </div>
+        {label}
+      </button>
+    ) : (
+      <strong key={label} style={{ color: current ? '#1e2b36' : undefined }}>
+        {label}
+      </strong>
+    );
 
-        <div style={{ marginTop: 14, borderTop: '1px solid #e6ebe4', paddingTop: 12 }}>
-          {LAYERS.map((layer) => {
-            const toggleable = layer.key !== 'network';
-            const on = toggleable ? show[layer.key as keyof DerivedVisibility] : true;
-            const style = BASIS_STYLE[layer.basis] ?? { background: '#eee', color: '#444' };
-            return (
-              <label
-                key={layer.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  marginBottom: 9,
-                  cursor: toggleable ? 'pointer' : 'default',
-                  opacity: toggleable ? 1 : 0.75,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={on}
-                  disabled={!toggleable}
-                  onChange={() =>
-                    toggleable &&
-                    setShow((current) => ({
-                      ...current,
-                      [layer.key]: !current[layer.key as keyof DerivedVisibility],
-                    }))
-                  }
-                  style={{ marginTop: 3 }}
-                />
-                <span>
-                  <span style={{ display: 'block' }}>{layer.label}</span>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      marginTop: 3,
-                      padding: '1px 7px',
-                      borderRadius: 999,
-                      fontSize: 11,
-                      ...style,
-                    }}
-                  >
-                    {layer.basis}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+  const separator = <span style={{ margin: '0 8px', color: '#c3cdba' }}>›</span>;
 
-        <div
-          style={{
-            marginTop: 6,
-            paddingTop: 10,
-            borderTop: '1px solid #e6ebe4',
-            minHeight: 44,
-          }}
+  switch (session.screen) {
+    case 'address':
+    case 'unsupported':
+      return (
+        <Shell>
+          <Landing
+            index={loaded.index}
+            fixtureNote={loaded.fixtureNote}
+            onFound={(address) =>
+              dispatch({
+                type: 'address-accepted',
+                address: {
+                  id: address.id,
+                  label: address.label,
+                  eastingM: address.e,
+                  northingM: address.n,
+                },
+              })
+            }
+            onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
+          />
+        </Shell>
+      );
+
+    case 'task':
+      return (
+        <Shell
+          crumbs={
+            <>
+              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {separator}
+              {crumb('Choose a task', undefined, true)}
+            </>
+          }
         >
-          {hit === null ? (
-            <span style={{ color: '#5b6b7a' }}>Select a drainage pit or pipe.</span>
-          ) : hit.kind === 'pit' ? (
+          <TaskSelect
+            address={session.address!}
+            onChoose={(task) => dispatch({ type: 'task-chosen', task })}
+            onChangeAddress={() => dispatch({ type: 'change-address' })}
+          />
+        </Shell>
+      );
+
+    default:
+      return (
+        <Shell
+          crumbs={
             <>
-              <strong>Pit {hit.feature.asset_number}</strong>
-              <div style={{ color: '#5b6b7a' }}>{hit.feature.asset_description}</div>
+              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {separator}
+              {crumb('Choose a task', () => dispatch({ type: 'back' }))}
+              {separator}
+              {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
             </>
-          ) : (
-            <>
-              <strong>Pipe {hit.feature.ref}</strong>
-              <div style={{ color: '#5b6b7a' }}>
-                {hit.feature.diameter ? `${hit.feature.diameter} mm · ` : ''}
-                {hit.feature.material}
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
-    </main>
-  );
+          }
+        >
+          <MapView
+            map={loaded.map}
+            derived={loaded.derived}
+            address={session.address}
+            task={session.task}
+            onBack={() => dispatch({ type: 'back' })}
+          />
+        </Shell>
+      );
+  }
 }

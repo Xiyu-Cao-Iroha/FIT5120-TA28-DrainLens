@@ -30,6 +30,17 @@ export interface IndexedAddress {
 export interface AddressIndex {
   readonly area: string;
   readonly addresses: readonly IndexedAddress[];
+  /**
+   * Every street the pilot area contains, published alongside the addresses.
+   *
+   * This is what separates "outside the pilot area" from "we hold no record of
+   * that street", and it has to be its own list rather than something derived
+   * from the addresses at run time. Recovering it by scanning every label is
+   * work repeated on each keystroke — and it silently gives the wrong answer
+   * whenever the index holds fewer addresses than streets, which is exactly
+   * the case while the stand-in is in place.
+   */
+  readonly streets?: readonly string[];
 }
 
 /**
@@ -162,12 +173,31 @@ export function resolve(index: AddressIndex, typed: string): Resolution {
     return { kind: 'ambiguous', matches };
   }
 
-  const query = normalise(typed);
-  const knownStreet = index.addresses.some((address) => {
-    const street = normalise(address.street);
-    return query.includes(street) || street.split(' ').every((word) => query.includes(word));
-  });
-  return knownStreet
+  return namesAKnownStreet(index, normalise(typed))
     ? { kind: 'outside-pilot', typed }
     : { kind: 'not-an-address', typed };
+}
+
+/**
+ * Whether the query names a street the pilot area contains.
+ *
+ * Checked against the published street list, not against the streets that
+ * happen to appear in the addresses. Those are the same thing only when the
+ * index is complete; while it is a stand-in holding two addresses, scanning
+ * the addresses says "we have no record of that street" about a hundred and
+ * twenty-nine streets the pilot demonstrably covers.
+ */
+export function namesAKnownStreet(index: AddressIndex, query: string): boolean {
+  const streets =
+    index.streets ?? index.addresses.map((address) => address.street);
+
+  for (const name of streets) {
+    const street = normalise(name);
+    if (street.length === 0) continue;
+    // Either the query contains the whole street name, or every word of it —
+    // so "999 bangalore st" matches "Bangalore Street" once `st` is expanded.
+    if (query.includes(street)) return true;
+    if (street.split(' ').every((word) => query.includes(word))) return true;
+  }
+  return false;
 }

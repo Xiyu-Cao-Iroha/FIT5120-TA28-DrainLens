@@ -131,6 +131,38 @@ describe('resolving a submitted address', () => {
     expect(answer.kind).toBe('outside-pilot');
   });
 
+  it('uses the published street list, not the streets the addresses happen to name', () => {
+    // The bug this test exists for. The artefact publishes every street in the
+    // pilot area; the addresses cover only some of them, and while the index
+    // is a stand-in they cover two. Scanning the addresses told somebody on a
+    // street the pilot demonstrably reaches that we had no record of it.
+    const sparse: AddressIndex = {
+      area: 'kensington',
+      streets: ['Gatehouse Drive', 'Bangalore Street', 'Altona Street'],
+      addresses: [at('a', '46', 'Gatehouse Drive')],
+    };
+
+    expect(resolve(sparse, '999 Bangalore Street').kind).toBe('outside-pilot');
+    expect(resolve(sparse, '12 Altona Street').kind).toBe('outside-pilot');
+    expect(resolve(sparse, '1 Collins Street').kind).toBe('not-an-address');
+  });
+
+  it('recognises a street from the abbreviation somebody typed', () => {
+    const sparse: AddressIndex = {
+      area: 'kensington',
+      streets: ['Bangalore Street'],
+      addresses: [at('a', '46', 'Gatehouse Drive')],
+    };
+    expect(resolve(sparse, '999 bangalore st').kind).toBe('outside-pilot');
+  });
+
+  it('falls back to the addresses when no street list is published', () => {
+    // Older artefacts, and the smallest possible index. Worse, but not wrong.
+    const noList: AddressIndex = { area: 'k', addresses: [at('a', '46', 'Gatehouse Drive')] };
+    expect(resolve(noList, '999 Gatehouse Drive').kind).toBe('outside-pilot');
+    expect(resolve(noList, '1 Collins Street').kind).toBe('not-an-address');
+  });
+
   it('says an unknown street is something it cannot speak about', () => {
     expect(resolve(KENSINGTON, '1 Collins Street, Melbourne').kind).toBe('not-an-address');
   });
