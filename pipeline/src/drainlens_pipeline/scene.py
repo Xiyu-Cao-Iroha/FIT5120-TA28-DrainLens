@@ -14,6 +14,19 @@ the model looks at, not a workaround for a download.
 Each array is its own file. A single packed blob would be one byte-offset
 arithmetic mistake away from an elevation grid read as flow directions, and
 nothing about that failure would look wrong until water ran uphill.
+
+**The elevation shipped here is the conditioned surface, not the raw one**, and
+that is the fork order arriving at the browser boundary. The engine walks cells
+in descending elevation so that a cell is solved before whatever it drains
+into; the flow field was computed on the conditioned surface, so ordering by
+any other surface puts the two out of step. Water then arrives at a cell that
+has already been visited, and is dropped.
+
+Shipping the raw surface was tried, and 71.6% of the rain vanished: 40,000 m³
+fell, 11,379 m³ was accounted for. The engine's mass-balance check caught it
+and refused the comparison, which is the only reason it was not a plausible map
+of where water goes. The raw surface's job ended when the depression capacities
+were measured on it; those travel in the table.
 """
 
 from __future__ import annotations
@@ -187,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
 
     from .geo import DEMONSTRATION_EXTENT
+    from .hydrology import condition
 
     parser = argparse.ArgumentParser(
         prog="python -m drainlens_pipeline.scene",
@@ -201,7 +215,12 @@ def main(argv: list[str] | None = None) -> int:
         print(message, file=sys.stderr)
 
     extent = DEMONSTRATION_EXTENT
-    elevation = np.load(args.terrain / "ground-surface.npy").astype(np.float64)
+    # The conditioned surface, because the flow field belongs to it. See the
+    # module docstring: ordering by any other surface loses water.
+    raw = np.load(args.terrain / "ground-surface.npy").astype(np.float64)
+    barriers_path = args.terrain / "barriers.npy"
+    barriers = np.load(barriers_path) if barriers_path.exists() else None
+    elevation = condition(raw, barriers)
     map_artefact = json.loads(args.map.read_text(encoding="utf-8"))
     pits = map_artefact.get("layers", {}).get("pit", [])
 

@@ -147,21 +147,59 @@ function validate(scene: SceneInput, assumptions: Assumptions): void {
 }
 
 /**
- * Cells ordered from highest to lowest, so every cell is processed after
- * everything that can drain into it.
+ * Cells ordered so that every one is solved before whatever it drains into.
  *
- * Ties break by index, which makes the order total and therefore the whole
- * solve reproducible. Two runs that disagreed only in tie-breaking would still
- * violate AC 2.2.
+ * Taken from the flow field itself, not from the elevations. Sorting by
+ * elevation is a proxy for this and it holds only while the surface strictly
+ * decreases along every flow path — which a conditioned surface tries to
+ * guarantee with a nudge of a hundredth of a millimetre per step, and which no
+ * finite representation of that surface can keep. On the real Kensington
+ * artefact at single precision, 509 of a million cells ended up exactly level
+ * with the cell they drain into. Each is a place where the order is arbitrary
+ * and water passed downstream lands on a cell already solved, where it is
+ * never read again: 27% of the rainfall disappeared, and only the mass-balance
+ * check stood between that and a plausible-looking map.
+ *
+ * The flow field is a forest of paths to the boundary, so Kahn's algorithm on
+ * it is exact by construction and needs no tolerance. Cells with nothing
+ * upstream come first, in index order, which keeps the whole solve
+ * reproducible — two runs disagreeing only in tie-breaking would still violate
+ * AC 2.2.
  */
-function descendingByElevation(grid: TerrainGrid): Int32Array {
-  const order = new Int32Array(grid.width * grid.height);
-  for (let i = 0; i < order.length; i += 1) order[i] = i;
-  const elevation = grid.elevationM;
-  return order.sort((a, b) => {
-    const difference = elevation[b]! - elevation[a]!;
-    return difference !== 0 ? difference : a - b;
-  });
+export function upstreamFirst(flow: FlowField): Int32Array {
+  const cells = flow.width * flow.height;
+  const upstreamCount = new Int32Array(cells);
+  for (let cell = 0; cell < cells; cell += 1) {
+    const next = downstreamOf(flow, cell);
+    if (next !== LEAVES_WINDOW) upstreamCount[next]! += 1;
+  }
+
+  const order = new Int32Array(cells);
+  const queue = new Int32Array(cells);
+  let head = 0;
+  let tail = 0;
+  for (let cell = 0; cell < cells; cell += 1) {
+    if (upstreamCount[cell] === 0) queue[tail++] = cell;
+  }
+
+  let written = 0;
+  while (head < tail) {
+    const cell = queue[head++]!;
+    order[written++] = cell;
+    const next = downstreamOf(flow, cell);
+    if (next !== LEAVES_WINDOW && --upstreamCount[next]! === 0) queue[tail++] = next;
+  }
+
+  // A cycle would leave cells unqueued. The field is acyclic by construction
+  // and the pipeline checks it, but a corrupt artefact must not silently drop
+  // the cells it strands — they are appended so every cell is still solved,
+  // and the mass balance is left to notice if the routing was nonsense.
+  if (written < cells) {
+    for (let cell = 0; cell < cells; cell += 1) {
+      if (upstreamCount[cell]! > 0) order[written++] = cell;
+    }
+  }
+  return order;
 }
 
 /**
@@ -228,7 +266,7 @@ export function solvePosition(
     if (water > 0) leftWindow += water;
   };
 
-  for (const cell of descendingByElevation(grid)) {
+  for (const cell of upstreamFirst(flow)) {
     const water = arriving[cell]!;
     if (water <= 0) continue;
     arriving[cell] = 0;
@@ -255,22 +293,58 @@ export function solvePosition(
     }
   }
 
-  // Depressions fill, then spill. Deepest spill elevation first, so a
-  // depression that overflows into a lower one is resolved before it.
+  // Depressions fill, then spill — and what spills can reach another
+  // depression, which may already have been resolved. A single pass ordered by
+  // rim height assumes those chains always run downhill in rim terms, and on
+  // real terrain they do not: a deep pit in low ground can have a higher rim
+  // than the shallow hollow feeding it. Water landing in an already-resolved
+  // store was then stranded there, counted as neither ponded nor passed on.
+  // That leak was 27% of the rainfall on the Kensington artefact.
+  //
+  // So the passes repeat until nothing moves. `held` accumulates separately
+  // from the unresolved inflow, so a depression revisited with more water
+  // fills further rather than being counted twice. The bound is one pass per
+  // depression plus one: each pass either resolves at least one store or ends
+  // the loop, and a corrupt field that somehow cycled cannot spin here.
   const bySpill = [...depressions.depressions].sort(
     (a, b) => b.spillElevationM - a.spillElevationM || a.id - b.id,
   );
-  for (const depression of bySpill) {
-    const store = depressionStore[depression.id]!;
-    if (store <= 0) continue;
-    const held = Math.min(store, depression.capacityM3);
-    const overflow = store - held;
-    depressionStore[depression.id] = held;
+  const heldM3 = new Float64Array(depressions.depressions.length);
 
-    const share = depression.cells.length > 0 ? held / depression.cells.length : 0;
+  for (let pass = 0; pass <= depressions.depressions.length; pass += 1) {
+    let moved = false;
+    for (const depression of bySpill) {
+      const arrivingHere = depressionStore[depression.id]!;
+      if (arrivingHere <= 0) continue;
+      depressionStore[depression.id] = 0;
+      moved = true;
+
+      const room = Math.max(depression.capacityM3 - heldM3[depression.id]!, 0);
+      const taken = Math.min(arrivingHere, room);
+      heldM3[depression.id]! += taken;
+
+      const overflow = arrivingHere - taken;
+      if (overflow > 0) routeFrom(depression.spillCell, overflow);
+    }
+    if (!moved) break;
+  }
+
+  // Anything still unresolved after the bound would be a cycle in the spill
+  // graph. It leaves the window rather than vanishing: the balance must
+  // account for every drop, and an honest overflow is better than a silent
+  // loss that only the mass-balance check would catch.
+  for (let id = 0; id < depressionStore.length; id += 1) {
+    if (depressionStore[id]! > 0) {
+      leftWindow += depressionStore[id]!;
+      depressionStore[id] = 0;
+    }
+  }
+
+  for (const depression of depressions.depressions) {
+    const held = heldM3[depression.id]!;
+    if (held <= 0 || depression.cells.length === 0) continue;
+    const share = held / depression.cells.length;
     for (const cell of depression.cells) pondedM3[cell] = share;
-
-    if (overflow > 0) routeFrom(depression.spillCell, overflow);
   }
 
   let pondedVolume = 0;
