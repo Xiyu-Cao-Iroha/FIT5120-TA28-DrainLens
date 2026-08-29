@@ -31,7 +31,7 @@ const LAYERS = [
 
 /** What the follow task opens with: the two layers its question needs. */
 const GUIDED: DerivedVisibility = { channel: true, lowPoint: false, unavailable: false };
-const EVERYTHING: DerivedVisibility = { channel: true, lowPoint: true, unavailable: true };
+export const EVERYTHING: DerivedVisibility = { channel: true, lowPoint: true, unavailable: true };
 
 export interface MapViewProps {
   readonly map: MapArtefact;

@@ -83,7 +83,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] A missing downstream connection travels as a network limitation, not an insufficiency → *2.2.1.f*
 - [x] **Data-sufficiency gate** — `SuccessfulComparison` or `InsufficientInformation` with four named reasons, applied in order → *2.2.1.f, 2.2.3, 2.3.2.c*
 - [x] Web Worker wrapper; run once on **Run comparison**, cache all positions; the control reads cache only → *2.2.1, 2.2.2*
-- [ ] Capture-fraction sensitivity at half, one and two times → decides whether the interface may report three result categories or two
+- [ ] Capture-fraction sensitivity at half, one and two times → decides whether the interface may report three result categories or two. **Now confirmed end to end in the browser**: with the interface finally able to run a comparison, blocking one inlet gives *No clear difference* at 20, 40 and 60 mm. The redundancy finding is real and visible, not an artefact of the engine harness
 - [ ] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result, once it exists → *2.2.3.b*
 - [x] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
 
@@ -119,14 +119,14 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] Scenario setup in the required order, pit carried over only if the user chose it, suggestions labelled and unconfirmed, blockage **unselected** by default → *2.1.1*
 - [x] Setup inputs with the two required explanations — **the blockage setting is an assumption, not an observed condition**, and **the rainfall is a user-selected assumption, not an observation or forecast** → *2.1.2.d, 2.1.2.e*
 - [x] Scenario summary before running → *2.1.2.f*
-- [~] Difference view by default → *2.2.1.c* ✓. **The pit and its downstream path do not stay visible** → *2.2.1.d* ✗ — the map beside a result renders with no selection and no trace, though both now exist and can be passed to it
+- [x] Difference view by default; pit and downstream path stay visible → *2.2.1.c, 2.2.1.d*
 - [x] Result categories: **No clear change** and **Higher than baseline** as bands; **Insufficient information** as a whole-result state with its reason → *2.2.1.e, 2.2.1.f, 2.2.3*
-- [ ] Rainfall control in millimetres, with the "not when water will reach a location" wording → *2.2.2*
+- [x] Rainfall control in millimetres, with the "not when water will reach a location" wording → *2.2.2*. Buttons rather than a slider, because these are the positions the engine solved and a slider would imply a continuum nothing computed. Reads the run's cache, so moving it cannot re-solve and cannot disagree with itself
 - [x] Back to setup from a result, inputs intact → *2.2.4*
 - [ ] Remaining back and rerun paths → *UI definition of done, covered by Playwright*
 - [x] Result explanation panel → *2.3.1.a, 2.3.1.b, 2.3.1.f*
-- [ ] **Provenance display** — recorded data, system-derived results and user assumptions visually separated, driven by the basis carried with each value → *1.1.3.d, 1.2.1.c, 2.3.1.c*
-- [ ] Assumptions and uncertainty surfaced from the assumption register → *2.3.1.d, 2.3.1.e*
+- [x] **Provenance display** — recorded data, system-derived results and user assumptions visually separated, driven by the basis carried with each value → *1.1.3.d, 1.2.1.c, 2.3.1.c*
+- [~] Assumptions and uncertainty surfaced → *2.3.1.d, 2.3.1.e*. The four that matter are on screen with their measured figures. They are **written in `outcome.ts` rather than read from an assumption register**, because the register does not exist yet — when it does, this is the display that should read from it
 - [x] Unclear-result explanation → *2.3.2*
 - [ ] Desktop and mobile layouts → *Epic 1 DoD*
 

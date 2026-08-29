@@ -171,6 +171,25 @@ describe('loading', () => {
   });
 });
 
+/** A scene the engine can solve: a slope draining east, fully covered. */
+async function runnableScene() {
+  const cells = 16;
+  const elevation = Int16Array.from({ length: cells }, (_, i) => 2000 - (i % 4) * 10);
+  const flow = Int8Array.from({ length: cells }, (_, i) => ((i % 4) === 3 ? -1 : 0));
+  const depressions = Int16Array.from({ length: cells }, () => -1);
+  return loadScene('/scene', {
+    fetchJson: async () => HEADER,
+    fetchBinary: async (url) =>
+      url.endsWith('elevation.bin')
+        ? elevation.buffer
+        : url.endsWith('flow.bin')
+          ? flow.buffer
+          : url.endsWith('depressions.bin')
+            ? depressions.buffer
+            : new Uint8Array([0xff, 0xff]).buffer,
+  });
+}
+
 describe('the worker turns outcomes into replies', () => {
   it('reports that nothing can run before the scene is loaded', () => {
     const reply = handle(
@@ -178,6 +197,42 @@ describe('the worker turns outcomes into replies', () => {
       null,
     );
     expect(reply).toEqual({ type: 'failed', id: 1, message: 'the scene has not been loaded' });
+  });
+
+  it('returns every position it solved, not only the last', async () => {
+    // The engine solves them all in one pass whether or not anybody asks, so
+    // returning one threw away the answer to the next question the person
+    // asks. AC 2.2.2 is a lookup because of this, which is what stops the
+    // rainfall control re-solving and possibly disagreeing with itself.
+    const scene = await runnableScene();
+
+    const reply = handle(
+      { type: 'run', id: 3, drainCell: 5, blockage: 'fully-blocked', rainfallPositionsMm: [20, 40, 60] },
+      scene,
+    );
+
+    expect(reply.type).toBe('result');
+    if (reply.type !== 'result' || reply.status !== 'successful') {
+      throw new Error(`expected a successful result, got ${JSON.stringify(reply)}`);
+    }
+    expect(reply.positions.map((position) => position.rainfallMm)).toEqual([20, 40, 60]);
+    // The headline stays what it was: the deepest position asked for.
+    expect(reply.band).toBe(reply.positions[reply.positions.length - 1]!.band);
+  });
+
+  it('gives every returned position a band the interface can present', async () => {
+    const scene = await runnableScene();
+    const reply = handle(
+      { type: 'run', id: 4, drainCell: 5, blockage: 'clear', rainfallPositionsMm: [20, 40] },
+      scene,
+    );
+    if (reply.type !== 'result' || reply.status !== 'successful') {
+      throw new Error('expected a successful result');
+    }
+    for (const position of reply.positions) {
+      expect(['no-clear-change', 'higher-than-baseline']).toContain(position.band);
+      expect(position.cellsHigherThanBaseline).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('turns a thrown engine error into a failed calculation, not a blank screen', async () => {

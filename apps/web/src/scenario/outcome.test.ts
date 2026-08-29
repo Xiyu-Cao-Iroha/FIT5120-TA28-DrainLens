@@ -14,9 +14,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTION_LABELS,
   BANDS,
+  BASIS_COLOURS,
+  BASIS_LABELS,
   HOW_IT_WAS_PRODUCED,
   INSUFFICIENT,
+  RAINFALL_CONTROL_NOTE,
   RESULT_DISCLAIMER,
+  WHAT_IS_UNCERTAIN,
   presentationFor,
 } from './outcome.js';
 
@@ -164,3 +168,70 @@ describe('picking a presentation', () => {
 function INSUFFICIENT_VALUES() {
   return Object.values(INSUFFICIENT);
 }
+
+describe('the rainfall control note', () => {
+  it('says the control is about accumulation, not about time', () => {
+    // AC 2.2.2.d. A control that slides left to right looks exactly like a
+    // timeline; the model's variable is how much has fallen, never how long
+    // it took, and this sentence is what stands between the two readings.
+    expect(RAINFALL_CONTROL_NOTE).toMatch(/as rainfall accumulates/i);
+    expect(RAINFALL_CONTROL_NOTE).toMatch(/does not show when/i);
+  });
+
+  it('claims nothing about arrival, speed or duration', () => {
+    expect(RAINFALL_CONTROL_NOTE).not.toMatch(/how (fast|long|quickly)/i);
+    expect(RAINFALL_CONTROL_NOTE).not.toMatch(/minutes?|hours?/i);
+  });
+});
+
+describe('bases', () => {
+  it('names all three kinds of thing on the result screen', () => {
+    expect(Object.keys(BASIS_LABELS).sort()).toEqual(['assumption', 'derived', 'recorded']);
+  });
+
+  it('gives each one its own colour, so the badges are distinguishable', () => {
+    const backgrounds = Object.values(BASIS_COLOURS).map((c) => c.background);
+    expect(new Set(backgrounds).size).toBe(backgrounds.length);
+  });
+
+  it('calls the chosen settings an assumption rather than data', () => {
+    // The distinction the whole screen turns on: a blockage setting the
+    // person chose is a fact about them, not about their street.
+    expect(BASIS_LABELS.assumption).toMatch(/assumption/i);
+    expect(BASIS_LABELS.assumption).not.toMatch(/data|recorded|measured/i);
+    expect(BASIS_LABELS.recorded).toMatch(/recorded/i);
+  });
+});
+
+describe('what is missing or uncertain', () => {
+  it('lists the limitations a person would want before acting', () => {
+    expect(WHAT_IS_UNCERTAIN.length).toBeGreaterThanOrEqual(3);
+    for (const item of WHAT_IS_UNCERTAIN) {
+      expect(item.title.trim()).not.toBe('');
+      expect(item.body.trim()).not.toBe('');
+    }
+  });
+
+  it('names the capture fraction as an assumption, with its number', () => {
+    const item = WHAT_IS_UNCERTAIN.find((i) => /drain takes/i.test(i.title));
+    expect(item?.body).toContain('60%');
+    expect(item?.body).toMatch(/assumption and not a measurement/i);
+  });
+
+  it('gives the measured share of ground rather than a vague hedge', () => {
+    // A caveat with no number in it is decoration.
+    const item = WHAT_IS_UNCERTAIN.find((i) => /ground surface/i.test(i.title));
+    expect(item?.body).toContain('52.1%');
+  });
+
+  it('rules out every underground claim AD6 forbids', () => {
+    const depth = WHAT_IS_UNCERTAIN.find((i) => /depth/i.test(i.title));
+    expect(depth?.body).toMatch(/not pipe capacity/i);
+    expect(depth?.body).toMatch(/not whether a pipe is adequate/i);
+  });
+
+  it('never calls the ground surface a LiDAR product', () => {
+    const everything = WHAT_IS_UNCERTAIN.map((i) => `${i.title} ${i.body}`).join(' ');
+    expect(everything.toLowerCase()).not.toContain('lidar');
+  });
+});

@@ -6,20 +6,22 @@
  * than at every screen that happens to touch it.
  */
 
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 
 import type { AddressIndex } from './address/search.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
-import { type TraceArtefact, assertTrace } from './trace/graph.js';
-import { MapView } from './screens/MapView.js';
+import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
+import { EVERYTHING, MapView } from './screens/MapView.js';
+import { MapCanvas } from './map/MapCanvas.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
-import { INITIAL_SESSION, type SupportedAddress, reduce } from './session.js';
+import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
+import { INITIAL_SESSION, type Session, type SupportedAddress, reduce } from './session.js';
 import { Shell } from './ui/Shell.js';
 
 interface Loaded {
@@ -54,6 +56,10 @@ export function App() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const scenario = useScenario('/data/scene');
+  // Every position the last run solved. The rainfall control on the result
+  // reads these, so changing the amount cannot start a second calculation and
+  // therefore cannot return a different answer for the same inputs (AC 2.2).
+  const [positions, setPositions] = useState<readonly SolvedPosition[]>([]);
 
   useEffect(() => {
     load()
@@ -207,6 +213,16 @@ export function App() {
                       : { status: 'insufficient-information', reason: outcome.reason }
                   }
                   scenario={session.scenario}
+                  positions={positions}
+                  onRainfall={(rainfallMm) => {
+                    const solved = positions.find((p) => p.rainfallMm === rainfallMm);
+                    if (solved === undefined) return;
+                    dispatch({ type: 'rainfall-selected', rainfallMm });
+                    dispatch({
+                      type: 'comparison-finished',
+                      outcome: { kind: 'comparison', band: solved.band },
+                    });
+                  }}
                   onAction={onAction}
                 />
               ) : (
@@ -215,17 +231,21 @@ export function App() {
                   scenario={session.scenario}
                   suggestedPitId={
                     session.scenario.pitId === null
-                      ? nearestInlet(loaded, session.address)
+                      ? nearestInlet(loaded, session.address, scenario.drains)
                       : null
                   }
                   onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
                   onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
                   onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
                   onRun={() => {
-                    const pit = loaded.map.layers.pit?.find(
-                      (p) => String(p.asset_number) === session.scenario.pitId,
+                    // The scene's own cell for this asset. Never recomputed
+                    // from the map geometry: the pipeline snaps drains onto
+                    // the flow field, so a cell worked out here disagrees with
+                    // the scene for every drain in the extent.
+                    const drain = scenario.drains.find(
+                      (d) => d.assetNumber === session.scenario.pitId,
                     );
-                    const cell = cellOf(pit, loaded);
+                    const cell = drain?.isInlet === true ? drain.cell : null;
                     if (cell === null || session.scenario.blockage === null) {
                       // A pit the scene does not place cannot carry a
                       // scenario, and that is an inlet problem rather than a
@@ -241,22 +261,26 @@ export function App() {
                     dispatch({ type: 'comparison-started' });
                     void scenario
                       .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
-                      .then((result) =>
+                      .then((result) => {
+                        // Cleared on failure: leaving the previous run's
+                        // positions attached would let the control offer
+                        // answers to a question nobody asked.
+                        setPositions(result.status === 'successful' ? result.positions : []);
                         dispatch({
                           type: 'comparison-finished',
                           outcome:
                             result.status === 'successful'
                               ? { kind: 'comparison', band: result.band }
                               : { kind: 'insufficient', reason: result.reason },
-                        }),
-                      );
+                        });
+                      });
                   }}
                   onReset={() => dispatch({ type: 'reset-choices' })}
                 />
               )}
             </div>
             <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-              <MapCanvasPane loaded={loaded} />
+              <MapCanvasPane loaded={loaded} session={session} />
             </div>
           </div>
         </Shell>
@@ -289,41 +313,45 @@ export function App() {
   }
 }
 
-/** The map beside the scenario panel, with everything derived shown. */
-function MapCanvasPane({ loaded }: { readonly loaded: Loaded }) {
+/**
+ * The map beside the scenario panel.
+ *
+ * AC 2.2.1.d: the selected pit and its recorded downstream path stay visible
+ * while a result is on screen. Without them the difference is highlighted over
+ * a map that has forgotten which drain the person was asking about, and the
+ * result reads as a statement about the whole neighbourhood.
+ *
+ * `MapCanvas` directly rather than `MapView`, because the panel is suppressed
+ * here anyway and this map is driven by the scenario rather than by its own
+ * selection.
+ */
+function MapCanvasPane({
+  loaded,
+  session,
+}: {
+  readonly loaded: Loaded;
+  readonly session: Session;
+}) {
+  const pitId = session.scenario.pitId;
+  const followed = useMemo(
+    () => (pitId === null ? null : traceDownstream(loaded.trace, pitId)),
+    [loaded.trace, pitId],
+  );
+
   return (
-    <MapView
-      map={loaded.map}
+    <MapCanvas
+      artefact={loaded.map}
       derived={loaded.derived}
-      trace={loaded.trace}
-      address={null}
-      task="full-map"
-      onBack={() => undefined}
-      panel={false}
+      show={EVERYTHING}
+      selectedPit={pitId === null ? null : Number(pitId)}
+      address={
+        session.address === null
+          ? null
+          : [session.address.eastingM, session.address.northingM]
+      }
+      trace={followed}
     />
   );
-}
-
-/**
- * Which grid cell a pit sits in.
- *
- * The map ships pits in local metres and the engine indexes cells, so the two
- * frames meet here — in one place, using the grid the artefact declares rather
- * than a constant, so a change to the cell size cannot leave this stale.
- */
-function cellOf(
-  pit: { readonly c: readonly [number, number] } | undefined,
-  loaded: Loaded,
-): number | null {
-  if (!pit) return null;
-  const { width_m, height_m } = loaded.map.extent;
-  const cell = 1;
-  const cols = Math.round(width_m / cell);
-  const rows = Math.round(height_m / cell);
-  const col = Math.floor(pit.c[0] / cell);
-  const row = rows - 1 - Math.floor(pit.c[1] / cell);
-  if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
-  return row * cols + col;
 }
 
 /**
@@ -339,19 +367,31 @@ function cellOf(
  * surface blockage, and suggesting one would set a scenario the engine is
  * bound to reject.
  */
-function nearestInlet(loaded: Loaded, address: SupportedAddress | null): string | null {
+function nearestInlet(
+  loaded: Loaded,
+  address: SupportedAddress | null,
+  drains: readonly SceneDrain[],
+): string | null {
   const pits = loaded.map.layers.pit ?? [];
-  if (address === null || pits.length === 0) return null;
+  if (address === null || pits.length === 0 || drains.length === 0) return null;
+
+  // Only what the engine will accept. Reading "is this an inlet?" off the
+  // asset description instead was how a suggestion the scene cannot place
+  // reached the screen, and the comparison then failed on the person rather
+  // than on us.
+  const usable = new Set(
+    drains.filter((drain) => drain.isInlet).map((drain) => drain.assetNumber),
+  );
 
   let bestId: string | null = null;
   let bestDistance = Infinity;
   for (const pit of pits) {
-    const description = String(pit.asset_description ?? '').toLowerCase();
-    if (!description.includes('entry') && !description.includes('grated')) continue;
+    const asset = String(pit.asset_number ?? '');
+    if (!usable.has(asset)) continue;
     const distance = Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM);
     if (distance < bestDistance) {
       bestDistance = distance;
-      bestId = String(pit.asset_number ?? '');
+      bestId = asset;
     }
   }
   return bestId;

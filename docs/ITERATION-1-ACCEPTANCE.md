@@ -21,18 +21,17 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 ## Where this stands — 29 August 2026
 
-**60 of 77 interaction criteria met.** Every box below was checked against the code today, not assumed from a task list. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
+**67 of 77 interaction criteria met.** Every box below was checked against the code, and the Epic 2 journey was **run end to end in a browser** rather than read. That distinction earned its keep: 2.2.1 had been ticked from the code on 29 August while the comparison could not actually run, and only clicking it found out. Ticks that have not been exercised are worth less than they look. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
 
 | Not met | Why |
 |---|---|
 | 1.1.2.c | No plain-English sentence about where water near the address may move. The panel gives the next step, not the explanation. |
 | 1.1.3.b | No control for a terrain layer; the four controls cover the network and the three derived layers. |
 | 1.3.1.a–e, 1.3.2.a–c | The street cross-section is not built. |
-| 2.2.1.d | The map beside a result does not keep the selected pit and its downstream path visible — it renders with no selection and no trace. |
-| 2.2.2.a–d | No rainfall control on the result screen. The engine already solves three positions per run, so this is interface work rather than model work. |
-| 2.3.1.c, 2.3.1.e | The result does not visually separate recorded data, derived results and user assumptions, and does not state what is missing or uncertain. |
 
 US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.1.3.a were met on 29 August**: the map now opens centred on the address and marks it. Verified in the browser at two addresses — one away from the boundary lands dead centre, one near the western edge stops exactly where the clamp says it should rather than opening onto ground outside the pilot area.
+
+**US 2.2 and 2.3 were finished on 29 August, and finishing them uncovered a defect that would have taken the demonstration with it.** The interface worked out which grid cell a pit occupied from the map geometry, while the pipeline snaps every drain up to three metres onto the flow field. The two disagreed for **895 of 895 drains**, so the engine found no drain at the cell it was given and *every* comparison returned `invalid_inlet`. The interface now reads the cell from the scene, which is the only thing that knows it, and suggestions are filtered to drains the scene actually places. **1.1.2.a and 1.1.3.a were met on 29 August**: the map now opens centred on the address and marks it. Verified in the browser at two addresses — one away from the boundary lands dead centre, one near the western edge stops exactly where the clamp says it should rather than opening onto ground outside the pilot area.
 
 ---
 
@@ -186,7 +185,7 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 - [x] **2.2.1.a** Compare the selected blockage with an all-clear baseline **within the same local calculation area**
 - [x] **2.2.1.b** Compare both conditions **at the same accumulated rainfall amount**
 - [x] **2.2.1.c** Open the **Difference** view by default
-- [ ] **2.2.1.d** Keep the selected pit and its connected downstream path visible
+- [x] **2.2.1.d** Keep the selected pit and its connected downstream path visible
 - [x] **2.2.1.e** Identify supported result areas as **No clear change** or **Higher than baseline**
 - [x] **2.2.1.f** Display **Insufficient information** where the data does not support a clear comparison
 - [x] **2.2.1.g** Describe the result as an indicative comparison based on simplified assumptions, **not a live flood prediction**
@@ -201,10 +200,10 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 
 *Given a completed comparison is displayed, when the user moves the rainfall control, then the system will:*
 
-- [ ] **2.2.2.a** Display the selected level in millimetres
-- [ ] **2.2.2.b** Update **both** the all-clear baseline and the blockage scenario to that same level
-- [ ] **2.2.2.c** Update the displayed difference without changing the selected pit or blockage setting
-- [ ] **2.2.2.d** **Explain that the control shows how the comparison changes as rainfall accumulates, not when water will reach a location**
+- [x] **2.2.2.a** Display the selected level in millimetres
+- [x] **2.2.2.b** Update **both** the all-clear baseline and the blockage scenario to that same level
+- [x] **2.2.2.c** Update the displayed difference without changing the selected pit or blockage setting
+- [x] **2.2.2.d** **Explain that the control shows how the comparison changes as rainfall accumulates, not when water will reach a location**
 
 > Every position is solved independently from zero, so moving the control cannot make an earlier position disagree with itself. A test asserts that solving four positions and solving one give the same answer at the rainfall they share.
 
@@ -238,9 +237,9 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 
 - [x] **2.3.1.a** Summarise the selected pit, blockage setting and accumulated rainfall
 - [x] **2.3.1.b** Explain in plain English how the blockage assumption changes the indicative build-up compared with the all-clear baseline
-- [ ] **2.3.1.c** **Distinguish official recorded data, system-derived indicative results and user-selected assumptions**
+- [x] **2.3.1.c** **Distinguish official recorded data, system-derived indicative results and user-selected assumptions**
 - [x] **2.3.1.d** Explain the simplified assumptions the comparison uses
-- [ ] **2.3.1.e** Identify important missing or uncertain information
+- [x] **2.3.1.e** Identify important missing or uncertain information
 - [x] **2.3.1.f** State that the comparison does not estimate water-routing time, flood arrival time or live flood conditions
 
 > 2.3.1.c is what the provenance record exists for, and it cannot be met by styling text at render time. Every value carries a basis: a data version, a derivation, an entry in the assumption register, or a model version. 2.3.1.d needs that register to exist — it is a build artefact, and without it the "assumed" label points at nothing.

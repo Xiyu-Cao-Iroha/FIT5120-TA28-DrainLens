@@ -11,14 +11,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BlockageSetting, InsufficiencyReason } from '@drainlens/schema';
 
-import type { WorkerReply, WorkerRequest } from './worker.js';
+import type { SceneDrain, SolvedPosition, WorkerReply, WorkerRequest } from './worker.js';
 
 export type ScenarioResult =
-  | { readonly status: 'successful'; readonly band: 'no-clear-change' | 'higher-than-baseline' }
+  | {
+      readonly status: 'successful';
+      readonly band: 'no-clear-change' | 'higher-than-baseline';
+      /** Every position solved by this run, ascending. The control reads these. */
+      readonly positions: readonly SolvedPosition[];
+    }
   | { readonly status: 'insufficient-information'; readonly reason: InsufficiencyReason };
 
 export interface ScenarioRunner {
   readonly ready: boolean;
+  /**
+   * The drains the scene places, once it has loaded.
+   *
+   * The single source for which pits a scenario can use and which cell each
+   * one occupies. Deriving either from the map artefact is what produced a
+   * suggestion the engine rejected for every pit in the extent.
+   */
+  readonly drains: readonly SceneDrain[];
   readonly running: boolean;
   readonly failure: string | null;
   readonly run: (
@@ -43,6 +56,7 @@ export function useScenario(base: string): ScenarioRunner {
   const nextId = useRef(1);
   const pending = useRef(new Map<number, (reply: WorkerReply) => void>());
   const [ready, setReady] = useState(false);
+  const [drains, setDrains] = useState<readonly SceneDrain[]>([]);
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -53,6 +67,7 @@ export function useScenario(base: string): ScenarioRunner {
     worker.onmessage = (event: MessageEvent<WorkerReply>) => {
       const reply = event.data;
       if (reply.type === 'loaded') {
+        setDrains(reply.drains);
         setReady(true);
         return;
       }
@@ -106,7 +121,7 @@ export function useScenario(base: string): ScenarioRunner {
           }
           resolve(
             reply.status === 'successful'
-              ? { status: 'successful', band: reply.band }
+              ? { status: 'successful', band: reply.band, positions: reply.positions }
               : {
                   status: 'insufficient-information',
                   reason: reply.reason as InsufficiencyReason,
@@ -125,5 +140,5 @@ export function useScenario(base: string): ScenarioRunner {
     [],
   );
 
-  return { ready, running, failure, run };
+  return { ready, drains, running, failure, run };
 }

@@ -132,6 +132,65 @@ export const presentationFor = (outcome: Outcome): Presentation =>
 export const RESULT_DISCLAIMER =
   'This is an indicative comparison between two assumptions. It is not a live flood prediction, and it does not show measured flood depth or when water would reach a location.';
 
+/**
+ * What the rainfall control does, and the thing it must not be read as.
+ *
+ * AC 2.2.2.d. The model's independent variable is accumulated rainfall, not
+ * time: it knows how much water has fallen, never how long that took. So a
+ * control that slides left to right looks exactly like a timeline and is not
+ * one, and this sentence is the only thing standing between the two readings.
+ */
+export const RAINFALL_CONTROL_NOTE =
+  'This shows how the comparison changes as rainfall accumulates. It does not show when water would reach a location.';
+
+/**
+ * The three kinds of thing on this screen, and their colours.
+ *
+ * AC 2.3.1.c. A person deciding what to do about their street needs to know
+ * which of these came from the council, which the model worked out, and which
+ * they themselves supposed — because only the first is a fact about the world,
+ * and the last is a fact about them.
+ */
+export type Basis = 'recorded' | 'derived' | 'assumption';
+
+export const BASIS_LABELS: Readonly<Record<Basis, string>> = {
+  recorded: 'Official recorded data',
+  derived: 'System-derived result',
+  assumption: 'Your assumption',
+};
+
+export const BASIS_COLOURS: Readonly<Record<Basis, { background: string; color: string }>> = {
+  recorded: { background: '#dcece6', color: '#1f5b4e' },
+  derived: { background: '#dde8f2', color: '#2a5678' },
+  assumption: { background: '#f6ecd8', color: '#7a5a1e' },
+};
+
+/**
+ * What is missing or uncertain in every comparison this product makes.
+ *
+ * AC 2.3.1.e. Each line is a limitation of the data or the model that a
+ * reasonable person would want to know before acting, and each is measured
+ * rather than hedged — a caveat with no number in it is decoration.
+ */
+export const WHAT_IS_UNCERTAIN: readonly { readonly title: string; readonly body: string }[] = [
+  {
+    title: 'How much water a drain takes is assumed',
+    body: 'The model assumes a clear drain captures 60% of the water reaching it. The council record does not describe inlet geometry or grate condition, so this figure is an assumption and not a measurement.',
+  },
+  {
+    title: 'The ground surface is derived from imagery, not survey',
+    body: 'It comes from aerial photography, so 52.1% of this area was measured directly and the rest — under roofs and tree canopy — is interpolated from the nearest measured ground.',
+  },
+  {
+    title: 'The recorded drainage network has gaps',
+    body: 'Some pipes stop without the record saying where they go. Those gaps are shown as gaps rather than joined up, so a path that ends may be the end of the record rather than the end of the drainage.',
+  },
+  {
+    title: 'Pipe depth is not used at all',
+    body: 'Depth is missing for almost every pit in this area, so nothing here models what happens underground: not pipe capacity, not a blockage below the surface, and not whether a pipe is adequate.',
+  },
+];
+
 /** How the comparison was produced, in the order it happened. */
 export const HOW_IT_WAS_PRODUCED: readonly { readonly title: string; readonly body: string }[] = [
   {

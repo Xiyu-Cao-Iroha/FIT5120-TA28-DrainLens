@@ -32,12 +32,51 @@ export interface LoadRequest {
 
 export type WorkerRequest = LoadRequest | RunRequest;
 
+/** One accumulated-rainfall position, as the interface needs it. */
+export interface SolvedPosition {
+  readonly rainfallMm: number;
+  readonly band: 'no-clear-change' | 'higher-than-baseline';
+  readonly cellsHigherThanBaseline: number;
+}
+
+/** A drain as the scene places it. The `cell` is authoritative — see below. */
+export interface SceneDrain {
+  readonly assetNumber: string;
+  readonly cell: number;
+  readonly isInlet: boolean;
+}
+
 export type WorkerReply =
-  | { readonly type: 'loaded'; readonly id: number; readonly drains: number; readonly inlets: number }
+  | {
+      readonly type: 'loaded';
+      readonly id: number;
+      /**
+       * Every drain, with the cell the scene put it in.
+       *
+       * The interface must never work this out for itself. The pipeline snaps
+       * each drain up to three metres onto the flow field — a kerbside inlet
+       * recorded in the middle of the road belongs to the gutter it drains,
+       * not to the cell its coordinate landed in — so a cell derived from the
+       * map geometry disagrees with the scene for every drain in the extent,
+       * and the engine then finds no drain there at all.
+       */
+      readonly drains: readonly SceneDrain[];
+      readonly inlets: number;
+    }
   | {
       readonly type: 'result';
       readonly id: number;
       readonly status: 'successful';
+      /**
+       * Every position the run solved, ascending.
+       *
+       * The engine solves them all in one pass whether or not anybody asks, so
+       * returning only the last threw away the answer to the next question the
+       * person is going to ask. AC 2.2.2 is then a lookup rather than a rerun,
+       * which is what keeps the rainfall control honest: it cannot quietly
+       * re-solve with a different assumption between two readings.
+       */
+      readonly positions: readonly SolvedPosition[];
       readonly band: 'no-clear-change' | 'higher-than-baseline';
       readonly cellsHigherThanBaseline: number;
     }
@@ -102,6 +141,11 @@ export function handle(request: WorkerRequest, loaded: LoadedScene | null): Work
       type: 'result',
       id: request.id,
       status: 'successful',
+      positions: outcome.positions.map((position) => ({
+        rainfallMm: position.accumulatedRainfallMm,
+        band: position.band,
+        cellsHigherThanBaseline: position.cellsHigherThanBaseline,
+      })),
       band: last.band,
       cellsHigherThanBaseline: last.cellsHigherThanBaseline,
     };
@@ -127,7 +171,11 @@ if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessag
         self.postMessage({
           type: 'loaded',
           id: request.id,
-          drains: drains.length,
+          drains: drains.map((drain) => ({
+            assetNumber: String(drain.assetNumber),
+            cell: drain.cell,
+            isInlet: drain.isInlet,
+          })),
           inlets: drains.filter((drain) => drain.isInlet).length,
         } satisfies WorkerReply);
         return;

@@ -155,7 +155,7 @@ Translate relative to the centre, scale, flip y. Having exactly one place that f
 | # | File · function | What happens |
 |---|---|---|
 | 1 | `App.tsx` · `onRun` | Looks the pit up in `map.layers.pit` by `asset_number` |
-| 2 | `App.tsx` · `cellOf()` | Converts the pit's local metres into a grid cell index |
+| 2 | `App.tsx` | Reads the pit's cell **from the scene**, never recomputing it from the map |
 | 3 | `session.ts` · `reduce()` | `comparison-started` sets `running: true` |
 | 4 | `scenario/useScenario.ts` · `run()` | Assigns a request id, posts to the worker |
 | 5 | `scenario/worker.ts` · `self.onmessage` | Receives it, off the main thread |
@@ -390,9 +390,9 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **347**, 16 files, **1.4 s** |
+| TypeScript tests | **359**, 16 files, **1.4 s** |
 | Python tests | **332**, **55 s** — still over the 5 s gate, see below |
-| TypeScript coverage | **91.36%** statements · 94.28% branches · 96.22% functions |
+| TypeScript coverage | **91.67%** statements · 94.17% branches · 96.22% functions |
 | Python coverage | **91.44%** |
 | Source lines, excluding tests | ~17,000 |
 
@@ -400,7 +400,7 @@ Both suites pass and both are above their **coverage** gate. The **runtime** gat
 
 > The Node suite runs in 1.4 s and holds the five-second rule. The Python suite takes 55 s, down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is ~45 s of `test_terrain.py` building real grids, which is inherent to what those tests check. CI blocks on the Node suite, so nothing was failing; but the rule is the team's own and we are not quietly exempting the slow half.
 
-Interaction criteria: **60 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
+Interaction criteria: **67 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
 
 ### Not in the repository — check before Tuesday
 
@@ -425,9 +425,9 @@ Volunteering a limitation reads as understanding. Being caught by it reads as no
 
 **The flow-route cross-check is weak, and we say so.** We compared our channels against the City of Melbourne's published overland flow routes. That layer is itself derived — a 2008 DEM through ESRI Spatial Analyst — so it is one derivation against another. Flow accumulation gave a 24 m median offset and a 1.7× lift over chance. **It is recorded as weaker evidence than the footprint check and is not quoted alongside it.**
 
-**The street cross-section (US 1.3) is not built.** Eight criteria. It was always the most likely thing to drop, because pit depth is missing for 95.4% of the record and the surviving fraction is internally inconsistent — so most of the work is the *unavailable* state rather than the drawing.
+**Say this one before anything else if the demonstration is mentioned.** Until 29 August the compare journey could not run at all, and nothing in the test suite noticed. The interface worked out which grid cell a pit occupied from the map geometry; the pipeline snaps every drain up to three metres onto the flow field, because a kerbside inlet recorded in the middle of the road belongs to the gutter it drains. The two disagreed for **895 of 895 drains**, so the engine found no drain at the cell it was handed and every comparison returned "required inlet records are missing" — a sentence about the council's data, blaming the source for our arithmetic. It was found by clicking the journey, not by reading it, which is the whole argument for the manual click-through being on the gate list.
 
-**The result screen does not separate the three bases visually.** It states its assumptions and disclaims prediction, but recorded data, derived results and user assumptions are not distinguished on screen (2.3.1.c). The map does this correctly; the result does not, and the basis records exist to drive it.
+**The street cross-section (US 1.3) is not built.** Eight criteria. It was always the most likely thing to drop, because pit depth is missing for 95.4% of the record and the surviving fraction is internally inconsistent — so most of the work is the *unavailable* state rather than the drawing.
 
 **`apps/api` and `models/` are empty.** Both are in the layout with "not yet started" written beside them. Neither is in Iteration 1 scope.
 
