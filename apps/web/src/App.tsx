@@ -17,7 +17,8 @@ import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
 import type { Action } from './scenario/outcome.js';
-import { INITIAL_SESSION, reduce } from './session.js';
+import { useScenario } from './scenario/useScenario.js';
+import { INITIAL_SESSION, type SupportedAddress, reduce } from './session.js';
 import { Shell } from './ui/Shell.js';
 
 interface Loaded {
@@ -48,6 +49,7 @@ export function App() {
   const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const scenario = useScenario('/data/scene');
 
   useEffect(() => {
     load()
@@ -207,19 +209,43 @@ export function App() {
                 <ScenarioSetup
                   address={session.address!}
                   scenario={session.scenario}
-                  suggestedPitId={session.scenario.pitId === null ? 'P-14' : null}
+                  suggestedPitId={
+                    session.scenario.pitId === null
+                      ? nearestInlet(loaded, session.address)
+                      : null
+                  }
                   onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
                   onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
                   onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
                   onRun={() => {
+                    const pit = loaded.map.layers.pit?.find(
+                      (p) => String(p.asset_number) === session.scenario.pitId,
+                    );
+                    const cell = cellOf(pit, loaded);
+                    if (cell === null || session.scenario.blockage === null) {
+                      // A pit the scene does not place cannot carry a
+                      // scenario, and that is an inlet problem rather than a
+                      // crash.
+                      dispatch({ type: 'comparison-started' });
+                      dispatch({
+                        type: 'comparison-finished',
+                        outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
+                      });
+                      return;
+                    }
+
                     dispatch({ type: 'comparison-started' });
-                    // The engine runs behind a worker once the terrain artefact
-                    // is browser-loadable. Until then the screen is wired to
-                    // the real outcome type, not to a different shape.
-                    dispatch({
-                      type: 'comparison-finished',
-                      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
-                    });
+                    void scenario
+                      .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
+                      .then((result) =>
+                        dispatch({
+                          type: 'comparison-finished',
+                          outcome:
+                            result.status === 'successful'
+                              ? { kind: 'comparison', band: result.band }
+                              : { kind: 'insufficient', reason: result.reason },
+                        }),
+                      );
                   }}
                   onReset={() => dispatch({ type: 'reset-choices' })}
                 />
@@ -270,4 +296,57 @@ function MapCanvasPane({ loaded }: { readonly loaded: Loaded }) {
       panel={false}
     />
   );
+}
+
+/**
+ * Which grid cell a pit sits in.
+ *
+ * The map ships pits in local metres and the engine indexes cells, so the two
+ * frames meet here — in one place, using the grid the artefact declares rather
+ * than a constant, so a change to the cell size cannot leave this stale.
+ */
+function cellOf(
+  pit: { readonly c: readonly [number, number] } | undefined,
+  loaded: Loaded,
+): number | null {
+  if (!pit) return null;
+  const { width_m, height_m } = loaded.map.extent;
+  const cell = 1;
+  const cols = Math.round(width_m / cell);
+  const rows = Math.round(height_m / cell);
+  const col = Math.floor(pit.c[0] / cell);
+  const row = rows - 1 - Math.floor(pit.c[1] / cell);
+  if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+  return row * cols + col;
+}
+
+/**
+ * The nearest inlet to the address, as the setup screen's suggestion.
+ *
+ * A real pit, not a placeholder. The first version of this screen carried
+ * `P-14` from the design mock, and because no real pit has that identifier the
+ * comparison never reached the engine at all — it fell into the guard for a
+ * pit the scene cannot place and reported an unusable inlet. A wrong answer
+ * that looked exactly like a right one.
+ *
+ * Only inlets are offered. A junction or a submerged node cannot carry a
+ * surface blockage, and suggesting one would set a scenario the engine is
+ * bound to reject.
+ */
+function nearestInlet(loaded: Loaded, address: SupportedAddress | null): string | null {
+  const pits = loaded.map.layers.pit ?? [];
+  if (address === null || pits.length === 0) return null;
+
+  let bestId: string | null = null;
+  let bestDistance = Infinity;
+  for (const pit of pits) {
+    const description = String(pit.asset_description ?? '').toLowerCase();
+    if (!description.includes('entry') && !description.includes('grated')) continue;
+    const distance = Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestId = String(pit.asset_number ?? '');
+    }
+  }
+  return bestId;
 }
