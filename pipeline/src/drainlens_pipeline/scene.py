@@ -64,7 +64,52 @@ def quantise_elevation(elevation: np.ndarray) -> np.ndarray:
     return np.round(elevation * ELEVATION_SCALE).astype(np.int16)
 
 
-def drains_from(pits: list[dict], extent_width_m: float, extent_height_m: float, cell_size_m: float) -> list[dict]:
+#: How far a drain may be moved onto the flow path near it, in metres.
+#:
+#: A pit position comes from an asset register and a flow path from a
+#: photogrammetric surface. Neither is wrong; they simply do not agree to a
+#: metre, and at a one-metre cell with single-path routing that disagreement is
+#: the difference between a drain on the gutter and a drain on the footpath
+#: beside it.
+#:
+#: Measured, not assumed. As recorded, the median inlet sits on a cell with
+#: nine cells of catchment above it — it collects its own square metre of rain
+#: and nothing else, so blocking it changes 0.024 m³ and no comparison can ever
+#: show anything. Snapping to the highest-accumulation cell within one metre
+#: lifts that median to 136 cells, within two to 463, within three to 1,028 —
+#: about a thousand square metres draining through the inlet, which is what a
+#: street inlet serves.
+#:
+#: Three metres is the choice because it is narrower than any road in the
+#: extent, so a pit cannot snap across a kerb onto a different street's flow.
+#: It is a stated tolerance on position, not a claim that the pit is elsewhere.
+DRAIN_SNAP_M = 3.0
+
+
+def snap_to_flow(
+    cell: int, accumulation: np.ndarray, radius_m: float, cell_size_m: float
+) -> int:
+    """Move a drain to the busiest cell within the snapping radius."""
+    rows, cols = accumulation.shape
+    reach = int(round(radius_m / cell_size_m))
+    if reach < 1:
+        return cell
+
+    row, col = divmod(cell, cols)
+    top, bottom = max(0, row - reach), min(rows, row + reach + 1)
+    left, right = max(0, col - reach), min(cols, col + reach + 1)
+    window = accumulation[top:bottom, left:right]
+    offset = int(np.argmax(window))
+    return (top + offset // window.shape[1]) * cols + (left + offset % window.shape[1])
+
+
+def drains_from(
+    pits: list[dict],
+    extent_width_m: float,
+    extent_height_m: float,
+    cell_size_m: float,
+    accumulation: np.ndarray | None = None,
+) -> list[dict]:
     """Map the pit layer onto grid cells, in the frame the engine indexes by.
 
     A pit outside the grid is dropped rather than clamped to an edge cell. A
@@ -88,7 +133,11 @@ def drains_from(pits: list[dict], extent_width_m: float, extent_height_m: float,
         found.append(
             {
                 "assetNumber": str(pit.get("asset_number") or ""),
-                "cell": row * cols + col,
+                "cell": (
+                    snap_to_flow(row * cols + col, accumulation, DRAIN_SNAP_M, cell_size_m)
+                    if accumulation is not None
+                    else row * cols + col
+                ),
                 # Only an inlet can carry a surface blockage. The published
                 # description is the only signal the source gives, so the rule
                 # is stated here rather than guessed at in the browser.
@@ -105,6 +154,7 @@ def write(
     direction: np.ndarray,
     depression_labels: np.ndarray,
     observed: np.ndarray,
+    rim_depth: np.ndarray,
     depressions: list[dict],
     drains: list[dict],
     cell_size_m: float,
@@ -140,6 +190,16 @@ def write(
     (out_dir / "coverage.bin").write_bytes(np.packbits(covered).tobytes())
     (out_dir / "measured.bin").write_bytes(np.packbits(observed).tobytes())
 
+    # The shape of each hollow, as centimetres below its own rim.
+    #
+    # A capacity alone tells the engine how much a depression holds and nothing
+    # about where. It could only spread the water evenly, and evenly is wrong in
+    # the way that hides this product's subject: the few cubic metres a blocked
+    # drain releases into a two-hectare hollow become a quarter of a millilitre
+    # per cell, and every comparison reports no clear change. With the shape,
+    # water finds a level and the change concentrates where it would.
+    (out_dir / "rim-depth.bin").write_bytes(rim_depth.tobytes())
+
     header = {
         "artefact": "scene",
         "version": 1,
@@ -171,6 +231,17 @@ def write(
                     "same question as whether the ground there was measured."
                 ),
             },
+            "rim-depth": {
+                "file": "rim-depth.bin",
+                "type": "int16",
+                "unit": "centimetres",
+                "scale": ELEVATION_SCALE,
+                "note": (
+                    "How far each cell sits below the rim of its depression. Zero outside "
+                    "one. This is the shape a capacity cannot carry: without it the engine "
+                    "can only spread a hollow's water evenly over its whole footprint."
+                ),
+            },
             "measured": {
                 "file": "measured.bin",
                 "type": "bitmask",
@@ -200,7 +271,8 @@ def main(argv: list[str] | None = None) -> int:
     import sys
 
     from .geo import DEMONSTRATION_EXTENT
-    from .hydrology import condition
+    from .derived import flow_accumulation
+    from .hydrology import condition, fill
 
     parser = argparse.ArgumentParser(
         prog="python -m drainlens_pipeline.scene",
@@ -221,10 +293,20 @@ def main(argv: list[str] | None = None) -> int:
     barriers_path = args.terrain / "barriers.npy"
     barriers = np.load(barriers_path) if barriers_path.exists() else None
     elevation = condition(raw, barriers)
+
+    # The shape of each hollow: how far every cell sits below the level its
+    # depression fills to. Measured on the raw surface, like the capacities,
+    # because that is where a hollow has a shape at all — the conditioned
+    # surface is flat across every one of them by construction.
+    labels = np.load(args.terrain / "depression-cells.npz")["labels"]
+    inside = labels >= 0
+    rim_depth = np.zeros(raw.shape, dtype=np.int16)
+    rim_depth[inside] = np.round((fill(raw)[inside] - raw[inside]) * ELEVATION_SCALE).astype(np.int16)
     map_artefact = json.loads(args.map.read_text(encoding="utf-8"))
     pits = map_artefact.get("layers", {}).get("pit", [])
 
-    drains = drains_from(pits, extent.width_m, extent.height_m, 1.0)
+    accumulation = flow_accumulation(np.load(args.terrain / "flow-direction.npy"), elevation)
+    drains = drains_from(pits, extent.width_m, extent.height_m, 1.0, accumulation)
     inlets = sum(1 for d in drains if d["isInlet"])
     log(f"Packing the scene for {extent.name}")
     log(f"  {len(drains):,} drains on the grid, {inlets:,} of them inlets")
@@ -233,7 +315,8 @@ def main(argv: list[str] | None = None) -> int:
         args.out,
         elevation=elevation,
         direction=np.load(args.terrain / "flow-direction.npy"),
-        depression_labels=np.load(args.terrain / "depression-cells.npz")["labels"],
+        depression_labels=labels,
+        rim_depth=rim_depth,
         observed=np.load(args.terrain / "ground-observed.npy"),
         depressions=json.loads((args.terrain / "depressions.json").read_text(encoding="utf-8")),
         drains=drains,

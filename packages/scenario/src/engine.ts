@@ -117,11 +117,80 @@ export interface SceneInput {
    */
   readonly coverage?: Uint8Array;
   /**
+   * How far each cell sits below the rim of the depression it belongs to, in
+   * metres. Zero outside a depression.
+   *
+   * This is the shape of the hollow, and without it a depression can only be
+   * flooded evenly across its whole footprint. Evenly is wrong in a way that
+   * hides the product's own subject: on the real extent, the 4.7 m³ a blocked
+   * drain releases into an 18,856-cell hollow becomes a quarter of a millilitre
+   * per cell, and every comparison reports no clear change.
+   *
+   * Absent means the shape is unknown and the fallback is even spreading,
+   * which is what the flat-bottomed fixtures describe anyway.
+   */
+  readonly rimDepthM?: Float32Array;
+  /**
    * Limitations the traversal service found in the recorded network. They
    * travel with a successful result and never turn one into an insufficiency:
    * where a pipe leads has no bearing on the surface calculation.
    */
   readonly networkLimitations?: readonly NetworkLimitation[];
+}
+
+/**
+ * Spread a held volume over a depression by water level rather than evenly.
+ *
+ * Water finds a level. Given how far each cell sits below the rim, there is one
+ * surface at which the volume held equals the volume asked for, and the cells
+ * above that surface stay dry. Solved by sorting the depths and walking down
+ * them: at each step the wetted area grows by one cell, so the volume between
+ * consecutive depths is exact rather than iterated towards.
+ *
+ * Returns the number of cells left wet.
+ */
+export function fillToLevel(
+  cells: readonly number[],
+  rimDepthM: Float32Array,
+  heldM3: number,
+  cellAreaM2: number,
+  pondedM3: Float32Array,
+): number {
+  if (heldM3 <= 0 || cells.length === 0) return 0;
+
+  // Deepest first: the water reaches them first and leaves them last.
+  const depths = cells.map((cell) => rimDepthM[cell] ?? 0);
+  const order = cells.map((_, index) => index).sort((a, b) => depths[b]! - depths[a]!);
+
+  // Walk down the depths, accumulating the volume needed to raise the surface
+  // from one to the next over everything already wet.
+  let wetted = 0;
+  let volumeSoFar = 0;
+  let surface = depths[order[0]!]!; // depth below rim of the water surface
+  for (let index = 0; index < order.length; index += 1) {
+    const depth = depths[order[index]!]!;
+    const step = (surface - depth) * wetted * cellAreaM2;
+    if (volumeSoFar + step >= heldM3) break;
+    volumeSoFar += step;
+    surface = depth;
+    wetted = index + 1;
+  }
+
+  // Whatever is left raises the surface evenly over the cells already wet.
+  if (wetted === 0) wetted = 1;
+  const remaining = heldM3 - volumeSoFar;
+  surface -= remaining / (wetted * cellAreaM2);
+
+  let wetCells = 0;
+  for (let index = 0; index < order.length; index += 1) {
+    const cell = cells[order[index]!]!;
+    const depth = depths[order[index]!]!;
+    const water = depth - surface;
+    if (water <= 0) break;
+    pondedM3[cell] = water * cellAreaM2;
+    wetCells += 1;
+  }
+  return wetCells;
 }
 
 function validate(scene: SceneInput, assumptions: Assumptions): void {
@@ -340,11 +409,20 @@ export function solvePosition(
     }
   }
 
+  const cellArea = grid.cellSizeM * grid.cellSizeM;
   for (const depression of depressions.depressions) {
     const held = heldM3[depression.id]!;
     if (held <= 0 || depression.cells.length === 0) continue;
-    const share = held / depression.cells.length;
-    for (const cell of depression.cells) pondedM3[cell] = share;
+
+    if (scene.rimDepthM !== undefined) {
+      fillToLevel(depression.cells, scene.rimDepthM, held, cellArea, pondedM3);
+    } else {
+      // No shape for the hollow, so the only honest distribution is an even
+      // one. Flat-bottomed fixtures are exactly this case, and on them the two
+      // agree.
+      const share = held / depression.cells.length;
+      for (const cell of depression.cells) pondedM3[cell] = share;
+    }
   }
 
   let pondedVolume = 0;
