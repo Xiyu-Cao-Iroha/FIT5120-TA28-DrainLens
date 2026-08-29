@@ -67,6 +67,7 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
         derived={derived}
         show={show}
         selectedPit={selected}
+        address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         onSelect={(next) => {
           setHit(next);

@@ -21,11 +21,10 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 ## Where this stands — 29 August 2026
 
-**58 of 77 interaction criteria met.** Every box below was checked against the code today, not assumed from a task list. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
+**60 of 77 interaction criteria met.** Every box below was checked against the code today, not assumed from a task list. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
 
 | Not met | Why |
 |---|---|
-| 1.1.2.a, 1.1.3.a | The map neither centres on nor draws a marker at the selected address. The address reaches the panel text only. **Smallest remaining gap, and it blocks two criteria.** |
 | 1.1.2.c | No plain-English sentence about where water near the address may move. The panel gives the next step, not the explanation. |
 | 1.1.3.b | No control for a terrain layer; the four controls cover the network and the three derived layers. |
 | 1.3.1.a–e, 1.3.2.a–c | The street cross-section is not built. |
@@ -33,7 +32,7 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 | 2.2.2.a–d | No rainfall control on the result screen. The engine already solves three positions per run, so this is interface work rather than model work. |
 | 2.3.1.c, 2.3.1.e | The result does not visually separate recorded data, derived results and user assumptions, and does not state what is missing or uncertain. |
 
-US 1.2 was completed on 29 August; see the note under AC 1.2.2.
+US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.1.3.a were met on 29 August**: the map now opens centred on the address and marks it. Verified in the browser at two addresses — one away from the boundary lands dead centre, one near the western edge stops exactly where the clamp says it should rather than opening onto ground outside the pilot area.
 
 ---
 
@@ -55,7 +54,7 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2.
 
 *Given a supported address is selected and the user is on the task-selection page, when they select "Follow local water and drainage", then the system will:*
 
-- [ ] **1.1.2.a** Open a local map centred on and marking the selected address
+- [x] **1.1.2.a** Open a local map centred on and marking the selected address
 - [x] **1.1.2.b** Show likely surface-water paths and nearby drainage pits **by default**
 - [ ] **1.1.2.c** Provide a short plain-English explanation of where water near the address may move
 - [x] **1.1.2.d** Display **one clear next-step instruction** asking the user to select a surface-water path or drainage pit
@@ -66,7 +65,7 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2.
 
 *Given a supported address is selected and the user is on the task-selection page, when they select "Explore the full map", then the system will:*
 
-- [ ] **1.1.3.a** Open a local map centred on and marking the selected address
+- [x] **1.1.3.a** Open a local map centred on and marking the selected address
 - [ ] **1.1.3.b** Provide controls for the terrain, surface-water path, low-area, drainage-pit and drainage-pipe layers
 - [x] **1.1.3.c** Allow individual layers to be turned on or off
 - [x] **1.1.3.d** **Distinguish official recorded data from system-derived information**

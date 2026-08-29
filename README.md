@@ -67,20 +67,21 @@ Measured on **29 August 2026**. These are the current figures, not the best ones
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **91.17%** Node · **91.44%** Python |
-| Suite runtime | < 5 s | **1.4 s Node ✓ · 88 s Python ✗** — see below |
-| Tests | 334 TypeScript · 332 Python | 666 in total |
+| Coverage, overall | ≥ 88% | **91.36%** Node · **91.44%** Python |
+| Suite runtime | < 5 s | **1.4 s Node ✓ · 55 s Python ✗** — see below |
+| Tests | 347 TypeScript · 332 Python | 679 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
 | CI green rate | ≥ 95% | tracked on the Actions tab |
 
-**The Python suite breaches this gate and we are recording it rather than rounding it off.** 88 seconds, of which:
+**The Python suite still breaches this gate, and it is recorded rather than rounded off.** It was 88 s; one test was 32.7 s of that.
 
-- **32.7 s is a single test**, `test_derived.py::TestSimplify::test_it_does_not_recurse`. It builds a 20,000-vertex zigzag, which is the pathological worst case for Douglas–Peucker — every vertex is a candidate, so the algorithm splits at nearly all of them. The test's purpose is to prove `simplify` iterates rather than recurses, and Python's default recursion limit is 1,000, so a far shorter path would prove the same thing in a fraction of the time.
-- **~45 s is `test_terrain.py`**, where each of a dozen tests builds a real grid.
+That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's pathological worst case, and quadratic in the length. Its purpose is to prove `simplify` iterates rather than recurses, and measuring the fixture showed the recursion a recursive version would need is exactly `len(path) - 1`. So the length is now taken from `sys.getrecursionlimit()` rather than picked: twice the limit is a margin that cannot be argued with, and it proves the same property in under half a second. **88 s → 55 s.**
 
-Neither is a defect in the product, and the Node suite — the one the gate was written for, and the one CI blocks on — runs in 1.4 s. But the rule below is the team's own, and a rule quietly exempted for the slow half is not a rule.
+What remains is **~45 s of `test_terrain.py`**, where a dozen tests each build a real grid. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass.
+
+The Node suite — the one the gate was written for, and the one CI blocks on — runs in 1.4 s.
 
 A test that would push the suite past five seconds belongs behind a separate script, not in this run.
 
@@ -92,6 +93,7 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.14.0 | 29 Aug 2026 | The map opens centred on the selected address and marks it — AC 1.1.2.a and 1.1.3.a, and the smallest gap the documentation pass had found. `focus` is clamped, so an address near the boundary moves the view as far as it can and no further rather than opening onto ground outside the pilot area; verified in the browser at both demonstration addresses, one landing dead centre and one stopping exactly where the arithmetic says. The marker is deliberately not the pit colour: the address is the person's own location, not a recorded asset. Also **88 s → 55 s on the Python suite**, by taking the length of a Douglas–Peucker worst-case fixture from `sys.getrecursionlimit()` rather than from a round number — measuring showed a recursive version would need a depth of exactly `len(path) - 1`, so twice the limit proves the property that 20,000 vertices were proving at 32.7 s. **60 of 77 interaction criteria met.** 347 TypeScript tests, 332 Python, 91.36% and 91.44%. |
 | 0.13.0 | 29 Aug 2026 | **US 1.2 complete**: select a pit, read what the council recorded, and follow the drainage downstream. The feature needed a pipeline stage for one reason — `map.json` cannot tell a pipe clipped out of our square kilometre from one the council never finished recording, and here that is **7 edges against 29**. Drawing all 36 as a pipe going nowhere would state something false about the source, so `trace.py` resolves it offline into a 37 KB artefact. The other finding is worth quoting: **there are no recorded outlets**. All 215 extent pits with no downstream pipe are junctions, kerbside inlets or unrecorded types — 83 of them inlets — so no path can reach an outlet and a test asserts none is claimed. Direction is read from the topology rather than the vertex order, which carries no meaning in the export. Two cycle guards, one of the council's eighteen back edges falling inside the demonstration extent. 334 TypeScript tests, 332 Python, 91.17% and 91.44%. |
 | 0.12.0 | 29 Aug 2026 | Documentation for the pre-deployment check: an [interface contract](./docs/INTERFACE-CONTRACT.md) recording that the frontend/backend boundary is deliberately almost empty, and a [walkthrough](./docs/PRE-DEPLOYMENT-WALKTHROUGH.md) that follows one click through file, function and logic. Two drifts found while checking: a docstring pointing at a `preference.ts` that was never written, and a gates table still claiming 99% on both sides. |
 | 0.11.0 | 29 Aug 2026 | **The mass balance closed**, from 71.55% of the water lost to 0.00%, through three separate causes. The pipeline shipped the raw surface while the flow field came from the conditioned one, so water was routed by one terrain and stored by another — 65.8%. Ordering cells by elevation is only a *proxy* for topological order and 509 cells out of a million were exactly level at float32, so `upstreamFirst` now uses Kahn's algorithm — 27.0%. Depressions resolved in a single pass ordered by rim height stranded water in already-resolved stores, because a deep pit in low ground can have a higher rim than the hollow feeding it; the passes now repeat until nothing moves. With it closed, blocking any single inlet produces **no visible difference at any rainfall from 20 to 200 mm** — not a bug, but a redundant recorded network under an assumed 60% capture fraction. **That is an open product decision.** |

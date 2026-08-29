@@ -107,6 +107,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Hit testing** — tap a pit or a pipe. Measured in screen pixels, not metres, so the target does not shrink exactly when the map is zoomed out and a pit is hardest to hit. Pits win ties, because every pit sits on the end of a pipe and pipes would otherwise shadow the whole layer
 - [x] **Street labels** — one per street at its longest visible run, colliding labels dropped rather than overdrawn. The source names every segment and Kensington's blocks are short, so drawing them all wrote the same name six times across four centimetres
 - [x] Follow-local-water view: surface-water paths and pits **by default**, one next-step instruction, other layers in a **collapsed** section → *1.1.2*
+- [x] **Address marker** — the map opens centred on the selected address and marks it, clamped so an address near the boundary never opens onto ground outside the pilot area → *1.1.2.a, 1.1.3.a*
 - [x] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
 - [x] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*. Fields the record leaves empty say **Not recorded** rather than showing a blank, and depth is declared absent rather than interpolated
 - [x] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*. Direction is read from the topology, not from vertex order, which carries no meaning in the source
@@ -189,7 +190,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 91.2% Node · 91.4% Python. **Node 1.4 s ✓, Python 88 s ✗** |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 91.4% Node · 91.4% Python. **Node 1.4 s ✓, Python 55 s ✗** |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |

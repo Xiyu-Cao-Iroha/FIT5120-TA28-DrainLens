@@ -8,6 +8,8 @@ pinned rather than eyeballed.
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pytest
 
@@ -137,10 +139,29 @@ class TestSimplify:
         assert dv.simplify([(0.0, 0.0), (1.0, 1.0)], 0.5) == [(0.0, 0.0), (1.0, 1.0)]
 
     def test_it_does_not_recurse(self):
-        # An outline of a large hollow runs to thousands of vertices, and the
-        # worst case for this algorithm is a recursion as deep as the path.
-        zigzag = [(float(i), float(i % 2)) for i in range(20_000)]
-        assert len(dv.simplify(zigzag, 0.4)) > 2
+        """A path deeper than the interpreter would allow is still simplified.
+
+        An outline of a large hollow runs to thousands of vertices, and a
+        zigzag is this algorithm's worst case: every vertex sits off the chord,
+        so it splits one vertex at a time and a recursive implementation
+        recurses as deep as the path is long. Measured on this fixture, the
+        depth is exactly ``len(path) - 1``.
+
+        So the path only has to be deeper than the interpreter would allow, and
+        the length is taken from the limit rather than picked. That matters
+        because the case is quadratic: this ran on 20,000 vertices and cost
+        32.7 s, a third of the whole Python suite, to prove something twice the
+        recursion limit proves in under half a second.
+        """
+        vertices = 2 * sys.getrecursionlimit()
+        zigzag = [(float(i), float(i % 2)) for i in range(vertices)]
+
+        simplified = dv.simplify(zigzag, 0.4)
+
+        # Every vertex of a unit zigzag stands half a metre off the chord, so
+        # a 0.4 m tolerance keeps all of them. Asserting the whole path
+        # survives says the traversal completed, not merely that it returned.
+        assert len(simplified) == vertices
 
 
 class TestRingArea:

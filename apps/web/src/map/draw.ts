@@ -22,6 +22,8 @@ export interface Palette {
   readonly selected: string;
   readonly label: string;
   readonly labelHalo: string;
+  readonly address: string;
+  readonly addressHalo: string;
 }
 
 /** Muted on purpose: the recorded network is context, not the answer. */
@@ -35,6 +37,11 @@ export const DAY: Palette = {
   selected: '#0f766e',
   label: '#5b6b7a',
   labelHalo: '#ffffff',
+  // Warm, and shared with no layer. The address is the person's own
+  // location, not a recorded asset, and a marker that borrowed the pit
+  // colour would put their house into the drainage network.
+  address: '#c2410c',
+  addressHalo: '#ffffff',
 };
 
 /** Below this many pixels per metre, street labels are noise rather than help. */
@@ -286,6 +293,40 @@ export interface DrawOptions {
   readonly palette?: Palette;
   readonly selectedPit?: number | null;
   readonly selectedPipe?: number | null;
+  /** The selected address, in local metres. Drawn last so nothing covers it. */
+  readonly address?: Local | null;
+}
+
+/**
+ * The selected address.
+ *
+ * A ring rather than a filled dot, so it reads as "here" rather than as one
+ * more asset in a layer of dots — and it is deliberately the one thing on this
+ * map that is not drawn from an artefact.
+ */
+export function drawAddress(
+  context: CanvasRenderingContext2D,
+  viewport: Viewport,
+  at: Local,
+  palette: Palette,
+): void {
+  const [x, y] = toScreen(viewport, at);
+  context.lineWidth = 3;
+  context.strokeStyle = palette.addressHalo;
+  context.beginPath();
+  context.arc(x, y, 8, 0, Math.PI * 2);
+  context.stroke();
+
+  context.lineWidth = 2.5;
+  context.strokeStyle = palette.address;
+  context.beginPath();
+  context.arc(x, y, 8, 0, Math.PI * 2);
+  context.stroke();
+
+  context.beginPath();
+  context.arc(x, y, 2.5, 0, Math.PI * 2);
+  context.fillStyle = palette.address;
+  context.fill();
 }
 
 export function drawMap(
@@ -309,6 +350,10 @@ export function drawMap(
   if (viewport.scale >= LABEL_MIN_SCALE) {
     drawStreetNames(context, viewport, artefact.layers['street-name'] ?? [], palette, seen);
   }
+
+  // Last, and never culled by `seen`: a marker just off screen is the one
+  // thing a person needs to be able to pan back towards.
+  if (options.address) drawAddress(context, viewport, options.address, palette);
 }
 
 export type { LineFeature, PolygonFeature };

@@ -85,6 +85,45 @@ export function fit(widthPx: number, heightPx: number, bounds: Bounds): Viewport
   };
 }
 
+/**
+ * Pixels per metre the guided view opens at.
+ *
+ * AC 1.1.2 asks for a *local* map. At the scale that fits the whole extent a
+ * house is one dot in a square kilometre, which answers "where is my address"
+ * with "somewhere in Kensington". Three pixels per metre puts roughly 300 m
+ * across a laptop pane — a few blocks, which is the distance the question
+ * "where does water near me go" is actually about.
+ */
+export const LOCAL_SCALE = 3;
+
+/**
+ * The whole extent, centred on `at`, at `scale`.
+ *
+ * Clamped, so asking to centre on an address near the boundary moves the view
+ * as far as it can and no further rather than opening onto blank ground
+ * outside the pilot area. At a scale that fits the extent this is `fit` — the
+ * clamp pins the centre — which is what the full-map task wants: the marker
+ * still marks, and the map still shows everything.
+ */
+export function focus(
+  widthPx: number,
+  heightPx: number,
+  bounds: Bounds,
+  at: Local,
+  scale: number = LOCAL_SCALE,
+): Viewport {
+  const smallest = scaleToCover(widthPx, heightPx, bounds);
+  return clamp(
+    {
+      widthPx,
+      heightPx,
+      scale: Math.min(Math.max(scale, smallest), MAX_SCALE),
+      centre: at,
+    },
+    bounds,
+  );
+}
+
 export const pan = (viewport: Viewport, dxPx: number, dyPx: number): Viewport => ({
   ...viewport,
   centre: [

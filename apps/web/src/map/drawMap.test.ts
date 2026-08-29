@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
 import { DAY, LABEL_MIN_SCALE, PIT_MIN_SCALE, drawMap } from './draw.js';
-import { type Bounds, fit } from './viewport.js';
+import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
 
@@ -212,5 +212,55 @@ describe('selection', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { palette: { ...DAY, ground: '#000000' } });
     expect(context.calls[0]?.op).toBe('fillRect');
+  });
+});
+
+describe('the address marker', () => {
+  /** The ring is radius 8; no pit at these scales is drawn larger than 7. */
+  const ringCalls = (context: ReturnType<typeof recorder>) =>
+    context.calls.filter((call) => call.op === 'arc' && call.args[2] === 8);
+
+  it('is drawn when an address is given', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [400, 400] });
+    expect(ringCalls(context).length).toBeGreaterThan(0);
+  });
+
+  it('is not drawn when there is no address', () => {
+    const context = recorder();
+    drawMap(context, FULL, view());
+    expect(ringCalls(context)).toHaveLength(0);
+  });
+
+  it('is drawn where the address is', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [400, 400] });
+    const [x, y] = toScreen(view(), [400, 400]);
+    const ring = ringCalls(context)[0];
+    expect(ring?.args[0]).toBeCloseTo(x);
+    expect(ring?.args[1]).toBeCloseTo(y);
+  });
+
+  it('does not borrow the pit colour', () => {
+    // The address is the person's own location, not a recorded asset. A
+    // marker in the pit colour puts their house into the drainage network.
+    expect(DAY.address).not.toBe(DAY.pit);
+    expect(DAY.address).not.toBe(DAY.selected);
+  });
+
+  it('is drawn after every layer, so nothing paints over it', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [400, 400] });
+    const lastRing = context.calls.map((c) => c.op === 'arc' && c.args[2] === 8).lastIndexOf(true);
+    const lastLabel = context.calls.map((c) => c.op === 'fillText').lastIndexOf(true);
+    expect(lastRing).toBeGreaterThan(lastLabel);
+  });
+
+  it('is drawn even when it sits outside the visible window', () => {
+    // A marker just off screen is the one thing a person needs in order to
+    // know which way to pan back, so it is never culled.
+    const context = recorder();
+    drawMap(context, FULL, { ...view(4), centre: [100, 100] }, { address: [900, 900] });
+    expect(ringCalls(context).length).toBeGreaterThan(0);
   });
 });
