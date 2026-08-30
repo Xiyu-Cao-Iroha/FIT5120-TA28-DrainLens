@@ -141,7 +141,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [ ] Cloud Storage + Cloud CDN for artefacts; confirm range requests pass through (PMTiles depends on them)
 - [ ] Cloud Run behind the load balancer; one URL map, one origin
 - [ ] **Log exclusion filter covering both** load balancer and Cloud Run request logs
-- [ ] Record p95 latency and external-fetch failure rate **before and after** every deployment
+- [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken** — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 40.8 ms for the whole first visit, 0.00% failures, 1.31 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
 - [ ] Probe every external dependency **from the deployment host, not a laptop**
 - [ ] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working
 
@@ -200,7 +200,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | ≥8 hours cross-discipline pair programming | Friday, Sunday | — |
 | Critical defects triaged within 24 h, resolved within the iteration | Continuous | — |
 | External dependencies probed from the deployment host | Monday | — |
-| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | — |
+| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | **before taken** — 40.8 ms p95, 0.00% failures |
 | Manual click-through in a real browser before the demo | Monday, Tuesday | — |
 
 ---
