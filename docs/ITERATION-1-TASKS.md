@@ -138,9 +138,9 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] CI: `npm ci` then `npm run check` on every pull request, plus the Python suite
 - [x] Artefact contract published in `packages/schema`
 - [ ] Required approvals raised from 0 to 1 once collaborators are added
-- [ ] Cloud Storage + Cloud CDN for artefacts; confirm range requests pass through (PMTiles depends on them)
-- [ ] Cloud Run behind the load balancer; one URL map, one origin
-- [ ] **Log exclusion filter covering both** load balancer and Cloud Run request logs
+- [~] Cloud Storage + Cloud CDN for artefacts — **the runbook and upload script are written** ([deploy/](../deploy/README.md)), not yet run against a project. The range-request line is withdrawn: it was written when the map was expected to be tiled, and tiling was dropped after the whole extent measured 1.27 MB gzipped. Nothing here uses range requests, which is as well — Cloud Storage's gzip transcoding and range requests do not combine
+- [—] Cloud Run behind the load balancer — **withdrawn for Iteration 1.** There is no `apps/api` to containerise. Reasonable again as an Iteration 2 target if AI inference moves off the device; see [deploy/README.md](../deploy/README.md)
+- [~] **Log exclusion filter** — **there is nothing to filter on this architecture, and that is the finding.** Load balancer request logs are off by default on a backend bucket, and Cloud Storage access logs are opt-in, so AD1 is kept by never enabling them rather than by filtering afterwards. Cloud Monitoring metrics carry no IP and stay. The filter becomes mandatory the day `apps/api` reaches Cloud Run, because Cloud Run logs requests — with `remoteIp` — by default. Verification commands in [deploy/README.md](../deploy/README.md), which assert the absence rather than assume it
 - [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken** — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 40.8 ms for the whole first visit, 0.00% failures, 1.31 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
 - [ ] Probe every external dependency **from the deployment host, not a laptop**
 - [ ] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working

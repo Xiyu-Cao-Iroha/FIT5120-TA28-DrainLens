@@ -33,6 +33,7 @@ apps/web            frontend (React + TypeScript + Vite) — session state and t
 apps/api            backend (Node + TypeScript + Hono on Cloud Run)               not yet started
 pipeline            Python geospatial pipeline, never deployed — graph, terrain, map geometry, trace
 tools/perf          the deployment measurement, run identically before and after
+deploy              the deployment runbook and upload script
 data                artefact releases — git-ignored, rebuilt locally
 docs                iteration scope, acceptance criteria, development guide, interface contract
 models              exported ONNX models and evaluation reports                   not yet started
