@@ -1,6 +1,6 @@
 # Interface contract — frontend and backend
 
-DrainLens · TA28 · **current as of 29 August 2026**
+DrainLens · TA28 · **current as of 30 August 2026**
 
 What the browser sends, what the server answers, and what may never cross between them.
 
@@ -107,7 +107,7 @@ email          userId         sessionId      ipAddress
 
 **This binds the backend as much as the frontend.** A response carrying any of these is as much a breach as a request carrying them, and so is a server log. Two specific consequences:
 
-- **Do not log request bodies or IP addresses** for these endpoints. A log line is storage, and an address in a log is an address we said we would not keep. The deployment task list already carries a log exclusion filter covering both the load balancer and Cloud Run for this reason.
+- **Do not log request bodies or IP addresses** for these endpoints. A log line is storage, and an address in a log is an address we said we would not keep. The deployment task list already carries a log exclusion filter for this reason, and [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md) records that it must be configured **before the first request** — a filter added afterwards cannot unwrite the lines already stored.
 - **Do not add a session cookie.** There is no session. A cookie would create the identity the product spent its architecture avoiding.
 
 ---

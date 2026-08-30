@@ -132,7 +132,7 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 
 ---
 
-## 4 · Deployment has not started — **OPEN, and not mine to take**
+## 4 · Deployment — **the baseline is taken; the deployment itself is still yours**
 
 **Workstream W4 is entirely unticked** and two of its items are assessed KPIs:
 
@@ -145,6 +145,8 @@ The product is a static site plus a worker, so hosting is not hard. But **"befor
 **Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure.
 
 **Two things that must happen before the first request, not after.**
+
+*The before-measurement.* **Done on 30 August** — [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), taken with `tools/perf/measure.mjs` so the "after" is the same script rather than a similar one. It also settled what deployment can and cannot affect: the whole artefact load is **41 ms at p95** and one comparison is **998 ms**, so hosting is not this product's performance story. Caveat stated in the document: it was run on a laptop against localhost, which is a floor, and W4's "from the deployment host" still stands — say where the "after" was run.
 
 *The log exclusion filter.* It has to be configured before traffic arrives. A filter added afterwards cannot unwrite the log lines already holding the first visitors' IP addresses, and for those people AD1 was false from the start.
 

@@ -172,6 +172,22 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 ---
 
+## Measuring a deployment
+
+W4 asks for p95 latency and the external-fetch failure rate **before and after** every deployment. The comparison is only worth something if both sides are the same script against the same critical path, so the script lives here rather than in somebody's shell history:
+
+```bash
+npm run build --workspace @drainlens/web
+node tools/perf/serve.mjs apps/web/dist 8099     # the MIME types a deployment must match
+node tools/perf/measure.mjs http://localhost:8099 100
+```
+
+After deploying, the same command against the deployed URL. **The resource list is discovered from the served `index.html` and `scene.json`, not written down** — Vite hashes asset names on every build, and a stale list probes URLs that 404, which looks fast.
+
+The "before" figures are in [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), along with the caveat that matters: they were taken on a laptop against localhost, so they are a floor rather than a network measurement. Say where the "after" was run from.
+
+---
+
 ## Repository layout
 
 ```
@@ -180,6 +196,7 @@ packages/scenario   scenario engine — routing, depressions, drains, comparison
 apps/web            frontend (React + Vite) — session state, canvas map. No map library
 apps/api            backend (Node + Hono on Cloud Run)                       not yet started
 pipeline            Python geospatial pipeline and model training, never deployed
+tools/perf          the deployment measurement, run identically before and after
 data                full-size intermediates — git-ignored, rebuilt locally
 docs                iteration scope, acceptance criteria, interface contract, this guide
 models              exported ONNX models and evaluation reports               not yet started

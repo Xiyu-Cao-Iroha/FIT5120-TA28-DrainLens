@@ -13,15 +13,19 @@ npm run check                              # typecheck and the whole suite, from
 
 **Address search** (`src/address/`) — normalisation, scoring and a `resolve` that returns four outcomes rather than two: `found`, `ambiguous`, `outside-pilot`, `not-an-address`. Runs against an index shipped with the site and never calls the network.
 
-**The map** (`src/map/`) — the viewport transform, hit testing, drawing, and the React component that binds them to a canvas. Roads, pipes, pits, street labels, and the three derived layers over them.
+**The map** (`src/map/`) — the viewport transform, hit testing, drawing, and the React component that binds them to a canvas. Roads, pipes, pits and street labels; a ground-surface layer painted once from the scene's elevation array and drawn beneath them; and the three derived layers over the top. `nearby.ts` measures the closest derived path and low area to an address so the panel can say, in words, where water may move.
 
 **The downstream trace** (`src/trace/`) — traversal of the recorded drainage with a reason at every place a path stops, and its rendering with direction arrows read from the topology.
 
 **The scenario** (`src/scenario/`) — scene loading, the Web Worker the engine runs in, and every user-facing sentence held as data in `outcome.ts`.
 
-**Screens** (`src/screens/`) — landing and address search, task selection, the map with its pit detail panel, scenario setup, and the result.
+**The street cross-section** (`src/crosssection/`) — what a section may claim about one pit, which is mostly a question about what the record does *not* hold. No invert level exists for any pit in this area, so the drawing splits itself: horizontal is recorded, vertical is illustrative.
 
-Not yet: the street cross-section (US 1.3), a rainfall control on the result screen, an address marker on the map, and the mobile layouts.
+**Screens** (`src/screens/`) — landing and address search, task selection, the map with its pit detail panel and cross-section, scenario setup, and the result.
+
+**The data credit** (`src/ui/attribution.ts`) — read from the artefacts and shown on every screen. CC BY 4.0 requires the attribution to be visible to the person using the work, and it includes the clause people skip: an indication that changes were made.
+
+**All 77 interaction criteria are met.** What is not built: the mobile layouts, and Playwright coverage of the remaining navigation paths.
 
 ## Two decisions worth knowing before you change anything
 

@@ -61,6 +61,8 @@ The full reasoning, including the forbidden-key list that will bind the backend 
 ## 3 · The map of the code
 
 ```
+tools/perf/                  The deployment measurement, before and after.
+
 pipeline/                    Python. Never deployed. Produces artefacts.
   las.py         ground.py         → bare-earth surface from LiDAR
   hydrology.py   footprints.py     → depressions, conditioning, D8 routing
@@ -81,6 +83,7 @@ apps/web/                    React + Vite. The only thing deployed.
   trace/                            downstream traversal and its rendering
   scenario/                         worker, scene loading, wording
   crosssection/                     what a section may claim
+  ui/attribution.ts                 the data credit, read from the artefacts
   screens/                          six screens
 ```
 
@@ -421,6 +424,12 @@ Both suites pass and both are above their **coverage** gate. The **runtime** gat
 
 Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 
+### The deployment baseline is taken
+
+The one deployment KPI that cannot be recovered retrospectively — p95 and the external-fetch failure rate **before** deploying — was measured on 30 August: [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), with the script that produced it, so the "after" is the same measurement rather than a similar one.
+
+Two caveats stated there and worth repeating aloud. It was taken **on a laptop against localhost**, which is a floor rather than a network figure, and W4's instruction to probe from the deployment host still stands. And the failure counter proved itself by accident: a first run reported 9.09% because a stale server was serving an `index.html` referencing a rebuilt bundle — exactly the shape of a real deployment failure, caught rather than reported as a fast 404.
+
 ### Not in the repository — check before Tuesday
 
 These are assessed and I cannot verify them from the codebase. **Somebody needs to confirm each one exists and is current:**
@@ -445,6 +454,8 @@ Volunteering a limitation reads as understanding. Being caught by it reads as no
 **The flow-route cross-check is weak, and we say so.** We compared our channels against the City of Melbourne's published overland flow routes. That layer is itself derived — a 2008 DEM through ESRI Spatial Analyst — so it is one derivation against another. Flow accumulation gave a 24 m median offset and a 1.7× lift over chance. **It is recorded as weaker evidence than the footprint check and is not quoted alongside it.**
 
 **Say this one before anything else if the demonstration is mentioned.** Until 29 August the compare journey could not run at all, and nothing in the test suite noticed. The interface worked out which grid cell a pit occupied from the map geometry; the pipeline snaps every drain up to three metres onto the flow field, because a kerbside inlet recorded in the middle of the road belongs to the gutter it drains. The two disagreed for **895 of 895 drains**, so the engine found no drain at the cell it was handed and every comparison returned "required inlet records are missing" — a sentence about the council's data, blaming the source for our arithmetic. It was found by clicking the journey, not by reading it, which is the whole argument for the manual click-through being on the gate list.
+
+**If latency comes up, the answer is not about hosting.** It is measured: loading every artefact on a first visit costs **41 ms at p95**; running one comparison costs **998 ms**, because it solves a million-cell grid twice for each of three rainfall positions. One comparison is roughly **twenty-five times** the entire load. No CDN, no Cloud Run configuration and no cache header changes that — if a comparison needs to be faster, the change is in `packages/scenario`. Method and figures in [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md).
 
 **`apps/api` and `models/` are empty.** Both are in the layout with "not yet started" written beside them. Neither is in Iteration 1 scope.
 
