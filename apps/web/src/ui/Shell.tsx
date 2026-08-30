@@ -11,6 +11,13 @@
 
 import type { ReactNode } from 'react';
 
+import {
+  CHANGES_NOTICE,
+  type Credit,
+  LICENCE_URL,
+  describeDatasets,
+} from './attribution.js';
+
 export const INDICATIVE = 'Indicative local information';
 
 export const PILOT_BADGE = 'Kensington pilot · illustrative prototype geometry';
@@ -21,9 +28,17 @@ export interface ShellProps {
   readonly actions?: ReactNode;
   /** Where the person is, when they are somewhere with a way back. */
   readonly crumbs?: ReactNode;
+  /**
+   * Who the data belongs to, read from the artefacts.
+   *
+   * Optional only so a screen can render before the artefacts have loaded.
+   * Once they have, this is not optional in any sense that matters: CC BY 4.0
+   * requires the credit to be visible wherever the work is.
+   */
+  readonly credits?: readonly Credit[];
 }
 
-export function Shell({ children, actions, crumbs }: ShellProps) {
+export function Shell({ children, actions, crumbs, credits }: ShellProps) {
   return (
     <div
       style={{
@@ -100,7 +115,49 @@ export function Shell({ children, actions, crumbs }: ShellProps) {
       <main style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}>
         {children}
       </main>
+
+      {credits !== undefined && credits.length > 0 && <Attribution credits={credits} />}
     </div>
+  );
+}
+
+/**
+ * The data credit, on every screen.
+ *
+ * CC BY 4.0 requires the attribution to be visible to the person using the
+ * work, so it sits in the frame rather than behind a link — the same argument
+ * as the indicative banner above it. It is small and quiet, which the licence
+ * permits; it is not absent, which the licence does not.
+ */
+function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
+  return (
+    <footer
+      style={{
+        flexShrink: 0,
+        padding: '6px 20px',
+        background: '#ffffff',
+        borderTop: '1px solid #e6ebe4',
+        fontSize: 11,
+        lineHeight: 1.45,
+        color: '#7a8894',
+      }}
+    >
+      {credits.map((credit) => (
+        <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: 10 }}>
+          {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
+          <a
+            href={LICENCE_URL}
+            target="_blank"
+            rel="license noreferrer"
+            style={{ color: '#5c6d7a' }}
+          >
+            {credit.licence}
+          </a>
+          {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
+        </span>
+      ))}
+      <span>{CHANGES_NOTICE}</span>
+    </footer>
   );
 }
 

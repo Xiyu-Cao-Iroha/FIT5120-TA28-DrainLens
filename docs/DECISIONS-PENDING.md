@@ -142,7 +142,17 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 
 The product is a static site plus a worker, so hosting is not hard. But **"before and after" cannot be recorded retrospectively**: if we deploy Monday night with no before-figure, that KPI is simply gone.
 
-**Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure. What I can say is the constraint: **the before-measurement cannot be taken retrospectively.** Whoever deploys must record p95 and the external-fetch failure rate *first*, from the deployment host, or that KPI is gone regardless of how well the deployment goes.
+**Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure.
+
+**Two things that must happen before the first request, not after.**
+
+*The log exclusion filter.* It has to be configured before traffic arrives. A filter added afterwards cannot unwrite the log lines already holding the first visitors' IP addresses, and for those people AD1 was false from the start.
+
+*The data credit.* **Done on 29 August.** CC BY 4.0 requires the attribution to be visible to the person using the work, and it appeared nowhere on screen — the `publisher` and `licence` fields were in the artefacts and never rendered. There is now a footer on every screen, read from the artefacts so replacing a source updates the credit with it, including the clause most often skipped: **an indication that changes were made**, because the surface-water paths, low points and ground shading are calculated rather than published.
+
+**And the plan itself needs revisiting.** W4 says Cloud Run behind a load balancer, with Cloud Storage and Cloud CDN confirming range requests for PMTiles. That was written when `apps/api` was expected and when the map was expected to be tiled. Neither exists: `apps/api` is not a directory, there is no Dockerfile, CI never builds or deploys, and tiling was dropped after the whole extent measured 1.27 MB gzipped. What there is to deploy is **14 static files, 7.9 MB on disk and 1.51 MB over the wire**.
+
+Cloud Run remains reasonable as an *Iteration 2* target for server-side AI — but note AD10 puts the photo classification on the device, and `FORBIDDEN_WIRE_KEYS` forbids `photo`, `image` and `imageData` structurally, so `assertSendable` would throw. Moving inference server-side means changing that contract deliberately, as a new declared payload type, not by deleting a key from a list. What I can say is the constraint: **the before-measurement cannot be taken retrospectively.** Whoever deploys must record p95 and the external-fetch failure rate *first*, from the deployment host, or that KPI is gone regardless of how well the deployment goes.
 
 ---
 

@@ -23,6 +23,7 @@ import { useScenario } from './scenario/useScenario.js';
 import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
 import { INITIAL_SESSION, type Session, type SupportedAddress, reduce } from './session.js';
 import { Shell } from './ui/Shell.js';
+import { creditsFor } from './ui/attribution.js';
 
 interface Loaded {
   readonly map: MapArtefact;
@@ -66,6 +67,11 @@ export function App() {
       .then(setLoaded)
       .catch((error: unknown) => setProblem(String(error)));
   }, []);
+
+  // Above the early returns, because the loading and failure screens render
+  // through the same Shell. Empty until the artefact arrives: there is nothing
+  // of the council's on screen yet, so there is nothing yet to attribute.
+  const credits = loaded === null ? [] : creditsFor(loaded.map);
 
   if (problem !== null) {
     return (
@@ -111,7 +117,7 @@ export function App() {
     case 'address':
     case 'unsupported':
       return (
-        <Shell>
+        <Shell credits={credits}>
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -134,6 +140,7 @@ export function App() {
     case 'task':
       return (
         <Shell
+          credits={credits}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -179,6 +186,7 @@ export function App() {
       const outcome = session.outcome;
       return (
         <Shell
+          credits={credits}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -290,6 +298,7 @@ export function App() {
     default:
       return (
         <Shell
+          credits={credits}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}

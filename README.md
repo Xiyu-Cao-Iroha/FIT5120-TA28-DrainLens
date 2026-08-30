@@ -67,9 +67,9 @@ Measured on **29 August 2026**. These are the current figures, not the best ones
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.6%** Node · **91.44%** Python |
+| Coverage, overall | ≥ 88% | **92.7%** Node · **91.44%** Python |
 | Suite runtime | < 5 s | **1.4 s Node ✓ · 55 s Python ✗** — see below |
-| Tests | 426 TypeScript · 332 Python | 758 in total |
+| Tests | 441 TypeScript · 332 Python | 773 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |

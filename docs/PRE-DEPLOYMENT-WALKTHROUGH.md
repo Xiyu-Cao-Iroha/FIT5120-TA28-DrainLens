@@ -409,9 +409,9 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **426**, 19 files, **1.6 s** |
+| TypeScript tests | **441**, 20 files, **1.6 s** |
 | Python tests | **332**, **55 s** — still over the 5 s gate, see below |
-| TypeScript coverage | **92.6%** statements · 93.9% branches · 95.2% functions |
+| TypeScript coverage | **92.7%** statements · 93.9% branches · 95.3% functions |
 | Python coverage | **91.44%** |
 | Source lines, excluding tests | ~17,000 |
 
