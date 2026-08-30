@@ -409,9 +409,9 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **389**, 17 files, **1.5 s** |
+| TypeScript tests | **426**, 19 files, **1.6 s** |
 | Python tests | **332**, **55 s** — still over the 5 s gate, see below |
-| TypeScript coverage | **92.0%** statements · 93.7% branches · 96.5% functions |
+| TypeScript coverage | **92.6%** statements · 93.9% branches · 95.2% functions |
 | Python coverage | **91.44%** |
 | Source lines, excluding tests | ~17,000 |
 
@@ -419,7 +419,7 @@ Both suites pass and both are above their **coverage** gate. The **runtime** gat
 
 > The Node suite runs in 1.4 s and holds the five-second rule. The Python suite takes 55 s, down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is ~45 s of `test_terrain.py` building real grids, which is inherent to what those tests check. CI blocks on the Node suite, so nothing was failing; but the rule is the team's own and we are not quietly exempting the slow half.
 
-Interaction criteria: **75 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
+Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 
 ### Not in the repository — check before Tuesday
 

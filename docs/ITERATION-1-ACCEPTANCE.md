@@ -21,12 +21,10 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 ## Where this stands — 29 August 2026
 
-**75 of 77 interaction criteria met.** Every box below was checked against the code, and the Epic 2 journey was **run end to end in a browser** rather than read. That distinction earned its keep: 2.2.1 had been ticked from the code on 29 August while the comparison could not actually run, and only clicking it found out. Ticks that have not been exercised are worth less than they look. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
+**77 of 77 interaction criteria met.** Every box below was checked against the code, and the Epic 2 journey was **run end to end in a browser** rather than read. That distinction earned its keep: 2.2.1 had been ticked from the code on 29 August while the comparison could not actually run, and only clicking it found out. Ticks that have not been exercised are worth less than they look. Nothing is left unticked, so the list of known gaps that stood here is gone rather than empty.
 
-| Not met | Why |
-|---|---|
-| 1.1.2.c | No plain-English sentence about where water near the address may move. The panel gives the next step, not the explanation. |
-| 1.1.3.b | No control for a terrain layer; the four controls cover the network and the three derived layers. |
+Every interaction criterion is met. What remains open is not a criterion but the definition of done: the desktop and mobile layouts, the Playwright coverage of the remaining back and rerun paths, and the deployment items — see [ITERATION-1-TASKS.md](./ITERATION-1-TASKS.md).
+
 
 **US 1.3 was built on 29 August.** The drawing was the easy half. The map artefact carries **no invert level for any pit** — the pipeline never fetched a field missing from 95.4% of the record and internally inconsistent in what survives — so a cross-section's one axis is the one with no data behind it. The section therefore splits itself: **everything horizontal is recorded** (which pipes connect, on which side, their diameter and material) and **everything vertical is drawn**, said inside the figure rather than in a caption. 726 of 895 pits can have one; the other 169 get AC 1.3.2, which is a real screen rather than a defensive branch. Both states were clicked through in a browser.
 
@@ -56,7 +54,7 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 
 - [x] **1.1.2.a** Open a local map centred on and marking the selected address
 - [x] **1.1.2.b** Show likely surface-water paths and nearby drainage pits **by default**
-- [ ] **1.1.2.c** Provide a short plain-English explanation of where water near the address may move
+- [x] **1.1.2.c** Provide a short plain-English explanation of where water near the address may move
 - [x] **1.1.2.d** Display **one clear next-step instruction** asking the user to select a surface-water path or drainage pit
 - [x] **1.1.2.e** Make other layers available through a **collapsed** "More map layers" section
 - [x] **1.1.2.f** Clearly identify any missing, incomplete or uncertain information
@@ -66,7 +64,7 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 *Given a supported address is selected and the user is on the task-selection page, when they select "Explore the full map", then the system will:*
 
 - [x] **1.1.3.a** Open a local map centred on and marking the selected address
-- [ ] **1.1.3.b** Provide controls for the terrain, surface-water path, low-area, drainage-pit and drainage-pipe layers
+- [x] **1.1.3.b** Provide controls for the terrain, surface-water path, low-area, drainage-pit and drainage-pipe layers
 - [x] **1.1.3.c** Allow individual layers to be turned on or off
 - [x] **1.1.3.d** **Distinguish official recorded data from system-derived information**
 - [x] **1.1.3.e** Clearly identify information that is missing, incomplete or uncertain

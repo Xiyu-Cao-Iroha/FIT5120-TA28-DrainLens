@@ -295,6 +295,16 @@ export interface DrawOptions {
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
+  /**
+   * Which recorded layers to draw.
+   *
+   * Pits and pipes are separate because AC 1.1.3.b names them separately, and
+   * because they answer different questions: the pipes are where water goes,
+   * the pits are where it can get in.
+   */
+  readonly showPipes?: boolean;
+  readonly showPits?: boolean;
+  readonly showRoads?: boolean;
 }
 
 /**
@@ -341,10 +351,14 @@ export function drawMap(
   context.fillStyle = palette.ground;
   context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
 
-  drawRoads(context, viewport, artefact.layers.road ?? [], palette, seen);
-  drawPipes(context, viewport, artefact.layers.pipe ?? [], palette, seen, options.selectedPipe ?? null);
+  if (options.showRoads !== false) {
+    drawRoads(context, viewport, artefact.layers.road ?? [], palette, seen);
+  }
+  if (options.showPipes !== false) {
+    drawPipes(context, viewport, artefact.layers.pipe ?? [], palette, seen, options.selectedPipe ?? null);
+  }
 
-  if (viewport.scale >= PIT_MIN_SCALE) {
+  if (options.showPits !== false && viewport.scale >= PIT_MIN_SCALE) {
     drawPits(context, viewport, artefact.layers.pit ?? [], palette, seen, options.selectedPit ?? null);
   }
   if (viewport.scale >= LABEL_MIN_SCALE) {

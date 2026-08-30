@@ -7,12 +7,14 @@
  * opens, and that difference is the whole reason the task question exists.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact, DerivedVisibility } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
+import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
+import { loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import { PitDetail } from './PitDetail.js';
@@ -22,12 +24,26 @@ const BASIS_STYLE: Readonly<Record<string, { background: string; color: string }
   'System-derived result': { background: '#dde8f2', color: '#2a5678' },
 };
 
+/**
+ * The five layers AC 1.1.3.b names, each with its own control.
+ *
+ * Pits and pipes were one entry until the criterion was read closely. They are
+ * named separately there, and they answer different questions: the pipes are
+ * where water goes, the pits are where it can get in.
+ */
 const LAYERS = [
-  { key: 'network', label: 'Drainage pits and pipes', basis: 'Official recorded data' },
+  { key: 'pit', label: 'Drainage pits', basis: 'Official recorded data' },
+  { key: 'pipe', label: 'Drainage pipes', basis: 'Official recorded data' },
+  { key: 'terrain', label: 'Ground surface', basis: 'System-derived result' },
   { key: 'channel', label: 'Likely surface water paths', basis: 'System-derived result' },
   { key: 'lowPoint', label: 'Low points and depressions', basis: 'System-derived result' },
   { key: 'unavailable', label: 'Not enough ground measured', basis: 'System-derived result' },
 ] as const;
+
+type LayerKey = (typeof LAYERS)[number]['key'];
+
+/** What the guided view shows before "More map layers" is opened. */
+const GUIDED_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'terrain', 'channel'];
 
 /** What the follow task opens with: the two layers its question needs. */
 const GUIDED: DerivedVisibility = { channel: true, lowPoint: false, unavailable: false };
@@ -50,6 +66,43 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
   const [moreOpen, setMoreOpen] = useState(!guided);
   const [hit, setHit] = useState<Hit | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
+  const [showPits, setShowPits] = useState(true);
+  const [showPipes, setShowPipes] = useState(true);
+  const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
+  const [terrainOn, setTerrainOn] = useState(true);
+
+  // Painted once, then reused for every pan and zoom. A failure here leaves
+  // the layer off rather than breaking the map: the terrain is context, and
+  // the recorded network is what the person came for.
+  useEffect(() => {
+    let live = true;
+    loadTerrain('/data/scene')
+      .then((raster) =>
+        rasterise(raster, (w, h) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          return canvas;
+        }),
+      )
+      .then((painted) => {
+        if (live) setTerrain(painted);
+      })
+      .catch(() => {
+        if (live) setTerrain(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const explanation = useMemo(
+    () =>
+      address === null
+        ? null
+        : describeWaterNearby(derived, [address.eastingM, address.northingM]),
+    [derived, address],
+  );
 
   const selected = hit?.kind === 'pit' ? (hit.feature.asset_number ?? null) : null;
 
@@ -67,6 +120,9 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
         derived={derived}
         show={show}
         selectedPit={selected}
+        terrain={terrainOn ? terrain : null}
+        showPits={showPits}
+        showPipes={showPipes}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         onSelect={(next) => {
@@ -121,12 +177,46 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
           </p>
         )}
 
+        {/* AC 1.1.2.c — measured against the layers beside it, not a caption. */}
+        {explanation !== null && (
+          <p
+            style={{
+              margin: '0 0 12px',
+              padding: '9px 11px',
+              background: '#f2f6fa',
+              borderRadius: 8,
+              color: '#33506b',
+            }}
+          >
+            {explanation}
+            <span
+              style={{
+                display: 'inline-block',
+                marginTop: 6,
+                padding: '1px 7px',
+                borderRadius: 999,
+                fontSize: 11,
+                ...(BASIS_STYLE[NEARBY_BASIS] ?? { background: '#eee', color: '#444' }),
+              }}
+            >
+              {NEARBY_BASIS}
+            </span>
+          </p>
+        )}
+
         <span style={{ fontSize: 12, letterSpacing: 0.6, color: '#8593a0' }}>MAP LAYERS</span>
         <div style={{ marginTop: 8 }}>
-          {LAYERS.filter((layer) => moreOpen || layer.key === 'network' || layer.key === 'channel').map(
+          {LAYERS.filter((layer) => moreOpen || GUIDED_KEYS.includes(layer.key)).map(
             (layer) => {
-              const toggleable = layer.key !== 'network';
-              const on = toggleable ? show[layer.key as keyof DerivedVisibility] : true;
+              const toggleable = layer.key !== 'terrain' || terrain !== null;
+              const on =
+                layer.key === 'pit'
+                  ? showPits
+                  : layer.key === 'pipe'
+                    ? showPipes
+                    : layer.key === 'terrain'
+                      ? terrainOn && terrain !== null
+                      : show[layer.key as keyof DerivedVisibility];
               const style = BASIS_STYLE[layer.basis] ?? { background: '#eee', color: '#444' };
               return (
                 <label
@@ -144,13 +234,16 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
                     type="checkbox"
                     checked={on}
                     disabled={!toggleable}
-                    onChange={() =>
-                      toggleable &&
-                      setShow((current) => ({
+                    onChange={() => {
+                      if (!toggleable) return;
+                      if (layer.key === 'pit') return setShowPits((v) => !v);
+                      if (layer.key === 'pipe') return setShowPipes((v) => !v);
+                      if (layer.key === 'terrain') return setTerrainOn((v) => !v);
+                      return setShow((current) => ({
                         ...current,
                         [layer.key]: !current[layer.key as keyof DerivedVisibility],
-                      }))
-                    }
+                      }));
+                    }}
                     style={{ marginTop: 3 }}
                   />
                   <span>

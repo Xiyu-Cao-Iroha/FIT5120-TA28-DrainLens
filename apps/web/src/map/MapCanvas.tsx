@@ -17,6 +17,7 @@ import { drawMap } from './draw.js';
 import { type Hit, pick } from './hit.js';
 import { type Local, type Viewport, clamp, fit, focus, pan, zoomAt } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
+import { drawTerrain } from './terrain.js';
 import type { Trace } from '../trace/graph.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
@@ -27,6 +28,10 @@ export interface MapCanvasProps {
   readonly derived?: DerivedArtefact | null;
   readonly show?: DerivedVisibility;
   readonly selectedPit?: number | null;
+  /** The painted terrain raster, or null when it is off or not loaded. */
+  readonly terrain?: HTMLCanvasElement | null;
+  readonly showPipes?: boolean;
+  readonly showPits?: boolean;
   /**
    * The selected address, in local metres.
    *
@@ -45,6 +50,9 @@ export function MapCanvas({
   derived = null,
   show,
   selectedPit = null,
+  terrain = null,
+  showPipes = true,
+  showPits = true,
   address = null,
   trace = null,
   onSelect,
@@ -97,13 +105,16 @@ export function MapCanvas({
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     // Recorded first, derived over it. A derivation drawn under the network it
     // was calculated from would look like the ground the network sits in.
-    drawMap(context, artefact, viewport, { selectedPit, address });
+    // The ground first: everything else sits on it, and a network drawn under
+    // its own terrain would read as buried rather than as underground.
+    if (terrain) drawTerrain(context, terrain, viewport, bounds);
+    drawMap(context, artefact, viewport, { selectedPit, address, showPipes, showPits });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // The followed path goes on top of both. It is the answer to the
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
-  }, [artefact, derived, show, viewport, selectedPit, address, trace]);
+  }, [artefact, derived, show, viewport, selectedPit, address, trace, terrain, showPipes, showPits]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
