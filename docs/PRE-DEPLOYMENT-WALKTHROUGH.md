@@ -80,7 +80,8 @@ apps/web/                    React + Vite. The only thing deployed.
   map/                              canvas renderer
   trace/                            downstream traversal and its rendering
   scenario/                         worker, scene loading, wording
-  screens/                          five screens
+  crosssection/                     what a section may claim
+  screens/                          six screens
 ```
 
 **`packages/schema` is the highest-value directory.** The frontend, the future backend and the model output share one definition, so a decision made there cannot drift between them. If a mentor asks where to start reading, start there.
@@ -89,7 +90,7 @@ apps/web/                    React + Vite. The only thing deployed.
 
 ## 4 · Feature walkthroughs
 
-Seven features. Each gives the click, the files in order, and the thing worth understanding.
+Eight features. Each gives the click, the files in order, and the thing worth understanding.
 
 ### 4.1 · Address search and the pilot boundary
 
@@ -299,7 +300,25 @@ Built 29 August. The best answer in the codebase to "why is there a pipeline sta
 
 ---
 
-### 4.7 · The result screen and its wording
+### 4.7 · The street cross-section
+
+Built 29 August. The shortest answer to "what do you do when the data is not there".
+
+**No invert level exists for any pit in the extent.** Not 95.4% missing — absent, because the pipeline never fetched a field missing from 95.4% of the council's record and internally inconsistent in what survives. A cross-section is a *vertical* drawing, and the one axis it exists to show is the one with no data behind it.
+
+So the section splits itself, and says so inside the figure rather than in a caption:
+
+> **Everything horizontal is recorded** — which pipes connect, on which side, their diameter and material. **Everything vertical is drawn.** The pipes are spaced evenly because the record gives no depth to space them by, and the vertical axis is labelled *depth not recorded — spacing illustrative*.
+
+**726 of 895 pits** get a drawing; the other **169** get AC 1.3.2, which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
+
+A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is AC 1.3.2.c, an unsupported assumption dressed as a measurement.
+
+**The line to have ready if asked about capacity:** a recorded diameter is a dimension, not a capacity. Going from one to the other needs a hydraulic model this project decided not to build (AD6), and the drawing says so on screen.
+
+---
+
+### 4.8 · The result screen and its wording
 
 `scenario/outcome.ts` holds every user-facing sentence as data — `BANDS`, `INSUFFICIENT`, `RESULT_DISCLAIMER`, `HOW_IT_WAS_PRODUCED`. `Result.tsx` chooses from it and renders. Nothing writes a sentence inline.
 
@@ -390,9 +409,9 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **359**, 16 files, **1.4 s** |
+| TypeScript tests | **389**, 17 files, **1.5 s** |
 | Python tests | **332**, **55 s** — still over the 5 s gate, see below |
-| TypeScript coverage | **91.67%** statements · 94.17% branches · 96.22% functions |
+| TypeScript coverage | **92.0%** statements · 93.7% branches · 96.5% functions |
 | Python coverage | **91.44%** |
 | Source lines, excluding tests | ~17,000 |
 
@@ -400,7 +419,7 @@ Both suites pass and both are above their **coverage** gate. The **runtime** gat
 
 > The Node suite runs in 1.4 s and holds the five-second rule. The Python suite takes 55 s, down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is ~45 s of `test_terrain.py` building real grids, which is inherent to what those tests check. CI blocks on the Node suite, so nothing was failing; but the rule is the team's own and we are not quietly exempting the slow half.
 
-Interaction criteria: **67 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
+Interaction criteria: **75 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) lists every gap and why.
 
 ### Not in the repository — check before Tuesday
 
@@ -426,8 +445,6 @@ Volunteering a limitation reads as understanding. Being caught by it reads as no
 **The flow-route cross-check is weak, and we say so.** We compared our channels against the City of Melbourne's published overland flow routes. That layer is itself derived — a 2008 DEM through ESRI Spatial Analyst — so it is one derivation against another. Flow accumulation gave a 24 m median offset and a 1.7× lift over chance. **It is recorded as weaker evidence than the footprint check and is not quoted alongside it.**
 
 **Say this one before anything else if the demonstration is mentioned.** Until 29 August the compare journey could not run at all, and nothing in the test suite noticed. The interface worked out which grid cell a pit occupied from the map geometry; the pipeline snaps every drain up to three metres onto the flow field, because a kerbside inlet recorded in the middle of the road belongs to the gutter it drains. The two disagreed for **895 of 895 drains**, so the engine found no drain at the cell it was handed and every comparison returned "required inlet records are missing" — a sentence about the council's data, blaming the source for our arithmetic. It was found by clicking the journey, not by reading it, which is the whole argument for the manual click-through being on the gate list.
-
-**The street cross-section (US 1.3) is not built.** Eight criteria. It was always the most likely thing to drop, because pit depth is missing for 95.4% of the record and the surviving fraction is internally inconsistent — so most of the work is the *unavailable* state rather than the drawing.
 
 **`apps/api` and `models/` are empty.** Both are in the layout with "not yet started" written beside them. Neither is in Iteration 1 scope.
 

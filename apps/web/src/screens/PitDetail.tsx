@@ -13,7 +13,11 @@
  * through JSX.
  */
 
-import type { Pit } from '../map/artefact.js';
+import { useState } from 'react';
+
+import type { MapArtefact, Pit } from '../map/artefact.js';
+import { sectionFor } from '../crosssection/section.js';
+import { CrossSection } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
 
@@ -65,13 +69,15 @@ const BADGE: React.CSSProperties = {
 
 export interface PitDetailProps {
   readonly pit: Pit;
+  readonly map: MapArtefact;
   readonly artefact: TraceArtefact;
   readonly trace: Trace | null;
   readonly onFollow: () => void;
   readonly onClear: () => void;
 }
 
-export function PitDetail({ pit, artefact, trace, onFollow, onClear }: PitDetailProps) {
+export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitDetailProps) {
+  const [sectionOpen, setSectionOpen] = useState(false);
   const asset = pit.asset_number === undefined ? null : String(pit.asset_number);
   const links = asset === null ? undefined : artefact.links[asset];
   const followable = links !== undefined && links.some((link) => link.to !== undefined);
@@ -100,6 +106,28 @@ export function PitDetail({ pit, artefact, trace, onFollow, onClear }: PitDetail
       </dl>
 
       <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6b7a88' }}>{DEPTH_NOTE}</p>
+
+      <button
+        type="button"
+        onClick={() => setSectionOpen((open) => !open)}
+        aria-expanded={sectionOpen}
+        style={{
+          marginBottom: 12,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          color: '#1f6f5c',
+          textDecoration: 'underline',
+          cursor: 'pointer',
+        }}
+      >
+        {sectionOpen ? 'Hide the street cross-section' : 'Open the street cross-section'}
+      </button>
+
+      {sectionOpen && (
+        <CrossSection outcome={sectionFor(map, pit)} onClose={() => setSectionOpen(false)} />
+      )}
 
       {trace === null ? (
         <>

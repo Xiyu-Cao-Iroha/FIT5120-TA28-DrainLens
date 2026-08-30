@@ -24,6 +24,7 @@ import {
   RAINFALL_CONTROL_NOTE,
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
+  WHY_NO_CLEAR_CHANGE,
   presentationFor,
 } from '../scenario/outcome.js';
 import type { SolvedPosition } from '../scenario/worker.js';
@@ -89,6 +90,28 @@ export function Result({
         <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#8593a0' }}>{shown.band}</span>
         <h2 style={{ margin: '4px 0 8px', fontSize: 17 }}>{shown.finding}</h2>
         <p style={{ margin: 0, color: '#4d5f6e', fontSize: 14 }}>{shown.body}</p>
+
+        {/*
+          A comparison that answers "nothing" and never says why reads as a
+          product that did not work. It did work; the measurement is the
+          finding, and it belongs beside the finding rather than in a footnote.
+        */}
+        {outcome.status === 'successful' && outcome.band === 'no-clear-change' && (
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', color: '#1f6f5c', fontSize: 13 }}>
+              Why this is usually the answer here
+            </summary>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: '#4d5f6e' }}>
+              {WHY_NO_CLEAR_CHANGE.map((item) => (
+                <li key={item.title} style={{ marginBottom: 6 }}>
+                  <strong style={{ color: '#1e2b36' }}>{item.title}</strong>
+                  <br />
+                  {item.body}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       {/*

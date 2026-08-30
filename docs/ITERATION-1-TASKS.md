@@ -83,8 +83,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] A missing downstream connection travels as a network limitation, not an insufficiency → *2.2.1.f*
 - [x] **Data-sufficiency gate** — `SuccessfulComparison` or `InsufficientInformation` with four named reasons, applied in order → *2.2.1.f, 2.2.3, 2.3.2.c*
 - [x] Web Worker wrapper; run once on **Run comparison**, cache all positions; the control reads cache only → *2.2.1, 2.2.2*
-- [ ] Capture-fraction sensitivity at half, one and two times → decides whether the interface may report three result categories or two. **Now confirmed end to end in the browser**: with the interface finally able to run a comparison, blocking one inlet gives *No clear difference* at 20, 40 and 60 mm. The redundancy finding is real and visible, not an artefact of the engine harness
-- [ ] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result, once it exists → *2.2.3.b*
+- [x] Capture-fraction sensitivity → **run, and it closed the question rather than answering it the expected way.** Zero of forty inlets show any difference at 15%, 30%, 60% or 90% capture — a six-fold range with no effect, so tuning this assumption cannot produce a result. Blocking the hundred inlets nearest a point raises water 5.6 mm and puts no cell over the threshold; only losing all 475 does anything visible. **The interface reports two bands, and the result screen now explains why.** See [DECISIONS-PENDING.md](./DECISIONS-PENDING.md)
+- [~] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result → *2.2.3.b*. The sensitivity is measured and says the fraction does not move the outcome, so there is nothing to tighten against — the check stays as the mass-balance guard it already is
 - [x] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
 
 ## W3 · Frontend
@@ -111,8 +111,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
 - [x] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*. Fields the record leaves empty say **Not recorded** rather than showing a blank, and depth is declared absent rather than interpolated
 - [x] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*. Direction is read from the topology, not from vertex order, which carries no meaning in the source
-- [ ] Hand-authored SVG street cross-section, depth only where supported, no capacity claim → *1.3.1*
-- [ ] **Cross-section unavailable state** — say which information is missing rather than filling it → *1.3.2*
+- [x] Hand-authored SVG street cross-section, depth only where supported, no capacity claim → *1.3.1*. Depth is supported nowhere, so the vertical axis is labelled illustrative **inside the figure**; horizontal is recorded, vertical is drawn
+- [x] **Cross-section unavailable state** — say which information is missing rather than filling it → *1.3.2*. 169 of 895 pits, and it says the gap is in the record rather than evidence no pipe exists
 
 ### Scenario
 

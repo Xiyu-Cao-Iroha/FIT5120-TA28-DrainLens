@@ -21,6 +21,7 @@ import {
   RAINFALL_CONTROL_NOTE,
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
+  WHY_NO_CLEAR_CHANGE,
   presentationFor,
 } from './outcome.js';
 
@@ -233,5 +234,34 @@ describe('what is missing or uncertain', () => {
   it('never calls the ground surface a LiDAR product', () => {
     const everything = WHAT_IS_UNCERTAIN.map((i) => `${i.title} ${i.body}`).join(' ');
     expect(everything.toLowerCase()).not.toContain('lidar');
+  });
+});
+
+describe('why no clear difference', () => {
+  it('gives the person a reason rather than only a verdict', () => {
+    expect(WHY_NO_CLEAR_CHANGE.length).toBeGreaterThanOrEqual(3);
+    for (const item of WHY_NO_CLEAR_CHANGE) {
+      expect(item.title.trim()).not.toBe('');
+      expect(item.body.trim()).not.toBe('');
+    }
+  });
+
+  it('explains the redundancy rather than apologising for the model', () => {
+    const all = WHY_NO_CLEAR_CHANGE.map((i) => `${i.title} ${i.body}`).join(' ').toLowerCase();
+    expect(all).toMatch(/captured within the next few|drains below/);
+    expect(all).not.toMatch(/sorry|unfortunately|limitation of this tool|failed/);
+  });
+
+  it('refuses to report a rise finer than the ground data', () => {
+    // The trap: showing millimetres would look like a result and would be
+    // some hundreds of times finer than the surface's own accuracy.
+    const all = WHY_NO_CLEAR_CHANGE.map((i) => i.body).join(' ');
+    expect(all).toMatch(/25 centimetres/);
+    expect(all).toMatch(/below what the data can support/i);
+  });
+
+  it('does not put a millimetre figure on screen as a finding', () => {
+    const all = WHY_NO_CLEAR_CHANGE.map((i) => i.body).join(' ');
+    expect(all).not.toMatch(/\d+(\.\d+)?\s?mm/);
   });
 });

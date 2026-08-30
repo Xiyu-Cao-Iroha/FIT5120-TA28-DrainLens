@@ -197,6 +197,7 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
           ) : hit.kind === 'pit' ? (
             <PitDetail
               pit={hit.feature}
+              map={map}
               artefact={trace}
               trace={followed}
               onFollow={() => setFollowing(String(hit.feature.asset_number))}

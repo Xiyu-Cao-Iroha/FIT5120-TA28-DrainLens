@@ -133,6 +133,39 @@ export const RESULT_DISCLAIMER =
   'This is an indicative comparison between two assumptions. It is not a live flood prediction, and it does not show measured flood depth or when water would reach a location.';
 
 /**
+ * Why "no clear difference" is the usual answer here, in the person's terms.
+ *
+ * Shown with every `no-clear-change` result, because a comparison that always
+ * answers "nothing" and never says why reads as a product that did not work.
+ * It did work. The measurement is the finding.
+ *
+ * Every figure below was measured on this extent: blocking one inlet frees a
+ * median of 0.036 m³; blocking the hundred inlets nearest a point raises water
+ * by 5.6 mm and puts no cell over the reporting threshold; the water a blocked
+ * inlet rejects is taken by the drains below it or spreads across a hollow
+ * large enough to absorb it.
+ *
+ * We do not report the millimetres. The ground surface is derived from aerial
+ * photography and is quoted at about 25 cm accuracy, so a computed rise of a
+ * millimetre is far finer than the data's own error bar — putting it on screen
+ * would be presenting noise as a finding.
+ */
+export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly body: string }[] = [
+  {
+    title: 'The drains below this one take the water instead',
+    body: 'The recorded network here has enough inlets that water passing one blocked drain is captured within the next few. Blocking a single drain moves very little water.',
+  },
+  {
+    title: 'What does get past spreads out',
+    body: 'Water that reaches a low area spreads across all of it. A blocked drain can add real volume and still raise the surface by less than a millimetre, which is not something to act on.',
+  },
+  {
+    title: 'We will not report a difference finer than the ground data',
+    body: 'The ground surface is measured from aerial photography to about 25 centimetres. A calculated change smaller than that is below what the data can support, so it is reported as no clear difference rather than as a number.',
+  },
+];
+
+/**
  * What the rainfall control does, and the thing it must not be read as.
  *
  * AC 2.2.2.d. The model's independent variable is accumulated rainfall, not

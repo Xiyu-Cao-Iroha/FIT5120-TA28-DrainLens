@@ -2,13 +2,15 @@
 
 DrainLens · TA28 · written 29 August 2026 · **demonstration Tuesday 1 September**
 
-Seven decisions. The first one changes what the product claims and what the demonstration shows, and it is the only one that needs real discussion — the rest are ten minutes each.
+Seven decisions. The first changes what the product claims and what the demonstration shows.
+
+> **Five of the seven were taken on 29 August** and are marked **DECIDED** below, with what was done. Two are left open because they are not mine to take: **the deployment** (§4) needs cloud credentials and is an outward-facing action, and **the process evidence** (§7) I cannot see from the code. The reasoning under each decision stands whether or not the team agrees — reopen any of them.
 
 Every number below was measured on the Kensington artefact today, not estimated.
 
 ---
 
-## 1 · The comparison does not show a difference, and the reason is physical
+## 1 · The comparison does not show a difference, and the reason is physical  — **DECIDED: A + C**
 
 **This is the decision. Everything else in this document is housekeeping.**
 
@@ -86,15 +88,17 @@ Blocking a hundred drains — far more than any believable scenario — raises w
 
 **Option D — move the pilot extent** somewhere the drainage is less redundant. Not realistic in three days; the terrain build alone is a critical path.
 
-**My recommendation: A, with C as the framing.** Keep every criterion as written and keep the comparison exactly as it is — then lead the demonstration with where water collects, and present the "no clear difference" result as a *finding we measured*, not as a feature that underdelivered. The sentence to have ready:
+**Decided: A, with C as the framing.** Keep every criterion as written and keep the comparison exactly as it is — then lead the demonstration with where water collects, and present the "no clear difference" result as a *finding we measured*, not as a feature that underdelivered. The sentence to have ready:
 
 > We built the comparison, and then we tested whether it could tell us anything. In this square kilometre it cannot, because the recorded network is redundant — and we would rather report that than tune an assumption until the screen showed something.
 
-**What we need from the team:** agreement on A, B, C or a combination, and if not A, who renegotiates the Epic 2 criteria before Tuesday.
+**What was done.** The model is unchanged and every criterion stands as written. The result screen now carries *Why this is usually the answer here* whenever the band is `no-clear-change` — three lines, in the person's terms: the drains below take the water, what gets past spreads out, and **we will not report a change finer than the ground data**. That last line is the defence against Option B, on screen rather than only in this document.
+
+**Still needs the team:** whether the demonstration leads with where water collects (C) or with the comparison. That is a rehearsal decision, not a code one.
 
 ---
 
-## 2 · The street cross-section — build, descope, or leave
+## 2 · The street cross-section — **DECIDED: built**
 
 US 1.3 is **eight criteria and nothing is built**. It is the largest remaining gap.
 
@@ -108,11 +112,11 @@ Three ways to go:
 | **Formally descope** | Write it into the iteration record as a deliberate cut with the 95.4% as the reason, before the demonstration rather than after. |
 | **Leave it silent** | Eight unticked boxes and no explanation. **Do not choose this** — an unexplained gap reads as one nobody noticed. |
 
-**Needed:** build or descope, and if descope, who writes it into the iteration record.
+**Built.** `crosssection/section.ts` decides what may be claimed and `screens/CrossSection.tsx` draws it. The honest finding is sharper than expected: the artefact carries **no invert level for any pit**, not 95.4% of them, because the pipeline never fetched a field it could not trust. So the section splits itself — **horizontal is recorded, vertical is drawn** — and says so inside the figure. 726 of 895 pits get a drawing; 169 get the unavailable state. Both clicked through in a browser. All eight criteria met.
 
 ---
 
-## 3 · The Python test suite breaches our own runtime gate
+## 3 · The Python test suite breaches our own runtime gate — **DECIDED: record it honestly**
 
 The team committed to **suites under five seconds**. Node holds at 1.4 s. Python was 88 s; it is now **55 s** after one pathological fixture was fixed.
 
@@ -124,11 +128,11 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 | **Restate the gate** | Say the five-second rule applies to the suite CI blocks on, and record the Python figure separately. Honest, and arguably what was always meant. |
 | **Accept the breach** | Leave it recorded as a breach. It is in the README now. |
 
-**Needed:** a choice, so the KPI table says something true on Tuesday.
+**Decided: record it rather than hide it.** The README and the gates table now say Node 1.4 s (holds) and Python 55 s (breaches), with the cause named. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
 
 ---
 
-## 4 · Deployment has not started
+## 4 · Deployment has not started — **OPEN, and not mine to take**
 
 **Workstream W4 is entirely unticked** and two of its items are assessed KPIs:
 
@@ -138,33 +142,29 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 
 The product is a static site plus a worker, so hosting is not hard. But **"before and after" cannot be recorded retrospectively**: if we deploy Monday night with no before-figure, that KPI is simply gone.
 
-**Needed:** who deploys, when, and who takes the before-measurement first.
+**Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure. What I can say is the constraint: **the before-measurement cannot be taken retrospectively.** Whoever deploys must record p95 and the external-fetch failure rate *first*, from the deployment host, or that KPI is gone regardless of how well the deployment goes.
 
 ---
 
-## 5 · The address index is a fixture
+## 5 · The address index is a fixture — **DECIDED: tried, still blocked**
 
 The shipped index holds **two real addresses** and the real street names. Nothing in it is invented and it declares itself a fixture, so it is honest — but a demonstration where only two addresses work is fragile if anyone types their own.
 
 The real build is one command (`python -m drainlens_pipeline.addresses`) and is blocked only on the council portal's rate limit clearing.
 
-**Needed:** somebody to run it before Tuesday and confirm the full index loads, or a decision to demonstrate on the two known addresses and say so.
+**Tried on 29 August; the portal still answers 429.** The build refuses to publish an empty index, so the fixture is untouched and honest. **Plan for the demonstration on the two known addresses** — 46 Gatehouse Drive and 13 Neale Street — and re-run `python -m drainlens_pipeline.addresses` if the limit clears. Somebody should try again Monday.
 
 ---
 
-## 6 · A slide deck is now in the repository
+## 6 · A slide deck is now in the repository — **DECIDED: removed**
 
 `docs/DrainLens-pre-deployment.pptx` (366 KB) was swept into a commit by me. It was not a deliberate choice.
 
-**Needed:** keep it or remove it —
-
-```bash
-git rm --cached docs/DrainLens-pre-deployment.pptx
-```
+**Removed from tracking, and the file is untouched on disk.** It was swept in by a `git add -A` of mine rather than chosen, so untracking restores what was there. `docs/*.pptx` is now in `.gitignore` so the next `-A` does not take it again. **Reopen if the deck was meant to be versioned** — that is a reasonable thing to want, it just should be a decision.
 
 ---
 
-## 7 · Process evidence I cannot see from the code
+## 7 · Process evidence I cannot see from the code — **OPEN, and not mine to take**
 
 The gates table has four rows with a dash where a status belongs, and these are assessed:
 
@@ -179,10 +179,11 @@ The gates table has four rows with a dash where a status belongs, and these are 
 
 ## The short version for the meeting
 
-1. **The comparison finding** — the real discussion. Capture-fraction tuning is dead; multi-pit blocking is dead; reporting millimetres is a false-precision trap. Recommend keeping the model honest and reframing the demonstration.
-2. Cross-section: build or formally descope.
-3. Test runtime: split, restate, or accept.
-4. Deployment: who and when, and take the before-measurement first.
-5. Address index: run it or demonstrate on two addresses.
-6. Slide deck: keep or remove.
-7. Pair-programming and desk-check evidence: confirm it exists.
+**Two things still need the team:**
+
+1. **Deployment** (§4) — who, when, and **take the before-measurement first**, because it cannot be taken afterwards.
+2. **Pair-programming hours and desk checks** (§7) — confirm the records exist. If the work happened but was never written down, the assessment cannot see it.
+
+**One thing worth a conversation rather than a decision:** whether the demonstration leads with *where water collects* or with the comparison. The comparison now explains itself when it finds nothing, so either order is defensible.
+
+**Five are done** and are recorded above with reasoning. Reopen any of them — particularly §3 if the KPI table reads badly, and §6 if the deck was meant to be versioned.

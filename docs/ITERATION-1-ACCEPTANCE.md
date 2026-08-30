@@ -21,13 +21,14 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 ## Where this stands — 29 August 2026
 
-**67 of 77 interaction criteria met.** Every box below was checked against the code, and the Epic 2 journey was **run end to end in a browser** rather than read. That distinction earned its keep: 2.2.1 had been ticked from the code on 29 August while the comparison could not actually run, and only clicking it found out. Ticks that have not been exercised are worth less than they look. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
+**75 of 77 interaction criteria met.** Every box below was checked against the code, and the Epic 2 journey was **run end to end in a browser** rather than read. That distinction earned its keep: 2.2.1 had been ticked from the code on 29 August while the comparison could not actually run, and only clicking it found out. Ticks that have not been exercised are worth less than they look. What is *not* ticked is listed here so that an unticked box means a known gap rather than an unchecked one.
 
 | Not met | Why |
 |---|---|
 | 1.1.2.c | No plain-English sentence about where water near the address may move. The panel gives the next step, not the explanation. |
 | 1.1.3.b | No control for a terrain layer; the four controls cover the network and the three derived layers. |
-| 1.3.1.a–e, 1.3.2.a–c | The street cross-section is not built. |
+
+**US 1.3 was built on 29 August.** The drawing was the easy half. The map artefact carries **no invert level for any pit** — the pipeline never fetched a field missing from 95.4% of the record and internally inconsistent in what survives — so a cross-section's one axis is the one with no data behind it. The section therefore splits itself: **everything horizontal is recorded** (which pipes connect, on which side, their diameter and material) and **everything vertical is drawn**, said inside the figure rather than in a caption. 726 of 895 pits can have one; the other 169 get AC 1.3.2, which is a real screen rather than a defensive branch. Both states were clicked through in a browser.
 
 US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.1.3.a were met on 29 August**: the map now opens centred on the address and marks it. Verified in the browser at two addresses — one away from the boundary lands dead centre, one near the western edge stops exactly where the clamp says it should rather than opening onto ground outside the pilot area.
 
@@ -126,11 +127,11 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 
 *Given a pit or pipe with sufficient recorded information is selected, when the user opens the street cross-section, then the system will:*
 
-- [ ] **1.3.1.a** Show a simplified relationship between the street surface, the selected pit and the connected underground pipes
-- [ ] **1.3.1.b** Show recorded pipe direction and depth **where the data supports them**
-- [ ] **1.3.1.c** Distinguish recorded information from simplified system presentation
-- [ ] **1.3.1.d** Clearly identify any missing or uncertain depth information
-- [ ] **1.3.1.e** **Avoid any claim about pipe capacity, underground blockage, or whether the pipe is adequate**
+- [x] **1.3.1.a** Show a simplified relationship between the street surface, the selected pit and the connected underground pipes
+- [x] **1.3.1.b** Show recorded pipe direction and depth **where the data supports them**
+- [x] **1.3.1.c** Distinguish recorded information from simplified system presentation
+- [x] **1.3.1.d** Clearly identify any missing or uncertain depth information
+- [x] **1.3.1.e** **Avoid any claim about pipe capacity, underground blockage, or whether the pipe is adequate**
 
 > Depth will be absent almost everywhere — invert values are 95.4% missing and the surviving fraction is internally inconsistent. 1.3.1.b is satisfied by showing depth where it exists and omitting it where it does not. Do not interpolate. 1.3.1.e is AD6 restated as a criterion.
 
@@ -138,9 +139,9 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 
 *Given the selected location lacks sufficient verified depth or connection information, when the user attempts to open the cross-section, then the system will:*
 
-- [ ] **1.3.2.a** Explain that a reliable cross-section cannot be provided for that location
-- [ ] **1.3.2.b** Identify which required information is missing or uncertain
-- [ ] **1.3.2.c** **Not** fill missing values using unsupported assumptions
+- [x] **1.3.2.a** Explain that a reliable cross-section cannot be provided for that location
+- [x] **1.3.2.b** Identify which required information is missing or uncertain
+- [x] **1.3.2.c** **Not** fill missing values using unsupported assumptions
 
 ---
 
