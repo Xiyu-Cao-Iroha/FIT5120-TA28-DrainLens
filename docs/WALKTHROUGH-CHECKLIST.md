@@ -23,6 +23,8 @@ Started ____:____   Finished ____:____   = ______ hours
 
 **Result codes:** `OK` · `?` needs discussion · `X` defect, write the number in Defects at the end.
 
+**Both side panels collapse.** Use *Hide panel* when the map is the thing being judged — the panel is 420 px of a laptop screen.
+
 ---
 
 ## Before you start — three things already known
@@ -32,7 +34,8 @@ Do not spend the session rediscovering these.
 | | |
 |---|---|
 | **The ground-surface ramp was changed and never seen** | The colours were widened after the layer was verified, and the preview pane went blank before it could be re-checked. **Toggling "Ground surface" must produce an obviously different map.** If the difference is subtle, that is the defect. |
-| **Blocking one drain gives "No clear difference" every time** | Measured, not broken: 0 of 40 inlets differ at any capture fraction from 15% to 90%. Check that the screen *explains* this rather than just saying it. |
+| **Three inlets, and only three, produce a visible difference** | An earlier sample of 40 found none and that was reported as "none exist" — 3 of 475 is 0.6%, which a sample of 40 misses about four times in five. **Use pit 1363621 to demonstrate the comparison working** (652 cells, 132 m³); 1363588 and 1730246 also work. Any other pit honestly returns *No clear difference*, and the screen should explain why rather than just say it. |
+| **Why those three** | All three have **no recorded downstream pipe** and a large catchment. Blocked, their water has no next inlet to reach; the other 472 sit in a redundant chain. Terminal inlets with small catchments release 0.00–0.04 m³ — three orders of magnitude less. |
 | **There are no recorded outlets** | Every trace ends at the edge of the record. The wording must never say a path reached an outlet. |
 
 ---
@@ -137,6 +140,8 @@ Open it on the same pit, then on one the record connects nothing to.
 | 2.1.1.a | The setup page opens | | |
 | 2.1.1.b | In order: pit → blockage → rainfall → run | | |
 | 2.1.1.d | A suggested pit is **labelled as a suggestion** and needs confirming | | |
+| | **The suggested pit is ringed on the map**, in a different colour from a chosen one — a suggestion named only by asset number cannot be found | | |
+| | **Clicking another pit on the map selects it.** Only inlets the scene places respond | | |
 | 2.1.1.e | **No blockage is pre-selected** | | |
 | 2.1.1.c | Go back and choose a pit yourself; it is carried over | | |
 | 2.1.2.a | Only one pit can be changed | | |
