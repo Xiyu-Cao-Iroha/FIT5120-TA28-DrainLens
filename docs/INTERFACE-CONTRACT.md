@@ -25,7 +25,7 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
 | `/data/derived.json` | 183 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
-| `/data/addresses.json` | 3 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
+| `/data/addresses.json` | 678 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
 | `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
 | `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
 
