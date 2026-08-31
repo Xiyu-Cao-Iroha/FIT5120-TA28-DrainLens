@@ -2,9 +2,18 @@
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app
 
-Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving fourteen static files — **1.36 MB over the wire**. There is no application server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **fourteen static files** — eleven artefacts, `index.html` and two hashed bundles. A first visit fetches four of them (**1.36 MB over the wire**, expanding to 6.43 MB); the scene arrays load when the scenario worker starts, and two published arrays are not fetched at all on the demonstration path. There is no application server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
 
-Deployed and verified on **31 August 2026**. Everything below was run, not planned.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer. Everything below was run, not planned, and the verification was repeated in full after the second deployment rather than assumed to still hold.
+
+| Redeployed 1 September | |
+|---|---|
+| Bundle | `index-DPqqSve1.js`, matching a local build of `main` — which is also how you know it built from the Dockerfile and not from Buildpacks |
+| Worker content type | `text/javascript`, exactly one header |
+| gzip, three cache tiers, `/data` 404 | unchanged |
+| **AD1** | positive control shows system, system_event and stderr writing; **0 entries carrying a client IP**, no `requests` log |
+| Transfer | **1.36 MB over the wire, expanding to 6.43 MB (21%)** |
+| First visit, p95 | **692.4 ms** from a laptop, against the 34.5 ms localhost floor |
 
 ---
 

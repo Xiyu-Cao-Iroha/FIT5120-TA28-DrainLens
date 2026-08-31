@@ -118,7 +118,7 @@ Three ways to go:
 
 ## 3 · The Python test suite breaches our own runtime gate — **DECIDED: record it honestly**
 
-The team committed to **suites under five seconds**. On the CI runner Node measured 5 s in both available samples — at the gate, not inside it — and Python 51–66 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
+The team committed to **suites under five seconds**. On the CI runner Node measured 5 s in all three available samples — at the gate, not inside it — and Python 51–67 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
 
 The remaining time is almost entirely `test_terrain.py`, where nineteen tests each build a real 1000 × 1000 grid: **65 of the 71 seconds**, with the whole rest of the suite at six. That is inherent to what they check — and it means splitting them out would still not reach the five-second gate.
 
@@ -134,7 +134,7 @@ The remaining time is almost entirely `test_terrain.py`, where nineteen tests ea
 
 ## 4 · Deployment — **DONE: deployed and verified 31 August**
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files at 1.36 MB over the wire. Every command was run by the user; nothing was executed from the assistant's machine.
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files; a first visit costs 1.36 MB over the wire. Every command was run by the user; nothing was executed from the assistant's machine.
 
 **Cloud Storage + CDN was abandoned mid-way.** It needs a domain for a certificate and there is none, and the app's paths are absolute from `/`, so a bucket sub-path cannot serve it either. Firebase Hosting, the obvious alternative, had already been **rejected by the teacher** when the first System Architecture proposed it. Cloud Run is what survives all three constraints.
 

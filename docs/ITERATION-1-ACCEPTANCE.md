@@ -189,6 +189,8 @@ US 1.2 was completed on 29 August; see the note under AC 1.2.2. **1.1.2.a and 1.
 - [x] **2.2.1.f** Display **Insufficient information** where the data does not support a clear comparison
 - [x] **2.2.1.g** Describe the result as an indicative comparison based on simplified assumptions, **not a live flood prediction**
 
+> **2.2.1.c was only half met until 1 September and the documentation did not say so.** The Difference view opened by default and named its band, but the map beside it highlighted nothing — the engine produced a band for each of the 1,000,000 cells and only a *count* of them crossed the worker boundary, so the screen's own sentence promised areas no code could draw. The 652 cells that differ are now sent and painted. Verified against the artefact, because the conversion has a plausible failure mode: the cells land 19 m from pit 1363621, where a reversed northing would have put them 873 m away. Then on the deployed site, both ways — a violet patch for 1363621, nothing at all for a pit that finds no difference.
+>
 > **2.2.1.f is implemented** by the gate in AC 2.2.3, which runs before anything is computed.
 >
 > **No clear change and Insufficient information are different results and must stay different.** The first means the calculation ran and found nothing; the second means it could not be made. `insufficient-data` has been removed from the comparison-band vocabulary so the two cannot share a word: a band describes an area within a comparison that succeeded, a status describes whether there was one.

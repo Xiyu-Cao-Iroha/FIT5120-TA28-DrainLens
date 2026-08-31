@@ -13,7 +13,7 @@ npm run check                              # typecheck and the whole suite, from
 
 **Address search** (`src/address/`) — normalisation, scoring and a `resolve` that returns four outcomes rather than two: `found`, `ambiguous`, `outside-pilot`, `not-an-address`. Runs against an index shipped with the site and never calls the network.
 
-**The map** (`src/map/`) — the viewport transform, hit testing, drawing, and the React component that binds them to a canvas. Roads, pipes, pits and street labels; a ground-surface layer painted once from the scene's elevation array and drawn beneath them; and the three derived layers over the top. `nearby.ts` measures the closest derived path and low area to an address so the panel can say, in words, where water may move.
+**The map** (`src/map/`) — the viewport transform, hit testing, drawing, and the React component that binds them to a canvas. Roads, pipes, pits and street labels; a ground-surface layer painted once from the scene's elevation array and drawn beneath them; and the three derived layers over the top. `nearby.ts` measures the closest derived path and low area to an address so the panel can say, in words, where water may move. `difference.ts` paints where a finished comparison puts more water than its baseline — flat violet, because AD7 allows one output and it is *where*, not how much, so a ramp would invite reading a quantity off a legend this product does not publish.
 
 **The downstream trace** (`src/trace/`) — traversal of the recorded drainage with a reason at every place a path stops, and its rendering with direction arrows read from the topology.
 
