@@ -28,6 +28,8 @@ export interface MapCanvasProps {
   readonly derived?: DerivedArtefact | null;
   readonly show?: DerivedVisibility;
   readonly selectedPit?: number | null;
+  /** Offered but not confirmed — drawn as a ring, not a fill. */
+  readonly suggestedPit?: number | null;
   /** The painted terrain raster, or null when it is off or not loaded. */
   readonly terrain?: HTMLCanvasElement | null;
   readonly showPipes?: boolean;
@@ -50,6 +52,7 @@ export function MapCanvas({
   derived = null,
   show,
   selectedPit = null,
+  suggestedPit = null,
   terrain = null,
   showPipes = true,
   showPits = true,
@@ -107,14 +110,26 @@ export function MapCanvas({
     // was calculated from would look like the ground the network sits in.
     // The ground first: everything else sits on it, and a network drawn under
     // its own terrain would read as buried rather than as underground.
+    //
+    // `drawMap` opens by filling the whole canvas, so it has to be told the
+    // ground is already painted. Without that it erases the terrain before
+    // drawing a single road over it.
     if (terrain) drawTerrain(context, terrain, viewport, bounds);
-    drawMap(context, artefact, viewport, { selectedPit, address, showPipes, showPits });
+    drawMap(context, artefact, viewport, {
+      selectedPit,
+      suggestedPit,
+      address,
+      showPipes,
+      showPits,
+      groundAlreadyDrawn: terrain !== null,
+    });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // The followed path goes on top of both. It is the answer to the
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
-  }, [artefact, derived, show, viewport, selectedPit, address, trace, terrain, showPipes, showPits]);
+  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, address, trace,
+      terrain, showPipes, showPits]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

@@ -118,9 +118,9 @@ Three ways to go:
 
 ## 3 · The Python test suite breaches our own runtime gate — **DECIDED: record it honestly**
 
-The team committed to **suites under five seconds**. Node holds at 1.4 s. Python was 88 s; it is now **55 s** after one pathological fixture was fixed.
+The team committed to **suites under five seconds**. On the CI runner Node measured 5 s in both available samples — at the gate, not inside it — and Python 51–66 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
 
-The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 1000 × 1000 grid. That is inherent to what they check.
+The remaining time is almost entirely `test_terrain.py`, where nineteen tests each build a real 1000 × 1000 grid: **65 of the 71 seconds**, with the whole rest of the suite at six. That is inherent to what they check — and it means splitting them out would still not reach the five-second gate.
 
 | | |
 |---|---|
@@ -128,45 +128,38 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 | **Restate the gate** | Say the five-second rule applies to the suite CI blocks on, and record the Python figure separately. Honest, and arguably what was always meant. |
 | **Accept the breach** | Leave it recorded as a breach. It is in the README now. |
 
-**Decided: record it rather than hide it.** The README and the gates table now say Node 1.4 s (holds) and Python 55 s (breaches), with the cause named. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
+**Decided: record it rather than hide it.** The README and the gates table now carry both machines, with the cause named. The figure was wrong twice before it was right: "55 s" had been taken with `--no-cov`, so the recorded breach was about half the real one; and the 105 s that replaced it was this laptop's clock reported as CI's. **The Node figure is the one to watch now** — about 5 s on the runner is at the gate, and CI times nothing, so it will be crossed silently. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
 
 ---
 
-## 4 · Deployment — **the baseline is taken; the deployment itself is still yours**
+## 4 · Deployment — **DONE: deployed and verified 31 August**
 
-**Workstream W4 is entirely unticked** and two of its items are assessed KPIs:
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files at 1.36 MB over the wire. Every command was run by the user; nothing was executed from the assistant's machine.
 
-- p95 latency and external-fetch failure rate recorded **before and after** deployment
-- external dependencies probed **from the deployment host, not a laptop**
-- a log exclusion filter covering both the load balancer and Cloud Run — this one is not optional, it is what keeps the no-identity promise true in production
+**Cloud Storage + CDN was abandoned mid-way.** It needs a domain for a certificate and there is none, and the app's paths are absolute from `/`, so a bucket sub-path cannot serve it either. Firebase Hosting, the obvious alternative, had already been **rejected by the teacher** when the first System Architecture proposed it. Cloud Run is what survives all three constraints.
 
-The product is a static site plus a worker, so hosting is not hard. But **"before and after" cannot be recorded retrospectively**: if we deploy Monday night with no before-figure, that KPI is simply gone.
+**That reversed this document's own logging finding, which is worth leaving visible.** On Cloud Storage there genuinely is nothing to filter — load balancer request logging is off by default on a backend bucket and access logs are opt-in. **Cloud Run writes request logs carrying `remoteIp` by default**, so the exclusion went from unnecessary to mandatory the moment the platform changed.
 
-**Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure.
+Getting it right took two attempts, and **two entries carrying a real client IP were stored in between**. The exclusion was written to the sink's own filter instead of `--add-exclusion`, and the check used a query that could not match — it returned zero and zero was read as success. Both are written up in [deploy/README.md](../deploy/README.md), because the correction is the more useful half: *a query returning nothing is evidence only when you know it would have returned something.* The entries were deleted, and AD1 is now verified after real traffic: 25 requests, 0 request-log entries, 0 entries carrying an IP, system and stderr logging intact.
 
-**Two things that must happen before the first request, not after.**
+**Before and after are both recorded** — [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md). They are not the same measurement and must not be read as a regression: the before is a laptop against `localhost` with no network in it. The comparable figure is the transfer, 1.37 MB against 1.36 MB at the same 21% ratio.
 
-*The before-measurement.* **Done on 30 August** — [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), taken with `tools/perf/measure.mjs` so the "after" is the same script rather than a similar one. It also settled what deployment can and cannot affect: the whole artefact load is **41 ms at p95** and one comparison is **998 ms**, so hosting is not this product's performance story. Caveat stated in the document: it was run on a laptop against localhost, which is a floor, and W4's "from the deployment host" still stands — say where the "after" was run.
-
-*The log exclusion filter.* **On Cloud Storage + CDN there is nothing to filter**, which is the better answer rather than a lucky one: load balancer request logging is off by default on a backend bucket and Cloud Storage access logs are opt-in, so AD1 is kept by never switching them on. [deploy/README.md](../deploy/README.md) carries commands that assert the absence rather than assume it. The filter becomes mandatory the day `apps/api` reaches Cloud Run, which logs `remoteIp` by default. The original wording assumed Cloud Run and is left here because the reasoning still applies to it: it has to be configured before traffic arrives. A filter added afterwards cannot unwrite the log lines already holding the first visitors' IP addresses, and for those people AD1 was false from the start.
-
-*The data credit.* **Done on 29 August.** CC BY 4.0 requires the attribution to be visible to the person using the work, and it appeared nowhere on screen — the `publisher` and `licence` fields were in the artefacts and never rendered. There is now a footer on every screen, read from the artefacts so replacing a source updates the credit with it, including the clause most often skipped: **an indication that changes were made**, because the surface-water paths, low points and ground shading are calculated rather than published.
-
-**And the plan itself needs revisiting.** W4 says Cloud Run behind a load balancer, with Cloud Storage and Cloud CDN confirming range requests for PMTiles. That was written when `apps/api` was expected and when the map was expected to be tiled. Neither exists: `apps/api` is not a directory, there is no Dockerfile, CI never builds or deploys, and tiling was dropped after the whole extent measured 1.27 MB gzipped. What there is to deploy is **14 static files, 8.5 MB on disk and 1.37 MB over the wire**.
-
-Cloud Run remains reasonable as an *Iteration 2* target for server-side AI — but note AD10 puts the photo classification on the device, and `FORBIDDEN_WIRE_KEYS` forbids `photo`, `image` and `imageData` structurally, so `assertSendable` would throw. Moving inference server-side means changing that contract deliberately, as a new declared payload type, not by deleting a key from a list. What I can say is the constraint: **the before-measurement cannot be taken retrospectively.** Whoever deploys must record p95 and the external-fetch failure rate *first*, from the deployment host, or that KPI is gone regardless of how well the deployment goes.
+**Still outstanding:** the live site is behind the repository. Everything since the first deployment — the terrain fix, the pit pin, the collapsible panels — needs a redeploy to reach it.
 
 ---
 
 ## 5 · The address index — **DONE: the real one is in**
 
-The shipped index holds **two real addresses** and the real street names. Nothing in it is invented and it declares itself a fixture, so it is honest — but a demonstration where only two addresses work is fragile if anyone types their own.
+**4,089 addresses across 132 streets**, replacing a fixture that held two. Search now suggests while typing, which two addresses could not.
 
-The real build is one command (`python -m drainlens_pipeline.addresses`) and is blocked only on the council portal's rate limit clearing.
+The 429 that had blocked this for days cleared on its own — and what it had been hiding was a defect rather than a rate limit. `addresses.py` was reading **`property-boundaries`**, the parcel dataset. It fetched and parsed and produced 1,619 entirely plausible entries containing **neither demonstration address**, because a parcel is not an address: Gatehouse Drive has a 10, a 15 and a 17 and no 46. The dataset it wanted was **`street-addresses`**, 63,721 records, named in the task list from the start.
 
-**Built on 31 August: 4,089 addresses across 132 streets.** The 429 cleared on its own, and what it had been hiding was a defect rather than a rate limit — the builder was reading `property-boundaries`, the parcel dataset. That fetched and parsed and produced 1,619 plausible entries containing **neither demonstration address**, because a parcel is not an address: Gatehouse Drive has a 10, a 15 and a 17 and no 46. The dataset it wanted was `street-addresses`, 63,721 records, named in the task list from the start. Search now suggests while typing, which two addresses could not. **Demonstrate on any Kensington address.**
+The `streets` list is deliberately wider than the addressed streets. 38 map street names carry no address, so without them somebody on Harper Street is told their street does not exist rather than that it is outside the pilot.
+
+**Demonstrate on any Kensington address.**
 
 ---
+
 
 ## 6 · A slide deck is now in the repository — **DECIDED: removed**
 

@@ -97,6 +97,8 @@ Both timestamps are required in the response. `upstreamUpdatedAt` and `fetchedAt
 
 `FORBIDDEN_WIRE_KEYS` in the schema. `assertSendable()` checks any payload structurally before it is sent — cheap enough to call on every submission, and it catches what the type system cannot: an object widened to `unknown` somewhere between a form and a `fetch`.
 
+> **It is called by nothing today, and that is correct.** Nothing is sent: every outbound call in `apps/web` is a `GET` of a static artefact with no body and no query. The guard is here for the submission Epic 4 will add. Wiring it now would mean inventing a payload to guard.
+
 ```
 photo          photograph     image          imageData
 address        streetAddress

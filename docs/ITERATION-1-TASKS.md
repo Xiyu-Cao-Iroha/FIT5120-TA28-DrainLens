@@ -138,12 +138,12 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] CI: `npm ci` then `npm run check` on every pull request, plus the Python suite
 - [x] Artefact contract published in `packages/schema`
 - [ ] Required approvals raised from 0 to 1 once collaborators are added
-- [~] Cloud Storage + Cloud CDN for artefacts — **the runbook and upload script are written** ([deploy/](../deploy/README.md)), not yet run against a project. The range-request line is withdrawn: it was written when the map was expected to be tiled, and tiling was dropped after the whole extent measured 1.27 MB gzipped. Nothing here uses range requests, which is as well — Cloud Storage's gzip transcoding and range requests do not combine
-- [—] Cloud Run behind the load balancer — **withdrawn for Iteration 1.** There is no `apps/api` to containerise. Reasonable again as an Iteration 2 target if AI inference moves off the device; see [deploy/README.md](../deploy/README.md)
-- [~] **Log exclusion filter** — **there is nothing to filter on this architecture, and that is the finding.** Load balancer request logs are off by default on a backend bucket, and Cloud Storage access logs are opt-in, so AD1 is kept by never enabling them rather than by filtering afterwards. Cloud Monitoring metrics carry no IP and stay. The filter becomes mandatory the day `apps/api` reaches Cloud Run, because Cloud Run logs requests — with `remoteIp` — by default. Verification commands in [deploy/README.md](../deploy/README.md), which assert the absence rather than assume it
+- [—] Cloud Storage + Cloud CDN — **withdrawn.** It needs a domain for a certificate and there is none, and the app's paths are absolute from `/` so it cannot be served from a bucket sub-path. The PMTiles range-request line goes with it: tiling was dropped after the whole extent measured 1.27 MB gzipped
+- [x] **Cloud Run — deployed 31 August**: https://drainlens-205559161217.australia-southeast1.run.app. nginx serving the static build; no `apps/api` exists and none is containerised. Chosen because it is the only option that is GCP, needs no domain, and serves at a root URL — see [deploy/README.md](../deploy/README.md)
+- [x] **Log exclusion — applied before the first request, and verified after real traffic.** Cloud Run writes request logs carrying `remoteIp` by default, so this was mandatory rather than optional. **It took two attempts:** the first put `NOT LOG_ID(...)` on the sink's own filter instead of using `--add-exclusion`, and a query that could not match returned zero, which was read as success — two entries with a real client IP had in fact been stored and were later deleted. Now: 25 real requests, 0 request-log entries, 0 entries carrying an IP, system and stderr logging intact
 - [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken**, and **re-taken on 31 August** when the real address index changed the payload — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 34.5 ms for the whole first visit, 0.00% failures, 1.37 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
-- [ ] Probe every external dependency **from the deployment host, not a laptop**
-- [ ] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working
+- [~] Probe every external dependency **from the deployment host, not a laptop** — the product makes **no external requests at runtime**, so there is no upstream to probe. The "after" measurement was taken from a laptop against the deployed URL and says so
+- [x] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working — `run`, `cloudbuild`, `artifactregistry` and `logging` each queried separately before deploying
 
 ## W5 · Acceptance, demo and documentation
 
@@ -192,7 +192,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 91.4% Node · 91.4% Python. **Node 1.4 s ✓, Python 55 s ✗** |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 92.8% Node · 91.05% Python. **Node 5 s on the runner — at the limit · Python 51–66 s ✗**. Locally 3.6 s and 105 s |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |

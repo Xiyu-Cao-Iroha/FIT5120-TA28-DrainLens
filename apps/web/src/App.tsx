@@ -61,6 +61,9 @@ export function App() {
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
   const [positions, setPositions] = useState<readonly SolvedPosition[]>([]);
+  // The scenario panel is 420px of a laptop screen. Reading a result means
+  // looking at the map it is about, and a teammate reported not being able to.
+  const [panelOpen, setPanelOpen] = useState(true);
 
   useEffect(() => {
     load()
@@ -206,12 +209,14 @@ export function App() {
           <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
             <div
               style={{
-                width: 420,
+                width: panelOpen ? 420 : 0,
                 flexShrink: 0,
-                overflow: 'auto',
-                borderRight: '1px solid #e6ebe4',
+                overflow: panelOpen ? 'auto' : 'hidden',
+                borderRight: panelOpen ? '1px solid #e6ebe4' : 'none',
                 background: '#ffffff',
+                transition: 'width 160ms ease',
               }}
+              aria-hidden={!panelOpen}
             >
               {session.screen === 'result' && outcome !== null ? (
                 <Result
@@ -288,7 +293,48 @@ export function App() {
               )}
             </div>
             <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-              <MapCanvasPane loaded={loaded} session={session} />
+              {/*
+                Over the map rather than beside it, so the button does not
+                move when the panel does — a control that runs away from the
+                cursor as it works is one people stop trusting.
+              */}
+              <button
+                type="button"
+                onClick={() => setPanelOpen((open) => !open)}
+                aria-expanded={panelOpen}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 12,
+                  zIndex: 2,
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #cfd9d2',
+                  background: 'rgba(255,255,255,0.94)',
+                  font: 'inherit',
+                  fontSize: 13,
+                  color: '#1f6f5c',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+                }}
+              >
+                {panelOpen ? '‹ Hide panel' : '› Show panel'}
+              </button>
+              <MapCanvasPane
+                loaded={loaded}
+                session={session}
+                suggestedPitId={
+                  session.scenario.pitId === null
+                    ? nearestInlet(loaded, session.address, scenario.drains)
+                    : null
+                }
+                scenarioDrains={
+                  new Set(scenario.drains.filter((d) => d.isInlet).map((d) => d.assetNumber))
+                }
+                onPickPit={(pitId) =>
+                  dispatch({ type: 'pit-selected', pitId, suggested: false })
+                }
+              />
             </div>
           </div>
         </Shell>
@@ -337,9 +383,16 @@ export function App() {
 function MapCanvasPane({
   loaded,
   session,
+  suggestedPitId,
+  scenarioDrains,
+  onPickPit,
 }: {
   readonly loaded: Loaded;
   readonly session: Session;
+  readonly suggestedPitId: string | null;
+  /** Asset numbers the scene places as inlets. Anything else cannot run. */
+  readonly scenarioDrains: ReadonlySet<string>;
+  readonly onPickPit: (pitId: string) => void;
 }) {
   const pitId = session.scenario.pitId;
   const followed = useMemo(
@@ -353,12 +406,24 @@ function MapCanvasPane({
       derived={loaded.derived}
       show={EVERYTHING}
       selectedPit={pitId === null ? null : Number(pitId)}
+      // Shown only while nothing is chosen. A suggestion the panel names by
+      // asset number and the map does not mark leaves the person holding an
+      // identifier with no way to find it — which is what a teammate hit.
+      suggestedPit={pitId === null && suggestedPitId !== null ? Number(suggestedPitId) : null}
       address={
         session.address === null
           ? null
           : [session.address.eastingM, session.address.northingM]
       }
       trace={followed}
+      onSelect={(hit) => {
+        // Only a pit, and only one the engine can use. Tapping a pipe or a
+        // junction here would silently set a scenario the engine is bound to
+        // reject, which is how a wrong answer looks exactly like a right one.
+        if (hit?.kind !== 'pit') return;
+        const asset = String(hit.feature.asset_number ?? '');
+        if (scenarioDrains.has(asset)) onPickPit(asset);
+      }}
     />
   );
 }

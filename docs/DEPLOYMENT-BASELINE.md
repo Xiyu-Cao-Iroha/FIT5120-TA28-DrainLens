@@ -1,6 +1,16 @@
-# Deployment baseline — the "before" measurement
+# Deployment measurement — before and after
 
-DrainLens · TA28 · **re-taken 31 August 2026**, before any deployment exists
+DrainLens · TA28 · **before re-taken and after taken, 31 August 2026**
+
+**Deployed:** https://drainlens-205559161217.australia-southeast1.run.app
+
+| | before | after |
+|---|---:|---:|
+| First visit, p95 | **34.5 ms** | **507.7 ms** |
+| Transfer | 1.37 MB (21%) | **1.36 MB (21%)** |
+| Fetch failures | 0 of 1,200 | **0 of 360** |
+
+> **They are not the same measurement and must not be read as a regression.** The "before" was taken on a laptop against `localhost`, which has no network in it — it is a floor, and the document said so before the deployment existed. The "after" is a real round trip from Melbourne to Sydney and back. What *is* comparable is the transfer: 1.37 MB against 1.36 MB at the same 21% ratio, which is the evidence that gzip is genuinely reaching the client in production rather than being inferred from a header.
 
 > Taken once on 30 August against a 1.31 MB payload, then **re-taken** when the address index was replaced. The fixture held two addresses and 3 KB; the real index holds 4,089 and 66 KB over the wire. A "before" measured against a payload the site no longer ships is not a before, so the numbers below are the ones the "after" must be compared with.
 
