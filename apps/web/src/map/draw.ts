@@ -305,6 +305,16 @@ export interface DrawOptions {
   readonly showPipes?: boolean;
   readonly showPits?: boolean;
   readonly showRoads?: boolean;
+  /**
+   * Skip the flat ground fill because something already painted the ground.
+   *
+   * `drawMap` opens by filling the whole canvas. With the terrain layer drawn
+   * first and this left false, the fill covered it completely: the layer was
+   * computed, drawn, and then erased before anything else was painted over
+   * it. Toggling it changed 0.1% of the screen, which a teammate reported —
+   * accurately — as "the button does nothing".
+   */
+  readonly groundAlreadyDrawn?: boolean;
 }
 
 /**
@@ -348,8 +358,10 @@ export function drawMap(
   const palette = options.palette ?? DAY;
   const seen = visibleBounds(viewport);
 
-  context.fillStyle = palette.ground;
-  context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
+  if (options.groundAlreadyDrawn !== true) {
+    context.fillStyle = palette.ground;
+    context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
+  }
 
   if (options.showRoads !== false) {
     drawRoads(context, viewport, artefact.layers.road ?? [], palette, seen);

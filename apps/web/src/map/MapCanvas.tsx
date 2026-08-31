@@ -107,8 +107,18 @@ export function MapCanvas({
     // was calculated from would look like the ground the network sits in.
     // The ground first: everything else sits on it, and a network drawn under
     // its own terrain would read as buried rather than as underground.
+    //
+    // `drawMap` opens by filling the whole canvas, so it has to be told the
+    // ground is already painted. Without that it erases the terrain before
+    // drawing a single road over it.
     if (terrain) drawTerrain(context, terrain, viewport, bounds);
-    drawMap(context, artefact, viewport, { selectedPit, address, showPipes, showPits });
+    drawMap(context, artefact, viewport, {
+      selectedPit,
+      address,
+      showPipes,
+      showPits,
+      groundAlreadyDrawn: terrain !== null,
+    });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // The followed path goes on top of both. It is the answer to the
     // question the person just asked, and a derived layer drawn over it

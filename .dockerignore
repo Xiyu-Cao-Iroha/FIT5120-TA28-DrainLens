@@ -1,0 +1,32 @@
+# What must not reach the build context.
+#
+# `node_modules` is the one that matters. The Dockerfile runs `npm ci` before
+# copying the source, so a host `node_modules` copied over the top replaces
+# the container's workspace symlinks with Windows-built binaries — and the
+# build then fails to resolve `@drainlens/schema`, which reads like a missing
+# dependency rather than the overwrite it is.
+node_modules
+**/node_modules
+
+# Build output. Rebuilt inside the image; copying it in risks publishing
+# something older than the source beside it.
+dist
+**/dist
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# The Python side is never deployed.
+pipeline/.venv
+**/__pycache__
+.pytest_cache
+.coverage
+
+# Full-size intermediates, including a 4 GB point cloud. The published
+# artefacts under apps/web/public/data are committed and must NOT be ignored.
+/data
+
+.git
+.github
+.idea
+.claude
+coverage

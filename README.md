@@ -2,6 +2,8 @@
 
 Stormwater flood risk for residents of Greater Melbourne communities that flood repeatedly.
 
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app
+
 FIT5120 S2 2026 · Disaster Resilience (SDG 11) · Team TA28
 
 A resident searches an address and can **explore** what is under their street, **trace** where water from a nearby drain goes, and **compare** what changes if that drain is blocked. It is not a flood warning, not a forecast, and not an engineering assessment.
@@ -30,10 +32,10 @@ A fourth position follows from the third and is worth stating on its own: **the 
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
 packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
 apps/web            frontend (React + TypeScript + Vite) — session state and the canvas map
-apps/api            backend (Node + TypeScript + Hono on Cloud Run)               not yet started
+apps/api            backend (Node + TypeScript + Hono)                            not yet started
 pipeline            Python geospatial pipeline, never deployed — graph, terrain, map geometry, trace
 tools/perf          the deployment measurement, run identically before and after
-deploy              the deployment runbook and upload script
+deploy              the Cloud Run runbook and the nginx configuration
 data                artefact releases — git-ignored, rebuilt locally
 docs                iteration scope, acceptance criteria, development guide, interface contract
 models              exported ONNX models and evaluation reports                   not yet started
@@ -69,9 +71,9 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.7%** Node · **91.05%** Python |
+| Coverage, overall | ≥ 88% | **92.8%** Node · **91.05%** Python |
 | Suite runtime | < 5 s | **1.4 s Node ✓ · 55 s Python ✗** — see below |
-| Tests | 441 TypeScript · 332 Python | 773 in total |
+| Tests | 450 TypeScript · 332 Python | 782 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
@@ -95,6 +97,7 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 0.20.0 | 31 Aug 2026 | **Deployed.** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files at 1.36 MB over the wire. Cloud Storage and CDN was abandoned mid-way: it needs a domain for a certificate and there is none, and the app's paths are absolute from `/` so a bucket sub-path cannot serve it either. Firebase Hosting, the obvious alternative, had already been **rejected by the teacher** when the first System Architecture proposed it. **That reversed the logging finding** — on Cloud Storage nothing is logged by default, but Cloud Run writes request logs carrying `remoteIp`, so the exclusion became mandatory. Getting it right took two attempts and **two real client IPs were stored in between**: `NOT LOG_ID(...)` went onto the sink's own filter rather than into `--add-exclusion`, and a query that could not match returned zero, which was read as success. They were deleted, and AD1 is now verified the only way that counts — 25 real requests, then 0 request-log entries and 0 entries carrying an IP, with system and stderr logging intact. A second silent failure: the Dockerfile sat under `deploy/`, so `--source=.` fell back to Buildpacks **without failing**, which would have shipped none of the verified content types, gzip or cache policy. `measure.mjs` was also wrong — it read `content-length` for wire bytes, which nginx does not send when compressing on the fly, so it reported 6.42 MB at a 100% ratio for a response that was gzipped throughout; it counts socket bytes now and still gives the baseline's 1.37 MB against the same server, so the recorded before stays comparable. **After: p95 507.7 ms from a laptop, against a 34.5 ms localhost floor — not a regression, a different measurement.** |
 | 0.19.0 | 31 Aug 2026 | **The real address index, and the reason it was not there.** 4,089 addresses across 132 streets, replacing a two-address fixture. The portal's 429 had been read as a rate limit for days; when it cleared, the build returned **zero addresses** — caught by the guard that refuses to publish an empty index, which is the only reason a working search that finds nothing did not ship. The cause was the dataset: `addresses.py` read **`property-boundaries`**, which is parcels. It has no split street fields, and a first fix parsed its free-text `address` against all eight published shapes — producing 1,619 entirely plausible entries containing **neither demonstration address**, because a parcel is not an address and Gatehouse Drive has a 10, a 15 and a 17 but no 46. The dataset it wanted was **`street-addresses`**, 63,721 records, named in the task list from the start; the parser was deleted rather than kept as dead code. The `streets` list is now deliberately wider than the addressed streets: 38 map street names carry no address, so without them somebody on Harper Street is told their street does not exist rather than that it is outside the pilot. Verified in the browser: typing suggests as you go, and Harper Street resolves to "outside the area this pilot covers". Baseline re-taken because the payload changed — 1.37 MB over the wire, p95 34.5 ms. 441 TypeScript tests, 332 Python, 92.7% and 91.05%. |
 | 0.18.0 | 30 Aug 2026 | **The credit, and the measurement that cannot be taken later.** Every artefact has carried `publisher`, `licence` and `last_modified` since the first commit and none of it had ever reached a screen — survivable locally, a licence breach once published, because CC BY 4.0 requires the attribution to be visible to the person using the work. There is now a footer on every screen, read from the artefacts so a replaced source carries its credit with it, and carrying the clause people skip: **an indication that changes were made**, since the surface-water paths, low points and ground shading are calculated rather than published. Two defects in the first version, both caught before it shipped: the credit was keyed on `publisher + ' ' + licence` and split back on a space, which credited "City" for everything; and the pre-load screens reached for a value declared thirty lines below them. Separately, **the deployment baseline was taken** — [DEPLOYMENT-BASELINE.md](./docs/DEPLOYMENT-BASELINE.md) — and it reframes the deployment question: loading every artefact costs **41 ms at p95**, while one comparison costs **998 ms**. Hosting is not this product's performance story, and no CDN will change that. 441 TypeScript tests, 332 Python, 92.7% and 91.44%. |
 | 0.17.0 | 29 Aug 2026 | **All 77 interaction criteria met.** The last two were the map's own silences. It never said in words where water near an address may move, so it now measures the nearest derived path and low area and says so — rounded to ten metres, because the surface cannot support finer, and silent when nothing is within 150 m rather than reaching for something to say. And it drew everything over a **flat colour**, which was the one thing on screen quietly implying the ground is level in a product whose whole argument is that it is not: there is now a ground-surface layer, painted once from the scene's elevation array and drawn under the network, with its own control alongside separate pit and pipe controls. Its first palette ramped to a pale near-white that was almost exactly the map's ground fill — the layer drew correctly and changed 6.8% of the pixels on screen, which is a layer nobody can see — so the ramp is now cool-low to warm-high, clear of the base at both ends. 426 TypeScript tests, 332 Python, 92.6% and 91.44%. |

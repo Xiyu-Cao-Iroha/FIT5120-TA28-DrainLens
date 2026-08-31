@@ -14,11 +14,29 @@
  * already hatches where too little was measured to say anything, and this
  * layer is drawn beneath it so that hatching still reads.
  *
- * The shading is relative, not absolute. It ramps between the lowest and
- * highest ground actually present in the extent rather than against sea level,
- * because the question a reader has is "which way is downhill from here", not
- * "how high am I". A legend in metres would invite the second reading and the
- * surface's own accuracy — about 25 cm — does not support it.
+ * The shading is relative, not absolute. It ramps across the ground actually
+ * present in the extent rather than against sea level, because the question a
+ * reader has is "which way is downhill from here", not "how high am I". A
+ * legend in metres would invite the second reading and the surface's own
+ * accuracy — about 25 cm — does not support it.
+ *
+ * **`elevation.bin` is the conditioned routing surface, not the ground.**
+ * `scene.py` says so at the top and gives the reason: the flow field was
+ * computed on it, and shipping the raw surface instead lost 71.6% of the
+ * rain. Conditioning raises every building by `BARRIER_RAISE_M` — a hundred
+ * metres — so water runs between them rather than through.
+ *
+ * A first version of this layer ramped from that array's own min to its max
+ * and produced a map that looked like one flat colour. 26.1% of the cells sit
+ * above 100 m, so the ramp spent almost all of itself on an artefact, and the
+ * ground a resident actually stands on — median 3.2 m, everything under 30 m
+ * — was compressed into the bottom few percent of it. A teammate reported it
+ * as "the button does nothing", which is exactly what it looked like.
+ *
+ * So this file has to undo, for display only, something the engine needs. The
+ * barrier cells are separated out and drawn as buildings rather than as very
+ * high ground, and the ramp is fitted to the remaining ground at robust
+ * percentiles rather than to its extremes.
  */
 
 import { type Viewport, toScreen } from './viewport.js';
@@ -46,6 +64,30 @@ export interface TerrainRaster {
 const LOW: readonly [number, number, number] = [108, 140, 158];
 const HIGH: readonly [number, number, number] = [226, 212, 178];
 
+/** Buildings, drawn as buildings. Deliberately off the ground ramp. */
+const BARRIER: readonly [number, number, number] = [176, 172, 166];
+
+/**
+ * Above this, a cell is a conditioning barrier rather than ground.
+ *
+ * `BARRIER_RAISE_M` is 100 and the highest real ground in the extent is
+ * 29.84 m, so half the raise separates the two with 20 m of margin on the
+ * ground side and 50 m on the barrier side. Measured, not guessed: it splits
+ * 260,532 barrier cells from 739,468 ground ones, and the barrier count
+ * matches the 258,754 the pipeline reports for the footprint mask.
+ */
+export const BARRIER_FLOOR_M = 50;
+
+/**
+ * Percentiles the ramp is fitted between.
+ *
+ * Not the extremes. A single spike would flatten everything else, which is
+ * the failure this layer already had once — for a different reason, and with
+ * the same symptom.
+ */
+export const RAMP_LOW_PERCENTILE = 0.02;
+export const RAMP_HIGH_PERCENTILE = 0.98;
+
 /**
  * Colour for one elevation, as a fraction of the extent's own range.
  *
@@ -57,6 +99,10 @@ export function shade(
   minM: number,
   maxM: number,
 ): readonly [number, number, number] {
+  // A conditioning barrier is a building, not the top of the ramp. Clamping
+  // it to the highest ground colour would draw every roof as a hill.
+  if (elevationM >= BARRIER_FLOOR_M) return BARRIER;
+
   const span = maxM - minM;
   const t = span <= 0 ? 0 : Math.max(0, Math.min(1, (elevationM - minM) / span));
   return [
@@ -68,6 +114,33 @@ export function shade(
 
 /** How strongly the terrain shows through. Context, not the subject. */
 export const TERRAIN_ALPHA = 0.75;
+
+/**
+ * The range to fit the ramp across: ground only, at robust percentiles.
+ *
+ * Barrier cells are excluded before the percentiles are taken rather than
+ * after, because at 26.1% of the extent they would otherwise dominate any
+ * percentile high enough to be useful.
+ *
+ * Falls back to the full span when there is no ground at all, which cannot
+ * happen on a real artefact and should not divide by zero if it does.
+ */
+export function groundRange(elevationM: Float32Array): { minM: number; maxM: number } {
+  const ground: number[] = [];
+  for (let cell = 0; cell < elevationM.length; cell += 1) {
+    const metres = elevationM[cell]!;
+    if (metres < BARRIER_FLOOR_M) ground.push(metres);
+  }
+  if (ground.length === 0) return { minM: 0, maxM: 1 };
+
+  ground.sort((a, b) => a - b);
+  const at = (p: number) => ground[Math.min(ground.length - 1, Math.floor(ground.length * p))]!;
+  const minM = at(RAMP_LOW_PERCENTILE);
+  const maxM = at(RAMP_HIGH_PERCENTILE);
+  // A perfectly flat extent would give an empty span; shade() handles it, but
+  // returning a usable one keeps the caller from having to know that.
+  return maxM > minM ? { minM, maxM } : { minM, maxM: minM + 1 };
+}
 
 /**
  * Read the scene's elevation array into a raster the map can shade.
@@ -110,15 +183,11 @@ export async function loadTerrain(
   }
 
   const elevationM = new Float32Array(cells);
-  let minM = Infinity;
-  let maxM = -Infinity;
   for (let cell = 0; cell < cells; cell += 1) {
-    const metres = centimetres[cell]! / scale!;
-    elevationM[cell] = metres;
-    if (metres < minM) minM = metres;
-    if (metres > maxM) maxM = metres;
+    elevationM[cell] = centimetres[cell]! / scale!;
   }
 
+  const { minM, maxM } = groundRange(elevationM);
   return { cols: cols!, rows: rows!, elevationM, minM, maxM };
 }
 
