@@ -16,7 +16,7 @@ Say this, in this order:
 
 > DrainLens lets a resident of a flood-prone Melbourne street search their address, see the drainage under it, and compare what changes if a nearby drain is blocked.
 >
-> It has three parts. An **offline Python pipeline** reads a LiDAR point cloud and the council's drainage records and produces a small set of static artefacts. A **browser application** in React and TypeScript loads those artefacts and draws them on a canvas. A **scenario engine**, a separate TypeScript package with no DOM, routes water over the terrain in a Web Worker and returns a comparison.
+> It has three parts. An **offline Python pipeline** reads a photogrammetric point cloud — not LiDAR, which matters because a camera cannot see the ground under a tree — and the council's drainage records and produces a small set of static artefacts. A **browser application** in React and TypeScript loads those artefacts and draws them on a canvas. A **scenario engine**, a separate TypeScript package with no DOM, routes water over the terrain in a Web Worker and returns a comparison.
 >
 > There is no application server in Iteration 1, and that is a decision rather than a gap. I can explain why.
 
@@ -66,7 +66,7 @@ The full reasoning, including the forbidden-key list that will bind the backend 
 tools/perf/                  The deployment measurement, before and after.
 
 pipeline/                    Python. Never deployed. Produces artefacts.
-  las.py         ground.py         → bare-earth surface from LiDAR
+  las.py         ground.py         → bare-earth surface from the cloud
   hydrology.py   footprints.py     → depressions, conditioning, D8 routing
   network.py     derived.py        → map geometry, surface-water layers
   addresses.py   scene.py          → address index, browser scene pack
@@ -235,7 +235,7 @@ Nothing here is deployed. It runs on a laptop and writes files. A mentor may sti
 
 | Stage | Module | What it does |
 |---|---|---|
-| 1 | `archive.py`, `las.py` | Range-reads the LiDAR archive; parses LAS 1.2 point formats 0–3 by hand |
+| 1 | `archive.py`, `las.py` | Range-reads the point-cloud archive; parses LAS 1.2 point formats 0–3 by hand. **LAS is the container, not the sensor** — this cloud is photogrammetric |
 | 2 | `ground.py` · `build_ground_surface()` | **SMRF** — removes buildings and trees, leaving bare earth |
 | 3 | `footprints.py` · `barrier_mask()` | Council building footprints, rasterised as flow barriers |
 | 4 | `hydrology.py` · `find_depressions()` | Priority-flood fill on the **raw** surface |
@@ -336,7 +336,7 @@ A pipe with no recorded diameter is drawn at the minimum and labelled, never at 
 ## 5 · The data flow, end to end
 
 ```
-LiDAR archive          council open data
+point-cloud archive    council open data
       │                        │
       └────────┬───────────────┘
                ▼
@@ -414,7 +414,7 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **472**, 23 files, **3.6 s** here · **5 s on the CI runner** |
+| TypeScript tests | **472**, 23 files, **3.6 s** here · **5 s on the CI runner, three samples** |
 | Python tests | **332**, **105 s** here · **51–66 s on the CI runner** — over the 5 s gate either way, see below |
 | TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions |
 | Python coverage | **91.05%** |
@@ -422,7 +422,7 @@ What the mentor can check in the repository, and what lives outside it.
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 
-> The Node suite runs in 3.6 s with coverage here and **about 5 s on the CI runner, which is at the gate rather than inside it**. The Python suite takes 105 s here and 51–66 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
+> The Node suite runs in 3.6 s with coverage here and **about 5 s on the CI runner, which is at the gate rather than inside it**. The Python suite takes 105 s here and 51–67 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
 
 Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 
@@ -434,6 +434,8 @@ Interaction criteria: **77 of 77 met**, each checked against the code on 29 Augu
 |---|---:|---:|
 | First visit, p95 | 34.5 ms | **507.7 ms** |
 | Transfer | 1.37 MB (21%) | **1.36 MB (21%)** |
+
+Re-measured after the 1 September redeployment: **p95 692.4 ms, 1.36 MB (21%), 0 of 60 failures.** The transfer did not move, because the difference layer ships no artefact — it is computed in the worker from arrays already on the wire.
 | Fetch failures | 0 of 1,200 | **0 of 360** |
 
 **Do not present that as a regression.** The "before" is a laptop against `localhost` with no network in it — a floor, and labelled as one before the deployment existed. The "after" is Melbourne to Sydney and back. The comparable figure is the transfer: 1.37 against 1.36 MB at the same ratio, which is what proves gzip actually reaches the client rather than being read off a header.
@@ -485,7 +487,7 @@ Fill this in before Tuesday. The person who wrote a piece is asked first; if the
 
 | Area | Files | Primary | Backup |
 |---|---|---|---|
-| Offline pipeline — LiDAR, ground filter | `pipeline/las.py`, `ground.py` | | |
+| Offline pipeline — point cloud, ground filter | `pipeline/las.py`, `ground.py` | | |
 | Offline pipeline — hydrology, derived layers | `pipeline/hydrology.py`, `derived.py` | | |
 | Scenario engine | `packages/scenario/` | | |
 | Shared schema | `packages/schema/` | | |

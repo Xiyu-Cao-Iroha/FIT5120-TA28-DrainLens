@@ -1,4 +1,5 @@
-# DrainLens on Cloud Run: nginx serving fourteen static files.
+# DrainLens on Cloud Run: nginx serving fourteen static files — eleven artefacts,
+# index.html and two hashed bundles.
 #
 # There is no application server. The map, the terrain, the drainage network
 # and the address index are build products, and the scenario engine runs in

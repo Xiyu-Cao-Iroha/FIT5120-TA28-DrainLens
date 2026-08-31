@@ -170,6 +170,8 @@ Open it on the same pit, then on one the record connects nothing to.
 | 2.2.1.a | Open **"How this result was produced"**. It must say the same rainfall was run twice, once with every drain clear — that is the baseline, and it is the only place the UI can show it | | |
 | 2.2.1.b | The same panel must say both conditions used the **same** amount | | |
 | 2.2.1.c | The **difference** is what is shown — no absolute depth anywhere | | |
+| | **On pit 1363621 a violet patch appears on the map, just north of the pin.** The panel promises highlighted areas; check they are there | | |
+| | On a pit that reports *No clear difference*, the panel says *"no difference is drawn on the map for this result"* and **nothing is painted**. Both directions matter | | |
 | 2.2.1.d | The selected pit **and its downstream path** stay visible on the map | | |
 | 2.2.1.e | The band is *No clear change* or *Higher than baseline* | | |
 | 2.2.1.f | Where the data cannot support a comparison, *Insufficient information* appears instead of a band — tested properly in section 8 | | |
