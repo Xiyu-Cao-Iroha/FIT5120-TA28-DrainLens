@@ -118,7 +118,7 @@ Three ways to go:
 
 ## 3 · The Python test suite breaches our own runtime gate — **DECIDED: record it honestly**
 
-The team committed to **suites under five seconds**. On the CI runner Node measures about 5 s — at the gate, not inside it — and Python 66 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
+The team committed to **suites under five seconds**. On the CI runner Node measured 5 s in both available samples — at the gate, not inside it — and Python 51–66 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
 
 The remaining time is almost entirely `test_terrain.py`, where nineteen tests each build a real 1000 × 1000 grid: **65 of the 71 seconds**, with the whole rest of the suite at six. That is inherent to what they check — and it means splitting them out would still not reach the five-second gate.
 

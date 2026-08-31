@@ -414,15 +414,15 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **454**, 21 files, **3.6 s** here · **≈ 5 s on the CI runner** |
-| Python tests | **332**, **105 s** here · **66 s on the CI runner** — over the 5 s gate either way, see below |
+| TypeScript tests | **454**, 21 files, **3.6 s** here · **5 s on the CI runner, twice** |
+| Python tests | **332**, **105 s** here · **51–66 s on the CI runner** — over the 5 s gate either way, see below |
 | TypeScript coverage | **92.8%** statements · 93.5% branches · 95.5% functions |
 | Python coverage | **91.05%** |
 | Source lines, excluding tests | ~17,000 |
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 
-> The Node suite runs in 3.6 s with coverage here and **about 5 s on the CI runner, which is at the gate rather than inside it**. The Python suite takes 105 s here and 66 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
+> The Node suite runs in 3.6 s with coverage here and **about 5 s on the CI runner, which is at the gate rather than inside it**. The Python suite takes 105 s here and 51–66 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
 
 Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 

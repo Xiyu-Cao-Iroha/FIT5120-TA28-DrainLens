@@ -72,7 +72,7 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
 | Coverage, overall | ≥ 88% | **92.8%** Node · **91.05%** Python |
-| Suite runtime | < 5 s | **Node ≈ 5 s on the CI runner — at the limit** · **Python 66 s ✗**. See below |
+| Suite runtime | < 5 s | **Node 5 s on the CI runner — at the limit** · **Python 51–66 s ✗**. See below |
 | Tests | 454 TypeScript · 332 Python | 786 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
@@ -85,11 +85,11 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 >
 > | | this laptop | GitHub runner |
 > |---|---|---|
-> | Node, with coverage | 3.6 s | **≈ 5 s** |
-> | Python, with coverage | 105 s | **66 s** |
+> | Node, with coverage | 3.6 s | **5 s, twice** |
+> | Python, with coverage | 105 s | **51 s and 66 s** |
 > | Python, without | 71 s | — |
 >
-> The runner figures are step timestamps at one-second resolution, so the Node one is 5 s give or take a second — which is to say **the Node suite is at the gate, not comfortably inside it**, and the margin the prose used to claim is not there. The runner is faster than this laptop at Python and slower at Node, because the Node run is mostly start-up and transform rather than tests.
+> The runner figures are step timestamps at one-second resolution, from the two runs this branch's pull request triggered. Python moved 15 s between them, which is why it is a range and not a figure; Node came out at 5 s both times, which is the more useful result — **the Node suite is at the gate, not comfortably inside it**, and the margin the prose used to claim is not there. The runner is faster than this laptop at Python and slower at Node, because the Node run is mostly start-up and transform rather than tests.
 >
 > Two lessons, and the second is the one that was nearly missed: measure the command CI runs, not a faster one that resembles it — and do not report your own machine's clock as CI's.
 
