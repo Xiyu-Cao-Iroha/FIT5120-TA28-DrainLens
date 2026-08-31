@@ -9,6 +9,10 @@
  * two numbers comparable.
  */
 
+import http from 'node:http';
+import https from 'node:https';
+import zlib from 'node:zlib';
+
 /** Artefacts the application fetches by fixed path. */
 const FIXED = [
   '/data/map.json',
@@ -16,6 +20,9 @@ const FIXED = [
   '/data/trace.json',
   '/data/addresses.json',
 ];
+
+
+
 
 export async function criticalPath(base) {
   const html = await (await fetch(base + '/')).text();
@@ -58,16 +65,62 @@ export async function criticalPath(base) {
 export const percentile = (sorted, p) =>
   sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))];
 
-export async function timeOne(base, path) {
-  const started = performance.now();
-  const response = await fetch(base + path, { headers: { 'accept-encoding': 'gzip' } });
-  const body = await response.arrayBuffer();
-  return {
-    ms: performance.now() - started,
-    status: response.status,
-    // Node's fetch decompresses transparently, so the decoded length is not
-    // what crossed the wire. The header is.
-    wireBytes: Number(response.headers.get('content-length') ?? body.byteLength),
-    decodedBytes: body.byteLength,
-  };
+/**
+ * One request, timed, with the bytes that actually crossed the wire.
+ *
+ * Counted off the socket rather than read from `content-length`. The first
+ * version trusted that header, which is correct only when the server knows
+ * the compressed length in advance: a server that pre-compresses sends it,
+ * and nginx compressing on the fly sends chunked with no length at all. Run
+ * against nginx, the header was absent, the fallback used the decoded size,
+ * and the tool reported **6.42 MB at a 100% ratio for a response that was
+ * gzipped the whole time**.
+ *
+ * That is worse than a wrong number. This script exists so a "before" and an
+ * "after" are the same measurement, and a figure that depends on which server
+ * answered is not one.
+ */
+export function timeOne(base, path) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(base + path);
+    const transport = url.protocol === 'https:' ? https : http;
+    const started = performance.now();
+
+    const req = transport.request(
+      url,
+      { headers: { 'accept-encoding': 'gzip' } },
+      (res) => {
+        let wireBytes = 0;
+        let decodedBytes = 0;
+        res.on('data', (chunk) => {
+          wireBytes += chunk.length;
+        });
+
+        const done = () =>
+          resolve({
+            ms: performance.now() - started,
+            status: res.statusCode,
+            wireBytes,
+            decodedBytes: decodedBytes || wireBytes,
+          });
+
+        if (String(res.headers['content-encoding'] ?? '').includes('gzip')) {
+          const gunzip = zlib.createGunzip();
+          gunzip.on('data', (chunk) => {
+            decodedBytes += chunk.length;
+          });
+          gunzip.on('end', done);
+          gunzip.on('error', reject);
+          res.pipe(gunzip);
+        } else {
+          res.on('end', done);
+        }
+      },
+    );
+
+    req.on('error', reject);
+    req.setTimeout(30_000, () => req.destroy(new Error(`timed out: ${path}`)));
+    req.end();
+  });
 }
+
