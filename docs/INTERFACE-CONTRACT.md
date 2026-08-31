@@ -122,6 +122,8 @@ Listed because each looks like a natural thing to move, and each would break som
 
 **The downstream trace.** `trace/graph.ts` walks the shipped artefact in memory. It is a graph traversal over 895 pits; a round trip to ask a server which pipe comes next would be slower than the answer and would tell that server which drain outside somebody's house they are looking at.
 
+**What crosses the worker boundary.** The engine produces a band for each of the 1,000,000 cells; the worker replies with a summary band, a count, and the **cells that differ** — 652 for the demonstration pit, so a few kilobytes rather than a few megabytes, capped at 60,000 so a future artefact whose hollows connect cannot post an unbounded message. They cross **already converted to local metres**, on the side the grid lives on. That is not a style preference: the one time this repository carried a cell index across a boundary and rebuilt the coordinate on the other side, all 895 drains disagreed with the scene and every comparison returned `invalid_inlet`. None of this is a network request — it is a `postMessage` inside the tab, so it carries no address, no identity and nothing that could reach a server.
+
 **The scenario engine.** `@drainlens/scenario` runs in a Web Worker over the shipped scene. Moving it server-side would mean sending the selected pit and rainfall — survivable — but the reason to keep it local is that the answer must be reproducible from artefacts anyone can check, and a service that could quietly change its assumptions between two runs breaks AC 2.2.
 
 **The photo classification.** AD10. The photograph never leaves the device.

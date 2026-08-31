@@ -93,7 +93,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 
 - [x] Vite + React + TypeScript shell, rendering the real map geometry. **No MapLibre** — see the note below
 - [x] **Session state in memory only** — address, task and scenario inputs held for the tab, written to no `localStorage` key, no `sessionStorage` key, no URL and no history state beyond a screen id → *1.1.1.e, 1.1.5*. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie`, plays a whole session and asserts nothing was written; sneaking a `setItem` into the address branch fails the suite
-- [ ] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*  *(blocked on the address index, W1)*
+- [x] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*. Verified on the **deployed** build, 1 Sep: typing a full address adds **zero** network requests to the seven the page loads with, and `localStorage`, `sessionStorage`, cookies, the URL and `history.state` are all empty of it
 - [x] **Task-selection page** with the three named options → *1.1.1.b, 1.1.1.c*
 - [x] **Unsupported-address path** — explain, do not fabricate, allow another address → *1.1.4*
 
@@ -192,7 +192,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 92.75% Node · 91.05% Python. **Node 5 s on the runner — at the limit · Python 51–66 s ✗**. Locally 3.6 s and 105 s |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 92.75% Node · 91.05% Python. **Node 5 s on the runner — at the limit · Python 51–67 s ✗**. Locally 3.6 s and 105 s |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |
