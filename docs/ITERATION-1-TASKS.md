@@ -54,15 +54,15 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Demonstration address and extent fixed** — Kensington, 46 Gatehouse Drive, four tiles. Stated as data in `pipeline/geo.py` and reasoned in [DEMO-EXTENT.md](./DEMO-EXTENT.md)
 - [x] **Tiles on disk** — `python -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud` brings back 81.5 MB of the 4.33 GB archive. 6.6 M points over the square kilometre
 - [x] **Drainage graph artefact** — self-loops excluded, directed graph from `upstr_pit`/`dnstr_pit`, cycles recorded, narrowing indicator, inlet classification → *1.2.1, 1.2.2, 1.3.1.c*
-- [ ] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*  *(all 63,721 addresses already exported while choosing the extent)*
-- [ ] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
+- [~] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*. **A fixture is shipping**: the real street names from the map artefact and the two real recorded demonstration addresses, declared as `address-index-fixture` so it cannot be mistaken for the real one. The real build is `python -m drainlens_pipeline.addresses`, blocked only on the portal's rate limit
+- [x] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
 - [x] **Ground-surface filtering** — confirmed necessary by D2. SMRF, written against numpy and scipy rather than PDAL, which will not install on the team's machines. Window set to 26 m by measuring the extent, not by taste; the under-canopy limitation is in `DERIVATION_NOTE` and travels with the artefact
 - [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid, 52.1% of cells measured after the footprint correction, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
 - [x] **Depressions characterised on the raw surface** → 486 hollows holding 31,364 m³ on the surface as published. Cut at 0.25 m: the source quotes 25 cm accuracy and the median untrimmed hollow is 5 cm, so most of the 8,472 raw hollows are the surface's own noise. The four largest sit at 0.4–2.3 m AHD, the Kensington Banks flats → *2.2.1*
 - [x] **Conditioning on a separate surface** → D8 flow-direction grid. Zero interior dead ends; all 998,594 directed cells point strictly downhill, so no trace can cycle → *1.1.2.b, 2.2.1*
 - [x] **Building footprints** as no-flow barriers — `2020-building-footprints`, CC BY, 258,754 barrier cells. Also the repair for the filter's blind spot: 20,311 roof cells it had kept as ground. The two sources agree 92.2% one way and only 51.9% the other, which is the measured reason the object mask is not a substitute — half of it is canopy, and water flows under trees
 - [x] **Pit and pipe geometry** → `python -m drainlens_pipeline.network`. 220 road polygons, 893 pipes, 895 pits, 163 street labels in 318 KB, as local metres so no projection runs in the browser. Streets come from the City's road-corridor polygons, so nothing at runtime needs a third-party tile server → *1.1.2.b, 1.1.3.b*
-- [ ] **Coverage mask** — which cells the terrain artefacts actually cover, so the engine can tell "no clear change" from "we have nothing here" → *2.2.1.f, 2.3.2*
+- [x] **Coverage mask** — which cells the terrain artefacts actually cover, so the engine can tell "no clear change" from "we have nothing here" → *2.2.1.f, 2.3.2*
 - [ ] **Data manifest** — per source: name, licence, capture date, modified date, coverage, record count, derivation → *1.1.3.d, 1.2.1.c, 2.3.1.c*
 - [ ] **Assumption register** — capture fraction, window size, rainfall distribution, operator fallback, minimum covered fraction, arrival-time exclusion, and the two AD13 statements the interface must be able to quote → *2.1.2.d, 2.3.1.d*
 
@@ -82,10 +82,10 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] `No clear change` and `Insufficient information` kept distinct in the shared vocabulary → *2.2.1.e, 2.2.1.f*
 - [x] A missing downstream connection travels as a network limitation, not an insufficiency → *2.2.1.f*
 - [x] **Data-sufficiency gate** — `SuccessfulComparison` or `InsufficientInformation` with four named reasons, applied in order → *2.2.1.f, 2.2.3, 2.3.2.c*
-- [ ] Web Worker wrapper; run once on **Run comparison**, cache all positions; the control reads cache only → *2.2.1, 2.2.2*
-- [ ] Capture-fraction sensitivity at half, one and two times → decides whether the interface may report three result categories or two
-- [ ] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result, once it exists → *2.2.3.b*
-- [ ] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
+- [x] Web Worker wrapper; run once on **Run comparison**, cache all positions; the control reads cache only → *2.2.1, 2.2.2*
+- [x] Capture-fraction sensitivity → **run, and it closed the question rather than answering it the expected way.** Zero of forty inlets show any difference at 15%, 30%, 60% or 90% capture — a six-fold range with no effect, so tuning this assumption cannot produce a result. Blocking the hundred inlets nearest a point raises water 5.6 mm and puts no cell over the threshold; only losing all 475 does anything visible. **The interface reports two bands, and the result screen now explains why.** See [DECISIONS-PENDING.md](./DECISIONS-PENDING.md)
+- [~] Tighten `comparison_not_comparable` with the capture-fraction sensitivity result → *2.2.3.b*. The sensitivity is measured and says the fraction does not move the outcome, so there is nothing to tighten against — the check stays as the mass-balance guard it already is
+- [x] Bare-earth and barrier check — water is neither routed across rooftops nor through building interiors
 
 ## W3 · Frontend
 
@@ -94,8 +94,8 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] Vite + React + TypeScript shell, rendering the real map geometry. **No MapLibre** — see the note below
 - [x] **Session state in memory only** — address, task and scenario inputs held for the tab, written to no `localStorage` key, no `sessionStorage` key, no URL and no history state beyond a screen id → *1.1.1.e, 1.1.5*. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie`, plays a whole session and asserts nothing was written; sneaking a `setItem` into the address branch fails the suite
 - [ ] Address search against the local index, no network request → *1.1.1.a, 1.1.1.d, 1.1.1.e*  *(blocked on the address index, W1)*
-- [ ] **Task-selection page** with the three named options → *1.1.1.b, 1.1.1.c*
-- [ ] **Unsupported-address path** — explain, do not fabricate, allow another address → *1.1.4*
+- [x] **Task-selection page** with the three named options → *1.1.1.b, 1.1.1.c*
+- [x] **Unsupported-address path** — explain, do not fabricate, allow another address → *1.1.4*
 
 > **MapLibre was dropped, deliberately.** The extent is a fixed square kilometre, north-up, and the pipeline ships its geometry in metres from the extent corner — so there is no global projection, no tile pyramid, no level-of-detail switching and no third-party basemap. What is left is an affine transform and a draw call. MapLibre is several hundred kilobytes solving problems this product does not have, and the streets come from the City's own road-corridor polygons, so nothing at runtime depends on a tile server being up or licensed.
 >
@@ -106,27 +106,30 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Canvas renderer** — roads, pipes, pits and street labels on the real Kensington geometry. Pan, zoom anchored on the cursor, and clamping so the canvas is never full of blank space outside the pilot area
 - [x] **Hit testing** — tap a pit or a pipe. Measured in screen pixels, not metres, so the target does not shrink exactly when the map is zoomed out and a pit is hardest to hit. Pits win ties, because every pit sits on the end of a pipe and pipes would otherwise shadow the whole layer
 - [x] **Street labels** — one per street at its longest visible run, colliding labels dropped rather than overdrawn. The source names every segment and Kensington's blocks are short, so drawing them all wrote the same name six times across four centimetres
-- [ ] Follow-local-water view: surface-water paths and pits **by default**, one next-step instruction, other layers in a **collapsed** section → *1.1.2*
-- [ ] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
-- [ ] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*
-- [ ] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*
-- [ ] Hand-authored SVG street cross-section, depth only where supported, no capacity claim → *1.3.1*
-- [ ] **Cross-section unavailable state** — say which information is missing rather than filling it → *1.3.2*
+- [x] **Plain-English explanation of where water near the address may move** — measured against the derived layers beside it rather than written as a caption, rounded to ten metres because the surface cannot support finer, and silent when nothing derived is within 150 m → *1.1.2.c*
+- [x] **Ground-surface layer** — the elevation raster painted once and drawn under everything, with its own control. Until now the map drew over a flat colour, which was the one thing on screen implying the ground is level → *1.1.3.b*
+- [x] Follow-local-water view: surface-water paths and pits **by default**, one next-step instruction, other layers in a **collapsed** section → *1.1.2*
+- [x] **Address marker** — the map opens centred on the selected address and marks it, clamped so an address near the boundary never opens onto ground outside the pilot area → *1.1.2.a, 1.1.3.a*
+- [x] Full-map view: layer controls, individual toggles, recorded versus derived distinguished → *1.1.3*
+- [x] **Pit detail panel** — recorded information, labelled as official recorded data, with the follow-downstream action → *1.2.1*. Fields the record leaves empty say **Not recorded** rather than showing a blank, and depth is declared absent rather than interpolated
+- [x] **Trace UI** — highlight, direction, termination reason, branch fan-out shown as multiple paths, gaps shown as gaps → *1.2.2*. Direction is read from the topology, not from vertex order, which carries no meaning in the source
+- [x] Hand-authored SVG street cross-section, depth only where supported, no capacity claim → *1.3.1*. Depth is supported nowhere, so the vertical axis is labelled illustrative **inside the figure**; horizontal is recorded, vertical is drawn
+- [x] **Cross-section unavailable state** — say which information is missing rather than filling it → *1.3.2*. 169 of 895 pits, and it says the gap is in the record rather than evidence no pipe exists
 
 ### Scenario
 
-- [ ] Scenario setup in the required order, pit carried over only if the user chose it, suggestions labelled and unconfirmed, blockage **unselected** by default → *2.1.1*
-- [ ] Setup inputs with the two required explanations — **the blockage setting is an assumption, not an observed condition**, and **the rainfall is a user-selected assumption, not an observation or forecast** → *2.1.2.d, 2.1.2.e*
-- [ ] Scenario summary before running → *2.1.2.f*
-- [ ] Difference view by default; pit and downstream path stay visible → *2.2.1.c, 2.2.1.d*
-- [ ] Result categories: **No clear change** and **Higher than baseline** as bands; **Insufficient information** as a whole-result state with its reason → *2.2.1.e, 2.2.1.f, 2.2.3*
-- [ ] Rainfall control in millimetres, with the "not when water will reach a location" wording → *2.2.2*
-- [ ] Back to setup from a result, inputs intact → *2.2.4*
+- [x] Scenario setup in the required order, pit carried over only if the user chose it, suggestions labelled and unconfirmed, blockage **unselected** by default → *2.1.1*
+- [x] Setup inputs with the two required explanations — **the blockage setting is an assumption, not an observed condition**, and **the rainfall is a user-selected assumption, not an observation or forecast** → *2.1.2.d, 2.1.2.e*
+- [x] Scenario summary before running → *2.1.2.f*
+- [x] Difference view by default; pit and downstream path stay visible → *2.2.1.c, 2.2.1.d*
+- [x] Result categories: **No clear change** and **Higher than baseline** as bands; **Insufficient information** as a whole-result state with its reason → *2.2.1.e, 2.2.1.f, 2.2.3*
+- [x] Rainfall control in millimetres, with the "not when water will reach a location" wording → *2.2.2*. Buttons rather than a slider, because these are the positions the engine solved and a slider would imply a continuum nothing computed. Reads the run's cache, so moving it cannot re-solve and cannot disagree with itself
+- [x] Back to setup from a result, inputs intact → *2.2.4*
 - [ ] Remaining back and rerun paths → *UI definition of done, covered by Playwright*
-- [ ] Result explanation panel → *2.3.1.a, 2.3.1.b, 2.3.1.f*
-- [ ] **Provenance display** — recorded data, system-derived results and user assumptions visually separated, driven by the basis carried with each value → *1.1.3.d, 1.2.1.c, 2.3.1.c*
-- [ ] Assumptions and uncertainty surfaced from the assumption register → *2.3.1.d, 2.3.1.e*
-- [ ] Unclear-result explanation → *2.3.2*
+- [x] Result explanation panel → *2.3.1.a, 2.3.1.b, 2.3.1.f*
+- [x] **Provenance display** — recorded data, system-derived results and user assumptions visually separated, driven by the basis carried with each value → *1.1.3.d, 1.2.1.c, 2.3.1.c*
+- [~] Assumptions and uncertainty surfaced → *2.3.1.d, 2.3.1.e*. The four that matter are on screen with their measured figures. They are **written in `outcome.ts` rather than read from an assumption register**, because the register does not exist yet — when it does, this is the display that should read from it
+- [x] Unclear-result explanation → *2.3.2*
 - [ ] Desktop and mobile layouts → *Epic 1 DoD*
 
 ## W4 · Deployment, CI and quality
@@ -135,10 +138,10 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] CI: `npm ci` then `npm run check` on every pull request, plus the Python suite
 - [x] Artefact contract published in `packages/schema`
 - [ ] Required approvals raised from 0 to 1 once collaborators are added
-- [ ] Cloud Storage + Cloud CDN for artefacts; confirm range requests pass through (PMTiles depends on them)
-- [ ] Cloud Run behind the load balancer; one URL map, one origin
-- [ ] **Log exclusion filter covering both** load balancer and Cloud Run request logs
-- [ ] Record p95 latency and external-fetch failure rate **before and after** every deployment
+- [~] Cloud Storage + Cloud CDN for artefacts — **the runbook and upload script are written** ([deploy/](../deploy/README.md)), not yet run against a project. The range-request line is withdrawn: it was written when the map was expected to be tiled, and tiling was dropped after the whole extent measured 1.27 MB gzipped. Nothing here uses range requests, which is as well — Cloud Storage's gzip transcoding and range requests do not combine
+- [—] Cloud Run behind the load balancer — **withdrawn for Iteration 1.** There is no `apps/api` to containerise. Reasonable again as an Iteration 2 target if AI inference moves off the device; see [deploy/README.md](../deploy/README.md)
+- [~] **Log exclusion filter** — **there is nothing to filter on this architecture, and that is the finding.** Load balancer request logs are off by default on a backend bucket, and Cloud Storage access logs are opt-in, so AD1 is kept by never enabling them rather than by filtering afterwards. Cloud Monitoring metrics carry no IP and stay. The filter becomes mandatory the day `apps/api` reaches Cloud Run, because Cloud Run logs requests — with `remoteIp` — by default. Verification commands in [deploy/README.md](../deploy/README.md), which assert the absence rather than assume it
+- [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken** — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 40.8 ms for the whole first visit, 0.00% failures, 1.31 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
 - [ ] Probe every external dependency **from the deployment host, not a laptop**
 - [ ] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working
 
@@ -189,7 +192,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 99% Node · 99% Python · 1.7 s |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 91.4% Node · 91.4% Python. **Node 1.4 s ✓, Python 55 s ✗** |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |
@@ -197,7 +200,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | ≥8 hours cross-discipline pair programming | Friday, Sunday | — |
 | Critical defects triaged within 24 h, resolved within the iteration | Continuous | — |
 | External dependencies probed from the deployment host | Monday | — |
-| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | — |
+| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | **before taken** — 40.8 ms p95, 0.00% failures |
 | Manual click-through in a real browser before the demo | Monday, Tuesday | — |
 
 ---

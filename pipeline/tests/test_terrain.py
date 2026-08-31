@@ -194,12 +194,24 @@ class TestWrite:
 
 
 class TestMain:
+    """`--no-footprints` is not a convenience here; it is what keeps these
+    tests offline.
+
+    Both of these passed for a while without it, because the footprint fetch
+    happened to reach the portal. That is a unit test quietly depending on a
+    third-party service: it passes until somebody runs the suite on a train, or
+    the publisher rate-limits the address behind it, and then it fails for a
+    reason that has nothing to do with the code under test. Which is exactly
+    what happened.
+    """
+
     def test_builds_and_writes_from_the_command_line(self, tile_dir, tmp_path, capsys):
         out = tmp_path / "terrain"
         code = terrain.main(
             [
                 "--tiles", str(tile_dir),
                 "--out", str(out),
+                "--no-footprints",
                 "--extent", *(str(v) for v in (EXTENT.min_e, EXTENT.min_n, EXTENT.max_e, EXTENT.max_n)),
             ]
         )
@@ -211,4 +223,33 @@ class TestMain:
         # Nobody should have to remember four six-digit numbers to rebuild the
         # thing the demonstration runs on.
         with pytest.raises(FileNotFoundError, match="Tile_"):
-            terrain.main(["--tiles", str(tmp_path), "--out", str(tmp_path / "out")])
+            terrain.main(["--tiles", str(tmp_path), "--out", str(tmp_path / "out"), "--no-footprints"])
+
+    def test_says_when_it_is_routing_without_barriers(self, tile_dir, tmp_path, capsys):
+        # A build with no footprints lets water cross buildings. That is a
+        # legitimate way to run it and an illegitimate thing to do silently.
+        terrain.main(
+            [
+                "--tiles", str(tile_dir),
+                "--out", str(tmp_path / "terrain"),
+                "--no-footprints",
+                "--extent", *(str(v) for v in (EXTENT.min_e, EXTENT.min_n, EXTENT.max_e, EXTENT.max_n)),
+            ]
+        )
+        assert "no barriers" in capsys.readouterr().err
+
+    def test_no_test_in_this_file_reaches_the_network(self, tile_dir, tmp_path, monkeypatch):
+        # The guard for the failure above. A trap rather than a convention,
+        # because a convention is what let the fetch in.
+        def refuse(*args, **kwargs):
+            raise AssertionError("a test in this file tried to open a network connection")
+
+        monkeypatch.setattr("urllib.request.urlopen", refuse)
+        terrain.main(
+            [
+                "--tiles", str(tile_dir),
+                "--out", str(tmp_path / "terrain"),
+                "--no-footprints",
+                "--extent", *(str(v) for v in (EXTENT.min_e, EXTENT.min_n, EXTENT.max_e, EXTENT.max_n)),
+            ]
+        )

@@ -30,3 +30,6 @@ __pycache__/
 .coverage
 .coverage.*
 .pytest_cache/
+
+# A slide deck is a build product of a meeting, not of this repository.
+docs/*.pptx
