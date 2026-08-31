@@ -1,6 +1,8 @@
 # Deployment baseline — the "before" measurement
 
-DrainLens · TA28 · taken **30 August 2026**, before any deployment exists
+DrainLens · TA28 · **re-taken 31 August 2026**, before any deployment exists
+
+> Taken once on 30 August against a 1.31 MB payload, then **re-taken** when the address index was replaced. The fixture held two addresses and 3 KB; the real index holds 4,089 and 66 KB over the wire. A "before" measured against a payload the site no longer ships is not a before, so the numbers below are the ones the "after" must be compared with.
 
 W4 requires p95 latency and the external-fetch failure rate recorded **before and after** every deployment. The "after" can be taken whenever. **The "before" cannot be taken retrospectively**, which is the only reason this document exists now rather than after the site is up.
 
@@ -48,18 +50,17 @@ node tools/perf/measure.mjs http://localhost:8099 100
 
 | Resource | p50 | p95 | max | wire (gzip) |
 |---|---:|---:|---:|---:|
-| `/` | 1.29 | 2.47 | 4.91 | 231 |
-| `assets/index-*.js` | 3.50 | 5.50 | 6.72 | 81,908 |
-| `assets/worker-*.js` | 1.11 | 1.52 | 6.89 | 3,764 |
-| `data/map.json` | 3.26 | 5.66 | 13.63 | 54,897 |
-| `data/derived.json` | 2.46 | 4.21 | 20.69 | 41,853 |
-| `data/trace.json` | 1.11 | 2.19 | 4.18 | 7,210 |
-| `data/addresses.json` | 0.87 | 1.30 | 3.58 | 1,592 |
-| `data/scene/scene.json` | 1.49 | 2.03 | 4.03 | 16,396 |
-| **`data/scene/elevation.bin`** | **19.31** | **28.14** | 87.26 | **812,867** |
-| `data/scene/flow.bin` | 8.63 | 16.19 | 127.64 | 305,822 |
-| `data/scene/depressions.bin` | 9.10 | 14.02 | 33.90 | 47,328 |
-| `data/scene/coverage.bin` | 1.42 | 2.84 | 4.91 | 156 |
+| `assets/index-*.js` | 2.76 | 4.49 | 8.47 | 81,909 |
+| `assets/worker-*.js` | 0.89 | 1.36 | 2.62 | 3,764 |
+| `data/map.json` | 2.49 | 3.68 | 10.25 | 54,897 |
+| `data/derived.json` | 1.93 | 3.33 | 16.01 | 41,853 |
+| `data/trace.json` | 0.94 | 1.92 | 4.97 | 7,210 |
+| `data/addresses.json` | 4.34 | 9.02 | 11.43 | 66,404 |
+| `data/scene/scene.json` | 1.51 | 3.15 | 4.50 | 16,396 |
+| **`data/scene/elevation.bin`** | **17.42** | **26.35** | 113.00 | **812,867** |
+| `data/scene/flow.bin` | 7.12 | 10.90 | 160.32 | 305,822 |
+| `data/scene/depressions.bin` | 7.32 | 10.85 | 29.50 | 47,328 |
+| `data/scene/coverage.bin` | 1.07 | 1.95 | 5.79 | 156 |
 
 All times in milliseconds.
 
@@ -67,9 +68,9 @@ All times in milliseconds.
 
 | p50 | p95 | max |
 |---:|---:|---:|
-| 30.6 ms | **40.8 ms** | 49.9 ms |
+| 28.6 ms | **34.5 ms** | 40.9 ms |
 
-**Transfer:** 1.31 MB over the wire, expanding to 5.77 MB — a **23%** ratio.
+**Transfer:** 1.37 MB over the wire, expanding to 6.42 MB — a **21%** ratio. The real address index added 65 KB to the wire for 4,087 more addresses.
 
 **Fetch failures:** **0 of 1,200** requests (0.00%).
 
@@ -107,7 +108,7 @@ The local server in `tools/perf/serve.mjs` sets these, and the deployment must m
 | `.js` | `text/javascript` — **a module worker is refused outright at any other type**, and the whole comparison feature goes with it |
 | `.bin` | `application/octet-stream` |
 | `.json` | `application/json` |
-| gzip | required. Without it the first visit is 5.77 MB instead of 1.31 MB |
+| gzip | required. Without it the first visit is 6.42 MB instead of 1.37 MB |
 | `/assets/*` | `max-age=31536000, immutable` — the names are content-hashed |
 | `/data/*` | short max-age. These are **not** hashed, and a rebuilt artefact behind a long cache is a map that silently disagrees with itself |
 

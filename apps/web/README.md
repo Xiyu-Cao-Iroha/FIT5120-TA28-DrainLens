@@ -66,7 +66,7 @@ Everything under `public/data/` is a build product of the Python pipeline, **com
 | `map.json` | 318 KB | `drainlens_pipeline.network` |
 | `derived.json` | 183 KB | `drainlens_pipeline.derived` |
 | `trace.json` | 37 KB | `drainlens_pipeline.trace` |
-| `addresses.json` | 3 KB | `drainlens_pipeline.address_fixture` *(a stand-in — see below)* |
+| `addresses.json` | 678 KB | `drainlens_pipeline.addresses` |
 | `scene/` | 1.28 MB gzipped | `drainlens_pipeline.scene` |
 
 Rebuild one when the extent changes, for example:
@@ -76,7 +76,7 @@ cd pipeline
 ./.venv/Scripts/python.exe -m drainlens_pipeline.network --out ../apps/web/public/data/map.json
 ```
 
-**The address index is a fixture.** It carries the real street names from the map artefact and the two real recorded demonstration addresses; nothing in it is invented, and it declares `artefact: "address-index-fixture"` so it cannot be mistaken for the real one. Replace it with `python -m drainlens_pipeline.addresses` once the portal's rate limit clears.
+**The address index is the real one** — 4,089 addresses across 132 streets, from the council's `street-addresses` dataset. Its `streets` list is deliberately wider than the streets that have addresses: it also carries the map's street names, so a real street just outside the addressed area is told it is outside the pilot rather than told it does not exist.
 
 Each artefact is checked before anything draws it — `assertUsable`, `assertDerived`, `assertTrace`, `assertScene`. Nothing goes on screen without a basis, and an artefact that cannot say where its contents came from cannot be displayed at all. `assertDerived` and `assertTrace` go further and refuse an artefact whose declared basis is the wrong one, because both layers are labelled on screen and a mislabelled basis is a false claim rather than a rendering bug.
 

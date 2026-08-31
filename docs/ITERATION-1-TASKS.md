@@ -54,7 +54,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [x] **Demonstration address and extent fixed** — Kensington, 46 Gatehouse Drive, four tiles. Stated as data in `pipeline/geo.py` and reasoned in [DEMO-EXTENT.md](./DEMO-EXTENT.md)
 - [x] **Tiles on disk** — `python -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud` brings back 81.5 MB of the 4.33 GB archive. 6.6 M points over the square kilometre
 - [x] **Drainage graph artefact** — self-loops excluded, directed graph from `upstr_pit`/`dnstr_pit`, cycles recorded, narrowing indicator, inlet classification → *1.2.1, 1.2.2, 1.3.1.c*
-- [~] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*. **A fixture is shipping**: the real street names from the map artefact and the two real recorded demonstration addresses, declared as `address-index-fixture` so it cannot be mistaken for the real one. The real build is `python -m drainlens_pipeline.addresses`, blocked only on the portal's rate limit
+- [x] Address index — trimmed, prefix-searchable, ships with the site → *1.1.1, 1.1.4*. **The real index is in: 4,089 addresses across 132 streets, 66 KB over the wire.** The fixture is gone. Typing now suggests as you go, which two addresses could not
 - [x] **Pilot-area boundary** the address index can test against, so an unsupported address is recognised rather than guessed → *1.1.4*
 - [x] **Ground-surface filtering** — confirmed necessary by D2. SMRF, written against numpy and scipy rather than PDAL, which will not install on the team's machines. Window set to 26 m by measuring the extent, not by taste; the under-canopy limitation is in `DERIVATION_NOTE` and travels with the artefact
 - [x] Filtered ground surface for the build extent — `python -m drainlens_pipeline.terrain`. 6.6 M points to a 1000 × 1000 m grid, 52.1% of cells measured after the footprint correction, −3.29 to 29.84 m AHD. **Not** called a LiDAR DTM anywhere, and a test fails if that wording appears
@@ -141,7 +141,7 @@ One piece of good news: the 4.33 GB archive serves HTTP range requests and lists
 - [~] Cloud Storage + Cloud CDN for artefacts — **the runbook and upload script are written** ([deploy/](../deploy/README.md)), not yet run against a project. The range-request line is withdrawn: it was written when the map was expected to be tiled, and tiling was dropped after the whole extent measured 1.27 MB gzipped. Nothing here uses range requests, which is as well — Cloud Storage's gzip transcoding and range requests do not combine
 - [—] Cloud Run behind the load balancer — **withdrawn for Iteration 1.** There is no `apps/api` to containerise. Reasonable again as an Iteration 2 target if AI inference moves off the device; see [deploy/README.md](../deploy/README.md)
 - [~] **Log exclusion filter** — **there is nothing to filter on this architecture, and that is the finding.** Load balancer request logs are off by default on a backend bucket, and Cloud Storage access logs are opt-in, so AD1 is kept by never enabling them rather than by filtering afterwards. Cloud Monitoring metrics carry no IP and stay. The filter becomes mandatory the day `apps/api` reaches Cloud Run, because Cloud Run logs requests — with `remoteIp` — by default. Verification commands in [deploy/README.md](../deploy/README.md), which assert the absence rather than assume it
-- [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken** — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 40.8 ms for the whole first visit, 0.00% failures, 1.31 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
+- [~] Record p95 latency and external-fetch failure rate **before and after** every deployment. **The "before" is taken**, and **re-taken on 31 August** when the real address index changed the payload — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md): p95 34.5 ms for the whole first visit, 0.00% failures, 1.37 MB over the wire. Re-run `node tools/perf/measure.mjs <url> 100` after deploying, and say where it was run from
 - [ ] Probe every external dependency **from the deployment host, not a laptop**
 - [ ] Confirm each required cloud API is enabled **individually**, not inferred from a sibling working
 
@@ -200,7 +200,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | ≥8 hours cross-discipline pair programming | Friday, Sunday | — |
 | Critical defects triaged within 24 h, resolved within the iteration | Continuous | — |
 | External dependencies probed from the deployment host | Monday | — |
-| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | **before taken** — 40.8 ms p95, 0.00% failures |
+| p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | **before taken** — 34.5 ms p95, 0.00% failures |
 | Manual click-through in a real browser before the demo | Monday, Tuesday | — |
 
 ---

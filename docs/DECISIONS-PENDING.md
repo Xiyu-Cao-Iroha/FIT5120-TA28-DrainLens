@@ -152,19 +152,19 @@ The product is a static site plus a worker, so hosting is not hard. But **"befor
 
 *The data credit.* **Done on 29 August.** CC BY 4.0 requires the attribution to be visible to the person using the work, and it appeared nowhere on screen — the `publisher` and `licence` fields were in the artefacts and never rendered. There is now a footer on every screen, read from the artefacts so replacing a source updates the credit with it, including the clause most often skipped: **an indication that changes were made**, because the surface-water paths, low points and ground shading are calculated rather than published.
 
-**And the plan itself needs revisiting.** W4 says Cloud Run behind a load balancer, with Cloud Storage and Cloud CDN confirming range requests for PMTiles. That was written when `apps/api` was expected and when the map was expected to be tiled. Neither exists: `apps/api` is not a directory, there is no Dockerfile, CI never builds or deploys, and tiling was dropped after the whole extent measured 1.27 MB gzipped. What there is to deploy is **14 static files, 7.9 MB on disk and 1.51 MB over the wire**.
+**And the plan itself needs revisiting.** W4 says Cloud Run behind a load balancer, with Cloud Storage and Cloud CDN confirming range requests for PMTiles. That was written when `apps/api` was expected and when the map was expected to be tiled. Neither exists: `apps/api` is not a directory, there is no Dockerfile, CI never builds or deploys, and tiling was dropped after the whole extent measured 1.27 MB gzipped. What there is to deploy is **14 static files, 8.5 MB on disk and 1.37 MB over the wire**.
 
 Cloud Run remains reasonable as an *Iteration 2* target for server-side AI — but note AD10 puts the photo classification on the device, and `FORBIDDEN_WIRE_KEYS` forbids `photo`, `image` and `imageData` structurally, so `assertSendable` would throw. Moving inference server-side means changing that contract deliberately, as a new declared payload type, not by deleting a key from a list. What I can say is the constraint: **the before-measurement cannot be taken retrospectively.** Whoever deploys must record p95 and the external-fetch failure rate *first*, from the deployment host, or that KPI is gone regardless of how well the deployment goes.
 
 ---
 
-## 5 · The address index is a fixture — **DECIDED: tried, still blocked**
+## 5 · The address index — **DONE: the real one is in**
 
 The shipped index holds **two real addresses** and the real street names. Nothing in it is invented and it declares itself a fixture, so it is honest — but a demonstration where only two addresses work is fragile if anyone types their own.
 
 The real build is one command (`python -m drainlens_pipeline.addresses`) and is blocked only on the council portal's rate limit clearing.
 
-**Tried on 29 August; the portal still answers 429.** The build refuses to publish an empty index, so the fixture is untouched and honest. **Plan for the demonstration on the two known addresses** — 46 Gatehouse Drive and 13 Neale Street — and re-run `python -m drainlens_pipeline.addresses` if the limit clears. Somebody should try again Monday.
+**Built on 31 August: 4,089 addresses across 132 streets.** The 429 cleared on its own, and what it had been hiding was a defect rather than a rate limit — the builder was reading `property-boundaries`, the parcel dataset. That fetched and parsed and produced 1,619 plausible entries containing **neither demonstration address**, because a parcel is not an address: Gatehouse Drive has a 10, a 15 and a 17 and no 46. The dataset it wanted was `street-addresses`, 63,721 records, named in the task list from the start. Search now suggests while typing, which two addresses could not. **Demonstrate on any Kensington address.**
 
 ---
 

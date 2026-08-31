@@ -247,7 +247,9 @@ So there is real agreement — our channels sit closer to their routes than chan
 
 Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), and an address index (`addresses`) with a fixture standing in for it.
 
-**The address index in the repository is the fixture, not the real one.** It carries the real street names taken from the map artefact and the two real recorded demonstration addresses; nothing in it is invented, and it declares `artefact: "address-index-fixture"` so it cannot be mistaken for the real thing. Run `python -m drainlens_pipeline.addresses` to build the real one once the portal's rate limit clears.
+**The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
+
+It reads **`street-addresses`** (63,721 records), not `property-boundaries`. That distinction cost a build: the parcel dataset has no split street fields and does not contain either demonstration address, because a parcel is not an address — Gatehouse Drive has a 10, a 15 and a 17, and no 46. The index it produced had 1,619 entirely plausible entries and was missing the two addresses the demonstration is built on.
 
 ## Still to come
 
