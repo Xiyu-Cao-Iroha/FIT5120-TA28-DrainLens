@@ -15,7 +15,7 @@
  * positions the interface chooses to show cannot change any of them.
  */
 
-import { type WaterBalance, checkMassBalance } from './checks.js';
+import { type WaterBalance, allOf, checkMassBalance, checkMonotonicity } from './checks.js';
 import {
   LEAVES_WINDOW,
   type DepressionField,
@@ -562,6 +562,32 @@ export function runScenario(
     if (!checkMassBalance(scenario.balance).ok || !checkMassBalance(baseline.balance).ok) {
       return insufficient('comparison_not_comparable');
     }
+  }
+
+  // 5. Internal consistency along the slider. Every position is solved
+  //    independently from zero rather than stepped forward from the last one,
+  //    so nothing in the arithmetic forces the sequence to agree with itself:
+  //    a routing defect could produce a slider whose ponding *shrinks* as the
+  //    storm gets heavier. That is wrong, and it is obviously wrong to a
+  //    resident, which is the worst combination to put on a screen.
+  //
+  //    On the published artefact this passes at every amount, which is the
+  //    reason to run it and not a reason to leave it out — the check has to be
+  //    in place before the artefact is rebuilt, not after someone notices.
+  //
+  //    `scenario_calculation_failed`, not `comparison_not_comparable`: the two
+  //    runs are comparable to each other, it is one run that is impossible.
+  const extentsOf = (chosen: readonly PositionSolution[]) =>
+    chosen.map((position) => ({
+      accumulatedRainfallMm: position.accumulatedRainfallMm,
+      pondedCells: position.pondedCells,
+    }));
+  const consistent = allOf(
+    checkMonotonicity(extentsOf(solved.map((s) => s.scenario))),
+    checkMonotonicity(extentsOf(solved.map((s) => s.baseline))),
+  );
+  if (!consistent.ok) {
+    return insufficient('scenario_calculation_failed');
   }
 
   const results = solved.map(({ scenario, baseline }) => {
