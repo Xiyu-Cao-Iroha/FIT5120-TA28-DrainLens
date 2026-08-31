@@ -72,8 +72,8 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
 | Coverage, overall | ≥ 88% | **92.8%** Node · **91.05%** Python |
-| Suite runtime | < 5 s | **1.4 s Node ✓ · 55 s Python ✗** — see below |
-| Tests | 450 TypeScript · 332 Python | 782 in total |
+| Suite runtime | < 5 s | **Node 5 s on the CI runner — at the limit** · **Python 51–66 s ✗**. See below |
+| Tests | 454 TypeScript · 332 Python | 786 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
@@ -81,11 +81,23 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 
 **The Python suite still breaches this gate, and it is recorded rather than rounded off.** It was 88 s; one test was 32.7 s of that.
 
-That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's pathological worst case, and quadratic in the length. Its purpose is to prove `simplify` iterates rather than recurses, and measuring the fixture showed the recursion a recursive version would need is exactly `len(path) - 1`. So the length is now taken from `sys.getrecursionlimit()` rather than picked: twice the limit is a margin that cannot be argued with, and it proves the same property in under half a second. **88 s → 55 s.**
+> **The figure quoted here was understated for a week, and a self-audit caught it — then got it wrong a second way.** "55 s" was measured with `--no-cov`, but CI runs plain `pytest` and `addopts` in `pyproject.toml` turns coverage on. That correction was right. Calling the result "what CI costs" was not: the number came from this laptop, and the CI runner is different hardware. Both, measured:
+>
+> | | this laptop | GitHub runner |
+> |---|---|---|
+> | Node, with coverage | 3.6 s | **5 s, twice** |
+> | Python, with coverage | 105 s | **51 s and 66 s** |
+> | Python, without | 71 s | — |
+>
+> The runner figures are step timestamps at one-second resolution, from the two runs this branch's pull request triggered. Python moved 15 s between them, which is why it is a range and not a figure; Node came out at 5 s both times, which is the more useful result — **the Node suite is at the gate, not comfortably inside it**, and the margin the prose used to claim is not there. The runner is faster than this laptop at Python and slower at Node, because the Node run is mostly start-up and transform rather than tests.
+>
+> Two lessons, and the second is the one that was nearly missed: measure the command CI runs, not a faster one that resembles it — and do not report your own machine's clock as CI's.
 
-What remains is **~45 s of `test_terrain.py`**, where a dozen tests each build a real grid. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass.
+That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's pathological worst case, and quadratic in the length. Its purpose is to prove `simplify` iterates rather than recurses, and measuring the fixture showed the recursion a recursive version would need is exactly `len(path) - 1`. So the length is now taken from `sys.getrecursionlimit()` rather than picked: twice the limit is a margin that cannot be argued with, and it proves the same property in under half a second. **88 s → 71 s without coverage**, which is the like-for-like comparison; with coverage the same suite is 105 s.
 
-The Node suite — the one the gate was written for, and the one CI blocks on — runs in 1.4 s.
+**65 of those 71 seconds are `test_terrain.py`** — nineteen tests, each building a real grid. Everything else in the pipeline suite runs in six. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass — note that doing so would leave the rest at six seconds, which still misses the gate.
+
+The Node suite — the one the gate was written for — runs in **3.6 s with coverage here and about 5 s on the runner**, which is at the limit rather than inside it. It was 1.4 s at 426 tests; it is 454 tests now, and almost all of the growth is start-up, transform and instrumentation rather than the tests, which take 0.6 s between them. **A dozen more test files would put it over**, and nothing in CI would say so, because CI does not time anything.
 
 A test that would push the suite past five seconds belongs behind a separate script, not in this run.
 

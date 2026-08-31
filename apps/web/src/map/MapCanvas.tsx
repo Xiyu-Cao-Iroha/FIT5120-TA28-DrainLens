@@ -28,6 +28,8 @@ export interface MapCanvasProps {
   readonly derived?: DerivedArtefact | null;
   readonly show?: DerivedVisibility;
   readonly selectedPit?: number | null;
+  /** Offered but not confirmed — drawn as a ring, not a fill. */
+  readonly suggestedPit?: number | null;
   /** The painted terrain raster, or null when it is off or not loaded. */
   readonly terrain?: HTMLCanvasElement | null;
   readonly showPipes?: boolean;
@@ -50,6 +52,7 @@ export function MapCanvas({
   derived = null,
   show,
   selectedPit = null,
+  suggestedPit = null,
   terrain = null,
   showPipes = true,
   showPits = true,
@@ -114,6 +117,7 @@ export function MapCanvas({
     if (terrain) drawTerrain(context, terrain, viewport, bounds);
     drawMap(context, artefact, viewport, {
       selectedPit,
+      suggestedPit,
       address,
       showPipes,
       showPits,
@@ -124,7 +128,8 @@ export function MapCanvas({
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
-  }, [artefact, derived, show, viewport, selectedPit, address, trace, terrain, showPipes, showPits]);
+  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, address, trace,
+      terrain, showPipes, showPits]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

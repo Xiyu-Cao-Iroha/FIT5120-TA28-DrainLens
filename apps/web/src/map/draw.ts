@@ -20,6 +20,7 @@ export interface Palette {
   readonly pit: string;
   readonly pitEdge: string;
   readonly selected: string;
+  readonly suggested: string;
   readonly label: string;
   readonly labelHalo: string;
   readonly address: string;
@@ -35,6 +36,9 @@ export const DAY: Palette = {
   pit: '#2f6f62',
   pitEdge: '#ffffff',
   selected: '#0f766e',
+  // Amber, matching the panel's "suggested, not your choice yet" note. A
+  // suggestion drawn in the chosen colour is a choice the person did not make.
+  suggested: '#b4690e',
   label: '#5b6b7a',
   labelHalo: '#ffffff',
   // Warm, and shared with no layer. The address is the person's own
@@ -151,6 +155,7 @@ function drawPits(
   palette: Palette,
   seen: Extremes,
   selectedAsset: number | null,
+  suggestedAsset: number | null = null,
 ): void {
   const radius = Math.max(2.5, Math.min(7, viewport.scale * 2.2));
   context.lineWidth = 1.5;
@@ -165,7 +170,71 @@ function drawPits(
     context.fill();
     context.strokeStyle = palette.pitEdge;
     context.stroke();
+
+    // A ring around, not a different fill: the suggestion has to read as
+    // "this one, if you want it" rather than as an already-made choice.
+    if (suggestedAsset !== null && pit.asset_number === suggestedAsset) {
+      drawPin(context, x, y, palette.suggested, String(pit.asset_number ?? ''));
+      context.lineWidth = 1.5;
+    }
+    if (isSelected) {
+      drawPin(context, x, y, palette.selected, String(pit.asset_number ?? ''));
+      context.lineWidth = 1.5;
+    }
   }
+}
+
+/**
+ * A pin and a label for the one pit a person is working with.
+ *
+ * A pit is drawn at two to seven pixels, which is right for eight hundred of
+ * them and useless for the one that matters: a teammate reported not being
+ * able to find the pit the panel had just named. So the chosen and suggested
+ * pits get a stem, a ring and their asset number — the same identifier the
+ * panel shows, so the two can be matched without counting dots.
+ *
+ * Drawn upward from the pit, because the label belongs to the point below it
+ * and a label centred on the point hides the thing it names.
+ */
+function drawPin(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  colour: string,
+  label: string,
+): void {
+  const stem = 22;
+
+  context.beginPath();
+  context.moveTo(x, y - 3);
+  context.lineTo(x, y - stem);
+  context.lineWidth = 2;
+  context.strokeStyle = colour;
+  context.stroke();
+
+  context.beginPath();
+  context.arc(x, y, 9, 0, Math.PI * 2);
+  context.lineWidth = 2.5;
+  context.strokeStyle = colour;
+  context.stroke();
+
+  if (label === '') return;
+
+  context.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  const width = context.measureText(label).width + 12;
+
+  // A plain rectangle, not a rounded one. The rounded-rectangle canvas
+  // method is missing on older browsers, and there the whole map would
+  // throw rather than lose a corner radius.
+  context.fillStyle = colour;
+  context.fillRect(x - width / 2, y - stem - 17, width, 17);
+
+  context.fillStyle = '#ffffff';
+  context.fillText(label, x, y - stem - 8);
+  context.textAlign = 'start';
+  context.textBaseline = 'alphabetic';
 }
 
 /** The longest segment of a street's centreline, which is where a label fits. */
@@ -292,6 +361,15 @@ function drawStreetNames(
 export interface DrawOptions {
   readonly palette?: Palette;
   readonly selectedPit?: number | null;
+  /**
+   * A pit offered but not yet confirmed.
+   *
+   * Drawn as a ring rather than filled, because AC 2.1.1.d requires a
+   * suggestion to be clearly labelled and require confirmation — and a
+   * suggestion the panel names but the map does not show leaves the person
+   * reading an asset number with no way to find it.
+   */
+  readonly suggestedPit?: number | null;
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
@@ -371,7 +449,15 @@ export function drawMap(
   }
 
   if (options.showPits !== false && viewport.scale >= PIT_MIN_SCALE) {
-    drawPits(context, viewport, artefact.layers.pit ?? [], palette, seen, options.selectedPit ?? null);
+    drawPits(
+      context,
+      viewport,
+      artefact.layers.pit ?? [],
+      palette,
+      seen,
+      options.selectedPit ?? null,
+      options.suggestedPit ?? null,
+    );
   }
   if (viewport.scale >= LABEL_MIN_SCALE) {
     drawStreetNames(context, viewport, artefact.layers['street-name'] ?? [], palette, seen);

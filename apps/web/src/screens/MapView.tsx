@@ -70,6 +70,9 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
   const [showPipes, setShowPipes] = useState(true);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
   const [terrainOn, setTerrainOn] = useState(true);
+  // The panel covers the top-left corner of a 1 km map. Reading the map means
+  // being able to put it away.
+  const [panelOpen, setPanelOpen] = useState(true);
 
   // Painted once, then reused for every pan and zoom. A failure here leaves
   // the layer off rather than breaking the map: the terrain is context, and
@@ -135,7 +138,31 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
         }}
       />
 
-      {panel && (
+      {panel && !panelOpen && (
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          style={{
+            position: 'absolute',
+            left: 16,
+            top: 16,
+            zIndex: 2,
+            padding: '7px 12px',
+            borderRadius: 8,
+            border: '1px solid #cfd9d2',
+            background: 'rgba(255,255,255,0.94)',
+            font: 'inherit',
+            fontSize: 13,
+            color: '#1f6f5c',
+            cursor: 'pointer',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+          }}
+        >
+          › Show panel
+        </button>
+      )}
+
+      {panel && panelOpen && (
       <aside
         style={{
           position: 'absolute',
@@ -151,6 +178,25 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
           fontSize: 14,
         }}
       >
+        <button
+          type="button"
+          onClick={() => setPanelOpen(false)}
+          aria-label="Hide the panel"
+          style={{
+            float: 'right',
+            marginTop: -4,
+            background: 'none',
+            border: 'none',
+            padding: '0 0 0 8px',
+            font: 'inherit',
+            fontSize: 13,
+            color: '#1f6f5c',
+            cursor: 'pointer',
+          }}
+        >
+          ‹ Hide
+        </button>
+
         {address && (
           <>
             <span style={{ fontSize: 12, letterSpacing: 0.6, color: '#8593a0' }}>
