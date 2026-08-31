@@ -249,7 +249,7 @@ Map geometry (`network`), the terrain-derived layers (`derived`), the browser sc
 
 **The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
 
-It reads **`street-addresses`** (63,721 records), not `property-boundaries`. That distinction cost a build: the parcel dataset has no split street fields and does not contain either demonstration address, because a parcel is not an address — Gatehouse Drive has a 10, a 15 and a 17, and no 46. The index it produced had 1,619 entirely plausible entries and was missing the two addresses the demonstration is built on.
+It reads **`street-addresses`** (63,721 records — confirmed against the portal's own metadata on 1 September, along with its title), not `property-boundaries`. That distinction cost a build: the parcel dataset has no split street fields and does not contain either demonstration address, because a parcel is not an address — Gatehouse Drive has a 10, a 15 and a 17, and no 46. The index it produced had 1,619 entirely plausible entries and was missing the two addresses the demonstration is built on.
 
 ## Still to come
 

@@ -254,3 +254,33 @@ class TestStreetList:
     def test_ignores_blank_map_labels(self):
         artefact = ad.build(EXTENT, ad.convert([gatehouse()], EXTENT), ["", "   ", None])
         assert artefact["streets"] == ["Gatehouse Drive"]
+
+
+class TestSourceNamesOneDataset:
+    """The human-readable source and the dataset id must name the same thing.
+
+    They did not, for every index this pipeline has ever published. When the
+    builder was moved off the parcel dataset only ``dataset_id`` was changed,
+    so the artefact went out saying its source was "Property boundaries" while
+    its id said ``street-addresses``. Nothing wrong reached a screen -- the
+    attribution footer reads the id -- but an artefact whose purpose is to be
+    checkable was making a false statement about where it came from, and no
+    test could tell.
+    """
+
+    def test_the_id_is_the_dataset_the_builder_fetches(self) -> None:
+        assert ad.SOURCE["dataset_id"] == ad.DATASET
+
+    def test_the_readable_name_is_the_portal_title_for_that_id(self) -> None:
+        # "Street addresses" is the City of Melbourne portal's own title for
+        # `street-addresses`. If the builder ever moves to another dataset,
+        # this fails and forces both halves to move together.
+        assert ad.SOURCE == {
+            "dataset": "Street addresses",
+            "publisher": "City of Melbourne Open Data Portal",
+            "licence": "CC BY 4.0",
+            "dataset_id": "street-addresses",
+        }
+
+    def test_it_never_names_the_parcel_dataset_again(self) -> None:
+        assert "boundar" not in ad.SOURCE["dataset"].lower()

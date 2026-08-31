@@ -168,6 +168,7 @@ CI runs on every pull request and both jobs must pass. The thresholds live in co
 | Python coverage | `pipeline/pyproject.toml` | 90% |
 | Suite runtime | not automated — watch it | under 5 s. **On the CI runner: Node 5 s in all three samples, which is at the limit, and Python 51–67 s, which breaches it.** Locally 3.6 s and 105 s — different hardware, so quote the one you mean. See the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
+| Markdown structure | `node tools/docs/check.mjs` | stray table rows, ragged rows, unclosed fences, broken relative links |
 
 > **`apps/web/dist` locally is not what ships.** `npm run typecheck` is `tsc --build`, which emits a `.js`, `.d.ts` and `.map` for every source file into the same `dist` Vite writes to — 130 files locally against the 14 the site serves. The container never sees them: the Dockerfile runs only `npm run build`. Confirmed against the live site, where `/map/draw.js` returns the single-page fallback as `text/html` rather than a script. Do not read a local `dist` listing as the deployed file list.
 
