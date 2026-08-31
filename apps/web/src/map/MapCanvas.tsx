@@ -17,6 +17,7 @@ import { drawMap } from './draw.js';
 import { type Hit, pick } from './hit.js';
 import { type Local, type Viewport, clamp, fit, focus, pan, zoomAt } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
+import { type DifferenceArea, drawDifference } from './difference.js';
 import { drawTerrain } from './terrain.js';
 import type { Trace } from '../trace/graph.js';
 
@@ -44,6 +45,13 @@ export interface MapCanvasProps {
   readonly address?: Local | null;
   /** A followed downstream path, drawn over the network it was read from. */
   readonly trace?: Trace | null;
+  /**
+   * Where a finished comparison puts more water than its baseline.
+   *
+   * Null on every screen but the result: this is the answer to one question
+   * that has been asked, not a property of the map.
+   */
+  readonly difference?: DifferenceArea | null;
   readonly onSelect?: (hit: Hit | null) => void;
 }
 
@@ -58,6 +66,7 @@ export function MapCanvas({
   showPits = true,
   address = null,
   trace = null,
+  difference = null,
   onSelect,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -124,12 +133,17 @@ export function MapCanvas({
       groundAlreadyDrawn: terrain !== null,
     });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
+    // Over the derived layers, under the followed path. The difference is the
+    // answer to the question that was just asked, so nothing calculated
+    // beforehand should cover it — but a trace the person is actively
+    // following is a second question, and it stays on top of the first.
+    if (difference) drawDifference(context, difference, viewport);
     // The followed path goes on top of both. It is the answer to the
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, address, trace,
-      terrain, showPipes, showPits]);
+      terrain, showPipes, showPits, difference]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
