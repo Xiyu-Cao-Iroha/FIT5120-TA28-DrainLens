@@ -118,7 +118,7 @@ Three ways to go:
 
 ## 3 · The Python test suite breaches our own runtime gate — **DECIDED: record it honestly**
 
-The team committed to **suites under five seconds**. Node holds at 3.6 s. Python was 88 s; it is now **105 s as CI runs it** — 71 s of tests plus 34 s of coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like measurement.
+The team committed to **suites under five seconds**. On the CI runner Node measures about 5 s — at the gate, not inside it — and Python 66 s. On this laptop the same two runs are 3.6 s and 105 s, of which 71 s is tests and 34 s coverage instrumentation. The pathological fixture that was fixed took it from 88 s to 71 s on the like-for-like local measurement.
 
 The remaining time is almost entirely `test_terrain.py`, where nineteen tests each build a real 1000 × 1000 grid: **65 of the 71 seconds**, with the whole rest of the suite at six. That is inherent to what they check — and it means splitting them out would still not reach the five-second gate.
 
@@ -128,7 +128,7 @@ The remaining time is almost entirely `test_terrain.py`, where nineteen tests ea
 | **Restate the gate** | Say the five-second rule applies to the suite CI blocks on, and record the Python figure separately. Honest, and arguably what was always meant. |
 | **Accept the breach** | Leave it recorded as a breach. It is in the README now. |
 
-**Decided: record it rather than hide it.** The README and the gates table now say Node 3.6 s (holds) and Python 105 s (breaches), with the cause named. The figure was itself wrong until a self-audit re-measured it: "55 s" had been taken with `--no-cov`, so the recorded breach was about half the real one. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
+**Decided: record it rather than hide it.** The README and the gates table now carry both machines, with the cause named. The figure was wrong twice before it was right: "55 s" had been taken with `--no-cov`, so the recorded breach was about half the real one; and the 105 s that replaced it was this laptop's clock reported as CI's. **The Node figure is the one to watch now** — about 5 s on the runner is at the gate, and CI times nothing, so it will be crossed silently. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
 
 ---
 

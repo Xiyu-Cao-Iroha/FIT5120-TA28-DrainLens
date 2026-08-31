@@ -166,7 +166,7 @@ CI runs on every pull request and both jobs must pass. The thresholds live in co
 | Node coverage, `packages/schema` | `vitest.config.ts` | 90% |
 | Node coverage, `packages/scenario` | `vitest.config.ts` | 90% — **currently 90.84%, so the margin is about four statements**. A defensive branch added here without a test to reach it can fail the build on its own |
 | Python coverage | `pipeline/pyproject.toml` | 90% |
-| Suite runtime | not automated — watch it | under 5 s, measured as CI runs it. **Node holds at 3.6 s; Python is at 105 s and breaches it** — see the root README |
+| Suite runtime | not automated — watch it | under 5 s. **On the CI runner: Node ≈ 5 s, which is at the limit, and Python 66 s, which breaches it.** Locally 3.6 s and 105 s — different hardware, so quote the one you mean. See the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
 
 If a test would push the suite past five seconds, it belongs behind a separate script rather than in this run.
