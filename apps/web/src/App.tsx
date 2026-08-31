@@ -18,6 +18,7 @@ import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
+import type { DifferenceArea } from './map/difference.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
@@ -61,6 +62,9 @@ export function App() {
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
   const [positions, setPositions] = useState<readonly SolvedPosition[]>([]);
+  // Metres per grid cell, from the run that produced `positions`. Held beside
+  // them so the two can never describe different grids.
+  const [cellSizeM, setCellSizeM] = useState(1);
   // The scenario panel is 420px of a laptop screen. Reading a result means
   // looking at the map it is about, and a teammate reported not being able to.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -187,6 +191,22 @@ export function App() {
       };
 
       const outcome = session.outcome;
+      // The difference layer, and only where there is one to draw.
+      //
+      // Read from the position matching the amount currently selected, so the
+      // rainfall control moves the highlight with the number beside it rather
+      // than leaving the map showing the amount the run happened to end on.
+      // Null off the result screen and null for an insufficient outcome: a
+      // highlight with no finding beside it is a claim nobody made.
+      const differenceShown: DifferenceArea | null =
+        session.screen === 'result' && outcome?.kind === 'comparison'
+          ? {
+              cells:
+                positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)
+                  ?.higherAreasM ?? [],
+              cellSizeM,
+            }
+          : null;
       return (
         <Shell
           credits={credits}
@@ -279,6 +299,7 @@ export function App() {
                         // positions attached would let the control offer
                         // answers to a question nobody asked.
                         setPositions(result.status === 'successful' ? result.positions : []);
+                        if (result.status === 'successful') setCellSizeM(result.cellSizeM);
                         dispatch({
                           type: 'comparison-finished',
                           outcome:
@@ -331,6 +352,7 @@ export function App() {
                 scenarioDrains={
                   new Set(scenario.drains.filter((d) => d.isInlet).map((d) => d.assetNumber))
                 }
+                difference={differenceShown}
                 onPickPit={(pitId) =>
                   dispatch({ type: 'pit-selected', pitId, suggested: false })
                 }
@@ -385,11 +407,14 @@ function MapCanvasPane({
   session,
   suggestedPitId,
   scenarioDrains,
+  difference,
   onPickPit,
 }: {
   readonly loaded: Loaded;
   readonly session: Session;
   readonly suggestedPitId: string | null;
+  /** The finished comparison's difference cells, or null off the result screen. */
+  readonly difference: DifferenceArea | null;
   /** Asset numbers the scene places as inlets. Anything else cannot run. */
   readonly scenarioDrains: ReadonlySet<string>;
   readonly onPickPit: (pitId: string) => void;
@@ -416,6 +441,7 @@ function MapCanvasPane({
           : [session.address.eastingM, session.address.northingM]
       }
       trace={followed}
+      difference={difference}
       onSelect={(hit) => {
         // Only a pit, and only one the engine can use. Tapping a pipe or a
         // junction here would silently set a scenario the engine is bound to

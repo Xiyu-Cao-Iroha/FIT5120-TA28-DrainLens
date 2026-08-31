@@ -19,6 +19,8 @@ export type ScenarioResult =
       readonly band: 'no-clear-change' | 'higher-than-baseline';
       /** Every position solved by this run, ascending. The control reads these. */
       readonly positions: readonly SolvedPosition[];
+      /** Metres per grid cell, for sizing the difference layer on the map. */
+      readonly cellSizeM: number;
     }
   | { readonly status: 'insufficient-information'; readonly reason: InsufficiencyReason };
 
@@ -121,7 +123,12 @@ export function useScenario(base: string): ScenarioRunner {
           }
           resolve(
             reply.status === 'successful'
-              ? { status: 'successful', band: reply.band, positions: reply.positions }
+              ? {
+                  status: 'successful',
+                  band: reply.band,
+                  positions: reply.positions,
+                  cellSizeM: reply.cellSizeM,
+                }
               : {
                   status: 'insufficient-information',
                   reason: reply.reason as InsufficiencyReason,
