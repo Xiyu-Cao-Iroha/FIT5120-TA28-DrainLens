@@ -196,8 +196,8 @@ Take in order, and take early. Each is already permitted by the criteria.
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |
-| ≥2 structured desk checks | Friday, Monday | — |
-| ≥8 hours cross-discipline pair programming | Friday, Sunday | — |
+| ≥2 structured desk checks | Friday, Monday | sheet ready: [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md) |
+| ≥8 hours cross-discipline pair programming | Friday, Sunday | sheet ready; **record the hours that happen** |
 | Critical defects triaged within 24 h, resolved within the iteration | Continuous | — |
 | External dependencies probed from the deployment host | Monday | — |
 | p95 latency and external-fetch failure rate recorded before and after deployment | Sunday onward | **before taken** — 34.5 ms p95, 0.00% failures |

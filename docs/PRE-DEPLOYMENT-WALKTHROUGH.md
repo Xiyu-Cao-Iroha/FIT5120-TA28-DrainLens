@@ -436,7 +436,7 @@ These are assessed and I cannot verify them from the codebase. **Somebody needs 
 
 - [ ] **Peer programming observation document** — the gates table records ≥8 hours cross-discipline pair programming as still unmarked
 - [ ] **PGP iteration build folder** — build artefacts for this iteration
-- [ ] **Structured desk checks** — ≥2 required; the gates table shows none recorded yet
+- [ ] **Structured desk checks** — ≥2 required. [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md) is the sheet: all 77 criteria in click order, with the three known-unverified items listed up front so the session does not rediscover them
 - [ ] **LeanKit board** — current, matching what is actually built
 
 The gates table in [ITERATION-1-TASKS.md](./ITERATION-1-TASKS.md) has four rows with an em dash where a status should be. That table is honest, which is good, but a mentor reading it will see the same gaps.
