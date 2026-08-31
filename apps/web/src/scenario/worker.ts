@@ -37,7 +37,33 @@ export interface SolvedPosition {
   readonly rainfallMm: number;
   readonly band: 'no-clear-change' | 'higher-than-baseline';
   readonly cellsHigherThanBaseline: number;
+  /**
+   * Where the difference is, as south-west cell corners in **local metres**.
+   *
+   * The engine produces a band for all 1,000,000 cells and for a long time
+   * only the count of them crossed this boundary, so the result screen
+   * promised highlighted areas over a map that could not draw any. The cells
+   * that actually differ are a tiny fraction — 652 for the demonstration pit,
+   * out of a million — so sending those and only those costs a few kilobytes.
+   *
+   * Converted here rather than in the interface **on purpose**. The grid this
+   * is derived from lives on this side; the one time a cell index was carried
+   * across and the coordinate rebuilt on the other, all 895 drains disagreed
+   * with the scene and every comparison returned `invalid_inlet`.
+   */
+  readonly higherAreasM: readonly (readonly [east: number, north: number])[];
 }
+
+/**
+ * The most difference cells one position will report.
+ *
+ * The measured worst case in this extent is 652, two orders of magnitude
+ * under this, so the cap never binds on the published artefact. It exists so
+ * a future artefact whose hollows connect cannot post a multi-megabyte
+ * message and freeze the tab — and `cellsHigherThanBaseline` is the true
+ * count regardless, so a truncated layer can still be described honestly.
+ */
+export const MAX_REPORTED_DIFFERENCE_CELLS = 60000;
 
 /** A drain as the scene places it. The `cell` is authoritative — see below. */
 export interface SceneDrain {
@@ -79,6 +105,12 @@ export type WorkerReply =
       readonly positions: readonly SolvedPosition[];
       readonly band: 'no-clear-change' | 'higher-than-baseline';
       readonly cellsHigherThanBaseline: number;
+      /**
+       * The grid's cell size in metres, so the interface can size what it
+       * draws. Sent once per reply rather than per position — one grid solved
+       * every position, and two values here could only ever disagree.
+       */
+      readonly cellSizeM: number;
     }
   | {
       readonly type: 'result';
@@ -89,6 +121,30 @@ export type WorkerReply =
   | { readonly type: 'failed'; readonly id: number; readonly message: string };
 
 let scene: LoadedScene | null = null;
+
+/**
+ * The cells a position marks higher than baseline, as local metres.
+ *
+ * Row 0 of the grid is its **north** edge and northing grows upward, so a
+ * cell's northing is measured from the far side of the grid rather than from
+ * the row index. Getting that backwards mirrors the whole layer about the
+ * middle of the extent, which looks entirely plausible on a square grid and
+ * is wrong everywhere.
+ */
+export function higherAreasOf(
+  bands: readonly string[],
+  grid: { readonly width: number; readonly height: number; readonly cellSizeM: number },
+): (readonly [number, number])[] {
+  const areas: (readonly [number, number])[] = [];
+  for (let cell = 0; cell < bands.length; cell += 1) {
+    if (bands[cell] !== 'higher-than-baseline') continue;
+    if (areas.length >= MAX_REPORTED_DIFFERENCE_CELLS) break;
+    const column = cell % grid.width;
+    const row = Math.floor(cell / grid.width);
+    areas.push([column * grid.cellSizeM, (grid.height - 1 - row) * grid.cellSizeM]);
+  }
+  return areas;
+}
 
 /**
  * Turn an engine outcome into a reply.
@@ -145,9 +201,11 @@ export function handle(request: WorkerRequest, loaded: LoadedScene | null): Work
         rainfallMm: position.accumulatedRainfallMm,
         band: position.band,
         cellsHigherThanBaseline: position.cellsHigherThanBaseline,
+        higherAreasM: higherAreasOf(position.bands, loaded.grid),
       })),
       band: last.band,
       cellsHigherThanBaseline: last.cellsHigherThanBaseline,
+      cellSizeM: loaded.grid.cellSizeM,
     };
   } catch {
     return {
