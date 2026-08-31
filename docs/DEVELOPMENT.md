@@ -75,7 +75,9 @@ From `pipeline/`:
 
 ## Building artefacts
 
-Artefacts are **build products and are not committed**. `/data` is ignored. Rebuild them locally when you need them.
+Artefacts are build products. `/data` at the repository root is **ignored** — it holds the full-size intermediates, including a 4 GB point cloud and the council-wide drainage graph.
+
+The clipped, published copies under **`apps/web/public/data/` are committed**, so the frontend runs from a clone with no Python toolchain at all. That is the distinction to keep straight: the pipeline's working directory is ignored, its published output is not.
 
 ```bash
 cd pipeline
@@ -90,7 +92,19 @@ Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `
 
 The build prints a summary and compares it against the figures in the Epic 1 data audit. **Drift is reported, not fatal** — the rules live in this repository and may legitimately change, but a change should never pass unnoticed. If you see drift you did not expect, stop and work out why before building on top of it.
 
-See [pipeline/README.md](../pipeline/README.md) for what the graph builder does and the data findings behind it.
+That builds the council-wide graph. The artefacts the browser actually loads are built separately, and each writes straight into `apps/web/public/data/`:
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.network   # map.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.terrain   # the ground surface and hydrology
+./.venv/Scripts/python.exe -m drainlens_pipeline.derived   # derived.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.trace     # trace.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.scene     # scene.json and the .bin arrays
+```
+
+Order matters for two of them: `derived` and `trace` both read what earlier stages wrote.
+
+See [pipeline/README.md](../pipeline/README.md) for what each stage does and the data findings behind them.
 
 ---
 
@@ -113,6 +127,26 @@ The push prints a link that opens the pull request. In the description, say what
 
 A subject line in the imperative — "Add the drainage graph builder", not "Added" or "Adding". A body explaining **why**, not what: the diff already says what. Nothing appended — no tool footers, no co-author trailers.
 
+**That last sentence is worth one command before every push**, because the cost of getting it wrong is out of all proportion to the mistake:
+
+```bash
+git log origin/develop..HEAD --format=%B | grep -iE 'co-authored-by|generated with'
+```
+
+One commit reached `develop` with a `Co-Authored-By` trailer on it. By the time anyone noticed, it had been merged to `develop`, then to `main`, and an automated account was showing in the repository's contributor list. Removing it meant rewriting one line of one commit message — and because everything sat on top of it, that changed **all 27 commit SHAs on both branches**, which needed branch protection temporarily disabled, a force-push, and every teammate to `reset --hard`.
+
+The file trees before and after were byte-identical. A one-line mistake, an afternoon to undo. Run the grep.
+
+### When history has to be rewritten anyway
+
+It happens; do it in this order.
+
+1. Verify the rewrite changed nothing but messages: `git diff <backup> <rewritten>` must be empty and the tree hashes must match.
+2. Keep a branch at the pre-rewrite state until everyone has re-synced.
+3. Tell the team **before** pushing, with the `reset --hard` they will need.
+4. Ask the repository owner to lower the ruleset. Nobody else can, and nobody should try — `--force-with-lease`, not `--force`, so a concurrent push refuses rather than being clobbered.
+5. Put the protection back the same minute, and verify it with `gh api repos/:owner/:repo/rules/branches/main` rather than by trying a push. `git push --dry-run` does not run the server's rules, so it proves nothing.
+
 ### What a reviewer is looking for
 
 - A test alongside every component that carries a judgement, written before or with it
@@ -131,10 +165,26 @@ CI runs on every pull request and both jobs must pass. The thresholds live in co
 | Node coverage, overall | `vitest.config.ts` | 88% |
 | Node coverage, `packages/schema` | `vitest.config.ts` | 90% |
 | Python coverage | `pipeline/pyproject.toml` | 90% |
-| Suite runtime | not automated — watch it | under 5 s |
+| Suite runtime | not automated — watch it | under 5 s. **Node holds at 1.4 s; Python is at 55 s and breaches it** — see the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
 
 If a test would push the suite past five seconds, it belongs behind a separate script rather than in this run.
+
+---
+
+## Measuring a deployment
+
+W4 asks for p95 latency and the external-fetch failure rate **before and after** every deployment. The comparison is only worth something if both sides are the same script against the same critical path, so the script lives here rather than in somebody's shell history:
+
+```bash
+npm run build --workspace @drainlens/web
+node tools/perf/serve.mjs apps/web/dist 8099     # the MIME types a deployment must match
+node tools/perf/measure.mjs http://localhost:8099 100
+```
+
+After deploying, the same command against the deployed URL. **The resource list is discovered from the served `index.html` and `scene.json`, not written down** — Vite hashes asset names on every build, and a stale list probes URLs that 404, which looks fast.
+
+The "before" figures are in [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), along with the caveat that matters: they were taken on a laptop against localhost, so they are a floor rather than a network measurement. Say where the "after" was run from.
 
 ---
 
@@ -142,11 +192,14 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 ```
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
-apps/web            frontend (React + Vite, MapLibre + deck.gl)              not yet started
+packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
+apps/web            frontend (React + Vite) — session state, canvas map. No map library
 apps/api            backend (Node + Hono on Cloud Run)                       not yet started
 pipeline            Python geospatial pipeline and model training, never deployed
-data                artefact releases — git-ignored, rebuilt locally
-docs                iteration scope, acceptance criteria, this guide
+tools/perf          the deployment measurement, run identically before and after
+data                full-size intermediates — git-ignored, rebuilt locally
+docs                iteration scope, acceptance criteria, interface contract, this guide
+models              exported ONNX models and evaluation reports               not yet started
 ```
 
 `packages/schema` is the one place the frontend, the backend and the model output share a definition. Change it deliberately: a change there can affect three workstreams at once.

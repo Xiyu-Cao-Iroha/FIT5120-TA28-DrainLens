@@ -1,6 +1,10 @@
 # Demonstration extent and address — proposal
 
-DrainLens · TA28 · 27 August 2026 · **needs a decision today**, because the terrain build cannot start without it
+DrainLens · TA28 · 27 August 2026 · **decided and built**
+
+> This was written as a proposal. The recommendation below was adopted and everything downstream — the terrain surface, the drainage graph, the map geometry, the trace and the scene pack — is built from it. It is kept as written because the *reasoning* is what a reader needs; the extent itself now lives as data in `pipeline/geo.py`, which is authoritative.
+>
+> One figure has moved. The **22-hop** downstream trace quoted below was measured against the council-wide graph. Inside the mapped square kilometre a trace from the nearest inlet is shorter, because the record leaves the extent before it runs out; the trace artefact reports which of the two happened rather than merging them.
 
 Chosen from the data rather than by eye. Every figure below was measured against the drainage export, the address export and the point cloud itself.
 

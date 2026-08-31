@@ -7,6 +7,8 @@ import {
   ViewportError,
   clamp,
   fit,
+  focus,
+  LOCAL_SCALE,
   pan,
   scaleToCover,
   toLocal,
@@ -200,5 +202,59 @@ describe('what is on screen', () => {
     const seen = visibleBounds(fit(1200, 500, KENSINGTON));
     expect(seen.minE).toBeLessThan(seen.maxE);
     expect(seen.minN).toBeLessThan(seen.maxN);
+  });
+});
+
+describe('focus', () => {
+  it('centres on the point it is given', () => {
+    const view = focus(800, 600, KENSINGTON, [300, 700]);
+    expect(view.centre[0]).toBeCloseTo(300);
+    expect(view.centre[1]).toBeCloseTo(700);
+  });
+
+  it('puts the point at the middle of the canvas', () => {
+    // The property AC 1.1.2.a actually asks for, stated in screen terms
+    // rather than in the viewport's own.
+    const at: readonly [number, number] = [420, 310];
+    const view = focus(800, 600, KENSINGTON, at);
+    const [x, y] = toScreen(view, at);
+    expect(x).toBeCloseTo(400);
+    expect(y).toBeCloseTo(300);
+  });
+
+  it('opens closer than the whole extent, so a local map is local', () => {
+    expect(focus(800, 600, KENSINGTON, [500, 500]).scale).toBe(LOCAL_SCALE);
+    expect(LOCAL_SCALE).toBeGreaterThan(scaleToCover(800, 600, KENSINGTON));
+  });
+
+  it('moves as far as it can towards an address near the boundary, and no further', () => {
+    // Never onto blank ground outside the pilot area: the product is careful
+    // not to imply it knows anything there.
+    const view = focus(800, 600, KENSINGTON, [5, 5]);
+    const seen = visibleBounds(view);
+    expect(seen.minE).toBeGreaterThanOrEqual(-0.001);
+    expect(seen.minN).toBeGreaterThanOrEqual(-0.001);
+  });
+
+  it('is fit when the requested scale cannot fill the canvas', () => {
+    // What the full-map task gets: the clamp pins the centre, so the whole
+    // extent still shows and the marker still marks.
+    const wide = focus(1200, 500, KENSINGTON, [200, 200], 0.1);
+    expect(wide.scale).toBeCloseTo(scaleToCover(1200, 500, KENSINGTON));
+    expect(wide.centre[0]).toBeCloseTo(500);
+  });
+
+  it('never opens past the zoom ceiling', () => {
+    expect(focus(800, 600, KENSINGTON, [500, 500], 999).scale).toBe(MAX_SCALE);
+  });
+
+  it('leaves nothing blank at any address in the extent', () => {
+    for (const at of [[0, 0], [1000, 1000], [0, 1000], [1000, 0], [500, 500]] as const) {
+      const seen = visibleBounds(focus(800, 600, KENSINGTON, at));
+      expect(seen.minE).toBeGreaterThanOrEqual(-0.001);
+      expect(seen.maxE).toBeLessThanOrEqual(1000.001);
+      expect(seen.minN).toBeGreaterThanOrEqual(-0.001);
+      expect(seen.maxN).toBeLessThanOrEqual(1000.001);
+    }
   });
 });
