@@ -132,7 +132,7 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 
 ---
 
-## 4 · Deployment — **the baseline is taken; the deployment itself is still yours**
+## 4 · Deployment — **DONE: deployed and verified 31 August**
 
 **Workstream W4 is entirely unticked** and two of its items are assessed KPIs:
 
@@ -142,7 +142,11 @@ The remaining ~45 s is `test_terrain.py`, where a dozen tests each build a real 
 
 The product is a static site plus a worker, so hosting is not hard. But **"before and after" cannot be recorded retrospectively**: if we deploy Monday night with no before-figure, that KPI is simply gone.
 
-**Not mine to take.** Deploying needs cloud credentials and is an outward-facing action on the team's infrastructure.
+**Deployed on 31 August** to Cloud Run: https://drainlens-205559161217.australia-southeast1.run.app. Every command was run by the user; nothing was executed from here.
+
+**Cloud Storage + CDN was abandoned mid-way, for a reason worth recording.** It needs a domain for a certificate and there is none — and the app's paths are absolute from `/`, so it cannot be served from a bucket sub-path either. Firebase Hosting, the obvious alternative, was **rejected by the teacher** when the first System Architecture proposed it. Cloud Run is what survives all three constraints.
+
+**That reversed the logging finding.** On Cloud Storage there was nothing to filter. Cloud Run writes request logs carrying `remoteIp` by default, so the exclusion became mandatory — and getting it right took two attempts, with two real client IPs stored in between and later deleted. The detail is in [deploy/README.md](../deploy/README.md) because it is the more useful half of the story.
 
 **Two things that must happen before the first request, not after.**
 

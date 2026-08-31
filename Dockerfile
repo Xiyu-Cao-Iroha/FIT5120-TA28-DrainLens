@@ -8,6 +8,12 @@
 #
 # Built in two stages so the published image carries no toolchain: the builder
 # has Node and the whole repository, the runtime has nginx and `dist`.
+#
+# **This file lives at the repository root and must stay there.** `gcloud run
+# deploy --source=.` looks for `./Dockerfile` and nothing else; with it under
+# `deploy/` the first deployment silently fell back to Buildpacks and built
+# something other than this — which would have shipped none of the content
+# types, gzip settings or cache policy verified below.
 
 FROM node:22-alpine AS build
 WORKDIR /repo

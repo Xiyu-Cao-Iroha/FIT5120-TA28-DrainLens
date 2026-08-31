@@ -172,6 +172,17 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 ---
 
+## Deploying
+
+Cloud Run: https://drainlens-205559161217.australia-southeast1.run.app. The runbook, the two mistakes made getting there, and the verification that asserts the absence of stored IPs are in [deploy/README.md](../deploy/README.md).
+
+```bash
+# From the repository root. --source looks for ./Dockerfile and nothing else.
+gcloud run deploy drainlens --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=3
+```
+
+---
+
 ## Measuring a deployment
 
 W4 asks for p95 latency and the external-fetch failure rate **before and after** every deployment. The comparison is only worth something if both sides are the same script against the same critical path, so the script lives here rather than in somebody's shell history:
@@ -197,6 +208,7 @@ apps/web            frontend (React + Vite) — session state, canvas map. No ma
 apps/api            backend (Node + Hono on Cloud Run)                       not yet started
 pipeline            Python geospatial pipeline and model training, never deployed
 tools/perf          the deployment measurement, run identically before and after
+deploy              the Cloud Run runbook and the nginx configuration
 data                full-size intermediates — git-ignored, rebuilt locally
 docs                iteration scope, acceptance criteria, interface contract, this guide
 models              exported ONNX models and evaluation reports               not yet started

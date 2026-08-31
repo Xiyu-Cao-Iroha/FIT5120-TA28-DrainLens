@@ -1,145 +1,128 @@
 # Deploying DrainLens
 
-Cloud Storage behind an HTTPS load balancer with Cloud CDN. **Fourteen static files, 1.37 MB over the wire.** There is no server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app
 
-> **These commands have not been run against a real project.** There is no `gcloud` on the machine they were written on, so treat them as a reviewed plan rather than a tested script. Read each one before running it; the verification section exists so that "it seemed to work" is not the standard.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving fourteen static files — **1.36 MB over the wire**. There is no application server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
+
+Deployed and verified on **31 August 2026**. Everything below was run, not planned.
 
 ---
 
-## The finding that changes the logging question
+## Why Cloud Run and not something simpler
 
-The task list carries a **log exclusion filter** as a deployment step, and for Cloud Run it would be mandatory: Cloud Run writes request logs automatically, and every entry carries `httpRequest.remoteIp` — the visitor's IP address. AD1 says this product keeps no IP, so on Cloud Run the promise is false the moment traffic arrives unless a filter is added first.
+Three constraints, and only one option survives all of them.
 
-**On this architecture there is nothing to filter, because nothing is logged by default.**
+| | |
+|---|---|
+| **Not Firebase Hosting** | The first System Architecture used it and that was rejected in a meeting with the teacher. |
+| **No domain** | Rules out Cloud Storage behind an HTTPS load balancer, which needs one for a certificate. |
+| **Must be served at a root URL** | Every path the app fetches is absolute from `/`. Served from a sub-path such as `storage.googleapis.com/BUCKET/`, `/data/map.json` resolves to the bucket's parent and 404s. |
 
-| | Default | What we do |
+Cloud Run gives a root URL with managed HTTPS and no domain. It is also where `apps/api` would go if AI inference ever moved off the device — but note AD10 puts the photo classification *on* the device, and `FORBIDDEN_WIRE_KEYS` refuses `photo`, `image` and `imageData` structurally, so moving inference server-side means changing that contract deliberately rather than deleting a key from a list.
+
+**This reverses what was written here before.** On Cloud Storage there is nothing to filter, because nothing is logged by default. **Cloud Run writes request logs carrying `httpRequest.remoteIp` by default**, so the exclusion is mandatory and has to be applied before the first request.
+
+---
+
+## The order, and why it is this order
+
+**1. Enable the APIs.** Individually — never inferred from a sibling working.
+
+```bash
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project=fit5120-504507
+```
+
+**2. Exclude the request logs — before deploying, not after.**
+
+```bash
+gcloud logging sinks update _Default --project=fit5120-504507 '--add-exclusion=name=cloud-run-request-logs,filter=LOG_ID(run.googleapis.com/requests)'
+```
+
+An exclusion drops entries **before they are written**. One added afterwards cannot unwrite the lines already holding a visitor's IP, and an IP in a log is exactly what AD1 says this product does not keep — a promise the landing page makes to residents in those words.
+
+> **It must be `--add-exclusion`, not the sink's own `--log-filter`.** Setting `NOT LOG_ID(...)` on the sink filter looked right, stored correctly, and **did not stop the logs**: two entries carrying a real client IP were written eleven minutes after it was applied. The two fields are not interchangeable. See *What went wrong*.
+
+**3. Deploy.** From the repository root, not from your home directory.
+
+```bash
+gcloud run deploy drainlens --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=3
+```
+
+`--allow-unauthenticated` is the one step to be deliberate about: it publishes the site. That is the intent — it is a public information site — but it is worth a pause.
+
+Watch the first line of output. It must say **`Building using Dockerfile`**. If it says `Building using Buildpacks`, stop — see *What went wrong*.
+
+**4. Take the "after" measurement, and say where you ran it from.**
+
+```bash
+node tools/perf/measure.mjs https://drainlens-205559161217.australia-southeast1.run.app 100
+```
+
+---
+
+## What the container gets right, and how each fails if it does not
+
+Verified against the live URL, not only locally.
+
+| | Verified | If wrong |
 |---|---|---|
-| Load balancer request logs | **off** — `logConfig.enable` is false on a backend bucket | never enable it |
-| Cloud Storage usage/access logs | **off** — opt-in per bucket | never enable it |
-| Cloud Monitoring metrics | on, and **carry no IP** — aggregate request counts, error rates, latency | keep, they are useful |
+| **Module worker content type** | `text/javascript`, one header | A module worker is refused outright at any other type. **The map still draws, so losing the entire comparison feature looks like nothing happening.** |
+| **gzip** | `content-encoding: gzip` on `.bin` and `.json` | The first visit is 6.42 MB instead of 1.36 MB. The site works; it is four times heavier. |
+| **Cache, in three classes** | `immutable` / `max-age=300` / `no-cache` | `/data` is not content-hashed. A rebuilt artefact behind a long cache is a map that silently disagrees with the model it was built beside. |
+| **`/data/*` returns 404** | A missing artefact 404s | Otherwise the single-page rewrite returns `index.html`, which reaches `assertUsable` as a parse error rather than as a missing file. |
 
-So AD1 is kept here by **not switching something on**, which is a stronger position than switching it on and filtering it afterwards. The exclusion filter becomes necessary again the day `apps/api` reaches Cloud Run, and not before.
-
-**This is not a reason to skip the check.** It is a reason the check is cheap: see *Verify* below, which asserts the absence rather than assuming it.
-
----
-
-## One-time setup
-
-Read each command. Several are irreversible in the sense that they publish something.
-
-```bash
-PROJECT=drainlens-ta28          # your project id
-BUCKET=drainlens-ta28-site      # must be globally unique
-REGION=australia-southeast1     # Melbourne
-
-gcloud config set project "$PROJECT"
-
-# 1. The bucket. Uniform access, so per-object ACLs cannot drift.
-gcloud storage buckets create "gs://$BUCKET" \
-  --location="$REGION" \
-  --uniform-bucket-level-access \
-  --public-access-prevention=inherited
-```
-
-**The next command makes the site public.** That is the intent — it is a public information site — but it is the one step to be deliberate about.
-
-```bash
-# 2. Public read. Objects only; nobody can list or write.
-gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" \
-  --member=allUsers --role=roles/storage.objectViewer
-```
-
-```bash
-# 3. A backend bucket with Cloud CDN, and logging left OFF (see above).
-gcloud compute backend-buckets create drainlens-backend \
-  --gcs-bucket-name="$BUCKET" \
-  --enable-cdn \
-  --cache-mode=USE_ORIGIN_HEADERS
-
-# 4. The front door.
-gcloud compute url-maps create drainlens-map --default-backend-bucket=drainlens-backend
-gcloud compute addresses create drainlens-ip --global
-gcloud compute ssl-certificates create drainlens-cert --domains=YOUR.DOMAIN --global
-gcloud compute target-https-proxies create drainlens-proxy \
-  --url-map=drainlens-map --ssl-certificates=drainlens-cert
-gcloud compute forwarding-rules create drainlens-fr \
-  --address=drainlens-ip --target-https-proxy=drainlens-proxy --global --ports=443
-```
-
-`--cache-mode=USE_ORIGIN_HEADERS` matters: it makes the CDN obey the `Cache-Control` that `publish.sh` sets per file, rather than applying one policy to everything. The three classes of file need three different policies, and the reason is in the next section.
+The content types are set with a `types` block, not `add_header`. `add_header` **appends**, so the first version sent every response with two `Content-Type` headers — caught by `curl -I` before it went anywhere.
 
 ---
 
-## Every deploy
+## Verify — assert the absence, do not assume it
+
+Configuration saying the right thing is not evidence.
 
 ```bash
-./deploy/publish.sh gs://$BUCKET
+curl -sI https://drainlens-205559161217.australia-southeast1.run.app/assets/worker-*.js | grep -i content-type
+
+curl -sI -H 'Accept-Encoding: gzip' https://drainlens-205559161217.australia-southeast1.run.app/data/scene/elevation.bin | grep -i content-encoding
 ```
 
-That script builds, then uploads with the metadata the application actually depends on. Three things it sets, each of which breaks something specific if wrong:
+**The logging check is the one that matters, and it only counts after real traffic.**
 
-**Content type.** `.js` must be served as `text/javascript`. **A module worker is refused outright at any other type**, and the whole comparison feature goes with it — the map still draws, so this fails quietly. `.bin` must be `application/octet-stream`.
+```bash
+# 1. Generate some. An empty log during a quiet hour proves nothing.
+for i in 1 2 3 4 5; do curl -s -o /dev/null https://drainlens-205559161217.australia-southeast1.run.app/data/map.json; done
+sleep 90
 
-**gzip.** Cloud Storage does not compress on the fly. Files are uploaded with `--gzip-local-all`, which compresses locally and stores `Content-Encoding: gzip` — taking the first visit from **6.42 MB to 1.37 MB**.
+# 2. Did any of them store a client IP?
+gcloud logging read 'httpRequest.remoteIp:*' --project=fit5120-504507 --limit=10 --freshness=1h --format='value(timestamp,httpRequest.remoteIp)'
+#    Expect: nothing.
 
-> Not `--gzip-in-flight-all`, which sounds like the same thing and is not: it compresses only the upload to Cloud Storage, leaving the stored object unencoded. Choosing it fails silently — the site works and is four times heavier. Check 2 below is what catches it.
+# 3. Prove logging is not simply switched off altogether.
+gcloud logging read 'resource.labels.service_name="drainlens"' --project=fit5120-504507 --limit=4 --freshness=2h --format='table(timestamp,logName.segment(-1))'
+#    Expect: system, system_event and stderr entries — and no `requests`.
+```
 
-**Cache lifetime, in three classes:**
-
-| | Policy | Why |
-|---|---|---|
-| `/assets/*` | `max-age=31536000, immutable` | Content-hashed by Vite. A new build has a new name, so it can never be stale. |
-| `/index.html` | `no-cache` | It names the hashed assets. Cached, it points at files a new deploy has replaced. |
-| `/data/*` | `max-age=300` | **Not hashed.** A rebuilt artefact behind a long cache is a map that silently disagrees with the model — the failure this product exists to avoid. |
+Result on 31 August: **25 real requests, 0 request-log entries, 0 entries carrying an IP**, with system and stderr logging intact.
 
 ---
 
-## Take the "after" measurement
+## What went wrong, twice, and both avoidably
 
-The "before" is in [DEPLOYMENT-BASELINE.md](../docs/DEPLOYMENT-BASELINE.md). The comparison is only worth something if both sides are the same script:
+**The Dockerfile was in the wrong place.** It lived under `deploy/`, and `--source=.` looks only for `./Dockerfile`. The first deployment fell back to Buildpacks **without failing** — it would have shipped none of the content types, gzip settings or cache policy above, and the site would have looked fine. It is at the repository root now with a comment saying it must stay there.
+
+**The log exclusion went onto the wrong field, and was then "verified" by a query that could not match.** `NOT LOG_ID(...)` was written to the sink's own filter instead of `--add-exclusion`. The check used `logName:"run.googleapis.com%2Frequests"`, got zero, and zero was read as success. A differently-phrased query then found **two stored entries, each carrying a real IPv6 client address**, written eleven minutes after the filter was applied. They were deleted:
 
 ```bash
-node tools/perf/measure.mjs https://YOUR.DOMAIN 100
+gcloud logging logs delete "run.googleapis.com%2Frequests" --project=fit5120-504507
 ```
 
-**Say where you ran it from.** The baseline was taken on a laptop against localhost, which has no network in it and is therefore a floor. W4 asks for a probe from the deployment host, and a laptop figure and a host figure are not interchangeable.
+The lesson is one this repository has written down before and had to learn again in practice: **a query returning nothing is evidence only when you know it would have returned something.** That is why the verification above generates traffic first.
 
 ---
 
-## Verify
+## Cost and rollback
 
-Four checks. The first two are correctness, the last two are the privacy position.
+Cloud Run scales to zero, so no requests means no charge, and `--max-instances=3` bounds an accident. To remove the service entirely:
 
 ```bash
-# 1. The worker's content type. If this is not a JavaScript type, the
-#    comparison feature is dead and the map still looks fine.
-curl -sI https://YOUR.DOMAIN/assets/worker-*.js | grep -i content-type
-
-# 2. Compression is actually reaching the browser.
-curl -sI -H 'Accept-Encoding: gzip' https://YOUR.DOMAIN/data/scene/elevation.bin \
-  | grep -iE 'content-encoding|content-length'
-#    Expect: content-encoding: gzip, and ~813 KB rather than 2 MB.
-
-# 3. No request logs exist. Not "we filtered them" — none were made.
-gcloud logging read \
-  'resource.type="http_load_balancer" AND httpRequest.remoteIp!=""' \
-  --limit=5 --freshness=1d
-#    Expect: no entries. If any appear, backend logging was enabled
-#    somewhere and AD1 is not being kept.
-
-# 4. Confirm it is off rather than merely quiet.
-gcloud compute backend-buckets describe drainlens-backend \
-  --format='value(cdnPolicy.cacheMode,enableCdn)'
-gcloud logging sinks describe _Default --format='value(filter)'
+gcloud run services delete drainlens --region=australia-southeast1 --project=fit5120-504507
 ```
-
-Check 3 is the one worth running properly. An empty result during a quiet hour proves nothing on its own, which is why check 4 asks the configuration rather than the data.
-
----
-
-## What is deliberately not here
-
-**No Cloud Run.** There is no `apps/api` and nothing to containerise. Cloud Run remains a reasonable Iteration 2 target if AI inference moves off the device — but note that AD10 puts the photo classification *on* the device, and `FORBIDDEN_WIRE_KEYS` refuses `photo`, `image` and `imageData` structurally. Moving inference server-side means changing that contract deliberately, as a new declared payload type, not by deleting a key from a list.
-
-**No PMTiles or range requests.** The task list mentions confirming that range requests pass through the CDN. That was written when the map was expected to be tiled. It is not: the whole extent is 1.27 MB gzipped, which was measured, and tiling was dropped. Nothing here needs range requests — which is just as well, because Cloud Storage's gzip transcoding and range requests do not combine.
