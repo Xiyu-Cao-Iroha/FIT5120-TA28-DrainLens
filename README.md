@@ -71,9 +71,9 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.7%** Node · **91.1%** Python |
-| Suite runtime | < 5 s | **2.5 s Node ✓ · 55–72 s Python ✗** — see below |
-| Tests | 450 TypeScript · 332 Python | 782 in total |
+| Coverage, overall | ≥ 88% | **92.8%** Node · **91.05%** Python |
+| Suite runtime | < 5 s | **3.6 s Node ✓ · 105 s Python ✗** — as CI runs them, with coverage. See below |
+| Tests | 454 TypeScript · 332 Python | 786 in total |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
@@ -81,11 +81,13 @@ Measured on **30 August 2026**. These are the current figures, not the best ones
 
 **The Python suite still breaches this gate, and it is recorded rather than rounded off.** It was 88 s; one test was 32.7 s of that.
 
-That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's pathological worst case, and quadratic in the length. Its purpose is to prove `simplify` iterates rather than recurses, and measuring the fixture showed the recursion a recursive version would need is exactly `len(path) - 1`. So the length is now taken from `sys.getrecursionlimit()` rather than picked: twice the limit is a margin that cannot be argued with, and it proves the same property in under half a second. **88 s → 55 s**, measured on an idle machine; the same suite takes 72 s on a busy one, so the figure quoted here is a range and not a stopwatch reading.
+> **The figure quoted here was understated for a week, and a self-audit caught it.** "55 s" was measured with `--no-cov`. CI runs plain `pytest`, and `addopts` in `pyproject.toml` turns coverage on, so the run that actually gates a pull request costs **105 s** — 71 s of tests and 34 s of instrumentation. The breach was about twice what was written down. Measure the command CI runs, not a faster one that resembles it.
 
-What remains is **~45 s of `test_terrain.py`**, where a dozen tests each build a real grid. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass.
+That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's pathological worst case, and quadratic in the length. Its purpose is to prove `simplify` iterates rather than recurses, and measuring the fixture showed the recursion a recursive version would need is exactly `len(path) - 1`. So the length is now taken from `sys.getrecursionlimit()` rather than picked: twice the limit is a margin that cannot be argued with, and it proves the same property in under half a second. **88 s → 71 s without coverage**, which is the like-for-like comparison; with coverage the same suite is 105 s.
 
-The Node suite — the one the gate was written for, and the one CI blocks on — runs in **2.5 s** and holds. It was 1.4 s at 426 tests; it is 450 tests now, and most of the added time is start-up rather than the tests themselves, which take 0.5 s of it.
+**65 of those 71 seconds are `test_terrain.py`** — nineteen tests, each building a real grid. Everything else in the pipeline suite runs in six. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass — note that doing so would leave the rest at six seconds, which still misses the gate.
+
+The Node suite — the one the gate was written for — runs in **3.6 s with coverage** and holds. It was 1.4 s at 426 tests; it is 454 tests now, and almost all of the growth is start-up and instrumentation rather than the tests, which take 0.6 s between them.
 
 A test that would push the suite past five seconds belongs behind a separate script, not in this run.
 
