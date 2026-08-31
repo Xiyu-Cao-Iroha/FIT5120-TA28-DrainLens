@@ -14,6 +14,14 @@ Fill it in while doing it. An entry written afterwards from memory is worth less
 
 **Run it against a real browser**, not the dev server alone if a deployment exists. Start at `npm run dev --workspace @drainlens/web`.
 
+> **Check the live build is not older than the repository before using it.** Cloud Run holds whatever was last deployed, and fixes land on a branch well before they are pushed to it — running this sheet against a stale build marks defects that are already repaired. The build is identified by its hashed bundle name, so this settles it in one line:
+>
+> ```bash
+> curl -s https://drainlens-205559161217.australia-southeast1.run.app | grep -o 'index-[A-Za-z0-9_-]*\.js'
+> ```
+>
+> Compare it with the name in your own `apps/web/dist/index.html` after `npm run build`. **If they differ, use the dev server** — or redeploy first.
+
 ```
 Date            ____________________
 Driver          ____________________   (does not write this code)
@@ -33,7 +41,8 @@ Do not spend the session rediscovering these.
 
 | | |
 |---|---|
-| **The ground-surface ramp was changed and never seen** | The colours were widened after the layer was verified, and the preview pane went blank before it could be re-checked. **Toggling "Ground surface" must produce an obviously different map.** If the difference is subtle, that is the defect. |
+| **The ground surface was broken and is now fixed — confirm the fix** | It was drawn and then erased by the map's own opening fill, and the ramp was fitted to a surface whose buildings are raised 100 m for routing, so 26% of the extent sat at one end of it. Measured after the fix: 100 distinct colours became 210. **Toggling "Ground surface" must produce an obviously different map**, and the only large block of a single colour should be the buildings. |
+| **Unverified by eye: the pit pin and click-to-select** | Both have tests and typecheck behind them and **neither has been seen rendered** — the preview pane stopped compositing. Check that a chosen pit shows a labelled pin with its asset number, and that clicking another inlet on the map selects it. |
 | **Three inlets, and only three, produce a visible difference** | An earlier sample of 40 found none and that was reported as "none exist" — 3 of 475 is 0.6%, which a sample of 40 misses about four times in five. **Use pit 1363621 to demonstrate the comparison working** (652 cells, 132 m³); 1363588 and 1730246 also work. Any other pit honestly returns *No clear difference*, and the screen should explain why rather than just say it. |
 | **Why those three** | All three have **no recorded downstream pipe** and a large catchment. Blocked, their water has no next inlet to reach; the other 472 sit in a redundant chain. Terminal inlets with small catchments release 0.00–0.04 m³ — three orders of magnitude less. |
 | **There are no recorded outlets** | Every trace ends at the edge of the record. The wording must never say a path reached an outlet. |

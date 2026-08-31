@@ -390,7 +390,7 @@ The mentor may ask "why did you choose X". Each of these has a rejected alternat
 | Kahn's algorithm | Sort by elevation | Elevation is a proxy. 509 of a million cells were exactly level at float32. |
 | Discriminated unions for outcomes | Nullable fields / error strings | The compiler forces every screen to handle every case; a new insufficiency reason breaks the build at each site that must change. |
 | An offline trace artefact | Tracing from `map.json` in the browser | The map cannot distinguish a pipe we clipped from one the council never finished recording. 7 edges versus 29, and they are different claims. |
-| Vitest | Jest | Native ESM and TypeScript with no transform config; the suite runs in 1.4 s, which is what keeps it being run. |
+| Vitest | Jest | Native ESM and TypeScript with no transform config; the suite runs in a couple of seconds, which is what keeps it being run. |
 
 ---
 
@@ -414,15 +414,15 @@ What the mentor can check in the repository, and what lives outside it.
 
 | Metric | Value |
 |---|---|
-| TypeScript tests | **441**, 20 files, **1.6 s** |
-| Python tests | **332**, **55 s** — still over the 5 s gate, see below |
-| TypeScript coverage | **92.7%** statements · 93.9% branches · 95.3% functions |
-| Python coverage | **91.44%** |
+| TypeScript tests | **450**, 20 files, **2.5 s** |
+| Python tests | **332**, **55–72 s** — still over the 5 s gate, see below |
+| TypeScript coverage | **92.7%** statements · 93.4% branches · 95.5% functions |
+| Python coverage | **91.05%** |
 | Source lines, excluding tests | ~17,000 |
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 
-> The Node suite runs in 1.4 s and holds the five-second rule. The Python suite takes 55 s, down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is ~45 s of `test_terrain.py` building real grids, which is inherent to what those tests check. CI blocks on the Node suite, so nothing was failing; but the rule is the team's own and we are not quietly exempting the slow half.
+> The Node suite runs in 2.5 s and holds the five-second rule. The Python suite takes 55–72 s — it varies that much with machine load — down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is ~45 s of `test_terrain.py` building real grids, which is inherent to what those tests check. CI blocks on the Node suite, so nothing was failing; but the rule is the team's own and we are not quietly exempting the slow half.
 
 Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 
