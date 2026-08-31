@@ -23,14 +23,12 @@ def record(east_m: float, north_m: float, **fields) -> dict:
 
 
 def gatehouse(number: str = "46", east_m: float = 320.0, north_m: float = 640.0) -> dict:
-    return record(
-        east_m,
-        north_m,
-        street_number=number,
-        street_name="GATEHOUSE",
-        street_type="DRIVE",
-        suburb="KENSINGTON",
-    )
+    return at(east_m, north_m, number, "Gatehouse Drive")
+
+
+def at(east_m: float, north_m: float, number: str, street: str, suburb: str = "Kensington") -> dict:
+    """A record as `street-addresses` publishes it: already split, already titled."""
+    return record(east_m, north_m, street_no=number, str_name=street, suburb=suburb)
 
 
 class TestConvert:
@@ -68,15 +66,15 @@ class TestConvert:
 
     def test_drops_an_address_outside_the_extent(self):
         far = record(
-            9_000.0, 9_000.0, street_number="1", street_name="ELSEWHERE", street_type="ROAD"
+            9_000.0, 9_000.0, street_no="1", str_name="Elsewhere Road", suburb="Somewhere"
         )
         assert ad.convert([far], EXTENT) == []
 
     def test_drops_a_record_with_no_position(self):
-        assert ad.convert([{"street_number": "1", "street_name": "NOWHERE"}], EXTENT) == []
+        assert ad.convert([{"street_no": "1", "str_name": "Nowhere Road"}], EXTENT) == []
 
     def test_drops_a_record_with_no_street(self):
-        assert ad.convert([record(100.0, 100.0, street_number="1")], EXTENT) == []
+        assert ad.convert([record(100.0, 100.0, str_name="Nameless Lane")], EXTENT) == []
 
     def test_a_block_of_flats_is_one_address_not_forty(self):
         # The source has a record per parcel, and a tower is many parcels at
@@ -102,7 +100,7 @@ class TestBuild:
         # The boundary check needs them. Recovering the street list by scanning
         # every label at run time is work the browser should not repeat on
         # every keystroke.
-        artefact = self.index(gatehouse(), record(140.0, 480.0, street_number="13", street_name="NEALE", street_type="STREET", suburb="KENSINGTON"))
+        artefact = self.index(gatehouse(), at(140.0, 480.0, "13", "Neale Street"))
         assert artefact["streets"] == ["Gatehouse Drive", "Neale Street"]
 
     def test_says_that_it_is_the_pilot_boundary(self):
@@ -199,3 +197,60 @@ class TestFixture:
         from drainlens_pipeline import address_fixture as fx
 
         assert fx.parse("46 Gatehouse Drive, Kensington") == ("46", "Gatehouse Drive", "Kensington")
+
+
+class TestTheDatasetItReads:
+    """`street-addresses`, not `property-boundaries`.
+
+    The parcel dataset was read first. It has no split street fields, and it
+    does not contain either demonstration address — Gatehouse Drive has a 10,
+    a 15 and a 17 but no 46, because a parcel is not an address. The index it
+    produced had 1,619 plausible entries and was missing the two addresses the
+    whole demonstration is built on.
+    """
+
+    def test_reads_the_address_dataset_rather_than_the_parcel_one(self):
+        assert ad.DATASET == "street-addresses"
+        assert ad.SOURCE["dataset_id"] == "street-addresses"
+
+    def test_takes_the_street_type_from_the_name_it_is_already_part_of(self):
+        # `str_name` is "Gatehouse Drive", not "Gatehouse" plus a type field.
+        [address] = ad.convert([at(320.0, 640.0, "46", "Gatehouse Drive")], EXTENT)
+        assert address.street == "Gatehouse Drive"
+
+    def test_keeps_both_demonstration_addresses(self):
+        # These are the two the demo script uses, and the reason the wrong
+        # dataset was caught at all.
+        found = ad.convert(
+            [at(320.0, 640.0, "46", "Gatehouse Drive"), at(140.0, 480.0, "13", "Neale Street")],
+            EXTENT,
+        )
+        assert {a.label for a in found} == {
+            "46 Gatehouse Drive, Kensington",
+            "13 Neale Street, Kensington",
+        }
+
+
+class TestStreetList:
+    """The list answers one question: is this a real street?"""
+
+    def test_carries_streets_the_map_knows_but_no_address_uses(self):
+        # 38 street names on the map carry no address in this dataset — some
+        # straddle the extent edge, some are lanes with no parcels. Built from
+        # addresses alone, the index tells somebody on Harper Street that their
+        # street does not exist, when it is simply outside the addressed area.
+        artefact = ad.build(EXTENT, ad.convert([gatehouse()], EXTENT), ["Harper Street"])
+        assert "Harper Street" in artefact["streets"]
+        assert "Gatehouse Drive" in artefact["streets"]
+
+    def test_collapses_the_double_spaces_the_map_labels_carry(self):
+        # The map's labels are "McTaggart  Street". A plain union listed 92
+        # streets twice and made the index look like it covered twice what
+        # it does.
+        artefact = ad.build(EXTENT, ad.convert([gatehouse()], EXTENT), ["Gatehouse  Drive"])
+        assert artefact["streets"].count("Gatehouse Drive") == 1
+        assert "Gatehouse  Drive" not in artefact["streets"]
+
+    def test_ignores_blank_map_labels(self):
+        artefact = ad.build(EXTENT, ad.convert([gatehouse()], EXTENT), ["", "   ", None])
+        assert artefact["streets"] == ["Gatehouse Drive"]

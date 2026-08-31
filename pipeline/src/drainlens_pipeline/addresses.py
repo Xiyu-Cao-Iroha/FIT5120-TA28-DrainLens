@@ -19,6 +19,7 @@ being recovered by scanning every label at run time.
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -26,7 +27,7 @@ from typing import Callable, Iterable
 
 from .geo import Extent, from_mga55, to_mga55
 
-DATASET = "property-boundaries"
+DATASET = "street-addresses"
 BASE = "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets"
 
 SOURCE = {
@@ -42,8 +43,23 @@ SOURCE = {
 #: street and drop a pin is left behind at build time rather than shipped and
 #: ignored — a field that never leaves the pipeline cannot leak from the
 #: browser.
-KEPT = ("street_number", "street_name", "street_type", "suburb")
+KEPT = ("street_no", "str_name", "suburb", "geo_point_2d")
 
+#: The fields an address needs, and nothing else.
+#:
+#: The published dataset carries far more. Everything not needed to find a
+#: street and drop a pin is left behind at build time rather than shipped and
+#: ignored — a field that never leaves the pipeline cannot leak from the
+#: browser.
+#:
+#: **This is `street-addresses`, not `property-boundaries`.** An earlier
+#: version read the parcel dataset, which has 15,341 records, no split street
+#: fields, and does not contain either demonstration address: Gatehouse Drive
+#: has a 10, a 15 and a 17 but no 46, because a parcel is not an address. It
+#: produced an index of 1,619 entries that looked entirely reasonable and was
+#: missing the two addresses the demonstration is built on. `street-addresses`
+#: has 63,721 records, 4,136 of them inside the extent, and carries
+#: `street_no`, `str_name` and `suburb` already split and already title-cased.
 
 class AddressError(Exception):
     pass
@@ -94,15 +110,16 @@ def convert(records: Iterable[dict], extent: Extent) -> list[Address]:
         if not extent.contains(easting, northing):
             continue
 
-        number = str(record.get("street_number") or "").strip()
-        name = str(record.get("street_name") or "").strip()
-        kind = str(record.get("street_type") or "").strip()
-        suburb = str(record.get("suburb") or "").strip()
+        # `str_name` already carries the type — "Gatehouse Drive" — so there
+        # is no separate street_type to join on.
+        number = str(record.get("street_no") or "").strip()
+        name = str(record.get("str_name") or "").strip()
+        locality = str(record.get("suburb") or "").strip()
         if not number or not name:
             continue
 
-        street = _title(f"{name} {kind}".strip())
-        suburb = _title(suburb)
+        street = _title(name)
+        suburb = _title(locality)
         label = f"{number} {street}, {suburb}" if suburb else f"{number} {street}"
 
         # One pin per address. The source has a record per parcel, and a block
@@ -151,15 +168,44 @@ def fetch(
     return convert(records, extent)
 
 
-def build(extent: Extent, addresses: list[Address]) -> dict:
-    """The artefact, with the street list the boundary check needs."""
+def build(
+    extent: Extent,
+    addresses: list[Address],
+    map_streets: Iterable[str] = (),
+) -> dict:
+    """The artefact, with the street list the boundary check needs.
+
+    ``streets`` is deliberately wider than the streets that have addresses.
+    The interface asks it one question — *is this a real street?* — and uses
+    the answer to tell "outside the pilot area" from "not an address". Those
+    are different things to be told, and only one of them is true of a street
+    that exists.
+
+    Measured on the demonstration extent: 38 street names on the map carry no
+    address in this dataset. Some straddle the extent edge, because the map
+    fetch reaches 150 m further than the addresses are clipped to; some are
+    service lanes with no parcels fronting them. Built from addresses alone,
+    the index would tell somebody on Harper Street that their street does not
+    exist — the same defect as the one this list was introduced to fix, just
+    one boundary further out.
+    """
     if not addresses:
         raise AddressError(
             "the index is empty; without it every address is 'not an address' and "
             "the pilot boundary cannot be told from a typing mistake"
         )
 
-    streets = sorted({address.street for address in addresses})
+    # Deduplicated on a normalised form, not on the raw string. The map's
+    # labels carry double spaces — "McTaggart  Street" — so a plain union
+    # listed 92 streets twice and made the index look like it covered twice
+    # what it does.
+    by_form: dict[str, str] = {}
+    for name in [a.street for a in addresses] + list(map_streets):
+        readable = " ".join(str(name or "").split())
+        if not readable:
+            continue
+        by_form.setdefault(readable.casefold(), readable)
+    streets = sorted(by_form.values())
     return {
         "artefact": "address-index",
         "version": 1,
@@ -199,6 +245,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Build the address index that ships with the site.",
     )
     parser.add_argument("--out", type=Path, default=Path("../data/map/addresses.json"))
+    parser.add_argument(
+        "--map",
+        type=Path,
+        default=Path("../apps/web/public/data/map.json"),
+        help="map artefact, read for street names that carry no address",
+    )
     args = parser.parse_args(argv)
 
     def log(message: str) -> None:
@@ -207,7 +259,21 @@ def main(argv: list[str] | None = None) -> int:
     extent = DEMONSTRATION_EXTENT
     log(f"Fetching addresses for {extent.name}")
     addresses = fetch(extent)
-    artefact = build(extent, addresses)
+
+    # Street names the map knows, so a real street just outside the addressed
+    # area is told it is outside the pilot rather than told it does not exist.
+    map_streets: list[str] = []
+    if args.map.exists():
+        layers = json.loads(args.map.read_text(encoding="utf-8")).get("layers", {})
+        map_streets = [
+            str(feature.get("maplabel") or feature.get("name") or "")
+            for feature in layers.get("street-name", [])
+        ]
+        log(f"  {len({n for n in map_streets if n.strip()}):,} street names from the map")
+    else:
+        log(f"  no map artefact at {args.map}; street list will cover addressed streets only")
+
+    artefact = build(extent, addresses, map_streets)
     log(f"  {len(addresses):,} addresses across {len(artefact['streets'])} streets")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

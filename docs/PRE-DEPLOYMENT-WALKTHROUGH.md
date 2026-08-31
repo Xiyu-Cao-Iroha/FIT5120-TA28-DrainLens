@@ -436,7 +436,7 @@ These are assessed and I cannot verify them from the codebase. **Somebody needs 
 
 - [ ] **Peer programming observation document** — the gates table records ≥8 hours cross-discipline pair programming as still unmarked
 - [ ] **PGP iteration build folder** — build artefacts for this iteration
-- [ ] **Structured desk checks** — ≥2 required; the gates table shows none recorded yet
+- [ ] **Structured desk checks** — ≥2 required. [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md) is the sheet: all 77 criteria in click order, with the three known-unverified items listed up front so the session does not rediscover them
 - [ ] **LeanKit board** — current, matching what is actually built
 
 The gates table in [ITERATION-1-TASKS.md](./ITERATION-1-TASKS.md) has four rows with an em dash where a status should be. That table is honest, which is good, but a mentor reading it will see the same gaps.
@@ -449,7 +449,7 @@ Volunteering a limitation reads as understanding. Being caught by it reads as no
 
 **The capture fraction is assumed, and its sensitivity is an open question.** `captureFraction: 0.6` stands in for inlet geometry and grate condition, which the source data does not record. We have measured a consequence: blocking any single inlet currently produces no visible difference at any rainfall from 20 to 200 mm — not because of a bug, but because the recorded network is redundant. The median inlet captures only its own cell's rain, and every drain downstream takes 60% of what reaches it, so water released by one blocked inlet is absorbed within a few cells. **This is an open product decision**, not a defect: it decides whether the interface reports three comparison bands or two, and whether the demonstration blocks one pit or several.
 
-**The address index is a fixture.** It carries 131 real street names taken from the map artefact and the two real recorded addresses; nothing is invented, and it declares `artefact: "address-index-fixture"` so it cannot be mistaken for the real thing. The real index builds from the council portal once the rate limit clears.
+**The address index is real as of 31 August** — 4,089 addresses across 132 streets, replacing the two-address fixture. Worth telling as a defect story: the builder had been reading `property-boundaries`, the **parcel** dataset. It fetched, parsed and produced 1,619 plausible entries, and contained neither demonstration address — Gatehouse Drive has a 10, a 15 and a 17 but no 46, because a parcel is not an address. The dataset it wanted was `street-addresses`, 63,721 records, which the task list had named all along.
 
 **The flow-route cross-check is weak, and we say so.** We compared our channels against the City of Melbourne's published overland flow routes. That layer is itself derived — a 2008 DEM through ESRI Spatial Analyst — so it is one derivation against another. Flow accumulation gave a 24 m median offset and a 1.7× lift over chance. **It is recorded as weaker evidence than the footprint check and is not quoted alongside it.**
 

@@ -1,6 +1,6 @@
 # Deploying DrainLens
 
-Cloud Storage behind an HTTPS load balancer with Cloud CDN. **Fourteen static files, 1.51 MB over the wire.** There is no server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
+Cloud Storage behind an HTTPS load balancer with Cloud CDN. **Fourteen static files, 1.37 MB over the wire.** There is no server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
 
 > **These commands have not been run against a real project.** There is no `gcloud` on the machine they were written on, so treat them as a reviewed plan rather than a tested script. Read each one before running it; the verification section exists so that "it seemed to work" is not the standard.
 
@@ -81,7 +81,7 @@ That script builds, then uploads with the metadata the application actually depe
 
 **Content type.** `.js` must be served as `text/javascript`. **A module worker is refused outright at any other type**, and the whole comparison feature goes with it — the map still draws, so this fails quietly. `.bin` must be `application/octet-stream`.
 
-**gzip.** Cloud Storage does not compress on the fly. Files are uploaded with `--gzip-local-all`, which compresses locally and stores `Content-Encoding: gzip` — taking the first visit from **5.77 MB to 1.31 MB**.
+**gzip.** Cloud Storage does not compress on the fly. Files are uploaded with `--gzip-local-all`, which compresses locally and stores `Content-Encoding: gzip` — taking the first visit from **6.42 MB to 1.37 MB**.
 
 > Not `--gzip-in-flight-all`, which sounds like the same thing and is not: it compresses only the upload to Cloud Storage, leaving the stored object unencoded. Choosing it fails silently — the site works and is four times heavier. Check 2 below is what catches it.
 
