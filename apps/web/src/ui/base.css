@@ -1,0 +1,207 @@
+/*
+ * The base layer: the typeface, a reset that only removes what gets in the
+ * way, and the states a browser draws for us and we would otherwise draw
+ * badly ourselves.
+ *
+ * Everything else is set in components against `ui/theme.ts`. This file is
+ * for the things a stylesheet does better than an inline style: @font-face,
+ * pseudo-classes, and defaults that should apply before any component renders.
+ */
+
+/*
+ * One file, weights 200-900 on a variable axis, 17.6 KB, served from this
+ * origin. See public/fonts/README.md — the short version is that a CDN font
+ * makes the reader's browser tell a third party who and where they are on
+ * every page load, and this product's contract says it does not do that.
+ *
+ * `swap` rather than `block`: the fallback stack is a real system face, and
+ * text a reader can read in the wrong font beats a blank screen in the right
+ * one. The metric overrides keep the swap from moving the layout.
+ */
+@font-face {
+  font-family: 'Kensington Sans';
+  src: url('/fonts/kensington-sans.woff2') format('woff2-variations');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 100%;
+  ascent-override: 98%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Kensington Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Kerning and contextual alternates are in the subset; ask for them. */
+  font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f5f8f7;
+  color: #33475a;
+}
+
+/*
+ * Figures line up in a column or they are harder to compare than prose.
+ * Applied where numbers are set as data rather than as words.
+ */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'kern' 1, 'tnum' 1;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/*
+ * A focus ring the interface draws on purpose.
+ *
+ * The default ring is drawn against the browser's idea of the page, not ours,
+ * and on a dark green button it disappears. `:focus-visible` rather than
+ * `:focus` so it appears for the keyboard and stays out of the way of the
+ * mouse — the reason the default was so often turned off entirely, which is
+ * the one thing that must not happen.
+ */
+:focus-visible {
+  outline: 2px solid #1f6f5c;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: #dcece6;
+  color: #17242e;
+}
+
+/*
+ * Motion, and permission to skip it.
+ *
+ * Nothing here animates for effect; transitions exist so a hover or a panel
+ * collapse reads as the same object changing rather than a new one appearing.
+ * A reader who has asked their system for less motion gets none.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * The landing page's two halves.
+ *
+ * A media query rather than a JS breakpoint: the layout has to be right in the
+ * first painted frame, and a width measured in an effect is one frame late —
+ * which on this screen means the hero map is drawn at the wrong size and then
+ * jumps.
+ */
+.landing {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100%;
+}
+
+.landing__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 24px 48px;
+}
+
+.landing__figure {
+  position: relative;
+  min-height: 260px;
+  background: #eef4f2;
+  border-top: 1px solid #dbe4e4;
+  overflow: hidden;
+}
+
+/*
+ * The map fades out where the writing begins, so the two halves read as one
+ * page rather than two panels. Masked rather than covered with a gradient
+ * overlay: an overlay would sit on top of the page background too and give the
+ * seam a visible edge at every viewport width.
+ */
+.landing__figure::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(245, 248, 247, 0.92), rgba(245, 248, 247, 0) 42%);
+}
+
+@media (min-width: 900px) {
+  .landing {
+    grid-template-columns: minmax(430px, 45%) 1fr;
+  }
+
+  .landing__content {
+    padding: 56px 40px 56px 48px;
+  }
+
+  .landing__figure {
+    min-height: 0;
+    border-top: none;
+    border-left: 1px solid #dbe4e4;
+  }
+
+  .landing__figure::after {
+    background: linear-gradient(to right, rgba(245, 248, 247, 0.94), rgba(245, 248, 247, 0) 38%);
+  }
+}
+
+/*
+ * The hero heading sizes itself.
+ *
+ * 42px is right on a laptop and far too large on a 375px phone, where it
+ * takes three lines and pushes everything else — including the field the
+ * screen exists for — below the fold. `clamp` rather than a breakpoint
+ * because the awkward width is not one number: it is every width between a
+ * phone and a tablet.
+ */
+.landing__title {
+  font: 680 clamp(28px, 6.4vw, 42px) / 1.08 'Kensington Sans', system-ui, sans-serif;
+  letter-spacing: -0.022em;
+}
+
+.landing__lead {
+  font: 400 clamp(15.5px, 1.6vw, 17px) / 1.55 'Kensington Sans', system-ui, sans-serif;
+}
