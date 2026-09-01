@@ -154,6 +154,8 @@ Getting it right took two attempts, and **two entries carrying a real client IP 
 
 The 429 that had blocked this for days cleared on its own — and what it had been hiding was a defect rather than a rate limit. `addresses.py` was reading **`property-boundaries`**, the parcel dataset. It fetched and parsed and produced 1,619 entirely plausible entries containing **neither demonstration address**, because a parcel is not an address: Gatehouse Drive has a 10, a 15 and a 17 and no 46. The dataset it wanted was **`street-addresses`**, 63,721 records, named in the task list from the start.
 
+> **That fix was half applied, and it took until 1 September to notice.** Only `dataset_id` was changed; the human-readable `SOURCE["dataset"]` still read *"Property boundaries"*, so every index this pipeline has published went out stating a source it was not built from. Nothing wrong ever reached a screen — the attribution footer reads the id, and the footer has always credited `street-addresses` — but an artefact whose entire purpose is to be checkable was making a false statement about its own provenance, and no test could tell. It is now `"Street addresses"`, the portal's own title for that id, with three tests holding the two halves together and a positive control showing they fail when the old label is put back.
+
 The `streets` list is deliberately wider than the addressed streets. 38 map street names carry no address, so without them somebody on Harper Street is told their street does not exist rather than that it is outside the pilot.
 
 **Demonstrate on any Kensington address.**

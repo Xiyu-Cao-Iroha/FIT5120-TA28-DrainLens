@@ -30,8 +30,17 @@ from .geo import Extent, from_mga55, to_mga55
 DATASET = "street-addresses"
 BASE = "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets"
 
+#: What the portal calls this dataset, and its id.
+#:
+#: The two must name the same thing. When the builder was moved off the parcel
+#: dataset only `dataset_id` was updated, so every published index went out
+#: carrying "Property boundaries" as its human-readable source while its id
+#: said `street-addresses` -- a false provenance statement inside an artefact
+#: whose whole purpose is to be checkable. The attribution footer reads the id,
+#: so nothing wrong ever reached a screen; the artefact was wrong regardless.
+#: "Street addresses" is the portal's own title for `street-addresses`.
 SOURCE = {
-    "dataset": "Property boundaries",
+    "dataset": "Street addresses",
     "publisher": "City of Melbourne Open Data Portal",
     "licence": "CC BY 4.0",
     "dataset_id": DATASET,
