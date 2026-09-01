@@ -17,10 +17,48 @@ import {
   LICENCE_URL,
   describeDatasets,
 } from './attribution.js';
+import {
+  advisory,
+  brand,
+  ink,
+  line,
+  radius,
+  space,
+  surface,
+  text,
+  tracking,
+  type,
+  weight,
+} from './theme.js';
 
 export const INDICATIVE = 'Indicative local information';
 
 export const PILOT_BADGE = 'Kensington pilot · illustrative prototype geometry';
+
+/**
+ * Drawn, not typed.
+ *
+ * The obvious character for this is `ⓘ`, and Source Sans 3 does not have it —
+ * so setting it as text hands one glyph on every screen to whatever face the
+ * reader's system supplies, in a different weight and on a different baseline
+ * from the sentence beside it. Four characters in this interface are in that
+ * position; all four are drawn instead. See `public/fonts/README.md`.
+ */
+function InfoMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+      <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="4.6" r="0.95" fill="currentColor" />
+      <path
+        d="M8 7.1v4.7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
 
 export interface ShellProps {
   readonly children: ReactNode;
@@ -46,39 +84,57 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
         inset: 0,
         display: 'flex',
         flexDirection: 'column',
-        font: '15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif',
-        color: '#1e2b36',
-        background: '#f6f8f4',
+        font: type(text.body),
+        color: ink.base,
+        background: surface.page,
       }}
     >
       <header
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-          padding: '12px 20px',
-          background: '#ffffff',
-          borderBottom: '1px solid #e6ebe4',
+          gap: space(3),
+          padding: `${String(space(3))}px ${String(space(6))}px`,
+          background: surface.raised,
+          borderBottom: `1px solid ${line.base}`,
+          flexShrink: 0,
         }}
       >
         <span
           aria-hidden
           style={{
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            background: '#243b53',
-            color: '#ffffff',
+            width: 32,
+            height: 32,
+            borderRadius: radius.base,
+            background: ink.strong,
+            color: ink.inverse,
             display: 'grid',
             placeItems: 'center',
-            fontSize: 15,
+            fontSize: 17,
+            lineHeight: 1,
           }}
         >
           ≈
         </span>
         <span>
-          <strong style={{ display: 'block', lineHeight: 1.2 }}>DrainLens</strong>
-          <span style={{ fontSize: 12, color: '#6b7a88' }}>Local drainage explorer</span>
+          <strong
+            style={{
+              display: 'block',
+              font: type(text.lead, { weight: weight.semibold, leading: 1.15 }),
+              letterSpacing: tracking.title,
+              color: ink.strong,
+            }}
+          >
+            DrainLens
+          </strong>
+          <span
+            style={{
+              font: type(text.small, { leading: 1.3 }),
+              color: ink.subtle,
+            }}
+          >
+            Local drainage explorer
+          </span>
         </span>
         <span style={{ marginLeft: 'auto' }}>{actions}</span>
       </header>
@@ -86,14 +142,18 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
       <div
         role="note"
         style={{
-          padding: '7px 20px',
-          background: '#fdf7e3',
-          borderBottom: '1px solid #f0e4bd',
-          fontSize: 13,
-          color: '#6b5b28',
+          display: 'flex',
+          alignItems: 'center',
+          gap: space(2),
+          padding: `${String(space(2))}px ${String(space(6))}px`,
+          background: advisory.fill,
+          borderBottom: `1px solid ${advisory.line}`,
+          font: type(text.label, { leading: 1.4 }),
+          color: advisory.ink,
+          flexShrink: 0,
         }}
       >
-        <span aria-hidden>ⓘ </span>
+        <InfoMark />
         {INDICATIVE}
       </div>
 
@@ -101,11 +161,12 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
         <nav
           aria-label="Breadcrumb"
           style={{
-            padding: '8px 20px',
-            fontSize: 13,
-            color: '#6b7a88',
-            borderBottom: '1px solid #edf1ea',
-            background: '#ffffff',
+            padding: `${String(space(2))}px ${String(space(6))}px`,
+            font: type(text.label, { leading: 1.4 }),
+            color: ink.subtle,
+            borderBottom: `1px solid ${line.hair}`,
+            background: surface.raised,
+            flexShrink: 0,
           }}
         >
           {crumbs}
@@ -134,22 +195,21 @@ function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
     <footer
       style={{
         flexShrink: 0,
-        padding: '6px 20px',
-        background: '#ffffff',
-        borderTop: '1px solid #e6ebe4',
-        fontSize: 11,
-        lineHeight: 1.45,
-        color: '#7a8894',
+        padding: `${String(space(2))}px ${String(space(6))}px`,
+        background: surface.raised,
+        borderTop: `1px solid ${line.base}`,
+        font: type(text.micro, { leading: 1.5 }),
+        color: ink.subtle,
       }}
     >
       {credits.map((credit) => (
-        <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: 10 }}>
+        <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
           {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
           <a
             href={LICENCE_URL}
             target="_blank"
             rel="license noreferrer"
-            style={{ color: '#5c6d7a' }}
+            style={{ color: ink.muted, textDecorationColor: line.strong }}
           >
             {credit.licence}
           </a>
@@ -174,16 +234,41 @@ export function FixtureNotice({ note }: { readonly note: string }) {
     <p
       role="status"
       style={{
-        margin: '14px 0 0',
-        padding: '9px 12px',
-        background: '#fff4f2',
-        border: '1px solid #f3d5cf',
-        borderRadius: 8,
-        fontSize: 13,
+        margin: `${String(space(4))}px 0 0`,
+        padding: `${String(space(3))}px ${String(space(3))}px`,
+        background: '#fff5f2',
+        border: '1px solid #f2d6cf',
+        borderRadius: radius.base,
+        font: type(text.label),
         color: '#8a4b3d',
       }}
     >
-      <strong>Stand-in address list.</strong> {note}
+      <strong style={{ fontWeight: weight.semibold }}>Stand-in address list.</strong> {note}
     </p>
+  );
+}
+
+/**
+ * The pilot badge, which is a claim about scope rather than a label.
+ *
+ * Exported because the landing page and the task page both carry it, and two
+ * copies of a sentence about what this product does *not* cover is how they
+ * drift apart.
+ */
+export function PilotBadge() {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: `${String(space(1))}px ${String(space(3))}px`,
+        borderRadius: radius.pill,
+        background: brand.wash,
+        border: `1px solid ${brand.tint}`,
+        font: type(text.small, { weight: weight.medium, leading: 1.5 }),
+        color: brand.ink,
+      }}
+    >
+      {PILOT_BADGE}
+    </span>
   );
 }

@@ -19,6 +19,7 @@ import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
 import type { DifferenceArea } from './map/difference.js';
+import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
@@ -232,8 +233,8 @@ export function App() {
                 width: panelOpen ? 420 : 0,
                 flexShrink: 0,
                 overflow: panelOpen ? 'auto' : 'hidden',
-                borderRight: panelOpen ? '1px solid #e6ebe4' : 'none',
-                background: '#ffffff',
+                borderRight: panelOpen ? `1px solid ${line.base}` : 'none',
+                background: surface.raised,
                 transition: 'width 160ms ease',
               }}
               aria-hidden={!panelOpen}
@@ -325,18 +326,19 @@ export function App() {
                 aria-expanded={panelOpen}
                 style={{
                   position: 'absolute',
-                  top: 12,
-                  left: 12,
+                  top: space(3),
+                  left: space(3),
                   zIndex: 2,
-                  padding: '7px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #cfd9d2',
-                  background: 'rgba(255,255,255,0.94)',
-                  font: 'inherit',
-                  fontSize: 13,
-                  color: '#1f6f5c',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+                  padding: `${String(space(2))}px ${String(space(3))}px`,
+                  borderRadius: radius.base,
+                  border: `1px solid ${line.base}`,
+                  // Translucent, because it sits over the map and a solid
+                  // chip would punch a white hole in the thing it floats on.
+                  background: 'rgba(255, 255, 255, 0.92)',
+                  backdropFilter: 'blur(6px)',
+                  font: type(text.label, { weight: weight.medium }),
+                  color: ink.strong,
+                  boxShadow: shadow.floating,
                 }}
               >
                 {panelOpen ? '‹ Hide panel' : '› Show panel'}
