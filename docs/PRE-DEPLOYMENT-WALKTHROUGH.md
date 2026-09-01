@@ -4,7 +4,7 @@ DrainLens · TA28 · for the tech mentor check, **Tuesday 1 September 2026**
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app
 
-This document exists for one purpose: so that any member of the team, asked to open a file and say what it does, can. It is not a feature list and not a sales document. It follows the path a single click takes, names the file and the function at each step, and says why each was written that way rather than another way.
+This document exists for one purpose: help any member of the team, asked to open a file and say what it does, can. It is not a feature list and not a sales document. It follows the path a single click takes, names the file and the function at each step, and says why each was written that way rather than another way.
 
 **Read section 2 before anything else.** It is the question we are most likely to answer badly.
 
