@@ -112,14 +112,49 @@ See [pipeline/README.md](../pipeline/README.md) for what each stage does and the
 
 **Never push to `main`.** Every change goes through a pull request with written technical feedback from another team member. This is a commitment the team made in its Week 4 KPI assessment and it is assessed.
 
+**Branch from `develop`, and open the pull request against `develop`.** Not
+from `main`. `main` is only ever moved by merging `develop` into it, so it is
+usually one or more merge commits ahead — and a branch cut from there arrives
+at review carrying those merge commits and whatever else came with them. That
+is not hypothetical: PR #20 was opened this way and turned up with two merge
+commits and an unrelated teammate's work inside it.
+
 ```bash
-git checkout main
+git checkout develop
 git pull
 git checkout -b feat/short-description       # or fix/, docs/, chore/
 # ... work, committing as you go ...
 npm run check                                 # and pytest, if you touched pipeline/
+node tools/docs/check.mjs                     # if you touched any .md
 git push -u origin feat/short-description
 ```
+
+Both `main` and `develop` are protected: neither accepts a direct push, both
+require a pull request, and both require the `check` and `pipeline` jobs to
+pass. Nothing else is enforced by the server — see the note under *review*
+below.
+
+### If you do not use git
+
+Most of what this repository needs from the team is not code. A wording change,
+a figure that is out of date, a claim in a document that is no longer true —
+none of that needs a clone, a terminal or a branch command.
+
+1. Open the file on GitHub and press the pencil.
+2. Edit it. Nothing is live until it is merged, and nothing you do here can
+   reach `main` without a pull request.
+3. At the bottom choose **Create a new branch for this commit**, and keep the
+   name it offers.
+4. **Change the base from `main` to `develop`** on the next screen. GitHub
+   offers `main` by default and that is the wrong target for this repository.
+5. Fill in the template and open it.
+
+The `check` job will run and pass — it does not care about `.md` files. If you
+edited a document, run `node tools/docs/check.mjs` locally if you can, or say
+in the description that you could not, so the reviewer knows to look at the
+rendered file rather than the diff.
+
+### The description
 
 The push prints a link that opens the pull request. In the description, say what changed and why, and **name the acceptance criterion the change serves** — `1.2.2.d`, `2.1.2.e`, and so on, from [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md). A change that serves no criterion is worth a conversation before it is worth a review.
 
@@ -146,6 +181,23 @@ It happens; do it in this order.
 3. Tell the team **before** pushing, with the `reset --hard` they will need.
 4. Ask the repository owner to lower the ruleset. Nobody else can, and nobody should try — `--force-with-lease`, not `--force`, so a concurrent push refuses rather than being clobbered.
 5. Put the protection back the same minute, and verify it with `gh api repos/:owner/:repo/rules/branches/main` rather than by trying a push. `git push --dry-run` does not run the server's rules, so it proves nothing.
+
+### The review is not enforced, and the KPI says it is required
+
+`required_approving_review_count` on both branches is **0**. GitHub will let a
+pull request merge with nobody having read it, and it will not complain. The
+Week 4 commitment — *100% of merges via pull request with written technical
+feedback* — is therefore held up by the team and by
+`.github/pull_request_template.md`, and by nothing else.
+
+Two ways to close that, and they are the repository owner's call:
+
+- Set the required approving review count to 1 on `develop` and `main`. It is
+  one field in the ruleset, and it makes the commitment true by construction.
+- Leave it at 0 and rely on the template. Defensible on a team of this size
+  where one person writes the code — but then the evidence a marker can read
+  is the review threads, so the feedback has to actually be written down
+  rather than said in a meeting.
 
 ### What a reviewer is looking for
 
