@@ -410,15 +410,15 @@ What the mentor can check in the repository, and what lives outside it.
 | Coverage gates | `vitest.config.ts`, `pyproject.toml` | 88% overall, 90% for judgement-carrying modules |
 | Commit messages | prose explaining *why*, not what | see `git log` |
 
-### Numbers, as measured on 29 August 2026 (after the trace feature landed)
+### Numbers, as measured on 1 September 2026
 
 | Metric | Value |
 |---|---|
 | TypeScript tests | **472**, 23 files, **3.6 s** here · **5 s on the CI runner, three samples** |
-| Python tests | **332**, **105 s** here · **51–66 s on the CI runner** — over the 5 s gate either way, see below |
+| Python tests | **341**, **105 s** here · **51–67 s on the CI runner** — over the 5 s gate either way, see below |
 | TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions |
 | Python coverage | **91.05%** |
-| Source lines, excluding tests | ~17,000 |
+| Source lines, excluding tests | **12,085** across 58 files — 13,482 TypeScript and 7,166 Python in total, of which tests are 8,563 |
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 
@@ -434,9 +434,9 @@ Interaction criteria: **77 of 77 met**, each checked against the code on 29 Augu
 |---|---:|---:|
 | First visit, p95 | 34.5 ms | **507.7 ms** |
 | Transfer | 1.37 MB (21%) | **1.36 MB (21%)** |
+| Fetch failures | 0 of 1,200 | **0 of 360** |
 
 Re-measured after the 1 September redeployment: **p95 692.4 ms, 1.36 MB (21%), 0 of 60 failures.** The transfer did not move, because the difference layer ships no artefact — it is computed in the worker from arrays already on the wire.
-| Fetch failures | 0 of 1,200 | **0 of 360** |
 
 **Do not present that as a regression.** The "before" is a laptop against `localhost` with no network in it — a floor, and labelled as one before the deployment existed. The "after" is Melbourne to Sydney and back. The comparable figure is the transfer: 1.37 against 1.36 MB at the same ratio, which is what proves gzip actually reaches the client rather than being read off a header.
 

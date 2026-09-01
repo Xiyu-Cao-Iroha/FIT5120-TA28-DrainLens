@@ -1,3 +1,5 @@
+import './ui/base.css';
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
