@@ -418,7 +418,7 @@ What the mentor can check in the repository, and what lives outside it.
 | Python tests | **341**, **105 s** here · **51–67 s on the CI runner** — over the 5 s gate either way, see below |
 | TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions |
 | Python coverage | **91.05%** |
-| Source lines, excluding tests | **12,085** across 58 files — 13,482 TypeScript and 7,166 Python in total, of which tests are 8,563 |
+| Source lines, excluding tests | **12,767** — 8,824 TypeScript and 3,943 Python, with 8,727 more in tests |
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 

@@ -66,14 +66,14 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Measured on **30 August 2026**. These are the current figures, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
+Measured on **1 September 2026** against the merged `main`. These are the current figures, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.75%** Node · **91.05%** Python |
+| Coverage, overall | ≥ 88% | **92.98%** Node · **91.05%** Python |
 | Suite runtime | < 5 s | **Node 5 s on the CI runner — at the limit** · **Python 51–67 s ✗**. See below |
-| Tests | 472 TypeScript · 341 Python | 813 in total |
+| Tests | 485 TypeScript · 341 Python | **826** in total, across 40 files |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
