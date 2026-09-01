@@ -126,76 +126,15 @@ button:disabled {
 }
 
 /*
- * The landing page's two halves.
- *
- * A media query rather than a JS breakpoint: the layout has to be right in the
- * first painted frame, and a width measured in an effect is one frame late —
- * which on this screen means the hero map is drawn at the wrong size and then
- * jumps.
- */
-.landing {
-  display: grid;
-  grid-template-columns: 1fr;
-  min-height: 100%;
-}
-
-.landing__content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 40px 24px 48px;
-}
-
-.landing__figure {
-  position: relative;
-  min-height: 260px;
-  background: #eef4f2;
-  border-top: 1px solid #dbe4e4;
-  overflow: hidden;
-}
-
-/*
- * The map fades out where the writing begins, so the two halves read as one
- * page rather than two panels. Masked rather than covered with a gradient
- * overlay: an overlay would sit on top of the page background too and give the
- * seam a visible edge at every viewport width.
- */
-.landing__figure::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgba(245, 248, 247, 0.92), rgba(245, 248, 247, 0) 42%);
-}
-
-@media (min-width: 900px) {
-  .landing {
-    grid-template-columns: minmax(430px, 45%) 1fr;
-  }
-
-  .landing__content {
-    padding: 56px 40px 56px 48px;
-  }
-
-  .landing__figure {
-    min-height: 0;
-    border-top: none;
-    border-left: 1px solid #dbe4e4;
-  }
-
-  .landing__figure::after {
-    background: linear-gradient(to right, rgba(245, 248, 247, 0.94), rgba(245, 248, 247, 0) 38%);
-  }
-}
-
-/*
  * The hero heading sizes itself.
  *
- * 42px is right on a laptop and far too large on a 375px phone, where it
- * takes three lines and pushes everything else — including the field the
- * screen exists for — below the fold. `clamp` rather than a breakpoint
- * because the awkward width is not one number: it is every width between a
- * phone and a tablet.
+ * 42px is right on a laptop and far too large on a 375px phone, where it takes
+ * three lines and pushes the field the screen exists for below the fold.
+ * `clamp` rather than a breakpoint because the awkward width is not one
+ * number: it is every width between a phone and a tablet.
+ *
+ * It lives here rather than inline because an inline `font` shorthand wins
+ * over a class, which is how the first attempt at this silently did nothing.
  */
 .landing__title {
   font: 680 clamp(28px, 6.4vw, 42px) / 1.08 'Kensington Sans', system-ui, sans-serif;

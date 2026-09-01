@@ -129,8 +129,6 @@ export function App() {
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
-            artefact={loaded.map}
-            derived={loaded.derived}
             onFound={(address) =>
               dispatch({
                 type: 'address-accepted',

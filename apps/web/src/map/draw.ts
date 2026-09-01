@@ -384,16 +384,6 @@ export interface DrawOptions {
   readonly showPits?: boolean;
   readonly showRoads?: boolean;
   /**
-   * Street names.
-   *
-   * Separate from `showRoads` because they answer different questions. On the
-   * instrument they are how somebody finds their own street, and they stay on.
-   * On the landing page the same map is an *illustration*: nobody is looking
-   * up a street on it, and forty names set at 10px over a square kilometre is
-   * texture rather than information. Off by choice there, never by default.
-   */
-  readonly showLabels?: boolean;
-  /**
    * Skip the flat ground fill because something already painted the ground.
    *
    * `drawMap` opens by filling the whole canvas. With the terrain layer drawn
@@ -469,7 +459,7 @@ export function drawMap(
       options.suggestedPit ?? null,
     );
   }
-  if (options.showLabels !== false && viewport.scale >= LABEL_MIN_SCALE) {
+  if (viewport.scale >= LABEL_MIN_SCALE) {
     drawStreetNames(context, viewport, artefact.layers['street-name'] ?? [], palette, seen);
   }
 

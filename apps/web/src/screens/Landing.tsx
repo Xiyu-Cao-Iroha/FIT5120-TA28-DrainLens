@@ -1,7 +1,7 @@
 /**
  * The first screen: find an address, or find out that we cannot help with it.
  *
- * Three things here are load-bearing rather than cosmetic.
+ * Four things here are load-bearing rather than cosmetic.
  *
  * The privacy line is a promise the code keeps — the index is local, the
  * search never takes a network, and the address is held in memory for the tab
@@ -12,11 +12,18 @@
  * An address we cannot resolve is never quietly swapped for one we can. The
  * three outcomes stay distinct all the way to the screen.
  *
- * And the map is on this screen at all because the product's whole argument is
- * *look at the ground you live on* — which it used to withhold until after you
- * had typed your address, leaving a form in the middle of an empty page. The
- * drawing is the pilot square kilometre from the artefacts already loaded, so
- * it is the product's own record rather than a stock image of water.
+ * The demonstration address is offered directly, because the pilot is one
+ * square kilometre and most people's own address is outside it. Without that
+ * offer the honest answer is also a dead end, and a dead end on the first
+ * screen is where somebody leaves.
+ *
+ * And the two lists at the bottom are why this page is not empty. It briefly
+ * carried a rendering of the pilot square kilometre instead, which is worth
+ * recording as a mistake: the instrument's palette is tuned to read discrete
+ * facts against terrain, so as a picture it is dense, multi-hued and
+ * hard-edged — it read as a screenshot pasted beside the writing, because that
+ * is exactly what it was. Space on a first screen is better earned by saying
+ * what somebody is about to get, and what they are not.
  */
 
 import { type FormEvent, useMemo, useState } from 'react';
@@ -29,9 +36,6 @@ import {
   resolve,
   search,
 } from '../address/search.js';
-import type { DerivedArtefact } from '../map/derived.js';
-import type { MapArtefact } from '../map/artefact.js';
-import { HeroMap } from '../map/HeroMap.js';
 import { FixtureNotice, PilotBadge } from '../ui/Shell.js';
 import {
   advisory,
@@ -51,13 +55,30 @@ import {
 export const PRIVACY_LINE =
   'No account is required. Your address stays in this browser tab: it is not sent anywhere, and nothing is kept when you close it.';
 
+/**
+ * What the product does, and what it refuses to do, before anybody types.
+ *
+ * The second list is not a disclaimer bolted on at the end. It is the claim
+ * the banner makes on every screen and the result screen makes again in its
+ * own words, said once more at the only moment it can still change what
+ * somebody expects — which is before they have asked for anything.
+ */
+const SHOWS: readonly string[] = [
+  'Surface-water paths and low points, calculated from a measured ground surface',
+  "The council's recorded drainage pits and pipes, and where a path stops because the record does",
+  'One blocked drain compared against the same rainfall with every drain clear',
+];
+
+const DOES_NOT: readonly string[] = [
+  'It is not a flood map and not a prediction',
+  'It does not show how deep water would be, or when it would arrive',
+  'It covers one square kilometre of Kensington, so most Melbourne addresses are outside it',
+];
+
 export interface LandingProps {
   readonly index: AddressIndex;
   /** Present only while the index is a stand-in. */
   readonly fixtureNote?: string | undefined;
-  /** Drawn as the page's own illustration. Already loaded before this renders. */
-  readonly artefact: MapArtefact;
-  readonly derived: DerivedArtefact;
   readonly onFound: (address: IndexedAddress) => void;
   readonly onUnsupported: (typed: string) => void;
 }
@@ -67,7 +88,7 @@ type Problem =
   | { readonly kind: 'not-an-address'; readonly typed: string }
   | null;
 
-/** The privacy line's mark, drawn because `◇` is not in the shipped subset. */
+/** The privacy line's mark, drawn because the shipped subset has no shield. */
 function ShieldMark() {
   return (
     <svg
@@ -97,14 +118,7 @@ function ShieldMark() {
   );
 }
 
-export function Landing({
-  index,
-  fixtureNote,
-  artefact,
-  derived,
-  onFound,
-  onUnsupported,
-}: LandingProps) {
+export function Landing({ index, fixtureNote, onFound, onUnsupported }: LandingProps) {
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
@@ -113,6 +127,8 @@ export function Landing({
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
+
+  const demonstration = index.addresses[0];
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -133,148 +149,242 @@ export function Landing({
   }
 
   return (
-    <div className="landing">
-      <div className="landing__content">
-        <div style={{ maxWidth: 560 }}>
-          <PilotBadge />
+    <div
+      style={{
+        maxWidth: 720,
+        margin: '0 auto',
+        padding: `${String(space(12))}px ${String(space(6))}px ${String(space(16))}px`,
+      }}
+    >
+      <PilotBadge />
 
-          <h1
-            className="landing__title"
+      <h1
+        className="landing__title"
+        style={{ margin: `${String(space(5))}px 0 ${String(space(3))}px`, color: ink.strong }}
+      >
+        See how rainwater may move near your address
+      </h1>
+      <p
+        className="landing__lead"
+        style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
+      >
+        Explore local surface water paths, public drainage connections and a simplified
+        drain-blockage scenario.
+      </p>
+
+      <form
+        onSubmit={submit}
+        style={{
+          padding: space(5),
+          background: surface.raised,
+          border: `1px solid ${line.base}`,
+          borderRadius: radius.large,
+          boxShadow: shadow.resting,
+        }}
+      >
+        <label
+          htmlFor="address"
+          style={{
+            display: 'block',
+            font: type(text.label, { weight: weight.semibold }),
+            color: ink.strong,
+            marginBottom: space(2),
+          }}
+        >
+          Enter an address
+        </label>
+        <div style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
+          <input
+            id="address"
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.target.value);
+              setProblem(null);
+            }}
+            onFocus={() => {
+              setFocused(true);
+            }}
+            onBlur={() => {
+              setFocused(false);
+            }}
+            placeholder="Start typing an address"
+            autoComplete="off"
             style={{
-              margin: `${String(space(5))}px 0 ${String(space(3))}px`,
-              // Size, weight and tracking come from `.landing__title`, which
-              // clamps to the viewport. Setting `font` here would win over it.
+              flex: '1 1 260px',
+              minWidth: 0,
+              padding: space(3),
+              font: type(text.body),
               color: ink.strong,
-            }}
-          >
-            See how rainwater may move near your address
-          </h1>
-          <p
-            className="landing__lead"
-            style={{
-              margin: `0 0 ${String(space(7))}px`,
-              color: ink.muted,
-              maxWidth: 480,
-            }}
-          >
-            Explore local surface water paths, public drainage connections and a simplified
-            drain-blockage scenario.
-          </p>
-
-          <form
-            onSubmit={submit}
-            style={{
-              padding: space(5),
               background: surface.raised,
-              border: `1px solid ${line.base}`,
-              borderRadius: radius.large,
-              boxShadow: shadow.resting,
+              border: `1px solid ${focused ? brand.base : line.strong}`,
+              borderRadius: radius.base,
+              outline: 'none',
+              transition: 'border-color 120ms ease',
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              padding: `${String(space(3))}px ${String(space(5))}px`,
+              font: type(text.body, { weight: weight.semibold }),
+              color: ink.inverse,
+              background: brand.base,
+              border: 'none',
+              borderRadius: radius.base,
+              transition: 'background-color 120ms ease',
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background = brand.hover;
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background = brand.base;
             }}
           >
-            <label
-              htmlFor="address"
-              style={{
-                display: 'block',
-                font: type(text.label, { weight: weight.semibold }),
-                color: ink.strong,
-                marginBottom: space(2),
-              }}
-            >
-              Enter an address
-            </label>
-            <div style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
-              <input
-                id="address"
-                value={typed}
-                onChange={(event) => {
-                  setTyped(event.target.value);
-                  setProblem(null);
-                }}
-                onFocus={() => {
-                  setFocused(true);
-                }}
-                onBlur={() => {
-                  setFocused(false);
-                }}
-                placeholder="Start typing an address"
-                autoComplete="off"
-                style={{
-                  flex: '1 1 240px',
-                  minWidth: 0,
-                  padding: `${String(space(3))}px ${String(space(3))}px`,
-                  font: type(text.body),
-                  color: ink.strong,
-                  background: surface.raised,
-                  border: `1px solid ${focused ? brand.base : line.strong}`,
-                  borderRadius: radius.base,
-                  outline: 'none',
-                  transition: 'border-color 120ms ease',
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  padding: `${String(space(3))}px ${String(space(5))}px`,
-                  font: type(text.body, { weight: weight.semibold }),
-                  color: ink.inverse,
-                  background: brand.base,
-                  border: 'none',
-                  borderRadius: radius.base,
-                  transition: 'background-color 120ms ease',
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.background = brand.hover;
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.background = brand.base;
-                }}
-              >
-                Explore this area →
-              </button>
-            </div>
-
-            {suggestions.length > 0 && (
-              <ul
-                aria-label="Matching addresses"
-                style={{ listStyle: 'none', margin: `${String(space(3))}px 0 0`, padding: 0 }}
-              >
-                {suggestions.map((match) => (
-                  <li key={match.address.id}>
-                    <SuggestionButton
-                      label={match.address.label}
-                      onPick={() => {
-                        onFound(match.address);
-                      }}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p
-              style={{
-                display: 'flex',
-                gap: space(2),
-                alignItems: 'flex-start',
-                margin: `${String(space(3))}px 0 0`,
-                font: type(text.small, { leading: 1.5 }),
-                color: ink.subtle,
-              }}
-            >
-              <ShieldMark />
-              <span>{PRIVACY_LINE}</span>
-            </p>
-
-            {problem !== null && <UnsupportedNotice problem={problem} index={index} />}
-            {fixtureNote !== undefined && <FixtureNotice note={fixtureNote} />}
-          </form>
+            Explore this area →
+          </button>
         </div>
-      </div>
 
-      <div className="landing__figure">
-        <HeroMap artefact={artefact} derived={derived} />
+        {suggestions.length > 0 && (
+          <ul
+            aria-label="Matching addresses"
+            style={{ listStyle: 'none', margin: `${String(space(3))}px 0 0`, padding: 0 }}
+          >
+            {suggestions.map((match) => (
+              <li key={match.address.id}>
+                <SuggestionButton
+                  label={match.address.label}
+                  onPick={() => {
+                    onFound(match.address);
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {suggestions.length === 0 && problem === null && demonstration && (
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              font: type(text.label),
+              color: ink.subtle,
+            }}
+          >
+            Not sure?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                onFound(demonstration);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                font: type(text.label, { weight: weight.semibold }),
+                color: brand.ink,
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              Try {demonstration.label}
+            </button>
+          </p>
+        )}
+
+        <p
+          style={{
+            display: 'flex',
+            gap: space(2),
+            alignItems: 'flex-start',
+            margin: `${String(space(4))}px 0 0`,
+            paddingTop: space(4),
+            borderTop: `1px solid ${line.hair}`,
+            font: type(text.small, { leading: 1.5 }),
+            color: ink.subtle,
+          }}
+        >
+          <ShieldMark />
+          <span>{PRIVACY_LINE}</span>
+        </p>
+
+        {problem !== null && <UnsupportedNotice problem={problem} index={index} />}
+        {fixtureNote !== undefined && <FixtureNotice note={fixtureNote} />}
+      </form>
+
+      <div
+        style={{
+          display: 'grid',
+          gap: space(8),
+          gridTemplateColumns: 'repeat(auto-fit, minmax(255px, 1fr))',
+          marginTop: space(12),
+        }}
+      >
+        <Claims title="What this shows" items={SHOWS} tone="brand" />
+        <Claims title="What it does not" items={DOES_NOT} tone="quiet" />
       </div>
     </div>
+  );
+}
+
+/**
+ * One of the two lists.
+ *
+ * The markers are a short rule for what the product does and a dot for what it
+ * does not. Deliberately not a tick and a cross: those read as good news and
+ * bad news, and the second list is not bad news — it is the boundary of a
+ * careful claim, which is the most valuable thing on the page.
+ */
+function Claims({
+  title,
+  items,
+  tone,
+}: {
+  readonly title: string;
+  readonly items: readonly string[];
+  readonly tone: 'brand' | 'quiet';
+}) {
+  return (
+    <section>
+      <h2
+        style={{
+          margin: `0 0 ${String(space(4))}px`,
+          font: type(text.micro, { weight: weight.semibold }),
+          letterSpacing: tracking.caps,
+          textTransform: 'uppercase',
+          color: ink.subtle,
+        }}
+      >
+        {title}
+      </h2>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {items.map((item) => (
+          <li
+            key={item}
+            style={{
+              display: 'flex',
+              gap: space(3),
+              alignItems: 'flex-start',
+              marginBottom: space(4),
+              font: type(text.label, { leading: 1.65 }),
+              color: ink.muted,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                width: tone === 'brand' ? 14 : 5,
+                height: 5,
+                borderRadius: radius.pill,
+                background: tone === 'brand' ? brand.base : line.strong,
+                marginTop: 9,
+              }}
+            />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
