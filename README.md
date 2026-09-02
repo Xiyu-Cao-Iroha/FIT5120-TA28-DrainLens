@@ -47,6 +47,8 @@ models              exported ONNX models and evaluation reports                 
 
 ## Working on it
 
+**How the water is routed** — [docs/ALGORITHMS.md](./docs/ALGORITHMS.md) follows the whole chain, from point cloud to the difference on screen, naming the file and function at each step. It also records the three routing failures that shaped it, re-measured rather than quoted.
+
 **Start with [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** — setup for both toolchains, everyday commands, how to build artefacts, the pull request workflow, and the gotchas worth knowing before you hit them.
 
 The short version, Node 20 or newer:

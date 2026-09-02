@@ -30,6 +30,8 @@ import type {
 
 /** Which screen the person is on. */
 export type Screen =
+  /** What somebody lands on: what this is, before it asks anything of them. */
+  | 'home'
   | 'address'
   | 'task'
   | 'explore'
@@ -87,7 +89,7 @@ export const EMPTY_SCENARIO: ScenarioInputs = {
 };
 
 export const INITIAL_SESSION: Session = {
-  screen: 'address',
+  screen: 'home',
   address: null,
   rejectedAddress: null,
   task: null,
@@ -98,6 +100,16 @@ export const INITIAL_SESSION: Session = {
 
 export type SessionEvent =
   | { readonly type: 'address-accepted'; readonly address: SupportedAddress }
+  /**
+   * A different address chosen from the map, rather than from the first screen.
+   *
+   * Separate from `address-accepted` because that one sends the person back to
+   * the task question, which is right when they have just arrived and wrong
+   * when they are already reading a map -- searching from the map should move
+   * the map. Everything else the two do is the same, including dropping a pit
+   * that belongs to the old neighbourhood.
+   */
+  | { readonly type: 'address-moved'; readonly address: SupportedAddress }
   | { readonly type: 'address-rejected'; readonly typed: string }
   | { readonly type: 'task-chosen'; readonly task: Task }
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
@@ -106,13 +118,28 @@ export type SessionEvent =
   | { readonly type: 'comparison-started' }
   | { readonly type: 'comparison-finished'; readonly outcome: Outcome }
   | { readonly type: 'back' }
+  /**
+   * Into the map without answering anything first.
+   *
+   * The homepage's own way in. It skips the address question rather than
+   * assuming an answer to it: the map opens over the pilot area with no
+   * address selected, and the search along the top is how somebody names one.
+   * Opening on a guessed address would put a marker on a street nobody asked
+   * about, which on a product about *your* address is the wrong first move.
+   *
+   * The task is `full-map`, because the two guided tasks exist to answer a
+   * question somebody has chosen. Nobody chose one on the way in here.
+   */
+  | { readonly type: 'map-opened' }
+  | { readonly type: 'go-home' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
 /** Where `back` goes from each screen. */
 const BACK: Readonly<Record<Screen, Screen>> = {
-  address: 'address',
+  home: 'home',
+  address: 'home',
   task: 'address',
   explore: 'task',
   scenario: 'task',
@@ -122,6 +149,19 @@ const BACK: Readonly<Record<Screen, Screen>> = {
 
 export function reduce(session: Session, event: SessionEvent): Session {
   switch (event.type) {
+    case 'address-moved':
+      return {
+        ...session,
+        address: event.address,
+        rejectedAddress: null,
+        ...(session.address && session.address.id !== event.address.id
+          ? {
+              scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+              outcome: null,
+            }
+          : {}),
+      };
+
     case 'address-accepted':
       return {
         ...session,
@@ -170,6 +210,12 @@ export function reduce(session: Session, event: SessionEvent): Session {
     case 'back':
       return { ...session, screen: BACK[session.screen] };
 
+    case 'map-opened':
+      return { ...session, screen: 'explore', task: 'full-map' };
+
+    case 'go-home':
+      return { ...session, screen: 'home' };
+
     case 'change-address':
       return { ...session, screen: 'address' };
 
@@ -179,6 +225,27 @@ export function reduce(session: Session, event: SessionEvent): Session {
 
     case 'reset-choices':
       return { ...session, scenario: EMPTY_SCENARIO, outcome: null };
+
+    default: {
+      /*
+       * Unreachable at compile time, and it has to be reachable at runtime.
+       *
+       * The assignment to `never` keeps the exhaustiveness check: a new event
+       * type that nothing handles fails the build here rather than silently
+       * doing nothing. The `return session` is for the case the compiler
+       * cannot see — a module that is one version behind the one dispatching
+       * to it. Without it the switch falls through, returns `undefined`, and
+       * React replaces the whole session with nothing: the screen goes blank
+       * and the stack points at whoever read `session.screen` first rather
+       * than at the action nobody handled.
+       *
+       * That is not hypothetical. It happened here, with a stale dev-server
+       * module serving a reducer that predated the action being dispatched.
+       */
+      const unhandled: never = event;
+      void unhandled;
+      return session;
+    }
   }
 }
 

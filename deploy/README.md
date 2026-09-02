@@ -54,7 +54,10 @@ An exclusion drops entries **before they are written**. One added afterwards can
 **3. Deploy.** From the repository root, not from your home directory.
 
 ```bash
-gcloud run deploy drainlens --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=3
+gcloud run deploy drainlens --project=fit5120-504507 --source=. \
+  --region=australia-southeast1 --allow-unauthenticated --port=8080 \
+  --memory=512Mi --max-instances=3 \
+  --set-env-vars "BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>"
 ```
 
 `--allow-unauthenticated` is the one step to be deliberate about: it publishes the site. That is the intent — it is a public information site — but it is worth a pause.
@@ -66,6 +69,112 @@ Watch the first line of output. It must say **`Building using Dockerfile`**. If 
 ```bash
 node tools/perf/measure.mjs https://drainlens-205559161217.australia-southeast1.run.app 100
 ```
+
+---
+
+## The access gate
+
+Required by the Week 6 studio, and stated again in Rana's email of 2 September:
+put a password in front of the **whole deployed website**, before a user can
+reach the application at all. DrainLens is a self-managed container behind
+nginx, so this is the Nginx Basic Authentication case the email names.
+
+**It is not a product login and never will be.** AD1 says this product holds no
+identity, so there is no account system to reuse and website-level protection
+is the only kind available to it -- which is exactly the distinction the slides
+draw. The landing page's promise that "no account is required" is about the
+product; the gate is about the deployment.
+
+### The password is never in this repository
+
+`entrypoint.sh` builds the htpasswd file at start-up from two environment
+variables. `BASIC_AUTH_HASH` is already a hash, generated on somebody's own
+machine, so nothing in the image or the repository can be turned back into a
+password.
+
+Generate it yourself, on your machine, and do not paste the password anywhere:
+
+```bash
+# Any one of these. Each prompts, or takes the password on stdin, and prints
+# only "user:$hash" or the hash. Never put the plain password in a command
+# that lands in shell history.
+htpasswd -nBC 10 mentor                    # apache2-utils, prompts twice
+openssl passwd -apr1                       # prompts, prints the hash alone
+```
+
+Put the **hash** in the deploy command below and the **password** in the PGP
+Team Info document beside the URLs, which is where the slides say operational
+credentials belong.
+
+### It fails closed, on purpose
+
+Without both variables the container **exits and never serves**. Cloud Run then
+keeps the previous revision running, so the cost is a failed deploy you can see
+rather than an unprotected site you cannot.
+
+This is not caution for its own sake. This repository has already shipped two
+failures of exactly that shape -- `--source=.` falling back to Buildpacks
+without erroring, and a log exclusion written to a field that stored it happily
+and filtered nothing. A gate that silently disappears is the same bug a third
+time.
+
+Verified before deploying, by running the entrypoint's guard directly:
+
+| Environment | Result |
+|---|---|
+| Neither variable set | exits 1, refuses to start |
+| `BASIC_AUTH_USER` only | exits 1 |
+| `BASIC_AUTH_HASH=""` | exits 1 -- an empty value is not a configured one |
+| Both set | exits 0, writes the htpasswd, substitutes `$PORT` |
+
+---
+
+## Preserving each iteration
+
+The studio asks for a Git tag per iteration, an accessible deployed version of
+each, and clear iteration URLs.
+
+**The tag.** `iteration-1-final` marks the commit that was demonstrated and
+deployed -- not the current `main`, which has moved on. A tag that points at
+code nobody ran is a worse record than no tag.
+
+```bash
+git tag -a iteration-1-final <commit> -m "Iteration 1 as demonstrated, 1 September 2026"
+git push origin iteration-1-final
+```
+
+**The URL.** Cloud Run gives every *service* its own hostname, so a second
+service is the closest thing available to the subdomain pattern:
+
+| | |
+|---|---|
+| `drainlens` | the current build, redeployed as work continues |
+| `drainlens-iteration1` | deployed once from the tag, then left alone |
+
+A subdirectory (`/iteration1`) is **not** an option here and the reason is
+already recorded above: every path this app fetches is absolute from `/`, which
+is the same constraint that ruled out serving it from a Cloud Storage
+sub-path. Reaching a subdirectory layout would mean an HTTPS load balancer,
+which needs a domain, which the team does not have.
+
+No iteration *branch* is needed. The studio says to create one only when the
+hosting platform requires a branch to deploy from; `gcloud run deploy --source`
+takes whatever is checked out, so a tag is enough.
+
+```bash
+git checkout iteration-1-final
+gcloud run deploy drainlens-iteration1 --project=fit5120-504507 --source=. \
+  --region=australia-southeast1 --allow-unauthenticated --port=8080 \
+  --memory=512Mi --max-instances=1 \
+  --set-env-vars "BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>"
+git checkout main
+```
+
+> `--allow-unauthenticated` stays on both. It governs Cloud Run's own IAM,
+> which is a different gate from the one in nginx: leaving it off would demand
+> a Google identity and a signed request, which is not something a mentor can
+> do from a browser. The password prompt is the gate; IAM is not being used as
+> one.
 
 ---
 
@@ -89,16 +198,24 @@ The content types are set with a `types` block, not `add_header`. `add_header` *
 Configuration saying the right thing is not evidence.
 
 ```bash
-curl -sI https://drainlens-205559161217.australia-southeast1.run.app/assets/worker-*.js | grep -i content-type
+# The gate first, and from both sides. A check that only confirms the site
+# still works cannot tell a protected deployment from an open one.
+curl -s -o /dev/null -w '%{http_code}\n' https://drainlens-205559161217.australia-southeast1.run.app/
+#    Expect: 401.
 
-curl -sI -H 'Accept-Encoding: gzip' https://drainlens-205559161217.australia-southeast1.run.app/data/scene/elevation.bin | grep -i content-encoding
+curl -s -o /dev/null -w '%{http_code}\n' -u '<user>:<password>' https://drainlens-205559161217.australia-southeast1.run.app/
+#    Expect: 200. Without this line the 401 above could be a broken container.
+
+curl -sI -u '<user>:<password>' https://drainlens-205559161217.australia-southeast1.run.app/assets/worker-*.js | grep -i content-type
+
+curl -sI -u '<user>:<password>' -H 'Accept-Encoding: gzip' https://drainlens-205559161217.australia-southeast1.run.app/data/scene/elevation.bin | grep -i content-encoding
 ```
 
 **The logging check is the one that matters, and it only counts after real traffic.**
 
 ```bash
 # 1. Generate some. An empty log during a quiet hour proves nothing.
-for i in 1 2 3 4 5; do curl -s -o /dev/null https://drainlens-205559161217.australia-southeast1.run.app/data/map.json; done
+for i in 1 2 3 4 5; do curl -s -o /dev/null -u '<user>:<password>' https://drainlens-205559161217.australia-southeast1.run.app/data/map.json; done
 sleep 90
 
 # 2. Did any of them store a client IP?

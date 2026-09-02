@@ -1,0 +1,13 @@
+# Nothing here is for a search engine.
+#
+# This is an unfinished student prototype: illustrative geometry over one
+# square kilometre, with a comparison that is explicitly not a flood
+# prediction. An indexed page of it is a page somebody can arrive at without
+# any of the framing that makes it honest.
+#
+# The access gate in front of the whole site is what actually prevents
+# indexing -- a crawler cannot get past HTTP 401, so it never reads this file.
+# This exists for the window in which the gate is deliberately lifted, when it
+# becomes the only thing saying so.
+User-agent: *
+Disallow: /
