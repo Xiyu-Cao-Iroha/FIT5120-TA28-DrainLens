@@ -437,6 +437,26 @@ describe('opening the map from the homepage', () => {
     expect(again.mapMode).toBe('low-areas');
   });
 
+  it('opens the flood history without taking an address to it', () => {
+    const busy = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'go-home' },
+    ]);
+    const end = reduce(busy, { type: 'history-opened' });
+
+    expect(end.screen).toBe('history');
+    // The board is about six years of recorded incidents across Greater
+    // Melbourne. Clearing the address would lose the person's work; using it
+    // would imply the board says something about their street, which is the
+    // reading the page exists to prevent. So it is carried and not consulted.
+    expect(end.address).toEqual(GATEHOUSE);
+  });
+
+  it('goes back from the flood history to the homepage it was opened from', () => {
+    const end = play([{ type: 'history-opened' }, { type: 'back' }]);
+    expect(end.screen).toBe('home');
+  });
+
   it('forgets the mode when a task is chosen instead', () => {
     // The other way into the map. A mode left over from an earlier trip
     // through the homepage would override the task's own defaults, and the

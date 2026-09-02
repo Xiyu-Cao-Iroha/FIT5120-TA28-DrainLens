@@ -34,6 +34,8 @@ import type { MapMode } from './map/modes.js';
 export type Screen =
   /** What somebody lands on: what this is, before it asks anything of them. */
   | 'home'
+  /** The recorded flood incidents, which are about the past and not this address. */
+  | 'history'
   | 'address'
   | 'task'
   | 'explore'
@@ -146,6 +148,15 @@ export type SessionEvent =
    * with everything on, which is what the unguided way in has always meant.
    */
   | { readonly type: 'map-opened'; readonly mode?: MapMode }
+  /**
+   * The flood-history board, from the homepage.
+   *
+   * It takes no address and gives none back. The board is about recorded
+   * incidents across Greater Melbourne over six financial years, and an
+   * address would imply it says something about one -- which is the reading
+   * the page exists to prevent.
+   */
+  | { readonly type: 'history-opened' }
   | { readonly type: 'go-home' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
@@ -154,6 +165,7 @@ export type SessionEvent =
 /** Where `back` goes from each screen. */
 const BACK: Readonly<Record<Screen, Screen>> = {
   home: 'home',
+  history: 'home',
   address: 'home',
   task: 'address',
   explore: 'task',
@@ -230,6 +242,9 @@ export function reduce(session: Session, event: SessionEvent): Session {
 
     case 'map-opened':
       return { ...session, screen: 'explore', task: 'full-map', mapMode: event.mode ?? null };
+
+    case 'history-opened':
+      return { ...session, screen: 'history' };
 
     case 'go-home':
       return { ...session, screen: 'home' };
