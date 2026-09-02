@@ -1,26 +1,35 @@
 /**
- * The layers, their controls, and the legend that says what each one is.
+ * The controls over the map, and the legend that says what each mark is.
  *
  * One module because they are one fact seen twice. The chips along the top
- * turn a layer on and off; the legend at the bottom says what its marks mean
- * and where it came from. Kept apart, the two drift — a layer renamed in the
+ * turn a mode on and off; the legend at the bottom says what its marks mean
+ * and where they came from. Kept apart, the two drift — a layer renamed in the
  * control and not in the legend is a map that disagrees with its own key.
  *
- * **The chips are toggles, not a mode switch.** They can all be on at once,
- * which matters: AC 1.1.3.b names five controls and AC 1.1.3.c requires each
- * to turn its layer off and on *individually*. A segmented control in the
- * usual sense — one of four, the others off — would fail both, and it would
- * also be wrong for the product, because the questions overlap. Where water
- * runs is a question about the ground it runs over.
+ * **Two levels, because AC 1.1.4 and 1.1.5 describe two.** The four modes are
+ * chips along the top. The drainage layers, pits and pipes, are switches
+ * behind the Layers button, each working on its own inside the mode that owns
+ * them. The rules for combining the two are in `modes.ts` with a truth table
+ * for a test; this file only draws them.
+ *
+ * **The chips are multi-select.** All four can be on at once — see the note in
+ * `modes.ts` for why the criterion's singular "the selected mode" does not
+ * force one-of-four, and why one-of-four would be the worse reading.
  */
 import { useState } from 'react';
 
-import type { DerivedVisibility } from './derived.js';
+import {
+  type LayerKey,
+  type LayerState,
+  MODES,
+  type MapMode,
+  type ModeState,
+  SUBLAYER_KEYS,
+  type SubLayerKey,
+  type SubLayerState,
+  ownerOf,
+} from './modes.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
-
-export type LayerKey = 'pit' | 'pipe' | 'terrain' | 'channel' | 'lowPoint' | 'unavailable';
-
-export type LayerState = Record<LayerKey, boolean>;
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
 type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch';
@@ -39,8 +48,11 @@ export interface LayerSpec {
  * The six layers, in the order the map stacks them.
  *
  * Pits and pipes were one entry until the criterion was read closely. They are
- * named separately in AC 1.1.3.b, and they answer different questions: the
- * pipes are where water goes, the pits are where it can get in.
+ * named separately in AC 1.1.5, and they answer different questions: the pipes
+ * are where water goes, the pits are where it can get in.
+ *
+ * This table is what a layer *looks like* and where it came from. Which
+ * control governs it is `modes.ts`.
  */
 export const LAYERS: readonly LayerSpec[] = [
   { key: 'terrain', chip: 'Terrain', label: 'Ground surface', basis: 'System-derived result', swatch: 'ramp' },
@@ -51,21 +63,11 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'unavailable', chip: 'No ground data', label: 'Not enough ground measured', basis: 'System-derived result', swatch: 'hatch' },
 ];
 
-/**
- * The layers that get a chip of their own.
- *
- * The other two sit behind the Layers button, and neither is a lesser layer.
- * "Not enough ground measured" answers a question about the *data* rather than
- * about the ground. The ground surface is there because it is background: it
- * is on by default, it is what everything else is drawn over, and it is not
- * something a person reaches for while reading a particular street. Both are
- * still individually switchable, which is what AC 1.1.3.b and 1.1.3.c ask —
- * the criteria require a control per layer, not a control in a chip row.
- */
-export const PRIMARY_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint'];
-
-export function visibilityOf(state: LayerState): DerivedVisibility {
-  return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
+/** The look-up the controls and the legend both go through. */
+function specOf(key: LayerKey): LayerSpec {
+  const spec = LAYERS.find((l) => l.key === key);
+  if (!spec) throw new Error(`No layer spec for ${key}`);
+  return spec;
 }
 
 function SwatchMark({ kind }: { readonly kind: Swatch }) {
@@ -144,14 +146,18 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
 }
 
 function Chip({
-  spec,
+  label,
+  swatch,
   on,
   disabled,
+  title,
   onToggle,
 }: {
-  readonly spec: LayerSpec;
+  readonly label: string;
+  readonly swatch: Swatch;
   readonly on: boolean;
   readonly disabled: boolean;
+  readonly title: string;
   readonly onToggle: () => void;
 }) {
   return (
@@ -160,7 +166,7 @@ function Chip({
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={on}
-      title={disabled ? `${spec.label} is still loading` : spec.label}
+      title={title}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -187,36 +193,52 @@ function Chip({
           padding: on ? '1px 2px' : 0,
         }}
       >
-        <SwatchMark kind={spec.swatch} />
+        <SwatchMark kind={swatch} />
       </span>
-      {spec.chip}
+      {label}
     </button>
   );
 }
 
-export interface LayerChipsProps {
-  readonly state: LayerState;
-  readonly onToggle: (key: LayerKey) => void;
-  /** Keys that cannot be turned on yet — the terrain raster is still loading. */
-  readonly unavailableKeys?: readonly LayerKey[];
+export interface ModeChipsProps {
+  readonly modes: ModeState;
+  readonly sub: SubLayerState;
+  readonly onToggleMode: (key: MapMode) => void;
+  readonly onToggleSub: (key: SubLayerKey) => void;
+  /** Modes that cannot be turned on yet — the terrain raster is still loading. */
+  readonly unavailableModes?: readonly MapMode[];
 }
 
-export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChipsProps) {
+/**
+ * The four modes, and the Layers button that opens the switches beneath them.
+ *
+ * The button is part of this row rather than a separate control because the
+ * two are one decision seen at two depths: the chips say which questions the
+ * map is answering, the panel says which parts of an answer are drawn.
+ */
+export function ModeChips({
+  modes,
+  sub,
+  onToggleMode,
+  onToggleSub,
+  unavailableModes = [],
+}: ModeChipsProps) {
   const [open, setOpen] = useState(false);
-  const extra = LAYERS.filter((l) => !PRIMARY_KEYS.includes(l.key));
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}>
-      {PRIMARY_KEYS.map((key) => {
-        const spec = LAYERS.find((l) => l.key === key)!;
+      {MODES.map((mode) => {
+        const disabled = unavailableModes.includes(mode.key);
         return (
           <Chip
-            key={key}
-            spec={spec}
-            on={state[key]}
-            disabled={unavailableKeys.includes(key)}
+            key={mode.key}
+            label={mode.chip}
+            swatch={specOf(mode.swatchOf).swatch}
+            on={modes[mode.key]}
+            disabled={disabled}
+            title={disabled ? `${mode.summary} — still loading` : mode.summary}
             onToggle={() => {
-              onToggle(key);
+              onToggleMode(mode.key);
             }}
           />
         );
@@ -261,7 +283,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
               right: 0,
               top: 'calc(100% + 6px)',
               zIndex: 5,
-              width: 280,
+              width: 288,
               padding: space(4),
               background: surface.raised,
               border: `1px solid ${line.base}`,
@@ -278,33 +300,65 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
                 color: ink.subtle,
               }}
             >
-              Other map layers
+              Layers
             </p>
-            {extra.map((spec) => (
-              <label
-                key={spec.key}
+            {SUBLAYER_KEYS.map((key) => {
+              const spec = specOf(key);
+              const owner = ownerOf(key);
+              // A switch under a mode that is off would appear to do nothing.
+              // Disabled and explained is honest; silently inert is not.
+              const off = owner !== null && !modes[owner];
+              const ownerChip = MODES.find((mode) => mode.key === owner)?.chip;
+              return (
+                <label
+                  key={key}
+                  title={off ? `Turn ${String(ownerChip)} on to show this` : spec.label}
+                  style={{
+                    display: 'flex',
+                    gap: space(3),
+                    alignItems: 'flex-start',
+                    marginBottom: space(3),
+                    font: type(text.label, { leading: 1.5 }),
+                    color: off ? ink.subtle : ink.base,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sub[key]}
+                    disabled={off}
+                    onChange={() => {
+                      onToggleSub(key);
+                    }}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    <span style={{ display: 'block' }}>{spec.label}</span>
+                    <BasisTag basis={spec.basis} />
+                  </span>
+                </label>
+              );
+            })}
+            {/*
+              Shown when a switch in *this panel* is greyed, not merely when
+              some mode is off. Low Areas has no switch here, so its being off
+              is no reason to explain a greying nobody can see.
+            */}
+            {SUBLAYER_KEYS.some((key) => {
+              const owner = ownerOf(key);
+              return owner !== null && !modes[owner];
+            }) && (
+              <p
                 style={{
-                  display: 'flex',
-                  gap: space(3),
-                  alignItems: 'flex-start',
-                  font: type(text.label, { leading: 1.5 }),
-                  color: ink.base,
+                  margin: `${String(space(2))}px 0 0`,
+                  paddingTop: space(2),
+                  borderTop: `1px solid ${line.hair}`,
+                  font: type(text.micro, { leading: 1.45 }),
+                  color: ink.subtle,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={state[spec.key]}
-                  onChange={() => {
-                    onToggle(spec.key);
-                  }}
-                  style={{ marginTop: 3 }}
-                />
-                <span>
-                  <span style={{ display: 'block' }}>{spec.label}</span>
-                  <BasisTag basis={spec.basis} />
-                </span>
-              </label>
-            ))}
+                A greyed switch belongs to a mode that is currently off.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -332,7 +386,8 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
 }
 
 /**
- * The legend, and where AC 1.1.3.d is met.
+ * The legend, and where "distinguish official recorded data from system-derived
+ * information" is met — AC 1.1.4, and AC 1.3.1 for the terrain in particular.
  *
  * The criterion asks that every layer carry *Official recorded data* or
  * *System-derived result*. It used to sit under each checkbox in the panel;

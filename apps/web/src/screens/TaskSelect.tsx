@@ -110,6 +110,14 @@ export interface TaskSelectProps {
   readonly onChangeAddress: () => void;
 }
 
+/**
+ * The guided tasks on offer.
+ *
+ * The drain-blockage comparison used to be the second of these. AC 1.1.1
+ * requires it to be absent from the Iteration 1 interface, so the entry is
+ * gone; `Task` still admits `'compare'` and the screens behind it are intact,
+ * because Iteration 2 turns it back on by restoring one entry here.
+ */
 const GUIDED: readonly {
   readonly task: Task;
   readonly title: string;
@@ -121,12 +129,6 @@ const GUIDED: readonly {
     title: 'Follow local water and drainage',
     body: 'See where rainwater may move near this address, and follow the recorded drainage connections downstream.',
     action: 'Follow water and drainage',
-  },
-  {
-    task: 'compare',
-    title: 'Compare a drain-blockage scenario',
-    body: 'Choose a drainage pit, a blockage assumption and an accumulated rainfall amount, then compare the result against all drains clear.',
-    action: 'Set up a comparison',
   },
 ];
 
@@ -181,7 +183,7 @@ export function TaskSelect({ address, onChoose, onChangeAddress }: TaskSelectPro
         What would you like to understand?
       </h1>
       <p style={{ margin: `0 0 ${String(space(7))}px`, color: ink.muted, maxWidth: 620 }}>
-        Choose a task to see the most relevant information first. You can change tasks or open
+        Choose a task to see the most relevant information first. You can switch modes or open
         other map layers at any time.
       </p>
 

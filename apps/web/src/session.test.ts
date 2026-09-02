@@ -416,4 +416,40 @@ describe('opening the map from the homepage', () => {
     expect(end.address).toEqual(GATEHOUSE);
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
+
+  it('carries the mode the card named — AC 1.1.2', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened', mode: 'water-flow' }).mapMode).toBe(
+      'water-flow',
+    );
+  });
+
+  it('names no mode when the way in did not', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).mapMode).toBeNull();
+  });
+
+  it('replaces the mode rather than keeping the previous card’s', () => {
+    const again = play([
+      { type: 'map-opened', mode: 'terrain' },
+      { type: 'go-home' },
+      { type: 'map-opened', mode: 'low-areas' },
+    ]);
+
+    expect(again.mapMode).toBe('low-areas');
+  });
+
+  it('forgets the mode when a task is chosen instead', () => {
+    // The other way into the map. A mode left over from an earlier trip
+    // through the homepage would override the task's own defaults, and the
+    // person would be looking at the answer to a question they left behind.
+    const viaTask = play([
+      { type: 'map-opened', mode: 'terrain' },
+      { type: 'go-home' },
+      { type: 'change-address' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+
+    expect(viaTask.screen).toBe('explore');
+    expect(viaTask.mapMode).toBeNull();
+  });
 });

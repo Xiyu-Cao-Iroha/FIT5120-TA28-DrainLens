@@ -66,7 +66,7 @@ export const PRIVACY_LINE =
 const SHOWS: readonly string[] = [
   'Surface-water paths and low points, calculated from a measured ground surface',
   "The council's recorded drainage pits and pipes, and where a path stops because the record does",
-  'One blocked drain compared against the same rainfall with every drain clear',
+  'The shape of the ground, and which parts of it were measured rather than filled in',
 ];
 
 const DOES_NOT: readonly string[] = [
@@ -168,8 +168,8 @@ export function Landing({ index, fixtureNote, onFound, onUnsupported }: LandingP
         className="landing__lead"
         style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
       >
-        Explore local surface water paths, public drainage connections and a simplified
-        drain-blockage scenario.
+        Explore local surface water paths, public drainage connections and the shape of the
+        ground around an address.
       </p>
 
       <form
