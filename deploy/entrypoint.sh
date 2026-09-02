@@ -27,6 +27,32 @@ if [ -z "${BASIC_AUTH_USER:-}" ] || [ -z "${BASIC_AUTH_HASH:-}" ]; then
   exit 1
 fi
 
+# The hash must still look like one, and this check is not pedantry.
+#
+# An apr1 hash is `$apr1$salt$digest` and a bcrypt one is `$2y$...`. Both are
+# full of `$`, so a deploy command that quotes them with double quotes has the
+# shell expand `$apr1` and `$salt` to nothing before gcloud ever sees them --
+# leaving a value like `.`, which is short, wrong, and *not empty*. The guard
+# above would pass it, nginx would start, and the site would be locked to
+# everybody including the person holding the password. That is worse than
+# failing closed: it looks like a working deployment until somebody tries.
+#
+# Checked by shape rather than by verifying a password, because the password is
+# deliberately not here to verify against.
+case "${BASIC_AUTH_HASH}" in
+  '$apr1$'*|'$2y$'*|'$2a$'*|'$2b$'*|'$1$'*|'$5$'*|'$6$'*|'{SHA}'*) ;;
+  *)
+    echo "FATAL: BASIC_AUTH_HASH is not a password hash in a format nginx reads." >&2
+    echo "       Got ${#BASIC_AUTH_HASH} characters starting with:" \
+         "$(printf '%.6s' "${BASIC_AUTH_HASH}")" >&2
+    echo "       The usual cause is quoting. A hash contains \$ signs, so it must" >&2
+    echo "       be passed in SINGLE quotes -- in double quotes the shell expands" >&2
+    echo "       them away and leaves a short, wrong, non-empty value." >&2
+    echo "       See deploy/README.md, 'The password is never in this repository'." >&2
+    exit 1
+    ;;
+esac
+
 # The password never exists here: BASIC_AUTH_HASH is already a hash, generated
 # on somebody's own machine and passed in at deploy time. Nothing in this image
 # or in the repository can be turned back into a password.
