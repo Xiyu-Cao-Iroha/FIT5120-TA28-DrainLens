@@ -11,6 +11,7 @@
 
 import type { LineFeature, MapArtefact, Pipe, Pit, PolygonFeature, Road, StreetName } from './artefact.js';
 import { type Local, type Viewport, toScreen, visibleBounds } from './viewport.js';
+import { ICON_MIN_SCALE, drawPitIcon } from './pitIcon.js';
 
 export interface Palette {
   readonly ground: string;
@@ -164,12 +165,19 @@ function drawPits(
     if (east < seen.minE || east > seen.maxE || north < seen.minN || north > seen.maxN) continue;
     const isSelected = selectedAsset !== null && pit.asset_number === selectedAsset;
     const [x, y] = toScreen(viewport, pit.c);
-    context.beginPath();
-    context.arc(x, y, isSelected ? radius + 2.5 : radius, 0, Math.PI * 2);
-    context.fillStyle = isSelected ? palette.selected : palette.pit;
-    context.fill();
-    context.strokeStyle = palette.pitEdge;
-    context.stroke();
+    if (viewport.scale >= ICON_MIN_SCALE) {
+      // Close enough for the grate to be countable. See map/pitIcon.ts for
+      // why it is a fixed size and why it is not the artwork's own colour.
+      drawPitIcon(context, x, y, isSelected ? palette.selected : palette.pit);
+      context.lineWidth = 1.5;
+    } else {
+      context.beginPath();
+      context.arc(x, y, isSelected ? radius + 2.5 : radius, 0, Math.PI * 2);
+      context.fillStyle = isSelected ? palette.selected : palette.pit;
+      context.fill();
+      context.strokeStyle = palette.pitEdge;
+      context.stroke();
+    }
 
     // A ring around, not a different fill: the suggestion has to read as
     // "this one, if you want it" rather than as an already-made choice.

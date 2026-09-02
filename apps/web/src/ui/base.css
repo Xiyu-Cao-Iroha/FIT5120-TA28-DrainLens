@@ -144,3 +144,55 @@ button:disabled {
 .landing__lead {
   font: 400 clamp(15.5px, 1.6vw, 17px) / 1.55 'Kensington Sans', system-ui, sans-serif;
 }
+
+/*
+ * The homepage.
+ *
+ * A media query rather than a JS breakpoint: the hero draws a canvas sized to
+ * its container, and a width measured in an effect is one frame late — which
+ * here means the map is painted at the wrong size and then jumps.
+ */
+.home__hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.home__title {
+  font: 680 clamp(30px, 5.2vw, 46px) / 1.08 'Kensington Sans', system-ui, sans-serif;
+  letter-spacing: -0.024em;
+}
+
+.home__section-title {
+  font: 680 clamp(24px, 3.2vw, 32px) / 1.15 'Kensington Sans', system-ui, sans-serif;
+  letter-spacing: -0.018em;
+}
+
+.home__preview {
+  min-height: 300px;
+}
+
+@media (min-width: 900px) {
+  .home__hero {
+    grid-template-columns: minmax(360px, 46%) 1fr;
+    gap: 56px;
+  }
+
+  .home__preview {
+    min-height: 360px;
+  }
+}
+
+/* The homepage's own navigation, which only it has. */
+.home-nav {
+  display: none;
+  align-items: center;
+  gap: 22px;
+}
+
+@media (min-width: 820px) {
+  .home-nav {
+    display: flex;
+  }
+}

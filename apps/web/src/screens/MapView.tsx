@@ -5,49 +5,69 @@
  * one instruction, with everything else collapsed. The full-map task asks for
  * the opposite. Both are the same map; what differs is what is on when it
  * opens, and that difference is the whole reason the task question exists.
+ *
+ * **The chrome is deliberately in pieces.** It used to be one 310px panel
+ * carrying the address, the instruction, the sentence about nearby water, six
+ * layer checkboxes and whatever was selected — over the top-left corner of a
+ * one-kilometre map, which is a lot of map to cover to read a list. Each part
+ * now sits where it belongs: controls along the top, the legend at the bottom,
+ * and the selected feature in a card that only exists when something is
+ * selected.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 
+import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
+import { MAX_SUGGESTIONS, search } from '../address/search.js';
 import type { MapArtefact } from '../map/artefact.js';
-import type { DerivedArtefact, DerivedVisibility } from '../map/derived.js';
+import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
+import {
+  LAYERS,
+  LayerChips,
+  type LayerKey,
+  type LayerState,
+  MapLegend,
+  visibilityOf,
+} from '../map/MapLayers.js';
 import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
+import {
+  basis as basisTone,
+  ink,
+  line,
+  radius,
+  shadow,
+  space,
+  surface,
+  text,
+  tracking,
+  type,
+  weight,
+} from '../ui/theme.js';
 import { PitDetail } from './PitDetail.js';
 
-const BASIS_STYLE: Readonly<Record<string, { background: string; color: string }>> = {
-  'Official recorded data': { background: '#dcece6', color: '#1f5b4e' },
-  'System-derived result': { background: '#dde8f2', color: '#2a5678' },
+/** What the follow task opens with: the two layers its question needs. */
+const GUIDED_ON: LayerState = {
+  pit: true,
+  pipe: true,
+  terrain: true,
+  channel: true,
+  lowPoint: false,
+  unavailable: false,
 };
 
-/**
- * The five layers AC 1.1.3.b names, each with its own control.
- *
- * Pits and pipes were one entry until the criterion was read closely. They are
- * named separately there, and they answer different questions: the pipes are
- * where water goes, the pits are where it can get in.
- */
-const LAYERS = [
-  { key: 'pit', label: 'Drainage pits', basis: 'Official recorded data' },
-  { key: 'pipe', label: 'Drainage pipes', basis: 'Official recorded data' },
-  { key: 'terrain', label: 'Ground surface', basis: 'System-derived result' },
-  { key: 'channel', label: 'Likely surface water paths', basis: 'System-derived result' },
-  { key: 'lowPoint', label: 'Low points and depressions', basis: 'System-derived result' },
-  { key: 'unavailable', label: 'Not enough ground measured', basis: 'System-derived result' },
-] as const;
-
-type LayerKey = (typeof LAYERS)[number]['key'];
-
-/** What the guided view shows before "More map layers" is opened. */
-const GUIDED_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'terrain', 'channel'];
-
-/** What the follow task opens with: the two layers its question needs. */
-const GUIDED: DerivedVisibility = { channel: true, lowPoint: false, unavailable: false };
-export const EVERYTHING: DerivedVisibility = { channel: true, lowPoint: true, unavailable: true };
+const EVERYTHING_ON: LayerState = {
+  pit: true,
+  pipe: true,
+  terrain: true,
+  channel: true,
+  lowPoint: true,
+  unavailable: true,
+};
 
 export interface MapViewProps {
   readonly map: MapArtefact;
@@ -58,21 +78,28 @@ export interface MapViewProps {
   readonly onBack: () => void;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
+  /** Present only where the map is the whole screen and search makes sense. */
+  readonly index?: AddressIndex | undefined;
+  readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
 }
 
-export function MapView({ map, derived, trace, address, task, onBack, panel = true }: MapViewProps) {
+export function MapView({
+  map,
+  derived,
+  trace,
+  address,
+  task,
+  onBack,
+  panel = true,
+  index,
+  onAddress,
+}: MapViewProps) {
   const guided = task !== 'full-map';
-  const [show, setShow] = useState<DerivedVisibility>(guided ? GUIDED : EVERYTHING);
-  const [moreOpen, setMoreOpen] = useState(!guided);
+  const [layers, setLayers] = useState<LayerState>(guided ? GUIDED_ON : EVERYTHING_ON);
   const [hit, setHit] = useState<Hit | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
-  const [showPits, setShowPits] = useState(true);
-  const [showPipes, setShowPipes] = useState(true);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
-  const [terrainOn, setTerrainOn] = useState(true);
-  // The panel covers the top-left corner of a 1 km map. Reading the map means
-  // being able to put it away.
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [chromeOpen, setChromeOpen] = useState(true);
 
   // Painted once, then reused for every pan and zoom. A failure here leaves
   // the layer off rather than breaking the map: the terrain is context, and
@@ -116,16 +143,25 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
     [trace, following],
   );
 
+  const toggle = (key: LayerKey) => {
+    setLayers((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  // The terrain chip cannot be pressed until its raster exists. Shown disabled
+  // rather than hidden: a control that vanishes reads as a control that was
+  // never there, and this one is named by AC 1.1.3.b.
+  const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
+
   return (
     <>
       <MapCanvas
         artefact={map}
         derived={derived}
-        show={show}
+        show={visibilityOf(layers)}
         selectedPit={selected}
-        terrain={terrainOn ? terrain : null}
-        showPits={showPits}
-        showPipes={showPipes}
+        terrain={layers.terrain ? terrain : null}
+        showPits={layers.pit}
+        showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         onSelect={(next) => {
@@ -138,257 +174,349 @@ export function MapView({ map, derived, trace, address, task, onBack, panel = tr
         }}
       />
 
-      {panel && !panelOpen && (
-        <button
-          type="button"
-          onClick={() => setPanelOpen(true)}
+      {panel && (
+        <div
           style={{
             position: 'absolute',
-            left: 16,
-            top: 16,
-            zIndex: 2,
-            padding: '7px 12px',
-            borderRadius: 8,
-            border: '1px solid #cfd9d2',
-            background: 'rgba(255,255,255,0.94)',
-            font: 'inherit',
-            fontSize: 13,
-            color: '#1f6f5c',
-            cursor: 'pointer',
-            boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+            left: space(4),
+            right: space(4),
+            top: space(4),
+            zIndex: 4,
+            display: 'flex',
+            gap: space(3),
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            pointerEvents: 'none',
           }}
         >
-          › Show panel
-        </button>
+          <div style={{ pointerEvents: 'auto', display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
+            {index && onAddress && <MapSearch index={index} address={address} onPick={onAddress} />}
+            <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
+          </div>
+        </div>
       )}
 
-      {panel && panelOpen && (
-      <aside
-        style={{
-          position: 'absolute',
-          left: 16,
-          top: 16,
-          width: 310,
-          maxHeight: 'calc(100% - 32px)',
-          overflow: 'auto',
-          padding: '14px 16px',
-          background: 'rgba(255,255,255,0.96)',
-          borderRadius: 10,
-          boxShadow: '0 2px 14px rgba(0,0,0,0.12)',
-          fontSize: 14,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setPanelOpen(false)}
-          aria-label="Hide the panel"
+      {panel && <MapLegend state={layers} />}
+
+      {panel && (
+        <aside
           style={{
-            float: 'right',
-            marginTop: -4,
-            background: 'none',
-            border: 'none',
-            padding: '0 0 0 8px',
-            font: 'inherit',
-            fontSize: 13,
-            color: '#1f6f5c',
-            cursor: 'pointer',
+            position: 'absolute',
+            left: space(4),
+            top: 64,
+            width: 320,
+            maxHeight: 'calc(100% - 84px)',
+            overflow: 'auto',
+            zIndex: 3,
+            padding: `${String(space(4))}px ${String(space(4))}px`,
+            background: 'rgba(255, 255, 255, 0.96)',
+            backdropFilter: 'blur(8px)',
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.large,
+            boxShadow: shadow.floating,
           }}
         >
-          ‹ Hide
-        </button>
-
-        {address && (
-          <>
-            <span style={{ fontSize: 12, letterSpacing: 0.6, color: '#8593a0' }}>
-              SELECTED ADDRESS
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: space(2) }}>
+            <span style={{ flex: 1 }}>
+              <span
+                style={{
+                  display: 'block',
+                  font: type(text.micro, { weight: weight.semibold }),
+                  letterSpacing: tracking.caps,
+                  textTransform: 'uppercase',
+                  color: ink.subtle,
+                }}
+              >
+                Selected address
+              </span>
+              <strong
+                style={{
+                  display: 'block',
+                  marginTop: space(1),
+                  font: type(text.body, { weight: weight.semibold, leading: 1.35 }),
+                  color: ink.strong,
+                }}
+              >
+                {address?.label ?? 'No address selected'}
+              </strong>
             </span>
-            <strong style={{ display: 'block', margin: '2px 0 10px' }}>{address.label}</strong>
-          </>
-        )}
-
-        {guided && (
-          <p
-            style={{
-              margin: '0 0 12px',
-              padding: '9px 11px',
-              background: '#eef4f0',
-              borderRadius: 8,
-              color: '#2c5f52',
-            }}
-          >
-            <strong style={{ display: 'block', fontSize: 12, letterSpacing: 0.6 }}>
-              YOUR NEXT STEP
-            </strong>
-            Select a highlighted surface-water path or a nearby drainage pit.
-          </p>
-        )}
-
-        {/* AC 1.1.2.c — measured against the layers beside it, not a caption. */}
-        {explanation !== null && (
-          <p
-            style={{
-              margin: '0 0 12px',
-              padding: '9px 11px',
-              background: '#f2f6fa',
-              borderRadius: 8,
-              color: '#33506b',
-            }}
-          >
-            {explanation}
-            <span
+            <button
+              type="button"
+              onClick={() => {
+                setChromeOpen((v) => !v);
+              }}
+              aria-expanded={chromeOpen}
               style={{
-                display: 'inline-block',
-                marginTop: 6,
-                padding: '1px 7px',
-                borderRadius: 999,
-                fontSize: 11,
-                ...(BASIS_STYLE[NEARBY_BASIS] ?? { background: '#eee', color: '#444' }),
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                font: type(text.label, { weight: weight.medium }),
+                color: ink.muted,
               }}
             >
-              {NEARBY_BASIS}
-            </span>
-          </p>
-        )}
+              {chromeOpen ? '‹ Hide' : '› More'}
+            </button>
+          </div>
 
-        <span style={{ fontSize: 12, letterSpacing: 0.6, color: '#8593a0' }}>MAP LAYERS</span>
-        <div style={{ marginTop: 8 }}>
-          {LAYERS.filter((layer) => moreOpen || GUIDED_KEYS.includes(layer.key)).map(
-            (layer) => {
-              const toggleable = layer.key !== 'terrain' || terrain !== null;
-              const on =
-                layer.key === 'pit'
-                  ? showPits
-                  : layer.key === 'pipe'
-                    ? showPipes
-                    : layer.key === 'terrain'
-                      ? terrainOn && terrain !== null
-                      : show[layer.key as keyof DerivedVisibility];
-              const style = BASIS_STYLE[layer.basis] ?? { background: '#eee', color: '#444' };
-              return (
-                <label
-                  key={layer.key}
+          {chromeOpen && (
+            <>
+              {guided && (
+                <p
                   style={{
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'flex-start',
-                    marginBottom: 9,
-                    cursor: toggleable ? 'pointer' : 'default',
-                    opacity: toggleable ? 1 : 0.8,
+                    margin: `${String(space(3))}px 0 0`,
+                    padding: `${String(space(3))}px ${String(space(3))}px`,
+                    background: basisTone.recorded.fill,
+                    borderRadius: radius.base,
+                    font: type(text.label, { leading: 1.5 }),
+                    color: ink.base,
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    disabled={!toggleable}
-                    onChange={() => {
-                      if (!toggleable) return;
-                      if (layer.key === 'pit') return setShowPits((v) => !v);
-                      if (layer.key === 'pipe') return setShowPipes((v) => !v);
-                      if (layer.key === 'terrain') return setTerrainOn((v) => !v);
-                      return setShow((current) => ({
-                        ...current,
-                        [layer.key]: !current[layer.key as keyof DerivedVisibility],
-                      }));
-                    }}
-                    style={{ marginTop: 3 }}
-                  />
-                  <span>
-                    <span style={{ display: 'block' }}>{layer.label}</span>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        marginTop: 3,
-                        padding: '1px 7px',
-                        borderRadius: 999,
-                        fontSize: 11,
-                        ...style,
-                      }}
-                    >
-                      {layer.basis}
-                    </span>
+                  <strong style={{ display: 'block', fontWeight: weight.semibold }}>
+                    Your next step
+                  </strong>
+                  Select a highlighted surface-water path or a nearby drainage pit.
+                </p>
+              )}
+
+              {explanation !== null && (
+                <p
+                  style={{
+                    margin: `${String(space(3))}px 0 0`,
+                    padding: `${String(space(3))}px ${String(space(3))}px`,
+                    background: basisTone.derived.fill,
+                    borderRadius: radius.base,
+                    font: type(text.label, { leading: 1.5 }),
+                    color: ink.base,
+                  }}
+                >
+                  {explanation}
+                  <Badge basis={NEARBY_BASIS} />
+                </p>
+              )}
+
+              <div
+                style={{
+                  marginTop: space(4),
+                  paddingTop: space(3),
+                  borderTop: `1px solid ${line.hair}`,
+                  minHeight: 44,
+                }}
+              >
+                {hit === null ? (
+                  <span style={{ color: ink.subtle, font: type(text.label) }}>
+                    Select a drainage pit or pipe.
                   </span>
-                </label>
-              );
-            },
-          )}
-        </div>
-
-        {guided && (
-          <button
-            type="button"
-            onClick={() => setMoreOpen((open) => !open)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              font: 'inherit',
-              color: '#1f6f5c',
-              cursor: 'pointer',
-            }}
-          >
-            {moreOpen ? '▾ Fewer map layers' : '▸ More map layers'}
-          </button>
-        )}
-
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e6ebe4', minHeight: 44 }}>
-          {hit === null ? (
-            <span style={{ color: '#6b7a88' }}>Select a drainage pit or pipe.</span>
-          ) : hit.kind === 'pit' ? (
-            <PitDetail
-              pit={hit.feature}
-              map={map}
-              artefact={trace}
-              trace={followed}
-              onFollow={() => setFollowing(String(hit.feature.asset_number))}
-              onClear={() => setFollowing(null)}
-            />
-          ) : (
-            <>
-              <strong>Pipe {hit.feature.ref}</strong>
-              <div style={{ color: '#6b7a88' }}>
-                {hit.feature.diameter ? `${hit.feature.diameter} mm · ` : ''}
-                {hit.feature.material}
+                ) : hit.kind === 'pit' ? (
+                  <PitDetail
+                    pit={hit.feature}
+                    map={map}
+                    artefact={trace}
+                    trace={followed}
+                    onFollow={() => {
+                      setFollowing(String(hit.feature.asset_number));
+                    }}
+                    onClear={() => {
+                      setFollowing(null);
+                    }}
+                  />
+                ) : (
+                  <>
+                    <strong style={{ color: ink.strong }}>Pipe {hit.feature.ref}</strong>
+                    <div style={{ color: ink.muted, font: type(text.label) }}>
+                      {hit.feature.diameter ? `${String(hit.feature.diameter)} mm · ` : ''}
+                      {hit.feature.material}
+                    </div>
+                    <Badge basis="Official recorded data" />
+                  </>
+                )}
               </div>
-              <Badge basis="Official recorded data" />
+
+              <button
+                type="button"
+                onClick={onBack}
+                style={{
+                  marginTop: space(4),
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: type(text.label, { weight: weight.medium }),
+                  color: '#1a5d4d',
+                }}
+              >
+                ← Back to choose a task
+              </button>
             </>
           )}
-        </div>
-
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            marginTop: 12,
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            font: 'inherit',
-            color: '#1f6f5c',
-            cursor: 'pointer',
-          }}
-        >
-          ← Back to choose a task
-        </button>
-      </aside>
+        </aside>
       )}
     </>
   );
 }
 
+/**
+ * Searching from the map, rather than going back to the first screen.
+ *
+ * The same index and the same `search`, so a match here means exactly what a
+ * match there means. Choosing one hands the address up to the session — the
+ * map does not move itself, because the address is a decision the whole
+ * application shares rather than a view state this screen owns.
+ */
+function MapSearch({
+  index,
+  address,
+  onPick,
+}: {
+  readonly index: AddressIndex;
+  readonly address: SupportedAddress | null;
+  readonly onPick: (address: IndexedAddress) => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [focused, setFocused] = useState(false);
+
+  const matches: Match[] = useMemo(
+    () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
+    [index, typed],
+  );
+
+  return (
+    <div style={{ position: 'relative', width: 268 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: space(2),
+          padding: `${String(space(2))}px ${String(space(3))}px`,
+          background: surface.raised,
+          border: `1px solid ${focused ? '#1f6f5c' : line.base}`,
+          borderRadius: radius.base,
+          boxShadow: shadow.floating,
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke={ink.subtle} strokeWidth="1.5" />
+          <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        <input
+          value={typed}
+          onChange={(event) => {
+            setTyped(event.target.value);
+          }}
+          onFocus={() => {
+            setFocused(true);
+          }}
+          onBlur={() => {
+            setFocused(false);
+          }}
+          placeholder={address?.label ?? 'Search an address'}
+          aria-label="Search for an address"
+          autoComplete="off"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            font: type(text.label),
+            color: ink.strong,
+          }}
+        />
+        {typed !== '' && (
+          <button
+            type="button"
+            onClick={() => {
+              setTyped('');
+            }}
+            aria-label="Clear the search"
+            style={{ background: 'none', border: 'none', padding: 0, color: ink.subtle }}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden focusable="false">
+              <path
+                d="m4 4 8 8M12 4l-8 8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/*
+        Shown whenever there is something to show, rather than only while the
+        field has focus. Gating it on focus meant a delayed blur could hide the
+        list out from under a click, or leave it hidden after a programmatic
+        focus that fired no event -- a list that is sometimes there is worse
+        than one that is always there while you are typing.
+      */}
+      {matches.length > 0 && (
+        <ul
+          aria-label="Matching addresses"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 'calc(100% + 4px)',
+            zIndex: 6,
+            listStyle: 'none',
+            margin: 0,
+            padding: space(1),
+            background: surface.raised,
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            boxShadow: shadow.lifted,
+          }}
+        >
+          {matches.map((match) => (
+            <li key={match.address.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onPick(match.address);
+                  setTyped('');
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: `${String(space(2))}px ${String(space(2))}px`,
+                  border: 'none',
+                  borderRadius: radius.small,
+                  background: 'transparent',
+                  font: type(text.label),
+                  color: ink.base,
+                }}
+              >
+                {match.address.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Badge({ basis }: { readonly basis: string }) {
-  const style = BASIS_STYLE[basis] ?? { background: '#eee', color: '#444' };
+  const tone = basis === 'Official recorded data' ? basisTone.recorded : basisTone.derived;
   return (
     <span
       style={{
         display: 'inline-block',
-        marginTop: 6,
-        padding: '1px 7px',
-        borderRadius: 999,
-        fontSize: 11,
-        ...style,
+        marginTop: space(2),
+        padding: `1px ${String(space(2))}px`,
+        borderRadius: radius.pill,
+        font: type(text.micro, { leading: 1.5 }),
+        background: tone.fill,
+        color: tone.ink,
       }}
     >
       {basis}
     </span>
   );
 }
+
+/** Re-exported so the scenario screens keep the visibility they always had. */
+export const EVERYTHING = visibilityOf(EVERYTHING_ON);
+
+/** The layer list, for anything that needs to name them. */
+export { LAYERS };

@@ -47,8 +47,12 @@ describe('the golden path', () => {
     expect(end.outcome).toEqual({ kind: 'comparison', band: 'higher-than-baseline' });
   });
 
-  it('starts on the address screen with nothing chosen', () => {
-    expect(INITIAL_SESSION.screen).toBe('address');
+  it('starts on a page that asks nothing, with nothing chosen', () => {
+    // The address field was the first screen until a homepage was added. It
+    // is the right first *question* once somebody has decided to use this,
+    // and the wrong one before: it asks a stranger to type where they live in
+    // order to find out what the site does.
+    expect(INITIAL_SESSION.screen).toBe('home');
     expect(INITIAL_SESSION.address).toBeNull();
     expect(INITIAL_SESSION.task).toBeNull();
     expect(INITIAL_SESSION.outcome).toBeNull();
@@ -189,7 +193,16 @@ describe('going back', () => {
   });
 
   it('has nowhere to go from the first screen', () => {
-    expect(reduce(INITIAL_SESSION, { type: 'back' }).screen).toBe('address');
+    const first = INITIAL_SESSION.screen;
+    expect(reduce(INITIAL_SESSION, { type: 'back' }).screen).toBe(first);
+  });
+
+  it('goes back from the address field to the homepage, not to itself', () => {
+    // Somebody who opened the address field to look at it needs a way out
+    // that is not the browser button.
+    const asked = reduce(INITIAL_SESSION, { type: 'change-address' });
+    expect(asked.screen).toBe('address');
+    expect(reduce(asked, { type: 'back' }).screen).toBe('home');
   });
 });
 
@@ -299,5 +312,108 @@ describe('nothing about the person leaves memory', () => {
     const end = play(wholeSession);
     expect(end.address).toBe(NEALE);
     expect(JSON.stringify(INITIAL_SESSION)).not.toContain('Neale');
+  });
+});
+
+describe('searching from the map', () => {
+  it('moves the map instead of sending the person back to the task question', () => {
+    // The distinction the two actions exist for. `address-accepted` is what
+    // the first screen sends and it goes on to ask what you want to do;
+    // searching while already reading a map should leave you reading a map.
+    const reading = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    // Whatever screen they were on, they are still on it -- and in particular
+    // not back at the task question, which is where `address-accepted` goes.
+    expect(end.screen).toBe(reading.screen);
+    expect(end.screen).not.toBe('task');
+    expect(end.address).toEqual(NEALE);
+  });
+
+  it('still drops a pit that belonged to the old neighbourhood', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: true },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    expect(end.scenario.pitId).toBeNull();
+    expect(end.outcome).toBeNull();
+  });
+
+  it('keeps the assumptions, which were the person’s and not the map’s', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    expect(end.scenario.blockage).toBe('fully-blocked');
+    expect(end.scenario.rainfallMm).toBe(60);
+  });
+
+  it('keeps everything when the same address is chosen again', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: false },
+      { type: 'address-moved', address: GATEHOUSE },
+    ]);
+
+    expect(end.scenario.pitId).toBe('P-14');
+  });
+});
+
+describe('an action the reducer does not know', () => {
+  it('leaves the session untouched instead of erasing it', () => {
+    // The compiler makes this unreachable, which is why the cast is needed to
+    // reach it. It is reachable in a browser: a module one version behind the
+    // one dispatching to it sends an action this build has never heard of.
+    // Falling through used to return `undefined`, which React accepted as the
+    // new session and which blanked the entire screen.
+    const start = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    const after = reduce(start, { type: 'from-the-future' } as unknown as SessionEvent);
+
+    expect(after).toBe(start);
+    expect(after.screen).toBe(start.screen);
+  });
+});
+
+describe('opening the map from the homepage', () => {
+  it('goes straight there without asking for an address first', () => {
+    const end = reduce(INITIAL_SESSION, { type: 'map-opened' });
+
+    expect(end.screen).toBe('explore');
+    // No address is invented on the way. The map opens over the pilot area
+    // with nothing selected, and the search along its top is how somebody
+    // names one — a guessed address would put a marker on a street nobody
+    // asked about.
+    expect(end.address).toBeNull();
+  });
+
+  it('opens unguided, because nobody chose a task on the way in', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
+  });
+
+  it('keeps whatever the person had already chosen', () => {
+    const busy = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'go-home' },
+    ]);
+    const end = reduce(busy, { type: 'map-opened' });
+
+    expect(end.address).toEqual(GATEHOUSE);
+    expect(end.scenario.blockage).toBe('fully-blocked');
   });
 });

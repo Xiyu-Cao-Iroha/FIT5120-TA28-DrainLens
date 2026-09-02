@@ -35,11 +35,13 @@ RUN npm run build --workspace @drainlens/web
 FROM nginx:1.27-alpine AS runtime
 
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 
-# Cloud Run sends traffic to $PORT and does not promise it is 8080. nginx has
-# no variable expansion in `listen`, so the port is substituted at start-up
-# rather than baked in — a container that ignores $PORT is one Cloud Run marks
-# unhealthy for reasons the logs do not explain.
+# The port substitution and the access gate both happen at start-up, in
+# `deploy/entrypoint.sh`. It refuses to start without credentials, which is the
+# behaviour that matters: a deployment that quietly loses its gate looks exactly
+# like one that never had it.
 ENV PORT=8080
-CMD ["/bin/sh", "-c", "sed -i \"s/listen 8080/listen ${PORT}/\" /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["/usr/local/bin/entrypoint.sh"]
