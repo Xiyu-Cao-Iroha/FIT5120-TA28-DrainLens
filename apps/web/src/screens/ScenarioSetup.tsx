@@ -9,7 +9,7 @@
  *
  * The blockage starts unchosen. A pre-selected assumption is one the interface
  * made and the person carries without ever having agreed to it, which is why
- * AC 2.1.1 asks for it and why `EMPTY_SCENARIO.blockage` is null.
+ * AC 2.1.1 (Aug-27 set) asks for it and why `EMPTY_SCENARIO.blockage` is null.
  */
 
 import type { BlockageSetting } from '@drainlens/schema';

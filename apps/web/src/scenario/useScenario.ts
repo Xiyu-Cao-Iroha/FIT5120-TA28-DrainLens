@@ -5,6 +5,16 @@
  * matched against the newest one, so a person who changes the blockage while a
  * comparison is running sees the answer to what they asked last rather than
  * whichever run happened to finish second.
+ *
+ * **It loads only where it is needed.** Starting the worker fetches the scene:
+ * `scene.json` plus the elevation, flow, depression and coverage arrays, a bit
+ * over five megabytes. That used to happen on every visit, including visits
+ * that never left the homepage. With the comparison out of the Iteration 1
+ * interface (AC 1.1.1) it would be five megabytes for a screen nobody can
+ * reach, so the caller says when it is wanted and the worker starts then.
+ *
+ * The map's own ground surface is a separate, smaller read in `terrain.ts`,
+ * and is unaffected by this.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -53,7 +63,7 @@ export interface ScenarioRunner {
  */
 export const POSITIONS_MM: readonly number[] = [20, 40, 60];
 
-export function useScenario(base: string): ScenarioRunner {
+export function useScenario(base: string, enabled = true): ScenarioRunner {
   const workerRef = useRef<Worker | null>(null);
   const nextId = useRef(1);
   const pending = useRef(new Map<number, (reply: WorkerReply) => void>());
@@ -63,6 +73,8 @@ export function useScenario(base: string): ScenarioRunner {
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
@@ -89,7 +101,7 @@ export function useScenario(base: string): ScenarioRunner {
       workerRef.current = null;
       pending.current.clear();
     };
-  }, [base]);
+  }, [base, enabled]);
 
   const run = useCallback(
     (drainCell: number, blockage: BlockageSetting, rainfallMm: number) =>

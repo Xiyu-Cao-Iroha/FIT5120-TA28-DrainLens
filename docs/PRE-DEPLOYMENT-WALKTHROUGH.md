@@ -8,6 +8,8 @@ This document exists for one purpose: help any member of the team, asked to open
 
 **Read section 2 before anything else.** It is the question we are most likely to answer badly.
 
+> **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+
 ---
 
 ## 1 · The system in sixty seconds
@@ -315,9 +317,9 @@ So the section splits itself, and says so inside the figure rather than in a cap
 
 > **Everything horizontal is recorded** — which pipes connect, on which side, their diameter and material. **Everything vertical is drawn.** The pipes are spaced evenly because the record gives no depth to space them by, and the vertical axis is labelled *depth not recorded — spacing illustrative*.
 
-**726 of 895 pits** get a drawing; the other **169** get AC 1.3.2, which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
+**726 of 895 pits** get a drawing; the other **169** get the unavailable state (AC 1.1.6.f), which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
 
-A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is AC 1.3.2.c, an unsupported assumption dressed as a measurement.
+A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is what AC 1.1.6.f forbids, an unsupported assumption dressed as a measurement.
 
 **The line to have ready if asked about capacity:** a recorded diameter is a dimension, not a capacity. Going from one to the other needs a hydraulic model this project decided not to build (AD6), and the drawing says so on screen.
 

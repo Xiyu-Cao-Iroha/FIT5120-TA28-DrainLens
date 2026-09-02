@@ -29,7 +29,7 @@ const RECORDED_BADGE = 'Official recorded data';
  * Depth is deliberately absent. Invert values are missing for 95.4% of the
  * council's pits and the surviving fraction is internally inconsistent, so a
  * depth row would be empty almost always and untrustworthy the rest of the
- * time. AC 1.3.1.d is served by saying so, not by showing a blank.
+ * time. AC 1.1.6.f is served by saying so, not by showing a blank.
  */
 const FIELDS: readonly { readonly key: keyof Pit; readonly label: string }[] = [
   { key: 'asset_number', label: 'Asset number' },

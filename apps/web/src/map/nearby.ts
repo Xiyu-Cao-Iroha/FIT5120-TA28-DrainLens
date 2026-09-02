@@ -1,7 +1,7 @@
 /**
  * A plain-English sentence about where water near one address may move.
  *
- * AC 1.1.2.c. The temptation is to write one sentence and show it to
+ * AC 1.1.6.c. The temptation is to write one sentence and show it to
  * everybody, which is not an explanation — it is a caption. So this measures
  * against the derived layers the person can see on the map beside it: the
  * nearest surface-water path, and the nearest low area it runs towards.
@@ -155,6 +155,6 @@ export function describeWaterNearby(derived: DerivedArtefact, at: Local): string
  * The label that must sit beside the sentence.
  *
  * Every clause above comes from a calculated surface rather than from the
- * council's record, and AC 1.1.3.d requires the two never to look alike.
+ * council's record, and AC 1.1.4.g requires the two never to look alike.
  */
 export const NEARBY_BASIS = 'System-derived result';

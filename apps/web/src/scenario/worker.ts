@@ -98,7 +98,7 @@ export type WorkerReply =
        *
        * The engine solves them all in one pass whether or not anybody asks, so
        * returning only the last threw away the answer to the next question the
-       * person is going to ask. AC 2.2.2 is then a lookup rather than a rerun,
+       * person is going to ask. AC 2.2.2 (Aug-27 set) is then a lookup rather than a rerun,
        * which is what keeps the rainfall control honest: it cannot quietly
        * re-solve with a different assumption between two readings.
        */

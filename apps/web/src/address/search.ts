@@ -8,7 +8,7 @@
  *
  * The other half of the job is telling two failures apart. "We have no record
  * of that address" and "that address is real but outside the pilot area" are
- * different things to a resident, and AC 1.1.4 requires the second to be
+ * different things to a resident, and AC 1.1.7 requires the second to be
  * explained rather than dressed up as the first — or worse, answered with a
  * nearby address they did not ask for.
  */
@@ -157,7 +157,7 @@ export type Resolution =
  * covered street and outside the covered part of it. A query naming no street
  * we hold is not something this product can say anything about at all.
  *
- * Neither case is ever resolved to a nearby address. AC 1.1.4 asks the product
+ * Neither case is ever resolved to a nearby address. AC 1.1.7 asks the product
  * to explain, and answering "did you mean number 44?" when somebody asked
  * about 46 is the failure the criterion exists to prevent.
  */

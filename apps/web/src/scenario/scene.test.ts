@@ -202,7 +202,7 @@ describe('the worker turns outcomes into replies', () => {
   it('returns every position it solved, not only the last', async () => {
     // The engine solves them all in one pass whether or not anybody asks, so
     // returning one threw away the answer to the next question the person
-    // asks. AC 2.2.2 is a lookup because of this, which is what stops the
+    // asks. AC 2.2.2 (Aug-27 set) is a lookup because of this, which is what stops the
     // rainfall control re-solving and possibly disagreeing with itself.
     const scene = await runnableScene();
 

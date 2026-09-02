@@ -14,6 +14,8 @@ import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
 import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
+import { FloodHistory } from './screens/FloodHistory.js';
+import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
 import { Home, SECTIONS } from './screens/Home.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
@@ -33,33 +35,44 @@ interface Loaded {
   readonly derived: DerivedArtefact;
   readonly trace: TraceArtefact;
   readonly index: AddressIndex;
+  readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
 }
 
 async function load(): Promise<Loaded> {
-  const [map, derived, trace, addresses] = await Promise.all([
+  // The flood history is 5.4 KB and joins the others rather than being
+  // fetched when the board opens: a separate round trip for five kilobytes
+  // buys a loading state nobody needed.
+  const [map, derived, trace, addresses, history] = await Promise.all([
     fetch('/data/map.json').then((r) => r.json()),
     fetch('/data/derived.json').then((r) => r.json()),
     fetch('/data/trace.json').then((r) => r.json()),
     fetch('/data/addresses.json').then((r) => r.json()),
+    fetch('/data/flood-history.json').then((r) => r.json()),
   ]);
 
   assertUsable(map);
   assertDerived(derived);
   assertTrace(trace);
+  assertFloodHistory(history);
 
   const index = addresses as AddressIndex & { fixture?: string };
   if (!Array.isArray(index.addresses)) {
     throw new Error('the address index carries no addresses');
   }
-  return { map, derived, trace, index, fixtureNote: index.fixture };
+  return { map, derived, trace, index, history, fixtureNote: index.fixture };
 }
 
 export function App() {
   const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const scenario = useScenario('/data/scene');
+  // Only the two comparison screens use it, and neither is reachable in the
+  // Iteration 1 interface. See the note at the top of `useScenario`.
+  const scenario = useScenario(
+    '/data/scene',
+    session.screen === 'scenario' || session.screen === 'result',
+  );
   // Every position the last run solved. The rainfall control on the result
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
@@ -132,17 +145,46 @@ export function App() {
               onOpenMap={() => {
                 dispatch({ type: 'map-opened' });
               }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
             />
           }
         >
           <Home
             artefact={loaded.map}
             derived={loaded.derived}
-            onOpenMap={() => {
-              dispatch({ type: 'map-opened' });
+            onOpenMap={(mode) => {
+              dispatch({ type: 'map-opened', ...(mode ? { mode } : {}) });
             }}
             onFindAddress={() => {
               dispatch({ type: 'change-address' });
+            }}
+            onOpenHistory={() => {
+              dispatch({ type: 'history-opened' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'history':
+      return (
+        <Shell
+          credits={credits}
+          crumbs={
+            <>
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
+              {separator}
+              {crumb('Flood history', undefined, true)}
+            </>
+          }
+        >
+          <FloodHistory
+            artefact={loaded.history}
+            onOpenMap={() => {
+              dispatch({ type: 'map-opened' });
             }}
           />
         </Shell>
@@ -436,6 +478,7 @@ export function App() {
             trace={loaded.trace}
             address={session.address}
             task={session.task}
+            mode={session.mapMode}
             index={loaded.index}
             onAddress={(picked) =>
               dispatch({
@@ -458,7 +501,7 @@ export function App() {
 /**
  * The map beside the scenario panel.
  *
- * AC 2.2.1.d: the selected pit and its recorded downstream path stay visible
+ * AC 2.2.1.d (Aug-27 set): the selected pit and its recorded downstream path stay visible
  * while a result is on screen. Without them the difference is highlighted over
  * a map that has forgotten which drain the person was asking about, and the
  * result reads as a statement about the whole neighbourhood.
@@ -470,16 +513,22 @@ export function App() {
 /**
  * The homepage's navigation.
  *
- * In-page anchors and one button, and nothing else. There is deliberately no
- * "Flood history" here: the board is not built, and the only dataset that
- * could feed it honestly has not been fetched — a navigation item pointing at
- * a page nobody wrote is a promise the site cannot keep.
+ * In-page anchors, one link to the other page, and the button. "Flood history"
+ * is a navigation item rather than an anchor because it is a different screen,
+ * and it is here at all only since 3 September — until the board existed it
+ * would have been a promise the site could not keep.
  *
- * Hidden below 820px rather than collapsed into a menu. Three anchors to
- * sections on the page somebody is already scrolling are not worth a drawer;
- * the button they do need stays.
+ * Hidden below 820px rather than collapsed into a menu. Anchors to sections on
+ * a page somebody is already scrolling are not worth a drawer; the two
+ * controls that go somewhere stay.
  */
-function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
+function HomeNav({
+  onOpenMap,
+  onOpenHistory,
+}: {
+  readonly onOpenMap: () => void;
+  readonly onOpenHistory: () => void;
+}) {
   const jump = (id: string) => () => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -507,6 +556,19 @@ function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
         {anchor('How it works', SECTIONS.flow)}
         {anchor('About the data', SECTIONS.limits)}
       </span>
+      <button
+        type="button"
+        onClick={onOpenHistory}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: type(text.label, { weight: weight.medium }),
+          color: ink.muted,
+        }}
+      >
+        Flood history
+      </button>
       <button
         type="button"
         onClick={onOpenMap}

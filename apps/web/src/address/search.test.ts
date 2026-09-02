@@ -125,7 +125,7 @@ describe('resolving a submitted address', () => {
   });
 
   it('says a known street with an unknown number is outside the covered part', () => {
-    // The distinction AC 1.1.4 turns on. This is a real address on a street
+    // The distinction AC 1.1.7 turns on. This is a real address on a street
     // the pilot covers, at a number the pilot does not.
     const answer = resolve(KENSINGTON, '999 Gatehouse Drive');
     expect(answer.kind).toBe('outside-pilot');

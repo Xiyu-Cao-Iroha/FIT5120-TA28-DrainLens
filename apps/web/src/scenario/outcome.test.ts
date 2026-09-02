@@ -172,7 +172,7 @@ function INSUFFICIENT_VALUES() {
 
 describe('the rainfall control note', () => {
   it('says the control is about accumulation, not about time', () => {
-    // AC 2.2.2.d. A control that slides left to right looks exactly like a
+    // AC 2.2.2.d (Aug-27 set). A control that slides left to right looks exactly like a
     // timeline; the model's variable is how much has fallen, never how long
     // it took, and this sentence is what stands between the two readings.
     expect(RAINFALL_CONTROL_NOTE).toMatch(/as rainfall accumulates/i);

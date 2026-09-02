@@ -100,9 +100,12 @@ That builds the council-wide graph. The artefacts the browser actually loads are
 ./.venv/Scripts/python.exe -m drainlens_pipeline.derived   # derived.json
 ./.venv/Scripts/python.exe -m drainlens_pipeline.trace     # trace.json
 ./.venv/Scripts/python.exe -m drainlens_pipeline.scene     # scene.json and the .bin arrays
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   # flood-history.json
 ```
 
 Order matters for two of them: `derived` and `trace` both read what earlier stages wrote.
+
+`flood_history` is the exception to the pattern: it fetches its own two sources rather than reading what an earlier stage left on disk, because neither is a local export. Give it `--incidents` and `--geography` to build from files you already have — both or neither, so a published file is never silently mixed with a local one. See [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) for what the sources are and what they do and do not support.
 
 See [pipeline/README.md](../pipeline/README.md) for what each stage does and the data findings behind them.
 

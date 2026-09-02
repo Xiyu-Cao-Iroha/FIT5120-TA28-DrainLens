@@ -10,7 +10,7 @@
  * That decides the shape of this module. A cross-section is a *vertical*
  * drawing, and the one axis it exists to show is the one we have no data for.
  * So the vertical dimension here is presentation and nothing else, and it says
- * so in the drawing rather than in a caption somewhere: AC 1.3.1.c asks that
+ * so in the drawing rather than in a caption somewhere: AC 1.1.6.d asks that
  * recorded information be distinguishable from simplified presentation, and
  * the honest split is that **everything horizontal is recorded and everything
  * vertical is invented**.
@@ -21,7 +21,8 @@
  * - each pipe's nominal diameter, for 98.9% of them
  * - each pipe's material, for all of them
  *
- * What it must never assert (AD6, restated as AC 1.3.1.e): anything about
+ * What it must never assert (AD6, which the 3 September revision no longer
+ * restates as a criterion of its own): anything about
  * capacity, about whether a pipe is adequate, or about a blockage underground.
  * A diameter is a recorded dimension. It is not a flow rate, and the step from
  * one to the other needs a hydraulic model this project does not have and has
@@ -52,7 +53,7 @@ export interface CrossSection {
 
 export interface SectionUnavailable {
   readonly kind: 'unavailable';
-  /** Which required information is missing — AC 1.3.2.b. */
+  /** Which required information is missing — AC 1.1.6.f. */
   readonly reasons: readonly string[];
 }
 
@@ -68,7 +69,7 @@ export type SectionOutcome = CrossSection | SectionUnavailable;
 export const DEPTH_IS_ABSENT =
   'No pipe depth or invert level is recorded for any pit in this area, so the vertical positions in this drawing are illustrative only.';
 
-/** AC 1.3.1.e, as a sentence rather than only as an omission. */
+/** AD6, as a sentence rather than only as an omission. */
 export const NO_CAPACITY_CLAIM =
   'A recorded diameter is a dimension, not a capacity. This drawing does not say whether a pipe is large enough, whether it is blocked below ground, or how much it can carry.';
 
@@ -174,7 +175,7 @@ export function summarise(pipe: SectionPipe): string {
  * Scaled against the widest pipe *in this section* rather than against a fixed
  * maximum, so the comparison a reader makes is between pipes they can see. A
  * pipe with no recorded diameter gets the minimum and is labelled, never an
- * average of its neighbours — filling it in is AC 1.3.2.c.
+ * average of its neighbours — filling it in is what AC 1.1.6.f forbids.
  */
 export function relativeWidth(pipe: SectionPipe, all: readonly SectionPipe[]): number {
   if (pipe.diameterMm === null) return 0;

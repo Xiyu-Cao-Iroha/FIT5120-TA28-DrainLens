@@ -168,7 +168,7 @@ export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly bo
 /**
  * What the rainfall control does, and the thing it must not be read as.
  *
- * AC 2.2.2.d. The model's independent variable is accumulated rainfall, not
+ * AC 2.2.2.d (Aug-27 set). The model's independent variable is accumulated rainfall, not
  * time: it knows how much water has fallen, never how long that took. So a
  * control that slides left to right looks exactly like a timeline and is not
  * one, and this sentence is the only thing standing between the two readings.
@@ -179,7 +179,7 @@ export const RAINFALL_CONTROL_NOTE =
 /**
  * The three kinds of thing on this screen, and their colours.
  *
- * AC 2.3.1.c. A person deciding what to do about their street needs to know
+ * AC 2.3.1.c (Aug-27 set). A person deciding what to do about their street needs to know
  * which of these came from the council, which the model worked out, and which
  * they themselves supposed — because only the first is a fact about the world,
  * and the last is a fact about them.
@@ -201,7 +201,7 @@ export const BASIS_COLOURS: Readonly<Record<Basis, { background: string; color: 
 /**
  * What is missing or uncertain in every comparison this product makes.
  *
- * AC 2.3.1.e. Each line is a limitation of the data or the model that a
+ * AC 2.3.1.e (Aug-27 set). Each line is a limitation of the data or the model that a
  * reasonable person would want to know before acting, and each is measured
  * rather than hedged — a caveat with no number in it is decoration.
  */

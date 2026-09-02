@@ -7,7 +7,10 @@ name = "drainlens-pipeline"
 version = "0.1.0"
 description = "Offline geospatial pipeline. Runs on a developer machine and publishes versioned static artefacts; never deployed."
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26", "scipy>=1.11"]
+# openpyxl reads the one source that is published as a spreadsheet rather
+# than as an API or a shapefile: the VICSES incident counts. It is a build
+# dependency only -- nothing it touches reaches the browser.
+dependencies = ["numpy>=1.26", "scipy>=1.11", "openpyxl>=3.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

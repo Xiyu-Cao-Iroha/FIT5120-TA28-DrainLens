@@ -1,7 +1,7 @@
 /**
  * The ground surface, as a layer under everything else.
  *
- * AC 1.1.3.b names terrain as one of the five controllable layers, and until
+ * AC 1.1.4 names Terrain as one of the four modes, and until
  * now there was nothing to control: the map drew the recorded network and the
  * derived paths over a flat colour. That flat colour was the one thing on
  * screen quietly implying the ground is level, in a product whose entire
