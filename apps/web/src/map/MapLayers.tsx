@@ -68,12 +68,19 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
 function SwatchMark({ kind }: { readonly kind: Swatch }) {
   // `flexShrink` is a CSS property, not an SVG attribute: spreading it onto
   // the element makes React warn and does nothing. It belongs in `style`.
-  const box = { width: 20, height: 12, style: { flexShrink: 0 } } as const;
+  const box = { width: 20, height: 14, style: { flexShrink: 0 } } as const;
   switch (kind) {
     case 'dot':
+      // The same marker the map draws: a ring with the grate inside it. A
+      // legend showing a dot while the map showed a grate would be a key to a
+      // different map, and this module exists so the two cannot drift.
       return (
-        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
-          <circle cx="10" cy="6" r="4" fill="#2f6f62" stroke="#ffffff" strokeWidth="1.5" />
+        <svg {...box} viewBox="0 0 26 26" aria-hidden focusable="false">
+          <circle cx="13" cy="13" r="12" fill="#ffffff" stroke="#2f6f62" strokeWidth="2" />
+          <g stroke="#2f6f62" strokeWidth="1.9" strokeLinecap="round">
+            <path d="M6.2 9.6v2.2M9.6 9.6v2.2M13 9.6v2.2M16.4 9.6v2.2M19.8 9.6v2.2" />
+            <path d="M6.2 14.9v2.2M9.6 14.9v2.2M13 14.9v2.2M16.4 14.9v2.2M19.8 14.9v2.2" />
+          </g>
         </svg>
       );
     case 'line':

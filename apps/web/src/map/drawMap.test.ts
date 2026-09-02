@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
 import { DAY, LABEL_MIN_SCALE, PIT_MIN_SCALE, drawMap } from './draw.js';
+import { ICON_MIN_SCALE } from './pitIcon.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
@@ -44,6 +45,15 @@ function recorder() {
     moveTo: note('moveTo'),
     lineTo: note('lineTo'),
     arc: note('arc'),
+    // The pit marker transforms the context to place the grate inside
+    // its ring. A double that does not answer for the whole surface a
+    // caller uses fails as a missing function rather than as a wrong
+    // drawing, which is a slower way to find out the same thing.
+    save: note('save'),
+    restore: note('restore'),
+    translate: note('translate'),
+    scale: note('scale'),
+    arcTo: note('arcTo'),
     fill: note('fill'),
     stroke: note('stroke'),
     fillRect: note('fillRect'),
@@ -166,9 +176,30 @@ describe('what is left out', () => {
 
   it('shows both again once there is room', () => {
     const context = recorder();
-    drawMap(context, FULL, view(2));
+    // Above the label floor and below the grate threshold, so pits are still
+    // the circle this asserts on. The two appearances are covered separately
+    // below -- the point here is that neither is culled at this scale.
+    drawMap(context, FULL, view(1));
     expect(context.calls.some((call) => call.op === 'arc')).toBe(true);
     expect(context.calls.some((call) => call.op === 'fillText')).toBe(true);
+  });
+
+  it('draws pits as a dot while they are too small to be a grate', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(ICON_MIN_SCALE - 0.01));
+    expect(context.calls.some((call) => call.op === 'arc')).toBe(true);
+  });
+
+  it('draws pits as a grate once one would be legible', () => {
+    // A grate at six pixels is a smudge that claims to show ten bars, so the
+    // icon only replaces the dot when there is room to count them.
+    const context = recorder();
+    drawMap(context, FULL, view(ICON_MIN_SCALE));
+    // The ring is an arc too, so `arc` no longer separates the two
+    // appearances. The grate does: a transform, then ten round-capped bars.
+    expect(context.calls.some((call) => call.op === 'scale')).toBe(true);
+    expect(context.calls.filter((call) => call.op === 'moveTo').length).toBeGreaterThanOrEqual(10);
+    expect(context.calls.some((call) => call.op === 'restore')).toBe(true);
   });
 
   it('draws a street name with a halo behind it, or it is unreadable over a road', () => {
