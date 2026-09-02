@@ -40,7 +40,7 @@ Three things, and the third is a hazard rather than a feature.
 
 ## Where this stands — 3 September 2026
 
-**Epic 1: 53 of 53 sub-criteria met.** The last two were AC 1.1.1's requirement to introduce and offer historical flood information, which the board closed on 3 September.
+**Epic 1: 52 of 53 sub-criteria met, and one deliberate deviation.** AC 1.1.1's two open items closed when the flood board landed on 3 September. **AC 1.1.4.c is not met**, by a design decision taken the same day and recorded under that criterion — the map has no Drainage mode, because pits and pipes are chips of their own.
 
 **Epic 2: 19 of 19 sub-criteria met, and clicked through on 3 September.** The board reads *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0), joined to ABS ASGS 2011 for the names. The data was verified before any of it was built — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
 
@@ -107,14 +107,33 @@ Three things, and the third is a hazard rather than a feature.
 
 - [x] **1.1.4.a** Clearly identify the selected mode as active
 - [x] **1.1.4.b** Retain the selected address and current map location
-- [x] **1.1.4.c** Display recorded drainage pits and pipes when Drainage is selected
+- [ ] **1.1.4.c** Display recorded drainage pits and pipes when Drainage is selected — **deviation, see below**
 - [x] **1.1.4.d** Display indicative surface-water paths when Water Flow is selected
 - [x] **1.1.4.e** Display contour lines or an equivalent elevation visualisation when Terrain is selected
 - [x] **1.1.4.f** Display the available low-area information when Low Areas is selected
 - [x] **1.1.4.g** **Distinguish official recorded data from system-derived information**
 - [x] **1.1.4.h** Provide the available modes for users to toggle
 
-> **The modes are multi-select, and that is a reading of the criterion rather than a departure from it.** 1.1.4.a is singular — "the selected mode" — but 1.1.4.h asks that the modes be available "for users to toggle", and every bullet between them is of the form *when X is selected, display X*, all of which hold when several are on. Mutual exclusion is the reading that loses information for no reason: where water runs is a question about the ground it runs over, and a person comparing the two should not have to choose. Confirmed with the team on 2 September.
+> **1.1.4.c is not met, and the reason is a decision rather than an omission.** The criterion
+> describes a **Drainage** mode covering pits and pipes together, with the two separated behind
+> the Layers button (AC 1.1.5). That was built on 3 September and reversed the same day by the
+> design owner: **Pits and Pipes are chips of their own**, and Terrain moved behind Layers with
+> the data-quality hatching.
+>
+> What is lost: there is no single control that turns the recorded network on and off in one
+> press, and the top row does not read as the four names the criterion lists.
+>
+> What is kept, and it is the substance both criteria protect: **every layer still has its own
+> switch**, pits and pipes are still independent, and each still says whether it is recorded or
+> derived. The argument for the change is that a control's place should follow how often it is
+> used — pits and pipes are the recorded data this product exists to show and are what a person
+> switches most, while the ground surface is background, on by default and drawn under
+> everything.
+>
+> Raised with the design owner with this criterion quoted, and confirmed. It is recorded here so
+> that the answer exists before somebody asks the question.
+>
+> **The chips are multi-select, and that part is a reading of the criterion rather than a departure from it.** 1.1.4.a is singular — "the selected mode" — but 1.1.4.h asks that the modes be available "for users to toggle", and every bullet between them is of the form *when X is selected, display X*, all of which hold when several are on. Mutual exclusion is the reading that loses information for no reason: where water runs is a question about the ground it runs over, and a person comparing the two should not have to choose. Confirmed with the team on 2 September.
 >
 > **1.1.4.e is an equivalent visualisation, not contour lines.** The surface is shaded by elevation, ramped across the ground actually present in the extent rather than against sea level. The reason it is not contours is in `map/terrain.ts`: the shipped array is the *conditioned routing surface*, which raises every building a hundred metres so water runs between them, and contour lines drawn on it would be lines around buildings presented as lines around terrain. The shading is fitted at robust percentiles and carries no metric legend, because the surface's own accuracy — about 25 cm — does not support one.
 >
@@ -130,9 +149,17 @@ Three things, and the third is a hazard rather than a feature.
 - [x] **1.1.5.d** Update the map legend to reflect the visible drainage layers
 - [x] **1.1.5.e** Retain the selected address and current map location
 
-> **1.1.5.b is stronger than it sounds and is tested as a truth table.** A layer is visible when its mode is on *and* its own switch is on, so a switch survives its mode being turned off and on again: turning Drainage off and back on does not resurrect the pipes somebody hid. `map/modes.test.ts` proves it; on 3 September it was also clicked.
+> **Every effect this criterion asks for is met; its opening clause is not.** There is no
+> Drainage mode to have selected, so "given the user is viewing the local map with Drainage
+> selected" describes a state the interface does not have — see the deviation under AC 1.1.4.c.
+> Pits and Pipes are chips instead, and from there each of a to e holds: they switch
+> independently, the untouched one keeps its visibility, the chips show which are on, the legend
+> follows, and the address and map position are untouched.
 >
-> A switch whose mode is off is shown disabled with the reason, not silently inert. The panel also carries *Not enough ground measured*, which is deliberately governed by no mode: it is a statement about the evidence rather than a view of the world, it is true in every mode, and behind Terrain it would be the one mark saying the map is guessing that a person could switch off by accident.
+> The Layers panel still exists and carries *Ground surface* and *Not enough ground measured*.
+> The hatching is deliberately never hidden by anything else: it is a statement about the
+> evidence rather than a view of the world, and it is the one mark that says the map is
+> guessing.
 
 ### AC 1.1.6 — View information about a map element
 

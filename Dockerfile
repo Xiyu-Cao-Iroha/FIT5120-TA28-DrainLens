@@ -36,7 +36,15 @@ FROM nginx:1.27-alpine AS runtime
 
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Strip carriage returns before making it executable.
+#
+# `gcloud run deploy --source=.` uploads the working directory, not what git
+# stored, and `.gitattributes` only governs the latter. An editor or a script
+# that writes CRLF on Windows therefore ships a `#!/bin/sh\r` the kernel cannot
+# resolve, and the container dies at start-up with "no such file or directory"
+# naming a path that plainly exists. Normalising here makes the image immune to
+# whatever the build host's line endings happen to be.
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 
 # The port substitution and the access gate both happen at start-up, in

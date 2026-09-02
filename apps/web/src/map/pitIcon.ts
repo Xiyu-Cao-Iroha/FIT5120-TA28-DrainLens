@@ -9,10 +9,17 @@
  * **The circle holds the whole icon, rounded rectangle and all.** An earlier
  * version dropped the artwork's own frame to give the bars room, which kept
  * them legible but stopped it looking like the icon it came from. Keeping the
- * frame costs size instead: the bars are 5.7% of the marker's diameter, so a
- * 26-pixel marker puts them at 1.49 px — right on the edge where five bars
- * become one grey block. At 32 they are 1.8 px and stay countable. The size
- * is the price of the likeness, and it is paid once, here.
+ * frame costs size instead: the bars are 5.7% of the marker's diameter, so the
+ * diameter is the only thing that buys them.
+ *
+ * **It was 32, and is 23 since 3 September.** Halved in *area* at the design
+ * owner's request, which put the bars at 1.29 px — thinner than the 1.5 the
+ * marker was originally sized to clear, and a deliberate trade of a little
+ * legibility for a marker that crowds the street less. Halving the *diameter*
+ * instead was the other reading of "half the size" and it does not survive
+ * contact with the pixel grid: 16 px puts the bars at 0.90, where five of them
+ * render as one grey smudge and the marker stops being the grate it was drawn
+ * from. One pixel is the floor `pitIcon.test.ts` now holds.
  *
  * **It is drawn at a fixed size, and only when there is room.** A marker that
  * scales with zoom is between 5 and 14 pixels across on this map. Below the
@@ -60,10 +67,11 @@ const FIT = 0.92;
 /**
  * Diameter of the marker, in pixels.
  *
- * Set by the bars, not by taste: `barWidthPx` has to clear 1.5 px, and with
- * the artwork's own frame inside the circle that does not happen below 30.
+ * Half the area of the 32 it started at. The lower bound is the bars, not
+ * taste: `barWidthPx` must stay above 1 px, which fails below about 18 with
+ * the artwork's own frame inside the circle.
  */
-export const ICON_DIAMETER_PX = 32;
+export const ICON_DIAMETER_PX = 23;
 
 export const RING_WIDTH_PX = 2;
 
@@ -71,8 +79,12 @@ export const RING_WIDTH_PX = 2;
  * The scale at or above which the grate replaces the dot.
  *
  * Not about whether the marker fits — it is a fixed size, so it always fits —
- * but about whether the map underneath still reads with 32-pixel markers on
- * it. Raised with the marker: a bigger icon crowds the streets sooner.
+ * but about whether the map underneath still reads with markers on it.
+ *
+ * Left at 2.2 when the marker shrank to 23, which makes it conservative rather
+ * than wrong: a smaller marker crowds less, so the grate could honestly appear
+ * a little sooner. Not lowered in the same change, because moving the size and
+ * the threshold together means neither can be judged on screen.
  */
 export const ICON_MIN_SCALE = 2.2;
 

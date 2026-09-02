@@ -6,28 +6,22 @@
  * and where they came from. Kept apart, the two drift — a layer renamed in the
  * control and not in the legend is a map that disagrees with its own key.
  *
- * **Two levels, because AC 1.1.4 and 1.1.5 describe two.** The four modes are
- * chips along the top. The drainage layers, pits and pipes, are switches
- * behind the Layers button, each working on its own inside the mode that owns
- * them. The rules for combining the two are in `modes.ts` with a truth table
- * for a test; this file only draws them.
+ * **One level: a chip is a layer.** Pits, Pipes, Water flow and Low areas are
+ * the chips; Terrain and the data-quality hatching are switches behind the
+ * Layers button. `modes.ts` holds the split and the note on why it departs
+ * from AC 1.1.4 and 1.1.5; this file only draws it.
  *
- * **The chips are multi-select.** All four can be on at once — see the note in
- * `modes.ts` for why the criterion's singular "the selected mode" does not
- * force one-of-four, and why one-of-four would be the worse reading.
+ * **The chips are multi-select.** All four can be on at once, and every layer
+ * has a switch of its own — which is the substance those criteria protect,
+ * whichever control happens to sit where.
  */
 import { useState } from 'react';
 
 import {
+  CHIP_KEYS,
   type LayerKey,
   type LayerState,
-  MODES,
-  type MapMode,
-  type ModeState,
-  SUBLAYER_KEYS,
-  type SubLayerKey,
-  type SubLayerState,
-  ownerOf,
+  PANEL_KEYS,
 } from './modes.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
@@ -200,45 +194,38 @@ function Chip({
   );
 }
 
-export interface ModeChipsProps {
-  readonly modes: ModeState;
-  readonly sub: SubLayerState;
-  readonly onToggleMode: (key: MapMode) => void;
-  readonly onToggleSub: (key: SubLayerKey) => void;
-  /** Modes that cannot be turned on yet — the terrain raster is still loading. */
-  readonly unavailableModes?: readonly MapMode[];
+export interface LayerChipsProps {
+  readonly state: LayerState;
+  readonly onToggle: (key: LayerKey) => void;
+  /** Keys that cannot be turned on yet — the terrain raster is still loading. */
+  readonly unavailableKeys?: readonly LayerKey[];
 }
 
 /**
- * The four modes, and the Layers button that opens the switches beneath them.
+ * The four chips, and the Layers button that opens the rest.
  *
- * The button is part of this row rather than a separate control because the
- * two are one decision seen at two depths: the chips say which questions the
- * map is answering, the panel says which parts of an answer are drawn.
+ * The button belongs in this row rather than beside it: the chips and the
+ * panel are one decision seen at two depths, and a person looking for a layer
+ * that is not a chip should find the place it lives without hunting.
  */
-export function ModeChips({
-  modes,
-  sub,
-  onToggleMode,
-  onToggleSub,
-  unavailableModes = [],
-}: ModeChipsProps) {
+export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}>
-      {MODES.map((mode) => {
-        const disabled = unavailableModes.includes(mode.key);
+      {CHIP_KEYS.map((key) => {
+        const spec = specOf(key);
+        const disabled = unavailableKeys.includes(key);
         return (
           <Chip
-            key={mode.key}
-            label={mode.chip}
-            swatch={specOf(mode.swatchOf).swatch}
-            on={modes[mode.key]}
+            key={key}
+            label={spec.chip}
+            swatch={spec.swatch}
+            on={state[key]}
             disabled={disabled}
-            title={disabled ? `${mode.summary} — still loading` : mode.summary}
+            title={disabled ? `${spec.label} is still loading` : spec.label}
             onToggle={() => {
-              onToggleMode(mode.key);
+              onToggle(key);
             }}
           />
         );
@@ -300,34 +287,30 @@ export function ModeChips({
                 color: ink.subtle,
               }}
             >
-              Layers
+              Other map layers
             </p>
-            {SUBLAYER_KEYS.map((key) => {
+            {PANEL_KEYS.map((key) => {
               const spec = specOf(key);
-              const owner = ownerOf(key);
-              // A switch under a mode that is off would appear to do nothing.
-              // Disabled and explained is honest; silently inert is not.
-              const off = owner !== null && !modes[owner];
-              const ownerChip = MODES.find((mode) => mode.key === owner)?.chip;
+              const disabled = unavailableKeys.includes(key);
               return (
                 <label
                   key={key}
-                  title={off ? `Turn ${String(ownerChip)} on to show this` : spec.label}
+                  title={disabled ? `${spec.label} is still loading` : spec.label}
                   style={{
                     display: 'flex',
                     gap: space(3),
                     alignItems: 'flex-start',
                     marginBottom: space(3),
                     font: type(text.label, { leading: 1.5 }),
-                    color: off ? ink.subtle : ink.base,
+                    color: disabled ? ink.subtle : ink.base,
                   }}
                 >
                   <input
                     type="checkbox"
-                    checked={sub[key]}
-                    disabled={off}
+                    checked={state[key]}
+                    disabled={disabled}
                     onChange={() => {
-                      onToggleSub(key);
+                      onToggle(key);
                     }}
                     style={{ marginTop: 3 }}
                   />
@@ -338,27 +321,6 @@ export function ModeChips({
                 </label>
               );
             })}
-            {/*
-              Shown when a switch in *this panel* is greyed, not merely when
-              some mode is off. Low Areas has no switch here, so its being off
-              is no reason to explain a greying nobody can see.
-            */}
-            {SUBLAYER_KEYS.some((key) => {
-              const owner = ownerOf(key);
-              return owner !== null && !modes[owner];
-            }) && (
-              <p
-                style={{
-                  margin: `${String(space(2))}px 0 0`,
-                  paddingTop: space(2),
-                  borderTop: `1px solid ${line.hair}`,
-                  font: type(text.micro, { leading: 1.45 }),
-                  color: ink.subtle,
-                }}
-              >
-                A greyed switch belongs to a mode that is currently off.
-              </p>
-            )}
           </div>
         )}
       </div>
