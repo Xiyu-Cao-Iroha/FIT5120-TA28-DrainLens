@@ -5,10 +5,10 @@
  * mode chosen on the homepage (AC 1.1.2), the guided task, or nothing at all —
  * in which case every mode is on, because nothing has been narrowed yet.
  *
- * **The two levels of control are combined here and nowhere else.** `modes`
- * is the chip row, `sub` is what sits behind the Layers button, and
- * `effectiveLayers` is the single function that turns the pair into the
- * `LayerState` the canvas draws. The canvas has never heard of a mode.
+ * **One `LayerState`, and the controls write to it directly.** The chips are
+ * Pits, Pipes, Water flow and Low areas; Terrain and the data-quality hatching
+ * sit behind the Layers button. Which control lives where is `modes.ts`,
+ * along with the note on why that departs from AC 1.1.4 and 1.1.5.
  *
  * **The chrome is deliberately in pieces.** It used to be one 310px panel
  * carrying the address, the instruction, the sentence about nearby water, six
@@ -27,17 +27,14 @@ import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
-import { MapLegend, ModeChips } from '../map/MapLayers.js';
+import { LayerChips, MapLegend } from '../map/MapLayers.js';
 import {
-  ALL_MODES,
-  GUIDED_MODES,
+  ALL_ON,
+  GUIDED_ON,
+  type LayerKey,
+  type LayerState,
   type MapMode,
-  type ModeState,
-  type SubLayerKey,
-  type SubLayerState,
-  effectiveLayers,
-  openingModes,
-  subLayersWith,
+  openingLayers,
   visibilityOf,
 } from '../map/modes.js';
 import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
@@ -67,13 +64,9 @@ import { PitDetail } from './PitDetail.js';
  * turns everything on including the hatching — somebody who asked for the whole
  * pilot area has asked to see where it is thin as well.
  */
-function openingState(
-  mode: MapMode | null,
-  guided: boolean,
-): { readonly modes: ModeState; readonly sub: SubLayerState } {
-  if (mode !== null) return { modes: openingModes(mode), sub: subLayersWith(false) };
-  if (guided) return { modes: GUIDED_MODES, sub: subLayersWith(false) };
-  return { modes: ALL_MODES, sub: subLayersWith(true) };
+function openingState(mode: MapMode | null, guided: boolean): LayerState {
+  if (mode !== null) return openingLayers(mode);
+  return guided ? GUIDED_ON : ALL_ON;
 }
 
 export interface MapViewProps {
@@ -108,9 +101,7 @@ export function MapView({
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
   // not an instruction, and nobody asked to be walked through anything.
   const guided = task !== 'full-map';
-  const opening = openingState(mode, guided);
-  const [modes, setModes] = useState<ModeState>(opening.modes);
-  const [sub, setSub] = useState<SubLayerState>(opening.sub);
+  const [layers, setLayers] = useState<LayerState>(() => openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
@@ -158,20 +149,14 @@ export function MapView({
     [trace, following],
   );
 
-  const layers = useMemo(() => effectiveLayers(modes, sub), [modes, sub]);
-
-  const toggleMode = (key: MapMode) => {
-    setModes((current) => ({ ...current, [key]: !current[key] }));
-  };
-
-  const toggleSub = (key: SubLayerKey) => {
-    setSub((current) => ({ ...current, [key]: !current[key] }));
+  const toggle = (key: LayerKey) => {
+    setLayers((current) => ({ ...current, [key]: !current[key] }));
   };
 
   // The terrain chip cannot be pressed until its raster exists. Shown disabled
   // rather than hidden: a control that vanishes reads as a control that was
   // never there, and this one is named by AC 1.1.4.
-  const notYet: MapMode[] = terrain === null ? ['terrain'] : [];
+  const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
 
   return (
     <>
@@ -212,13 +197,7 @@ export function MapView({
         >
           <div style={{ pointerEvents: 'auto', display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
             {index && onAddress && <MapSearch index={index} address={address} onPick={onAddress} />}
-            <ModeChips
-              modes={modes}
-              sub={sub}
-              onToggleMode={toggleMode}
-              onToggleSub={toggleSub}
-              unavailableModes={notYet}
-            />
+            <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
           </div>
         </div>
       )}
@@ -543,4 +522,4 @@ function Badge({ basis }: { readonly basis: string }) {
 }
 
 /** Re-exported so the scenario screens keep the visibility they always had. */
-export const EVERYTHING = visibilityOf(effectiveLayers(ALL_MODES, subLayersWith(true)));
+export const EVERYTHING = visibilityOf(ALL_ON);
