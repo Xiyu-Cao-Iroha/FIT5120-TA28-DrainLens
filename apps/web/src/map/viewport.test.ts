@@ -213,7 +213,7 @@ describe('focus', () => {
   });
 
   it('puts the point at the middle of the canvas', () => {
-    // The property AC 1.1.2.a actually asks for, stated in screen terms
+    // The property AC 1.1.3.b actually asks for, stated in screen terms
     // rather than in the viewport's own.
     const at: readonly [number, number] = [420, 310];
     const view = focus(800, 600, KENSINGTON, at);

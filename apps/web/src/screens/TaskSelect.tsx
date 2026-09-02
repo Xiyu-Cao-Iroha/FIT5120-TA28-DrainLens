@@ -1,14 +1,20 @@
 /**
- * Choosing what to look at.
+ * Choosing what to look at, on the way in from an address.
  *
- * The screen exists because the two guided tasks answer different questions
- * and want different layers on by default. Asking first is what lets the
- * follow view open with two layers and one instruction instead of everything
- * at once, which is AC 1.1.2.
+ * This is the older of the two routes into the map and it is no longer the
+ * main one. Somebody arriving at the homepage picks a mode and goes straight
+ * there (AC 1.1.2); this screen is what somebody sees who started by naming
+ * an address instead, and it survives because the guided task is a different
+ * offer from the map: it opens with fewer modes on and one instruction, so
+ * the first thing on screen is a next step rather than everything at once.
  *
- * The third option is deliberately not a task. Somebody who wants the whole
+ * The 3 September revision does not name the guided task in any criterion.
+ * It is kept because it costs one screen and answers the question a resident
+ * actually arrives with, not because a criterion requires it.
+ *
+ * The second option is deliberately not a task. Somebody who wants the whole
  * map should be able to have it, and should be told that it comes without the
- * guidance the other two carry.
+ * guidance the other one carries.
  */
 
 import { useState } from 'react';

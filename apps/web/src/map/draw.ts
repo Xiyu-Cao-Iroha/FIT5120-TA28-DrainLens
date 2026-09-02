@@ -372,7 +372,7 @@ export interface DrawOptions {
   /**
    * A pit offered but not yet confirmed.
    *
-   * Drawn as a ring rather than filled, because AC 2.1.1.d requires a
+   * Drawn as a ring rather than filled, because AC 2.1.1.d (Aug-27 set) requires a
    * suggestion to be clearly labelled and require confirmation — and a
    * suggestion the panel names but the map does not show leaves the person
    * reading an asset number with no way to find it.
@@ -384,7 +384,7 @@ export interface DrawOptions {
   /**
    * Which recorded layers to draw.
    *
-   * Pits and pipes are separate because AC 1.1.3.b names them separately, and
+   * Pits and pipes are separate because AC 1.1.5 names them separately, and
    * because they answer different questions: the pipes are where water goes,
    * the pits are where it can get in.
    */

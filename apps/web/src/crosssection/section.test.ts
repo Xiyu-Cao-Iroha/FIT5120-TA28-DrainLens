@@ -159,7 +159,7 @@ describe('when it cannot be drawn', () => {
 
 describe('what it must never claim', () => {
   it('never says anything about capacity, adequacy or a hidden blockage', () => {
-    // AD6 as a criterion: AC 1.3.1.e. A diameter is a dimension.
+    // AD6, which the criteria no longer restate. A diameter is a dimension.
     const out = sectionFor(mapOf([{ ref: 11, dnstr_pit: 500, diameter: 300 }]), pit(500));
     if (out.kind !== 'available') throw new Error('expected a section');
     const everything = [...out.missing, ...out.incoming.map(summarise)].join(' ').toLowerCase();
@@ -212,7 +212,7 @@ describe('relativeWidth', () => {
   });
 
   it('draws an unrecorded diameter at the minimum rather than an average', () => {
-    // Filling it with a neighbour's value is AC 1.3.2.c — an unsupported
+    // Filling it with a neighbour's value is what AC 1.1.6.f forbids — an unsupported
     // assumption dressed as a measurement.
     expect(relativeWidth(unknown, [wide, narrow, unknown])).toBe(0);
   });

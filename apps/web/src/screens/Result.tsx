@@ -116,7 +116,7 @@ export function Result({
 
       {/*
         Grouped by where each value came from rather than by what it is about.
-        AC 2.3.1.c: the drain is the council's, the settings are the person's,
+        AC 2.3.1.c (Aug-27 set): the drain is the council's, the settings are the person's,
         and the comparison is ours — and only the first is a fact about the
         world, while the last is a fact about them.
       */}

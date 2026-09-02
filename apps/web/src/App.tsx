@@ -464,7 +464,7 @@ export function App() {
 /**
  * The map beside the scenario panel.
  *
- * AC 2.2.1.d: the selected pit and its recorded downstream path stay visible
+ * AC 2.2.1.d (Aug-27 set): the selected pit and its recorded downstream path stay visible
  * while a result is on screen. Without them the difference is highlighted over
  * a map that has forgotten which drain the person was asking about, and the
  * result reads as a statement about the whole neighbourhood.

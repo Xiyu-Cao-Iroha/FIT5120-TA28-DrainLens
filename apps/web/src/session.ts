@@ -54,7 +54,7 @@ export interface SupportedAddress {
 /**
  * Scenario inputs, each independently unset.
  *
- * `blockage` starts `null` rather than defaulting to clear, because AC 2.1.1
+ * `blockage` starts `null` rather than defaulting to clear, because AC 2.1.1 (Aug-27 set)
  * requires the person to choose it: a pre-selected assumption is one the
  * interface made and the person owns without knowing it.
  */
@@ -238,7 +238,7 @@ export function reduce(session: Session, event: SessionEvent): Session {
       return { ...session, screen: 'address' };
 
     case 'change-scenario':
-      // AC 2.2.4: the inputs are still there when they get back.
+      // AC 2.2.4 (Aug-27 set): the inputs are still there when they get back.
       return { ...session, screen: 'scenario' };
 
     case 'reset-choices':
