@@ -42,7 +42,9 @@ Three things, and the third is a hazard rather than a feature.
 
 **Epic 1: 51 of 53 sub-criteria met.** The two open ones are both AC 1.1.1's requirement to introduce and offer historical flood information, which cannot be met until Epic 2 exists.
 
-**Epic 2: nothing built.** The board needs *VICSES Incidents Per SA1, 2009–2015* (data.vic, CC BY 4.0, about 2 MB of XLSX), which has not been fetched. It is the only candidate dataset that matches "recorded flood-incident count by area"; four others were ruled out with measured evidence. It stops in August 2015, and 2010–2014 are the five complete years — which fixes what AC 2.1.1 must display as the reporting period.
+**Epic 2: nothing built, but the data is verified.** The board needs *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0). It has now been fetched and measured — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
+
+> **Correction, 3 September.** An earlier note here said the file "stops in August 2015, and 2010–2014 are the five complete years". That came from the catalogue's description, which gives the collection period as July 2009 – 8 August 2015. The file itself has six financial-year columns, 2009-10 to 2014-15, and the Data Quality Statement states the reference period as **1 July 2009 – 30 June 2015**. All six are complete; there is no partial year to exclude. The reporting period AC 2.1.1.f must display is *six financial years, 1 July 2009 to 30 June 2015*.
 
 **What was rebuilt for this revision**, and clicked through in a browser on 3 September: the four modes and the drainage-layer switches (1.1.4, 1.1.5), the homepage's per-mode ways in (1.1.1, 1.1.2), the retention of modes across an address change (1.1.8.d), and the comparison's removal from the homepage, the task question and the address screen.
 
@@ -243,7 +245,9 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 - [ ] **2.1.1.h** Retain the five highest-ranked areas as the default view
 - [ ] **2.1.1.i** Provide an option to continue to the local drainage map
 
-> **2.1.1.f is the criterion that decides the dataset.** The candidate is *VICSES Incidents Per SA1, 2009–2015*: the geographic unit is SA1, the source is data.vic under CC BY 4.0, and the reporting period must be stated as what the data actually covers. It ends in August 2015, so 2010–2014 are the five complete years — a period of "2009–2015" would be a claim the file does not support at either end.
+> **2.1.1.f is the criterion the data was checked against, and it is satisfiable.** Source: Victoria State Emergency Service, *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015*, via data.vic under CC BY 4.0. Reporting period: **six financial years, 1 July 2009 to 30 June 2015**, which is what the Data Quality Statement states and what the file's six year columns contain.
+>
+> **The geographic unit needs a second source.** The DQS says in as many words that "SA1 regions are not named", so AC 2.1.1.d's *area name* cannot come from this file. ABS ASGS 2011 (`SA1_2011_AUST.csv`) carries `SA1_7DIGITCODE_2011` alongside `SA2_NAME_2011` and `GCCSA_NAME_2011`, and all **13,339 of 13,339** VICSES codes join to it with nothing left over on either side. The named unit is therefore **SA2**, and Greater Melbourne is separable from the rest of Victoria. Details and the measurements behind them: [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md).
 
 ### AC 2.2.1 — Show more locations
 
