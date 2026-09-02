@@ -57,7 +57,20 @@ esac
 # on somebody's own machine and passed in at deploy time. Nothing in this image
 # or in the repository can be turned back into a password.
 printf '%s:%s\n' "${BASIC_AUTH_USER}" "${BASIC_AUTH_HASH}" > /etc/nginx/.htpasswd
-chmod 600 /etc/nginx/.htpasswd
+
+# Readable by the worker, which is not the process that wrote it.
+#
+# nginx opens `auth_basic_user_file` in a worker, and workers drop to an
+# unprivileged user; this script runs as root. At 600 and owned by root the
+# worker gets EACCES, and the failure is a nasty shape: a request with no
+# credentials never opens the file and still gets a clean 401, so the gate
+# looks like it is working, while a request with the *correct* password gets
+# 500. It fails only for the person who has the password.
+#
+# 444 rather than a tighter mode with a chown, because a chown that silently
+# fails puts it straight back. The file holds a username and a hash, and
+# anything that can read it is already inside the container.
+chmod 444 /etc/nginx/.htpasswd
 
 # Cloud Run sends traffic to $PORT and does not promise it is 8080. nginx has
 # no variable expansion in `listen`, so the port is substituted at start-up
