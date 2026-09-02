@@ -1,10 +1,14 @@
 /**
- * The map, with the layers the chosen task wants on by default.
+ * The map, with the modes the way in asked for.
  *
- * AC 1.1.2 asks the follow task to open with surface-water paths and pits and
- * one instruction, with everything else collapsed. The full-map task asks for
- * the opposite. Both are the same map; what differs is what is on when it
- * opens, and that difference is the whole reason the task question exists.
+ * Three things can decide what is on when it opens, in order of precedence: a
+ * mode chosen on the homepage (AC 1.1.2), the guided task, or nothing at all —
+ * in which case every mode is on, because nothing has been narrowed yet.
+ *
+ * **The two levels of control are combined here and nowhere else.** `modes`
+ * is the chip row, `sub` is what sits behind the Layers button, and
+ * `effectiveLayers` is the single function that turns the pair into the
+ * `LayerState` the canvas draws. The canvas has never heard of a mode.
  *
  * **The chrome is deliberately in pieces.** It used to be one 310px panel
  * carrying the address, the instruction, the sentence about nearby water, six
@@ -23,14 +27,19 @@ import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
+import { MapLegend, ModeChips } from '../map/MapLayers.js';
 import {
-  LAYERS,
-  LayerChips,
-  type LayerKey,
-  type LayerState,
-  MapLegend,
+  ALL_MODES,
+  GUIDED_MODES,
+  type MapMode,
+  type ModeState,
+  type SubLayerKey,
+  type SubLayerState,
+  effectiveLayers,
+  openingModes,
+  subLayersWith,
   visibilityOf,
-} from '../map/MapLayers.js';
+} from '../map/modes.js';
 import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
@@ -50,24 +59,22 @@ import {
 } from '../ui/theme.js';
 import { PitDetail } from './PitDetail.js';
 
-/** What the follow task opens with: the two layers its question needs. */
-const GUIDED_ON: LayerState = {
-  pit: true,
-  pipe: true,
-  terrain: true,
-  channel: true,
-  lowPoint: false,
-  unavailable: false,
-};
-
-const EVERYTHING_ON: LayerState = {
-  pit: true,
-  pipe: true,
-  terrain: true,
-  channel: true,
-  lowPoint: true,
-  unavailable: true,
-};
+/**
+ * What the map opens with.
+ *
+ * A mode chosen on the homepage wins, because it is the most recent thing the
+ * person said. The guided task is the next-best signal, and the unguided map
+ * turns everything on including the hatching — somebody who asked for the whole
+ * pilot area has asked to see where it is thin as well.
+ */
+function openingState(
+  mode: MapMode | null,
+  guided: boolean,
+): { readonly modes: ModeState; readonly sub: SubLayerState } {
+  if (mode !== null) return { modes: openingModes(mode), sub: subLayersWith(false) };
+  if (guided) return { modes: GUIDED_MODES, sub: subLayersWith(false) };
+  return { modes: ALL_MODES, sub: subLayersWith(true) };
+}
 
 export interface MapViewProps {
   readonly map: MapArtefact;
@@ -75,6 +82,8 @@ export interface MapViewProps {
   readonly trace: TraceArtefact;
   readonly address: SupportedAddress | null;
   readonly task: Task | null;
+  /** A mode named on the way in, which decides what is on when the map opens. */
+  readonly mode?: MapMode | null;
   readonly onBack: () => void;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
@@ -89,13 +98,19 @@ export function MapView({
   trace,
   address,
   task,
+  mode = null,
   onBack,
   panel = true,
   index,
   onAddress,
 }: MapViewProps) {
+  // Also decides whether the map offers a next step, which only a guided task
+  // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
+  // not an instruction, and nobody asked to be walked through anything.
   const guided = task !== 'full-map';
-  const [layers, setLayers] = useState<LayerState>(guided ? GUIDED_ON : EVERYTHING_ON);
+  const opening = openingState(mode, guided);
+  const [modes, setModes] = useState<ModeState>(opening.modes);
+  const [sub, setSub] = useState<SubLayerState>(opening.sub);
   const [hit, setHit] = useState<Hit | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
@@ -143,14 +158,20 @@ export function MapView({
     [trace, following],
   );
 
-  const toggle = (key: LayerKey) => {
-    setLayers((current) => ({ ...current, [key]: !current[key] }));
+  const layers = useMemo(() => effectiveLayers(modes, sub), [modes, sub]);
+
+  const toggleMode = (key: MapMode) => {
+    setModes((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const toggleSub = (key: SubLayerKey) => {
+    setSub((current) => ({ ...current, [key]: !current[key] }));
   };
 
   // The terrain chip cannot be pressed until its raster exists. Shown disabled
   // rather than hidden: a control that vanishes reads as a control that was
-  // never there, and this one is named by AC 1.1.3.b.
-  const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
+  // never there, and this one is named by AC 1.1.4.
+  const notYet: MapMode[] = terrain === null ? ['terrain'] : [];
 
   return (
     <>
@@ -191,7 +212,13 @@ export function MapView({
         >
           <div style={{ pointerEvents: 'auto', display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
             {index && onAddress && <MapSearch index={index} address={address} onPick={onAddress} />}
-            <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
+            <ModeChips
+              modes={modes}
+              sub={sub}
+              onToggleMode={toggleMode}
+              onToggleSub={toggleSub}
+              unavailableModes={notYet}
+            />
           </div>
         </div>
       )}
@@ -516,7 +543,4 @@ function Badge({ basis }: { readonly basis: string }) {
 }
 
 /** Re-exported so the scenario screens keep the visibility they always had. */
-export const EVERYTHING = visibilityOf(EVERYTHING_ON);
-
-/** The layer list, for anything that needs to name them. */
-export { LAYERS };
+export const EVERYTHING = visibilityOf(effectiveLayers(ALL_MODES, subLayersWith(true)));

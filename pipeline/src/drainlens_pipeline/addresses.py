@@ -11,7 +11,7 @@ holding for a reason other than finding a street.
 
 The index is also the pilot boundary. An address in it is covered; an address
 on one of its streets but not in it is a real place the pilot does not reach;
-anything else is a query this product cannot speak about at all. AC 1.1.4 turns
+anything else is a query this product cannot speak about at all. AC 1.1.7 turns
 on telling those three apart, so the streets are listed separately rather than
 being recovered by scanning every label at run time.
 """

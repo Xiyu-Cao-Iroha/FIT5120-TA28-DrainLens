@@ -6,6 +6,8 @@ What to do. Every task names the criterion it serves in [ITERATION-1-ACCEPTANCE.
 
 **Re-mapped 27 August** against the revised criteria document, which replaced six broad criteria with twenty and added navigation and state-retention requirements that had no tasks before.
 
+> **Every AC number in this file is the 27 August set.** *Epic 1-2 Revised*, received 3 September, renumbered the criteria and replaced Epic 2 entirely. This is a record of how Iteration 1 was planned and sequenced, kept as it was written; the mapping from these numbers to the current ones is at the top of [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md), which is the file to work from.
+
 **The critical path is W1.** Everything visually interesting in Epic 2 depends on a D8 flow-direction grid and depression tables that do not yet exist, and the offline pipeline is the only workstream with genuine uncertainty in it.
 
 ---

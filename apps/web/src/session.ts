@@ -28,6 +28,8 @@ import type {
   InsufficiencyReason,
 } from '@drainlens/schema';
 
+import type { MapMode } from './map/modes.js';
+
 /** Which screen the person is on. */
 export type Screen =
   /** What somebody lands on: what this is, before it asks anything of them. */
@@ -52,7 +54,7 @@ export interface SupportedAddress {
 /**
  * Scenario inputs, each independently unset.
  *
- * `blockage` starts `null` rather than defaulting to clear, because AC 2.1.1
+ * `blockage` starts `null` rather than defaulting to clear, because AC 2.1.1 (Aug-27 set)
  * requires the person to choose it: a pre-selected assumption is one the
  * interface made and the person owns without knowing it.
  */
@@ -73,6 +75,15 @@ export interface Session {
   /** What they typed that turned out not to be supported, so the screen can say it back. */
   readonly rejectedAddress: string | null;
   readonly task: Task | null;
+  /**
+   * The information mode the way in asked for, or `null` for "no preference".
+   *
+   * AC 1.1.2 requires the map to open with the mode belonging to whatever was
+   * chosen on the homepage. That is a fact about the route taken, so it lives
+   * with the rest of the route rather than being threaded through props; the
+   * map treats it as an opening value and owns its own state from there.
+   */
+  readonly mapMode: MapMode | null;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -93,6 +104,7 @@ export const INITIAL_SESSION: Session = {
   address: null,
   rejectedAddress: null,
   task: null,
+  mapMode: null,
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -129,8 +141,11 @@ export type SessionEvent =
    *
    * The task is `full-map`, because the two guided tasks exist to answer a
    * question somebody has chosen. Nobody chose one on the way in here.
+   *
+   * `mode` carries the homepage card that was pressed. Absent, the map opens
+   * with everything on, which is what the unguided way in has always meant.
    */
-  | { readonly type: 'map-opened' }
+  | { readonly type: 'map-opened'; readonly mode?: MapMode }
   | { readonly type: 'go-home' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
@@ -187,6 +202,9 @@ export function reduce(session: Session, event: SessionEvent): Session {
         ...session,
         screen: event.task === 'compare' ? 'scenario' : 'explore',
         task: event.task,
+        // The other way into the map. A mode left over from an earlier trip
+        // through the homepage would quietly override the task's own defaults.
+        mapMode: null,
       };
 
     case 'pit-selected':
@@ -211,7 +229,7 @@ export function reduce(session: Session, event: SessionEvent): Session {
       return { ...session, screen: BACK[session.screen] };
 
     case 'map-opened':
-      return { ...session, screen: 'explore', task: 'full-map' };
+      return { ...session, screen: 'explore', task: 'full-map', mapMode: event.mode ?? null };
 
     case 'go-home':
       return { ...session, screen: 'home' };
@@ -220,7 +238,7 @@ export function reduce(session: Session, event: SessionEvent): Session {
       return { ...session, screen: 'address' };
 
     case 'change-scenario':
-      // AC 2.2.4: the inputs are still there when they get back.
+      // AC 2.2.4 (Aug-27 set): the inputs are still there when they get back.
       return { ...session, screen: 'scenario' };
 
     case 'reset-choices':

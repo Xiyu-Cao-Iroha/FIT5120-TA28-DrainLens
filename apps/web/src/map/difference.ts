@@ -7,7 +7,7 @@
  * self-audit then traced to the worker: the engine computes a band for every
  * cell, and only a count of them ever crossed back to the interface.
  *
- * **It is a difference, never a depth.** AD7 and AC 2.2.1.c allow one output
+ * **It is a difference, never a depth.** AD7 and AC 2.2.1.c (Aug-27 set) allow one output
  * and one only — where the two runs disagree. Nothing here encodes how much
  * water, and the fill is deliberately flat for that reason: a ramp would
  * invite reading a quantity off a legend this product does not publish.

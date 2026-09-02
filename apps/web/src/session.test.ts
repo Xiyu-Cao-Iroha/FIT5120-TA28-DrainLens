@@ -70,7 +70,7 @@ describe('the golden path', () => {
 
 describe('scenario inputs', () => {
   it('leaves the blockage unchosen rather than assuming one', () => {
-    // AC 2.1.1. A pre-selected assumption is one the interface made and the
+    // AC 2.1.1 (Aug-27 set). A pre-selected assumption is one the interface made and the
     // person carries without ever having agreed to it.
     expect(EMPTY_SCENARIO.blockage).toBeNull();
     expect(canRunComparison(EMPTY_SCENARIO)).toBe(false);
@@ -98,7 +98,7 @@ describe('scenario inputs', () => {
   });
 
   it('keeps the inputs when the person goes back to change the scenario', () => {
-    // AC 2.2.4.
+    // AC 2.2.4 (Aug-27 set).
     const end = play([
       { type: 'pit-selected', pitId: 'P-14', suggested: false },
       { type: 'blockage-selected', blockage: 'partly-blocked' },
@@ -165,7 +165,7 @@ describe('changing the address', () => {
   });
 
   it('says an unsupported address back rather than guessing at one', () => {
-    // AC 1.1.4: explain, do not fabricate.
+    // AC 1.1.7: explain, do not fabricate.
     const end = play([{ type: 'address-rejected', typed: '1 Example Road, Outside Pilot' }]);
     expect(end.screen).toBe('unsupported');
     expect(end.rejectedAddress).toBe('1 Example Road, Outside Pilot');
@@ -415,5 +415,41 @@ describe('opening the map from the homepage', () => {
 
     expect(end.address).toEqual(GATEHOUSE);
     expect(end.scenario.blockage).toBe('fully-blocked');
+  });
+
+  it('carries the mode the card named — AC 1.1.2', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened', mode: 'water-flow' }).mapMode).toBe(
+      'water-flow',
+    );
+  });
+
+  it('names no mode when the way in did not', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).mapMode).toBeNull();
+  });
+
+  it('replaces the mode rather than keeping the previous card’s', () => {
+    const again = play([
+      { type: 'map-opened', mode: 'terrain' },
+      { type: 'go-home' },
+      { type: 'map-opened', mode: 'low-areas' },
+    ]);
+
+    expect(again.mapMode).toBe('low-areas');
+  });
+
+  it('forgets the mode when a task is chosen instead', () => {
+    // The other way into the map. A mode left over from an earlier trip
+    // through the homepage would override the task's own defaults, and the
+    // person would be looking at the answer to a question they left behind.
+    const viaTask = play([
+      { type: 'map-opened', mode: 'terrain' },
+      { type: 'go-home' },
+      { type: 'change-address' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+
+    expect(viaTask.screen).toBe('explore');
+    expect(viaTask.mapMode).toBeNull();
   });
 });

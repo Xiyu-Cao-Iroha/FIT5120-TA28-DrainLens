@@ -49,7 +49,8 @@ export interface MapCanvasProps {
   /**
    * The selected address, in local metres.
    *
-   * The map opens centred on it and marks it — AC 1.1.2.a and 1.1.3.a. It is
+   * The map opens centred on it and marks it — AC 1.1.3.b, and AC 1.1.8.b
+   * again when the address changes from the map itself. It is
    * only the *opening* view: once somebody has panned, a re-render must not
    * drag them back, so this is read when the viewport is first built.
    */

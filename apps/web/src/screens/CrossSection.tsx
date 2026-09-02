@@ -65,7 +65,7 @@ export function CrossSection({ outcome, onClose }: CrossSectionProps) {
   );
 }
 
-/** AC 1.3.2: say it cannot be drawn, say what is missing, invent nothing. */
+/** AC 1.1.6.f: say it cannot be drawn, say what is missing, invent nothing. */
 function Unavailable({ reasons }: { readonly reasons: readonly string[] }) {
   return (
     <div

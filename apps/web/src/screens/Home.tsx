@@ -7,11 +7,23 @@
  * site does. This page answers that first, and every way onward from it goes
  * to the same map.
  *
- * **What is deliberately not on it.** No flood history entry, because the
- * board does not exist yet and the only dataset that could feed it honestly
- * has not been fetched. A navigation item pointing at a page nobody built is
- * a promise the site cannot keep, and this product's whole argument is that
- * it does not make those.
+ * **The ways in are the modes.** AC 1.1.2 asks that choosing a drainage,
+ * water-flow or terrain option open the map with that mode active, so each
+ * card names one and carries it through. A card that opened the same default
+ * map as every other card would be four labels over one door.
+ *
+ * **What is deliberately not on it.**
+ *
+ * No drain-blockage comparison. AC 1.1.1 requires it to be absent from the
+ * Iteration 1 interface, and absent means not described here either — a card
+ * explaining a feature is that feature appearing in the interface. The screens
+ * and their tests are untouched in the repository, waiting for Iteration 2.
+ *
+ * No flood history entry yet. AC 1.1.1 asks for one; the board does not exist
+ * and the only dataset that could feed it honestly has not been fetched. A
+ * navigation item pointing at a page nobody built is a promise the site cannot
+ * keep, and this product's whole argument is that it does not make those. It
+ * goes on the page when there is a page for it to go to.
  */
 
 import { useState } from 'react';
@@ -19,6 +31,7 @@ import { useState } from 'react';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { MapArtefact } from '../map/artefact.js';
 import { FramedMap } from '../map/FramedMap.js';
+import type { MapMode } from '../map/modes.js';
 import { PilotBadge } from '../ui/Shell.js';
 import {
   basis as basisTone,
@@ -41,30 +54,48 @@ export const SECTIONS = {
   limits: 'home-limits',
 } as const;
 
-/** The three ways into the map, which are the three the product actually has. */
+/**
+ * The four ways into the map, one per mode.
+ *
+ * The accents are the colours those layers are actually drawn in, so the card
+ * a person pressed is recognisable in the map that opens. Water flow and low
+ * areas are both blue because both are blue on the map; correcting that here
+ * would make the homepage prettier and the map harder to read back.
+ */
 const PATHS: readonly {
+  readonly mode: MapMode;
   readonly title: string;
   readonly body: string;
   readonly action: string;
   readonly accent: string;
 }[] = [
   {
-    title: 'Follow local water and drainage',
-    body: 'See where rainwater may move near an address, and follow the recorded drainage connections downstream until the record stops.',
-    action: 'Open the drainage map',
+    mode: 'drainage',
+    title: 'Recorded drainage',
+    body: 'The public pits and pipes the council has a record of, and where a path stops because the record does rather than because the water does.',
+    action: 'Open drainage',
     accent: '#1f6f5c',
   },
   {
-    title: 'Compare a drain-blockage scenario',
-    body: 'Choose a pit, a blockage assumption and a rainfall amount, then compare the result against the same rainfall with every drain clear.',
-    action: 'Set up a comparison',
+    mode: 'water-flow',
+    title: 'Where rainwater may move',
+    body: 'Indicative surface-water paths calculated from measured ground. They say which way water tends to run, not how much of it or how deep.',
+    action: 'Open water flow',
     accent: '#2f7fb8',
   },
   {
-    title: 'Explore the whole pilot area',
-    body: 'Every layer at once — terrain, pits, pipes, surface-water paths and low areas — without a guided task in the way.',
-    action: 'Open the full map',
-    accent: '#7c5cc4',
+    mode: 'terrain',
+    title: 'The shape of the ground',
+    body: 'Elevation shading across the pilot area, so you can see which way is downhill from a street before reading anything else over it.',
+    action: 'Open terrain',
+    accent: '#6c8c9e',
+  },
+  {
+    mode: 'low-areas',
+    title: 'Low points and depressions',
+    body: 'Places the calculated surface says water can collect. Indicative, and not a statement that any of them has flooded or will.',
+    action: 'Open low areas',
+    accent: '#5aa0cd',
   },
 ];
 
@@ -79,14 +110,14 @@ const STEPS: readonly { readonly title: string; readonly body: string }[] = [
   },
   {
     title: 'Read what is recorded',
-    body: 'Turn layers on and off, select a pit or pipe, and see which parts are the council’s record and which DrainLens calculated.',
+    body: 'Switch modes along the top, open Layers to show pits and pipes on their own, and see which parts are the council’s record and which DrainLens calculated.',
   },
 ];
 
 const PROVIDES: readonly string[] = [
   'Recorded public drainage pits and pipes, and where a path stops because the record does',
   'Surface-water paths, low points and a ground surface calculated from measured terrain',
-  'One blocked drain compared against the same rainfall with every drain clear',
+  'A plain-English note on every layer saying whether it is recorded or calculated',
 ];
 
 const WITHHOLDS: readonly string[] = [
@@ -98,17 +129,25 @@ const WITHHOLDS: readonly string[] = [
 export interface HomeProps {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
-  readonly onOpenMap: () => void;
+  /** Called with the mode the map should open in, or nothing for all of them. */
+  readonly onOpenMap: (mode?: MapMode) => void;
   readonly onFindAddress: () => void;
 }
 
 export function Home({ artefact, derived, onOpenMap, onFindAddress }: HomeProps) {
   return (
     <div>
+      {/*
+        The hero's button is called, not forwarded. Its `onClick` hands the
+        click event to whatever it is given, and an event arriving where a mode
+        is expected is a mode nobody chose.
+      */}
       <Hero
         artefact={artefact}
         derived={derived}
-        onOpenMap={onOpenMap}
+        onOpenMap={() => {
+          onOpenMap();
+        }}
         onFindAddress={onFindAddress}
       />
       <Paths onOpenMap={onOpenMap} />
@@ -355,12 +394,12 @@ function Hero({
   );
 }
 
-function Paths({ onOpenMap }: { readonly onOpenMap: () => void }) {
+function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) {
   return (
     <Band tone="raised" id={SECTIONS.paths}>
       <SectionHeading
         title="Start with what you want to understand."
-        body="Three ways in, each opening the same map with different things turned on. None of them asks you to learn the whole map first."
+        body="Four ways in, each opening the same map with a different question already asked. None of them makes you learn the whole map first, and every one of them can be switched to the others once you are there."
       />
       <div
         style={{
@@ -405,7 +444,9 @@ function Paths({ onOpenMap }: { readonly onOpenMap: () => void }) {
             </p>
             <button
               type="button"
-              onClick={onOpenMap}
+              onClick={() => {
+                onOpenMap(path.mode);
+              }}
               style={{
                 alignSelf: 'flex-start',
                 background: 'none',
@@ -420,6 +461,36 @@ function Paths({ onOpenMap }: { readonly onOpenMap: () => void }) {
           </article>
         ))}
       </div>
+
+      {/*
+        The unnarrowed way in, kept quieter than the four. Somebody who already
+        knows what the map holds should not have to pick a question first, but
+        it is the wrong first suggestion for somebody who does not.
+      */}
+      <p
+        style={{
+          margin: `${String(space(5))}px 0 0`,
+          font: type(text.label, { leading: 1.6 }),
+          color: ink.muted,
+        }}
+      >
+        Or{' '}
+        <button
+          type="button"
+          onClick={() => {
+            onOpenMap();
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.label, { weight: weight.semibold }),
+            color: brand.ink,
+          }}
+        >
+          open the map with every mode on →
+        </button>
+      </p>
     </Band>
   );
 }

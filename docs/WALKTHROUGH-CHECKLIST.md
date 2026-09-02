@@ -4,6 +4,8 @@ DrainLens · TA28 · a working sheet for a paired session, **not a record of one
 
 Fill it in while doing it. An entry written afterwards from memory is worth less than a blank one, and a blank one is honest.
 
+> **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+
 ---
 
 ## How to run this

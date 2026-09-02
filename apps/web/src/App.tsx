@@ -59,7 +59,12 @@ export function App() {
   const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const scenario = useScenario('/data/scene');
+  // Only the two comparison screens use it, and neither is reachable in the
+  // Iteration 1 interface. See the note at the top of `useScenario`.
+  const scenario = useScenario(
+    '/data/scene',
+    session.screen === 'scenario' || session.screen === 'result',
+  );
   // Every position the last run solved. The rainfall control on the result
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
@@ -138,8 +143,8 @@ export function App() {
           <Home
             artefact={loaded.map}
             derived={loaded.derived}
-            onOpenMap={() => {
-              dispatch({ type: 'map-opened' });
+            onOpenMap={(mode) => {
+              dispatch({ type: 'map-opened', ...(mode ? { mode } : {}) });
             }}
             onFindAddress={() => {
               dispatch({ type: 'change-address' });
@@ -436,6 +441,7 @@ export function App() {
             trace={loaded.trace}
             address={session.address}
             task={session.task}
+            mode={session.mapMode}
             index={loaded.index}
             onAddress={(picked) =>
               dispatch({
@@ -458,7 +464,7 @@ export function App() {
 /**
  * The map beside the scenario panel.
  *
- * AC 2.2.1.d: the selected pit and its recorded downstream path stay visible
+ * AC 2.2.1.d (Aug-27 set): the selected pit and its recorded downstream path stay visible
  * while a result is on screen. Without them the difference is highlighted over
  * a map that has forgotten which drain the person was asking about, and the
  * result reads as a statement about the whole neighbourhood.
