@@ -31,6 +31,8 @@ function recorder() {
     moveTo: note('moveTo'),
     lineTo: note('lineTo'),
     arc: note('arc'),
+    arcTo: note('arcTo'),
+    closePath: note('closePath'),
     fill: note('fill'),
     stroke: note('stroke'),
   };
@@ -42,12 +44,21 @@ describe('the pit marker', () => {
     expect(barWidthPx()).toBeGreaterThanOrEqual(1.5);
   });
 
-  it('would not, inside the artwork’s own frame at this size', () => {
-    // Why the round frame replaces the rounded rectangle rather than holding
-    // it: the supplied artwork is 168 units wide and its bars are 11 of them,
-    // so fitting the whole thing in a 26px circle puts a bar under a pixel.
-    const insideTheOldFrame = (26 * 0.873 * 11) / 168;
-    expect(insideTheOldFrame).toBeLessThan(1.5);
+  it('is the reason the marker is as large as it is', () => {
+    // The circle holds the whole artwork, frame included, so the bars are a
+    // fixed fraction of the diameter. At 26px they fall under a pixel and a
+    // half and five bars read as one grey block; the size is the price of
+    // keeping the icon looking like the icon.
+    expect(barWidthPx(26)).toBeLessThan(1.5);
+    expect(barWidthPx(ICON_DIAMETER_PX)).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('draws the artwork’s own frame, not just the bars', () => {
+    // `arcTo` is the rounded rectangle. Without it the marker is a ring with
+    // loose bars in it, which is legible but is not this icon.
+    const r = recorder();
+    drawPitIcon(r.context, 0, 0, '#2f6f62');
+    expect(r.calls.filter((c) => c.op === 'arcTo').length).toBeGreaterThanOrEqual(4);
   });
 
   it('grows its bars with the marker', () => {
@@ -66,8 +77,12 @@ describe('the pit marker', () => {
   it('draws ten bars', () => {
     const r = recorder();
     drawPitIcon(r.context, 0, 0, '#2f6f62');
-    expect(r.calls.filter((c) => c.op === 'moveTo')).toHaveLength(10);
-    expect(r.calls.filter((c) => c.op === 'lineTo')).toHaveLength(10);
+    // The frame is a path too, and it uses moveTo and lineTo as well. The
+    // bars are what comes after it, so count from the frame's last corner.
+    const lastCorner = r.calls.map((c) => c.op).lastIndexOf('arcTo');
+    const after = r.calls.slice(lastCorner);
+    expect(after.filter((c) => c.op === 'moveTo')).toHaveLength(10);
+    expect(after.filter((c) => c.op === 'lineTo')).toHaveLength(10);
   });
 
   it('leaves the context as it found it', () => {

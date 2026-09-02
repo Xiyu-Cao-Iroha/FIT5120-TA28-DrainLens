@@ -52,14 +52,17 @@ export const LAYERS: readonly LayerSpec[] = [
 ];
 
 /**
- * The five AC 1.1.3.b names, which get a chip of their own.
+ * The layers that get a chip of their own.
  *
- * The sixth stays behind the Layers button. It is not a lesser layer — AC
- * 1.1.3.e requires it to be available and legible — but it answers a question
- * about the *data* rather than about the ground, and a person who has not
- * asked that question yet is better served by five chips than six.
+ * The other two sit behind the Layers button, and neither is a lesser layer.
+ * "Not enough ground measured" answers a question about the *data* rather than
+ * about the ground. The ground surface is there because it is background: it
+ * is on by default, it is what everything else is drawn over, and it is not
+ * something a person reaches for while reading a particular street. Both are
+ * still individually switchable, which is what AC 1.1.3.b and 1.1.3.c ask —
+ * the criteria require a control per layer, not a control in a chip row.
  */
-export const PRIMARY_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'terrain', 'channel', 'lowPoint'];
+export const PRIMARY_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint'];
 
 export function visibilityOf(state: LayerState): DerivedVisibility {
   return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
@@ -68,18 +71,30 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
 function SwatchMark({ kind }: { readonly kind: Swatch }) {
   // `flexShrink` is a CSS property, not an SVG attribute: spreading it onto
   // the element makes React warn and does nothing. It belongs in `style`.
-  const box = { width: 20, height: 14, style: { flexShrink: 0 } } as const;
+  const box = { width: 18, height: 18, style: { flexShrink: 0 } } as const;
   switch (kind) {
     case 'dot':
-      // The same marker the map draws: a ring with the grate inside it. A
-      // legend showing a dot while the map showed a grate would be a key to a
-      // different map, and this module exists so the two cannot drift.
+      // The marker the map draws, artwork and all. A legend showing something
+      // simpler than the map is a key to a different map, which is why both
+      // live in this module.
       return (
-        <svg {...box} viewBox="0 0 26 26" aria-hidden focusable="false">
-          <circle cx="13" cy="13" r="12" fill="#ffffff" stroke="#2f6f62" strokeWidth="2" />
-          <g stroke="#2f6f62" strokeWidth="1.9" strokeLinecap="round">
-            <path d="M6.2 9.6v2.2M9.6 9.6v2.2M13 9.6v2.2M16.4 9.6v2.2M19.8 9.6v2.2" />
-            <path d="M6.2 14.9v2.2M9.6 14.9v2.2M13 14.9v2.2M16.4 14.9v2.2M19.8 14.9v2.2" />
+        <svg {...box} viewBox="0 0 32 32" aria-hidden focusable="false">
+          <circle cx="16" cy="16" r="15" fill="#ffffff" stroke="#2f6f62" strokeWidth="2" />
+          <g transform="translate(16 16) scale(0.1752) translate(-84 -47)">
+            <rect
+              x="10.75"
+              y="8.75"
+              width="146.5"
+              height="76.5"
+              rx="9"
+              fill="#ffffff"
+              stroke="#2f6f62"
+              strokeWidth="5.5"
+            />
+            <g stroke="#2f6f62" strokeWidth="11" strokeLinecap="round">
+              <path d="M36.5 24.5v13M63 24.5v13M89.5 24.5v13M116 24.5v13M142.5 24.5v13" />
+              <path d="M36.5 56.5v13M63 56.5v13M89.5 56.5v13M116 56.5v13M142.5 56.5v13" />
+            </g>
           </g>
         </svg>
       );
