@@ -301,3 +301,77 @@ describe('nothing about the person leaves memory', () => {
     expect(JSON.stringify(INITIAL_SESSION)).not.toContain('Neale');
   });
 });
+
+describe('searching from the map', () => {
+  it('moves the map instead of sending the person back to the task question', () => {
+    // The distinction the two actions exist for. `address-accepted` is what
+    // the first screen sends and it goes on to ask what you want to do;
+    // searching while already reading a map should leave you reading a map.
+    const reading = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    // Whatever screen they were on, they are still on it -- and in particular
+    // not back at the task question, which is where `address-accepted` goes.
+    expect(end.screen).toBe(reading.screen);
+    expect(end.screen).not.toBe('task');
+    expect(end.address).toEqual(NEALE);
+  });
+
+  it('still drops a pit that belonged to the old neighbourhood', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: true },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    expect(end.scenario.pitId).toBeNull();
+    expect(end.outcome).toBeNull();
+  });
+
+  it('keeps the assumptions, which were the person’s and not the map’s', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'address-moved', address: NEALE },
+    ]);
+
+    expect(end.scenario.blockage).toBe('fully-blocked');
+    expect(end.scenario.rainfallMm).toBe(60);
+  });
+
+  it('keeps everything when the same address is chosen again', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: false },
+      { type: 'address-moved', address: GATEHOUSE },
+    ]);
+
+    expect(end.scenario.pitId).toBe('P-14');
+  });
+});
+
+describe('an action the reducer does not know', () => {
+  it('leaves the session untouched instead of erasing it', () => {
+    // The compiler makes this unreachable, which is why the cast is needed to
+    // reach it. It is reachable in a browser: a module one version behind the
+    // one dispatching to it sends an action this build has never heard of.
+    // Falling through used to return `undefined`, which React accepted as the
+    // new session and which blanked the entire screen.
+    const start = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    const after = reduce(start, { type: 'from-the-future' } as unknown as SessionEvent);
+
+    expect(after).toBe(start);
+    expect(after.screen).toBe(start.screen);
+  });
+});

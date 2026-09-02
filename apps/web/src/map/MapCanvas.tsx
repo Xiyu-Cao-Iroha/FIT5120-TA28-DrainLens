@@ -15,10 +15,21 @@ import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
 import { drawMap } from './draw.js';
 import { type Hit, pick } from './hit.js';
-import { type Local, type Viewport, clamp, fit, focus, pan, zoomAt } from './viewport.js';
+import {
+  MAX_SCALE,
+  type Local,
+  type Viewport,
+  clamp,
+  fit,
+  focus,
+  pan,
+  scaleToCover,
+  zoomAt,
+} from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
 import { drawTerrain } from './terrain.js';
+import { MapControls, STEP } from './MapControls.js';
 import type { Trace } from '../trace/graph.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
@@ -76,6 +87,11 @@ export function MapCanvas({
   // Held in a ref rather than read in the effect, so that changing the
   // address does not re-run the resize effect and yank a panned map back.
   const openingRef = useRef<Local | null>(address);
+  // The address the view has already been moved to. A *re-render* must not
+  // drag a panned map back, which is what `openingRef` protects against — but
+  // a genuinely different address must, or searching for one from the map
+  // leaves you looking at the old neighbourhood with a new name on the panel.
+  const movedToRef = useRef<Local | null>(address);
   const bounds = boundsOf(artefact);
 
   // Size to the element, in device pixels, so the map is not a blurred
@@ -191,6 +207,35 @@ export function MapCanvas({
     [viewport, artefact, onSelect, at],
   );
 
+  // Move when the address actually changes, and only then.
+  useEffect(() => {
+    if (address === null) return;
+    const held = movedToRef.current;
+    if (held !== null && held[0] === address[0] && held[1] === address[1]) return;
+    movedToRef.current = address;
+    setViewport((current) =>
+      current === null
+        ? current
+        : clamp(focus(current.widthPx, current.heightPx, bounds, address, current.scale), bounds),
+    );
+  }, [address, bounds]);
+
+  const zoomBy = useCallback(
+    (factor: number) => {
+      if (!viewport) return;
+      // About the centre of the canvas, not the pointer: somebody pressing a
+      // button is looking at the middle of the map, while somebody turning a
+      // wheel is looking at whatever is under their cursor.
+      const centre: [number, number] = [viewport.widthPx / 2, viewport.heightPx / 2];
+      setViewport(clamp(zoomAt(viewport, factor, centre, bounds), bounds));
+    },
+    [viewport, bounds],
+  );
+
+  // The floor is the scale at which the whole extent is covered: below it the
+  // map would sit in a frame of nothing, which `clamp` already refuses.
+  const minScale = viewport === null ? 0 : scaleToCover(viewport.widthPx, viewport.heightPx, bounds);
+
   return (
     <div
       ref={frameRef}
@@ -207,6 +252,33 @@ export function MapCanvas({
         }}
         style={{ display: 'block', cursor: 'grab' }}
       />
-    </div>
-  );
+      {viewport && (
+          <MapControls
+            scale={viewport.scale}
+            canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
+            canZoomOut={viewport.scale > minScale + 1e-6}
+            onZoomIn={() => {
+              zoomBy(STEP);
+            }}
+            onZoomOut={() => {
+              zoomBy(1 / STEP);
+            }}
+            onRecentre={
+              address === null
+                ? undefined
+                : () => {
+                    setViewport((current) =>
+                      current === null
+                        ? current
+                        : clamp(
+                            focus(current.widthPx, current.heightPx, bounds, address, current.scale),
+                            bounds,
+                          ),
+                    );
+                  }
+            }
+          />
+        )}
+      </div>
+    );
 }

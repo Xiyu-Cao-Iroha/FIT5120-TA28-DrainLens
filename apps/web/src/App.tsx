@@ -385,6 +385,18 @@ export function App() {
             trace={loaded.trace}
             address={session.address}
             task={session.task}
+            index={loaded.index}
+            onAddress={(picked) =>
+              dispatch({
+                type: 'address-moved',
+                address: {
+                  id: picked.id,
+                  label: picked.label,
+                  eastingM: picked.e,
+                  northingM: picked.n,
+                },
+              })
+            }
             onBack={() => dispatch({ type: 'back' })}
           />
         </Shell>
