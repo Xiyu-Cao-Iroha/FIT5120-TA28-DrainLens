@@ -2,6 +2,8 @@
 
 The offline geospatial pipeline. Runs once, on a developer machine, and publishes versioned static artefacts. **Never deployed** — nothing in here executes in production.
 
+> The water side of this pipeline — filling, conditioning, D8, depressions and how the browser engine consumes them — is walked end to end in [docs/ALGORITHMS.md](../docs/ALGORITHMS.md).
+
 ## Setup
 
 ```
