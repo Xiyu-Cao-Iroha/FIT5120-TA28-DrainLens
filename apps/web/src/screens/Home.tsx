@@ -19,11 +19,11 @@
  * explaining a feature is that feature appearing in the interface. The screens
  * and their tests are untouched in the repository, waiting for Iteration 2.
  *
- * No flood history entry yet. AC 1.1.1 asks for one; the board does not exist
- * and the only dataset that could feed it honestly has not been fetched. A
- * navigation item pointing at a page nobody built is a promise the site cannot
- * keep, and this product's whole argument is that it does not make those. It
- * goes on the page when there is a page for it to go to.
+ * Flood history arrived on 3 September and is the fifth card, set apart from
+ * the four modes because it is the one way in that does not open the map. It
+ * answers a question about the past across Greater Melbourne; the other four
+ * answer questions about the ground under one square kilometre. Putting it in
+ * the same row would suggest the map can show it, which the map cannot.
  */
 
 import { useState } from 'react';
@@ -118,6 +118,7 @@ const PROVIDES: readonly string[] = [
   'Recorded public drainage pits and pipes, and where a path stops because the record does',
   'Surface-water paths, low points and a ground surface calculated from measured terrain',
   'A plain-English note on every layer saying whether it is recorded or calculated',
+  'Recorded flood-incident counts by area across Greater Melbourne, 2009-10 to 2014-15',
 ];
 
 const WITHHOLDS: readonly string[] = [
@@ -132,9 +133,16 @@ export interface HomeProps {
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onFindAddress: () => void;
+  readonly onOpenHistory: () => void;
 }
 
-export function Home({ artefact, derived, onOpenMap, onFindAddress }: HomeProps) {
+export function Home({
+  artefact,
+  derived,
+  onOpenMap,
+  onFindAddress,
+  onOpenHistory,
+}: HomeProps) {
   return (
     <div>
       {/*
@@ -150,7 +158,7 @@ export function Home({ artefact, derived, onOpenMap, onFindAddress }: HomeProps)
         }}
         onFindAddress={onFindAddress}
       />
-      <Paths onOpenMap={onOpenMap} />
+      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} />
       <Flow />
       <Limits />
       <ClosingNote />
@@ -394,7 +402,13 @@ function Hero({
   );
 }
 
-function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) {
+function Paths({
+  onOpenMap,
+  onOpenHistory,
+}: {
+  readonly onOpenMap: (mode?: MapMode) => void;
+  readonly onOpenHistory: () => void;
+}) {
   return (
     <Band tone="raised" id={SECTIONS.paths}>
       <SectionHeading
@@ -461,6 +475,60 @@ function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) 
           </article>
         ))}
       </div>
+
+      {/*
+        The fifth kind of information AC 1.1.1.b names, and the only one that
+        is not a map layer. It gets a band of its own rather than a fifth card
+        because a card in that row would say "this opens the map too", and the
+        difference between the past across a city and the ground under a
+        square kilometre is the thing most worth not blurring.
+      */}
+      <article
+        style={{
+          display: 'flex',
+          gap: space(5),
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginTop: space(6),
+          padding: space(5),
+          background: brand.wash,
+          border: `1px solid ${brand.tint}`,
+          borderRadius: radius.large,
+        }}
+      >
+        <span style={{ flex: '1 1 320px' }}>
+          <h3
+            style={{
+              margin: `0 0 ${String(space(2))}px`,
+              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+              letterSpacing: tracking.title,
+              color: ink.strong,
+            }}
+          >
+            Recorded flood incidents across Greater Melbourne
+          </h3>
+          <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
+            Which areas called the State Emergency Service about flooding most often between
+            2009-10 and 2014-15, what a count actually means, and why it is not a measure of how
+            bad the flooding was. This one is about the past, and about the whole city rather
+            than the pilot area.
+          </p>
+        </span>
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          style={{
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            border: 'none',
+            borderRadius: radius.base,
+            background: brand.base,
+            color: ink.inverse,
+            font: type(text.label, { weight: weight.semibold }),
+          }}
+        >
+          See flood history →
+        </button>
+      </article>
 
       {/*
         The unnarrowed way in, kept quieter than the four. Somebody who already

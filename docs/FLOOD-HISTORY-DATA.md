@@ -152,8 +152,10 @@ Small numbers, and worth saying plainly rather than dressing up. They are enough
 | 2.3.1.b — limitations and gaps | Findings 2, 3 and 4 are the limitations, and each is measured |
 | 2.3.1.c — not severity, not damage | **Directly supported by the source**: a dispatch says nothing about either |
 
-Nothing here blocks Epic 2. Three product decisions remain, and each changes what the page says:
+Nothing here blocked Epic 2. Three product decisions were taken on 3 September with these measurements in front of them, and each now lives on the artefact rather than in a screen, so the page cannot drift from what was decided:
 
-1. **Scope** — Greater Melbourne, or all Victoria (finding 1)
-2. **Which count** — Flood alone, or Flood with Storm (finding 3)
-3. **How the 2010-11 spike is shown** — per-year figures beside the total, or a note (finding 2)
+1. **Scope: Greater Melbourne** (finding 1) — `geography.scope`
+2. **Which count: Flood alone** (finding 3) — `incidentType`, with what it leaves out in `excludes`
+3. **The six-year total, with every year beside it** (finding 2) — `byYear` on every area, and a chart of the six years above the ranking
+
+The board is `apps/web/src/screens/FloodHistory.tsx`. Two things the measurements above did not anticipate turned up while building it, and both are on the page: ranks five and six are tied at 133, so the default view names the area level with its last row; and nine of the published thirty contain a withheld count, so those totals are shown as floors rather than as measurements.

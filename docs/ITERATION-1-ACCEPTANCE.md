@@ -40,9 +40,11 @@ Three things, and the third is a hazard rather than a feature.
 
 ## Where this stands — 3 September 2026
 
-**Epic 1: 51 of 53 sub-criteria met.** The two open ones are both AC 1.1.1's requirement to introduce and offer historical flood information, which cannot be met until Epic 2 exists.
+**Epic 1: 53 of 53 sub-criteria met.** The last two were AC 1.1.1's requirement to introduce and offer historical flood information, which the board closed on 3 September.
 
-**Epic 2: nothing built, but the data is verified.** The board needs *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0). It has now been fetched and measured — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
+**Epic 2: 19 of 19 sub-criteria met, and clicked through on 3 September.** The board reads *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0), joined to ABS ASGS 2011 for the names. The data was verified before any of it was built — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
+
+> **Three product decisions were taken with the measurements in front of them**, and each is on the artefact rather than in a screen, so the page cannot drift from what was decided. **Greater Melbourne**, because not one Melbourne area reaches the statewide top five. **Flood alone**, because the Data Quality Statement files flash flooding under Storm and ranking on Storm produces the Dandenongs. **The six-year total, with every year shown beside it**, because 2010-11 is most of the total and choosing a shorter window would be choosing the answer.
 
 > **Correction, 3 September.** An earlier note here said the file "stops in August 2015, and 2010–2014 are the five complete years". That came from the catalogue's description, which gives the collection period as July 2009 – 8 August 2015. The file itself has six financial-year columns, 2009-10 to 2014-15, and the Data Quality Statement states the reference period as **1 July 2009 – 30 June 2015**. All six are complete; there is no partial year to exclude. The reporting period AC 2.1.1.f must display is *six financial years, 1 July 2009 to 30 June 2015*.
 
@@ -61,12 +63,12 @@ Three things, and the third is a hazard rather than a feature.
 *Given the user has not selected an address, when the user opens the website, then the system will:*
 
 - [x] **1.1.1.a** Display a homepage that briefly explains the purpose of the website
-- [ ] **1.1.1.b** Introduce the available local drainage, water-flow, terrain, low-area **and historical flood** information
-- [ ] **1.1.1.c** Present clear entry points to the main available features
+- [x] **1.1.1.b** Introduce the available local drainage, water-flow, terrain, low-area **and historical flood** information
+- [x] **1.1.1.c** Present clear entry points to the main available features
 - [x] **1.1.1.d** Allow the user to choose where to begin without first entering an address
 - [x] **1.1.1.e** **Not** display the drain-blockage Comparison feature in the Iteration 1 interface
 
-> **1.1.1.b and 1.1.1.c are open for the same reason.** Four of the five kinds of information are introduced, each with an entry point that opens the map in that mode. Historical flood information is not, because there is no page for it to point at. A card describing a board that does not exist is a promise the site cannot keep, so the card waits for the board rather than the board waiting for the card. Both tick when Epic 2 lands.
+> **1.1.1.b and 1.1.1.c closed on 3 September**, when the board they were waiting for was built. Four of the five kinds of information are four cards, each opening the map in that mode. The fifth sits in a band of its own below them, because a card in that row would say "this opens the map too" — and the difference between six years across a city and the ground under one square kilometre is the thing most worth not blurring.
 >
 > **1.1.1.e is met by removal, not by hiding.** The comparison's card is gone from the homepage, its option is gone from the task question, and the two sentences on the address screen that described it are rewritten. It is also not *fetched*: starting the scenario worker pulls `scene.json` and the elevation, flow, depression and coverage arrays — a little over five megabytes — and that now happens only on the two screens that use it, neither of which is reachable. `Task` still admits `'compare'` and `screens/ScenarioSetup.tsx`, `screens/Result.tsx` and their tests are untouched; Iteration 2 restores one entry in `TaskSelect.tsx` and one card in `Home.tsx`.
 
@@ -229,49 +231,63 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 
 ## Epic 2 — Understand historical flood patterns
 
-**Nothing below is built.** The dataset it needs has not been fetched. Recorded here in full so that the shape of the work is fixed before any of it starts.
+**Built and clicked through on 3 September.** The board is `screens/FloodHistory.tsx`, the artefact `apps/web/public/data/flood-history.json` (5.4 KB), and the stage that builds it `drainlens_pipeline.flood_history`.
 
 ### AC 2.1.1 — View the historical flood overview
 
 *Given the user is on the homepage, when the user selects the historical flood information option, then the system will:*
 
-- [ ] **2.1.1.a** Open the historical flood information page
-- [ ] **2.1.1.b** Display the five areas with the highest recorded flood-related incident counts
-- [ ] **2.1.1.c** Order the areas from the highest to the lowest recorded incident count
-- [ ] **2.1.1.d** Display the rank, area name and recorded incident count for each area
-- [ ] **2.1.1.e** Present the information using an infographic, bar chart or equivalent visualisation
-- [ ] **2.1.1.f** Display the reporting period, geographic unit and source of the information
-- [ ] **2.1.1.g** Clearly indicate when required information is missing, incomplete or unavailable
-- [ ] **2.1.1.h** Retain the five highest-ranked areas as the default view
-- [ ] **2.1.1.i** Provide an option to continue to the local drainage map
+- [x] **2.1.1.a** Open the historical flood information page
+- [x] **2.1.1.b** Display the five areas with the highest recorded flood-related incident counts
+- [x] **2.1.1.c** Order the areas from the highest to the lowest recorded incident count
+- [x] **2.1.1.d** Display the rank, area name and recorded incident count for each area
+- [x] **2.1.1.e** Present the information using an infographic, bar chart or equivalent visualisation
+- [x] **2.1.1.f** Display the reporting period, geographic unit and source of the information
+- [x] **2.1.1.g** Clearly indicate when required information is missing, incomplete or unavailable
+- [x] **2.1.1.h** Retain the five highest-ranked areas as the default view
+- [x] **2.1.1.i** Provide an option to continue to the local drainage map
 
-> **2.1.1.f is the criterion the data was checked against, and it is satisfiable.** Source: Victoria State Emergency Service, *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015*, via data.vic under CC BY 4.0. Reporting period: **six financial years, 1 July 2009 to 30 June 2015**, which is what the Data Quality Statement states and what the file's six year columns contain.
+> **2.1.1.c is checked, not enforced.** The artefact arrives ranked and the browser refuses it if it is not descending, rather than re-sorting it: a file out of order is a pipeline defect, and sorting it here would hide the defect while leaving the ranks it published wrong.
 >
-> **The geographic unit needs a second source.** The DQS says in as many words that "SA1 regions are not named", so AC 2.1.1.d's *area name* cannot come from this file. ABS ASGS 2011 (`SA1_2011_AUST.csv`) carries `SA1_7DIGITCODE_2011` alongside `SA2_NAME_2011` and `GCCSA_NAME_2011`, and all **13,339 of 13,339** VICSES codes join to it with nothing left over on either side. The named unit is therefore **SA2**, and Greater Melbourne is separable from the rest of Victoria. Details and the measurements behind them: [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md).
+> **2.1.1.b needed a decision the criterion does not anticipate.** Ranks five and six both recorded 133, and 133, 117, 85, 81 and 80 all repeat inside the published thirty. Five rows would present "the five highest" as five of the six highest without saying so, so the last row names the area level with it and where to find it. The alternative — a ranking drawn sharper than the counts behind it — is the failure this whole page is built against.
+>
+> **2.1.1.f sits above the first row, not in a footer.** Reporting period, area unit and both sources are the first thing under the heading, because a ranked list of suburbs is the most persuasive thing this product will ever show and the qualifications must not be scrollable past.
+>
+> **2.1.1.g is a live case rather than a defensive branch.** Nine of the thirty contain an SA1 whose count was withheld under the Privacy and Data Protection Act 2014. Those rows are marked *a count withheld* and their totals carry a `+`, because the number is a floor.
+>
+> **2.1.1.i is made concrete by the pilot area.** Kensington recorded 39 or more incidents over the six years, which places it well down the list — said on the page, so the invitation to the map is not an abstract link and does not imply the pilot area is a hotspot.
 
 ### AC 2.2.1 — Show more locations
 
 *Given the user is viewing the historical flood information page, when the user selects Show More Locations, then the system will:*
 
-- [ ] **2.2.1.a** Display additional available locations
-- [ ] **2.2.1.b** Display **no more than 30 locations in total**
-- [ ] **2.2.1.c** Retain the Top Five locations at the beginning of the displayed results
-- [ ] **2.2.1.d** Use the same reporting period and counting basis for all displayed locations
-- [ ] **2.2.1.e** Display the available recorded incident count for each location
-- [ ] **2.2.1.f** Clearly indicate when information for a location is missing, incomplete or unavailable
+- [x] **2.2.1.a** Display additional available locations
+- [x] **2.2.1.b** Display **no more than 30 locations in total**
+- [x] **2.2.1.c** Retain the Top Five locations at the beginning of the displayed results
+- [x] **2.2.1.d** Use the same reporting period and counting basis for all displayed locations
+- [x] **2.2.1.e** Display the available recorded incident count for each location
+- [x] **2.2.1.f** Clearly indicate when information for a location is missing, incomplete or unavailable
+
+> **2.2.1.b is enforced where the data is, not where it is drawn.** The pipeline publishes thirty and no more, so the cap cannot be exceeded by a change to a screen. 275 of Greater Melbourne's 281 areas recorded at least one incident, so the cap binds rather than the data.
+>
+> **2.2.1.d is free here and would not be if the page did the arithmetic.** One file, one incident type, one six-year period, one counting basis — nothing on the page recomputes anything.
+>
+> Clicked on 3 September: thirty rows, Bacchus Marsh still first and Keilor East last. The bars do not rescale when the list grows, because they are scaled against every published area rather than the visible ones — a picture that changed while the data did not would be its own small lie.
 
 ### AC 2.3.1 — View the data explanation
 
 *Given the user is viewing the historical flood information page, when the historical information is displayed, then the system will:*
 
-- [ ] **2.3.1.a** Identify the source, reporting period and meaning of a recorded incident count
-- [ ] **2.3.1.b** Explain any relevant limitations or gaps in the available historical data
-- [ ] **2.3.1.c** Explain that recorded incident counts **do not indicate flood severity or property damage**
-- [ ] **2.3.1.d** State that the information **does not represent current or future flood conditions**
+- [x] **2.3.1.a** Identify the source, reporting period and meaning of a recorded incident count
+- [x] **2.3.1.b** Explain any relevant limitations or gaps in the available historical data
+- [x] **2.3.1.c** Explain that recorded incident counts **do not indicate flood severity or property damage**
+- [x] **2.3.1.d** State that the information **does not represent current or future flood conditions**
 
-> **2.3.1.c and 2.3.1.d are the same commitment the rest of the product already makes**, applied to a new kind of number. An incident count is a count of times somebody called for help. It is shaped by who calls, by how many people live in the area, and by what SES recorded — none of which is flood severity. A ranked list invites exactly the reading these two bullets forbid, so the explanation has to sit with the chart rather than behind a link.
-
----
+> **2.3.1.a is quoted from the Data Quality Statement rather than paraphrased.** One count is one crew dispatch; a task may or may not have followed; several crews at one incident count once.
+>
+> **2.3.1.b has four limitations, and each is measured rather than hedged.** Flash flooding is recorded under Storm and is not counted here. 2010-11 is 45% of the incidents on the board, so the ranking is substantially a record of one year — drawn as a chart above the list rather than written under it, because a sentence beneath a chart is a sentence people skim past the chart to reach. 144 small areas had counts withheld for privacy. And a count depends on who calls, which varies with population and with whether people ring the SES, the council, or nobody.
+>
+> **2.3.1.c and 2.3.1.d are the same commitment the rest of the product makes**, applied to a new kind of number. Each is its own headed paragraph, not a clause inside another one.
 
 ## Deferred to Iteration 2 — the drain-blockage comparison
 
