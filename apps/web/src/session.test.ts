@@ -47,8 +47,12 @@ describe('the golden path', () => {
     expect(end.outcome).toEqual({ kind: 'comparison', band: 'higher-than-baseline' });
   });
 
-  it('starts on the address screen with nothing chosen', () => {
-    expect(INITIAL_SESSION.screen).toBe('address');
+  it('starts on a page that asks nothing, with nothing chosen', () => {
+    // The address field was the first screen until a homepage was added. It
+    // is the right first *question* once somebody has decided to use this,
+    // and the wrong one before: it asks a stranger to type where they live in
+    // order to find out what the site does.
+    expect(INITIAL_SESSION.screen).toBe('home');
     expect(INITIAL_SESSION.address).toBeNull();
     expect(INITIAL_SESSION.task).toBeNull();
     expect(INITIAL_SESSION.outcome).toBeNull();
@@ -189,7 +193,16 @@ describe('going back', () => {
   });
 
   it('has nowhere to go from the first screen', () => {
-    expect(reduce(INITIAL_SESSION, { type: 'back' }).screen).toBe('address');
+    const first = INITIAL_SESSION.screen;
+    expect(reduce(INITIAL_SESSION, { type: 'back' }).screen).toBe(first);
+  });
+
+  it('goes back from the address field to the homepage, not to itself', () => {
+    // Somebody who opened the address field to look at it needs a way out
+    // that is not the browser button.
+    const asked = reduce(INITIAL_SESSION, { type: 'change-address' });
+    expect(asked.screen).toBe('address');
+    expect(reduce(asked, { type: 'back' }).screen).toBe('home');
   });
 });
 
@@ -373,5 +386,34 @@ describe('an action the reducer does not know', () => {
 
     expect(after).toBe(start);
     expect(after.screen).toBe(start.screen);
+  });
+});
+
+describe('opening the map from the homepage', () => {
+  it('goes straight there without asking for an address first', () => {
+    const end = reduce(INITIAL_SESSION, { type: 'map-opened' });
+
+    expect(end.screen).toBe('explore');
+    // No address is invented on the way. The map opens over the pilot area
+    // with nothing selected, and the search along its top is how somebody
+    // names one — a guessed address would put a marker on a street nobody
+    // asked about.
+    expect(end.address).toBeNull();
+  });
+
+  it('opens unguided, because nobody chose a task on the way in', () => {
+    expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
+  });
+
+  it('keeps whatever the person had already chosen', () => {
+    const busy = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'go-home' },
+    ]);
+    const end = reduce(busy, { type: 'map-opened' });
+
+    expect(end.address).toEqual(GATEHOUSE);
+    expect(end.scenario.blockage).toBe('fully-blocked');
   });
 });

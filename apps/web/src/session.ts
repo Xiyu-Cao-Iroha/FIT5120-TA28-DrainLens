@@ -30,6 +30,8 @@ import type {
 
 /** Which screen the person is on. */
 export type Screen =
+  /** What somebody lands on: what this is, before it asks anything of them. */
+  | 'home'
   | 'address'
   | 'task'
   | 'explore'
@@ -87,7 +89,7 @@ export const EMPTY_SCENARIO: ScenarioInputs = {
 };
 
 export const INITIAL_SESSION: Session = {
-  screen: 'address',
+  screen: 'home',
   address: null,
   rejectedAddress: null,
   task: null,
@@ -116,13 +118,28 @@ export type SessionEvent =
   | { readonly type: 'comparison-started' }
   | { readonly type: 'comparison-finished'; readonly outcome: Outcome }
   | { readonly type: 'back' }
+  /**
+   * Into the map without answering anything first.
+   *
+   * The homepage's own way in. It skips the address question rather than
+   * assuming an answer to it: the map opens over the pilot area with no
+   * address selected, and the search along the top is how somebody names one.
+   * Opening on a guessed address would put a marker on a street nobody asked
+   * about, which on a product about *your* address is the wrong first move.
+   *
+   * The task is `full-map`, because the two guided tasks exist to answer a
+   * question somebody has chosen. Nobody chose one on the way in here.
+   */
+  | { readonly type: 'map-opened' }
+  | { readonly type: 'go-home' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
 /** Where `back` goes from each screen. */
 const BACK: Readonly<Record<Screen, Screen>> = {
-  address: 'address',
+  home: 'home',
+  address: 'home',
   task: 'address',
   explore: 'task',
   scenario: 'task',
@@ -192,6 +209,12 @@ export function reduce(session: Session, event: SessionEvent): Session {
 
     case 'back':
       return { ...session, screen: BACK[session.screen] };
+
+    case 'map-opened':
+      return { ...session, screen: 'explore', task: 'full-map' };
+
+    case 'go-home':
+      return { ...session, screen: 'home' };
 
     case 'change-address':
       return { ...session, screen: 'address' };

@@ -14,6 +14,7 @@ import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
 import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
+import { Home, SECTIONS } from './screens/Home.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
@@ -122,6 +123,31 @@ export function App() {
   const separator = <span style={{ margin: '0 8px', color: '#c3cdba' }}>›</span>;
 
   switch (session.screen) {
+    case 'home':
+      return (
+        <Shell
+          credits={credits}
+          actions={
+            <HomeNav
+              onOpenMap={() => {
+                dispatch({ type: 'map-opened' });
+              }}
+            />
+          }
+        >
+          <Home
+            artefact={loaded.map}
+            derived={loaded.derived}
+            onOpenMap={() => {
+              dispatch({ type: 'map-opened' });
+            }}
+            onFindAddress={() => {
+              dispatch({ type: 'change-address' });
+            }}
+          />
+        </Shell>
+      );
+
     case 'address':
     case 'unsupported':
       return (
@@ -151,7 +177,13 @@ export function App() {
           credits={credits}
           crumbs={
             <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
+              {separator}
+              {crumb('Address search', () => {
+                dispatch({ type: 'change-address' });
+              })}
               {separator}
               {crumb('Choose a task', undefined, true)}
             </>
@@ -371,10 +403,29 @@ export function App() {
           credits={credits}
           crumbs={
             <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
               {separator}
-              {crumb('Choose a task', () => dispatch({ type: 'back' }))}
-              {separator}
+              {/*
+                Only the screens somebody actually passed through.
+                Arriving from the homepage means the address field and the
+                task question were never seen, and a trail that lists them
+                is a claim about a route nobody took -- on a product whose
+                whole argument is that it does not imply what it cannot show.
+              */}
+              {session.address !== null && (
+                <>
+                  {crumb('Address search', () => {
+                    dispatch({ type: 'change-address' });
+                  })}
+                  {separator}
+                  {crumb('Choose a task', () => {
+                    dispatch({ type: 'back' });
+                  })}
+                  {separator}
+                </>
+              )}
               {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
             </>
           }
@@ -416,6 +467,64 @@ export function App() {
  * here anyway and this map is driven by the scenario rather than by its own
  * selection.
  */
+/**
+ * The homepage's navigation.
+ *
+ * In-page anchors and one button, and nothing else. There is deliberately no
+ * "Flood history" here: the board is not built, and the only dataset that
+ * could feed it honestly has not been fetched — a navigation item pointing at
+ * a page nobody wrote is a promise the site cannot keep.
+ *
+ * Hidden below 820px rather than collapsed into a menu. Three anchors to
+ * sections on the page somebody is already scrolling are not worth a drawer;
+ * the button they do need stays.
+ */
+function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
+  const jump = (id: string) => () => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const anchor = (label: string, id: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={jump(id)}
+      style={{
+        background: 'none',
+        border: 'none',
+        padding: 0,
+        font: type(text.label, { weight: weight.medium }),
+        color: ink.muted,
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
+      <span className="home-nav">
+        {anchor('What you can do', SECTIONS.paths)}
+        {anchor('How it works', SECTIONS.flow)}
+        {anchor('About the data', SECTIONS.limits)}
+      </span>
+      <button
+        type="button"
+        onClick={onOpenMap}
+        style={{
+          padding: `${String(space(2))}px ${String(space(4))}px`,
+          font: type(text.label, { weight: weight.semibold }),
+          color: ink.inverse,
+          background: ink.strong,
+          border: 'none',
+          borderRadius: radius.base,
+        }}
+      >
+        Explore map →
+      </button>
+    </span>
+  );
+}
+
 function MapCanvasPane({
   loaded,
   session,
