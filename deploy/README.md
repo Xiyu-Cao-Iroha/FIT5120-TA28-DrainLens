@@ -57,8 +57,11 @@ An exclusion drops entries **before they are written**. One added afterwards can
 gcloud run deploy drainlens --project=fit5120-504507 --source=. \
   --region=australia-southeast1 --allow-unauthenticated --port=8080 \
   --memory=512Mi --max-instances=3 \
-  --set-env-vars "BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>"
+  --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
 ```
+
+**Single quotes.** The hash contains `$` signs and double quotes destroy it —
+see *Quote the hash with single quotes* below, which is not a style preference.
 
 `--allow-unauthenticated` is the one step to be deliberate about: it publishes the site. That is the intent — it is a public information site — but it is worth a pause.
 
@@ -92,19 +95,56 @@ variables. `BASIC_AUTH_HASH` is already a hash, generated on somebody's own
 machine, so nothing in the image or the repository can be turned back into a
 password.
 
-Generate it yourself, on your machine, and do not paste the password anywhere:
+Generate it yourself, on your machine, and do not paste the password anywhere.
+
+**`htpasswd` is not on Windows.** It ships with Apache, not with Git or with
+PowerShell, and `htpasswd -nBC 10 mentor` fails with `CommandNotFoundException`.
+Git for Windows does ship OpenSSL, which is enough:
 
 ```bash
-# Any one of these. Each prompts, or takes the password on stdin, and prints
-# only "user:$hash" or the hash. Never put the plain password in a command
-# that lands in shell history.
-htpasswd -nBC 10 mentor                    # apache2-utils, prompts twice
-openssl passwd -apr1                       # prompts, prints the hash alone
+# Prompts twice, prints only the hash. Run it in Git Bash.
+openssl passwd -apr1
 ```
+
+```powershell
+# The same thing from PowerShell, naming Git's copy explicitly.
+& "C:\Program Files\Git\usr\bin\openssl.exe" passwd -apr1
+```
+
+Never pass the password as an argument (`openssl passwd -apr1 mypassword`) —
+that lands in shell history. Let it prompt.
+
+**Use `-apr1`, not bcrypt, for this image.** nginx implements apr1 itself, in
+`ngx_crypt.c`, so it works regardless of what the container's libc offers. For
+`$2y$` it hands off to the platform's `crypt()`, which is a dependency on musl
+in `nginx:1.27-alpine` rather than on nginx — a needless thing to be right
+about when apr1 is guaranteed. The gate is website-level protection on a
+student project, not a credential store.
 
 Put the **hash** in the deploy command below and the **password** in the PGP
 Team Info document beside the URLs, which is where the slides say operational
 credentials belong.
+
+### Quote the hash with single quotes, or it is destroyed silently
+
+An apr1 hash looks like `$apr1$vVu0PpL1$IPCDVqdCLwY7X7qdPiwaI.` — three `$`
+signs. In **double** quotes, bash and PowerShell both expand `$apr1`, `$vVu0PpL1`
+and `$IPCDVqdCLwY7X7qdPiwaI` to nothing before `gcloud` ever runs:
+
+```bash
+H='$apr1$vVu0PpL1$IPCDVqdCLwY7X7qdPiwaI.'
+eval "echo \"$H\""      # prints: .
+```
+
+One character. **Short, wrong, and not empty** — so the fail-closed guard used
+to pass it, nginx started, and the site was locked against everybody including
+whoever held the password. That is worse than a failed deploy, because it looks
+like a working one until somebody tries the gate.
+
+`entrypoint.sh` now checks the *shape* of the hash as well as its presence and
+refuses anything that is not a format nginx reads. But the fix is to quote it
+correctly in the first place: **single quotes around the whole `--set-env-vars`
+value.**
 
 ### It fails closed, on purpose
 
@@ -125,7 +165,8 @@ Verified before deploying, by running the entrypoint's guard directly:
 | Neither variable set | exits 1, refuses to start |
 | `BASIC_AUTH_USER` only | exits 1 |
 | `BASIC_AUTH_HASH=""` | exits 1 -- an empty value is not a configured one |
-| Both set | exits 0, writes the htpasswd, substitutes `$PORT` |
+| `BASIC_AUTH_HASH="."` | exits 1 -- what double quotes leave behind, and the case the presence check alone let through |
+| Both set, hash well formed | exits 0, writes the htpasswd, substitutes `$PORT` |
 
 ---
 
@@ -166,7 +207,7 @@ git checkout iteration-1-final
 gcloud run deploy drainlens-iteration1 --project=fit5120-504507 --source=. \
   --region=australia-southeast1 --allow-unauthenticated --port=8080 \
   --memory=512Mi --max-instances=1 \
-  --set-env-vars "BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>"
+  --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
 git checkout main
 ```
 
