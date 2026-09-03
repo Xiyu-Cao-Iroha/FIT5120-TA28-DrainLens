@@ -247,7 +247,9 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 >
 > It is not the `back` event, which walks a fixed chain of screens. This one reads where the person actually came from.
 >
-> **Two controls, both named.** The breadcrumb's first crumb reads *Home* or *Flood history* to match, and the panel carries *← Back to the homepage* / *← Back to flood history*. Naming the destination is what makes it honest with two possible origins; a bare *Back* would be a guess.
+> **1.1.10.c is a button, and it took two attempts to put it where a person would look.** The first version was a link at the foot of the map panel and a clickable *Home* leading the breadcrumb. Neither reads as a way out: a breadcrumb says where you *are*, its first crumb happening to be clickable is not an exit, and the panel link sat below the fold of a side panel that can itself be collapsed. It is now a bordered *← Home* / *← Flood history* button at the top left of every screen that has somewhere to go back to, with the trail beside it reduced to the page you are on.
+>
+> Naming the destination is what makes it honest with two possible origins; a bare *Back* would be a guess.
 >
 > Clicked both ways on 3 September: from the board the crumb reads Flood history and Back lands on the board; from the homepage it reads Home and Back lands there.
 
@@ -347,7 +349,7 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 - [x] **2.1.2.a** Return the user to the homepage
 - [x] **2.1.2.b** Allow the user to return without relying on the browser's navigation controls
 
-> The breadcrumb already went home, and the control at the foot of the page is not redundant with it: this page is a ranking, six headed paragraphs of explanation and an invitation to the map, so by the time somebody has finished reading, the crumb is a long way up.
+> **Two controls, and neither is redundant.** *← Home* sits at the top left of every screen, which is where somebody looks first. The one at the foot of this page earns its place because the page is long — a ranking, six headed paragraphs and an invitation to the map — so by the time it has been read, the top of the screen is a long way up.
 
 ### AC 2.2.1 — Show more locations
 
