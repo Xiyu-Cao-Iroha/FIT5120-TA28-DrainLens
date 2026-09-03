@@ -8,6 +8,14 @@ hollows, and the browser routes rainfall over both. This document walks that
 chain and names the file and function at each step, so a question about any
 claim on screen has somewhere to land.
 
+> **The last link in this chain is not currently on screen.** The surface, the
+> flow field and the hollows are — they are what the map draws as terrain,
+> water flow and low areas. The rainfall routing on top of them belongs to the
+> drain-blockage comparison, which AC 1.1.1 requires to be absent from the
+> Iteration 1 interface. The engine, its tests and this description are all
+> intact and unchanged; what is missing is a way to reach it. See
+> [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+
 **What it defers.** [pipeline/README.md](../pipeline/README.md) is the authority
 on the ground filter — the SMRF window, the building-footprint cross-check, and
 why the source is photogrammetric rather than LiDAR. This document starts where

@@ -1,4 +1,4 @@
-# Paired walkthrough — 77 criteria, in the order you click them
+# Paired walkthrough — the 77 criteria of 27 August, in the order you click them
 
 DrainLens · TA28 · a working sheet for a paired session, **not a record of one**
 
