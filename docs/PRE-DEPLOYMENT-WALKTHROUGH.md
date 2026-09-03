@@ -412,15 +412,23 @@ What the mentor can check in the repository, and what lives outside it.
 | Coverage gates | `vitest.config.ts`, `pyproject.toml` | 88% overall, 90% for judgement-carrying modules |
 | Commit messages | prose explaining *why*, not what | see `git log` |
 
-### Numbers, as measured on 1 September 2026
+### Numbers
 
-| Metric | Value |
-|---|---|
-| TypeScript tests | **472**, 23 files, **3.6 s** here · **5 s on the CI runner, three samples** |
-| Python tests | **341**, **105 s** here · **51–67 s on the CI runner** — over the 5 s gate either way, see below |
-| TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions |
-| Python coverage | **91.05%** |
-| Source lines, excluding tests | **12,085** across 58 files — 13,482 TypeScript and 7,166 Python in total, of which tests are 8,563 |
+Two columns, because the sheet is a record of the 1 September walkthrough and the repository has moved since. The right column is re-measured; nothing is carried across on the assumption that it still holds.
+
+| Metric | 1 September | 3 September |
+|---|---|---|
+| TypeScript tests | **472**, 23 files | **565**, 28 files |
+|   with coverage | **3.6 s** here · **5 s** on the runner | **4.9–5.2 s** here over three runs · **5 s** on the runner |
+| Python tests | **341** | **375**, 17 files |
+|   with coverage | **105 s** here · **51–67 s** on the runner | **74 s** here · **67 s** on the runner (50 s here without coverage) |
+| TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions | **93.4%** statements · 93.84% branches · 96.02% functions |
+| Python coverage | **91.05%** | **91.79%** |
+| Source lines, excluding tests | **12,085** across 58 files | **16,869** across 71 files — 23,178 in total, of which tests are 6,309 |
+
+> **The runner figures are read from the workflow's own step timing, not from a stopwatch here**, which is the distinction this sheet got wrong once and had to correct twice. They are whole seconds, so 5 s means 4.5–5.5.
+>
+> **The TypeScript suite did not get slower**, despite 93 more tests in 5 more files. Almost all of its cost is start-up, transform and instrumentation, which is why adding tests to existing files is nearly free and adding files is not. The warning that stood in the root README — *"a dozen more test files would put it over"* — was pessimistic, and re-measuring is the only way that was ever going to be found out.
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 

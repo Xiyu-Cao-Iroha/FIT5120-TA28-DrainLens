@@ -26,6 +26,7 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/derived.json` | 183 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
 | `/data/addresses.json` | 678 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
+| `/data/flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` | Recorded flood incidents by named area, and what a count is |
 | `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
 | `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
 
@@ -167,7 +168,7 @@ Every value the interface displays carries a **basis** — `packages/schema/src/
 | `assumed` | A model value where no record exists — the capture fraction, for one |
 | `inferred` | An indicative relationship read from available records |
 
-The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source.
+The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source, and `assertFloodHistory` goes further: it refuses one that names no reporting period, no geographic unit, or no sentence saying what a count is. A ranking of suburbs with nothing qualifying it is the one shape that page must never take, so a missing *sentence* fails the load exactly as a missing number does.
 
 For drain checks specifically: a stored check is `sourceProvided` when a resident confirmed it, and the `wasModelProposed` flag is what lets a later reader tell how much of the dataset began as a machine's suggestion.
 

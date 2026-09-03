@@ -245,6 +245,43 @@ Comparing our per-cell D8 directions to their line bearings gives agreement *wor
 
 So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
 
+## Recorded flood incidents — `flood_history`
+
+The one stage that fetches its own sources. Everything else here reads what an
+earlier stage wrote or what was downloaded into `data/`; this reads two
+published files, neither of which is a local export.
+
+It also needs both, and that is the interesting part. The incident counts come
+from VICSES per ABS SA1 region, and the Data Quality Statement says in as many
+words that **"SA1 regions are not named"** — so the area name AC 2.1.1.d
+requires has to come from ABS ASGS 2011. All **13,339** codes join with nothing
+left over on either side, which is better evidence of the 7-digit code's
+structure than the sentence describing it.
+
+**The join is asserted before the scope filter, not after.** Writing those two
+steps in the wrong order was the first mistake here: a scope filter posing as
+an integrity check passes silently while dropping regions, and a missing area
+is indistinguishable from an area with no incidents once it is gone. Ordered
+correctly it failed loudly on 3,681 regions rather than quietly ranking a
+subset.
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history
+# or from files you already have -- both or neither, so a published file is
+# never silently mixed with a local one
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history \
+  --incidents incidents.xlsx --geography SA1_2011_AUST.csv
+```
+
+`fetch` checks that each download is an archive holding the file it should,
+because **data.vic's own catalogue link for this dataset is dead** and serves a
+404 HTML page that `curl` saves as 119 KB of "spreadsheet" without complaint.
+Assert the content, not the status code.
+
+What the data does and does not support — the reporting period, why Flood
+alone, why Greater Melbourne, and the four limitations the page has to carry
+— is in [FLOOD-HISTORY-DATA.md](../docs/FLOOD-HISTORY-DATA.md).
+
 ## Built since this file was first written
 
 Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), and an address index (`addresses`) with a fixture standing in for it.
