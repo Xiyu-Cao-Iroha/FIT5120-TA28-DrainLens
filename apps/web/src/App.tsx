@@ -168,15 +168,13 @@ export function App() {
       return (
         <Shell
           credits={credits}
-          crumbs={
-            <>
-              {crumb('Home', () => {
-                dispatch({ type: 'go-home' });
-              })}
-              {separator}
-              {crumb('Flood history', undefined, true)}
-            </>
-          }
+          back={{
+            label: 'Home',
+            onBack: () => {
+              dispatch({ type: 'go-home' });
+            },
+          }}
+          crumbs={crumb('Flood history', undefined, true)}
         >
           <FloodHistory
             artefact={loaded.history}
@@ -443,27 +441,28 @@ export function App() {
       return (
         <Shell
           credits={credits}
-          crumbs={
-            <>
-              {/*
-                The trail names the page the map was opened from, which is not
-                always the homepage: the flood board opens it too. A crumb
-                reading Home after arriving from the board would be a claim
-                about a route nobody took.
+          /*
+            The Back control names where it goes, because the map has two ways
+            in -- the homepage and the flood board -- and with two possible
+            origins a bare "Back" is a guess.
 
-                It is also two crumbs shorter than it was. The address field
-                and the task question are on no route at all now -- the
-                homepage opens the map directly and an address is named in the
-                map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
-                it.
-              */}
-              {crumb(session.mapOrigin === 'history' ? 'Flood history' : 'Home', () => {
-                dispatch({ type: 'leave-map' });
-              })}
-              {separator}
-              {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
-            </>
-          }
+            The trail beside it is one crumb now. It used to lead with a
+            clickable Home, which was doing two jobs badly: a breadcrumb says
+            where you *are*, and a person looking for the way out does not read
+            a location as an exit. The button is the exit; the crumb says where
+            they are.
+          */
+          back={{
+            label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+            onBack: () => {
+              dispatch({ type: 'leave-map' });
+            },
+          }}
+          crumbs={crumb(
+            session.task === 'full-map' ? 'Full map' : 'Explore drainage',
+            undefined,
+            true,
+          )}
         >
           <MapView
             map={loaded.map}
@@ -472,10 +471,6 @@ export function App() {
             address={session.address}
             task={session.task}
             mode={session.mapMode}
-            backTo={session.mapOrigin === 'history' ? 'flood history' : 'the homepage'}
-            onBack={() => {
-              dispatch({ type: 'leave-map' });
-            }}
             index={loaded.index}
             onAddress={(picked) =>
               dispatch({
