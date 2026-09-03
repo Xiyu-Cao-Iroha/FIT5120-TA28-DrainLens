@@ -23,6 +23,7 @@ import {
   type LayerState,
   PANEL_KEYS,
 } from './modes.js';
+import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from './terrain.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -118,8 +119,8 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
         <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
           <defs>
             <linearGradient id="dl-ramp" x1="0" x2="1">
-              <stop offset="0" stopColor="#6c8c9e" />
-              <stop offset="1" stopColor="#e2d4b2" />
+              <stop offset="0" stopColor={RAMP_LOW_HEX} />
+              <stop offset="1" stopColor={RAMP_HIGH_HEX} />
             </linearGradient>
           </defs>
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
@@ -419,25 +420,29 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
 
       {open && (
         <>
-          {shown.map((spec) => (
-            <div
-              key={spec.key}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: space(2),
-                marginTop: space(2),
-              }}
-            >
-              <SwatchMark kind={spec.swatch} />
-              <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
-                {spec.label}
-              </span>
-              <span style={{ marginLeft: 'auto' }}>
-                <BasisDot basis={spec.basis} />
-              </span>
-            </div>
-          ))}
+          {shown.map((spec) =>
+            spec.swatch === 'ramp' ? (
+              <TerrainScale key={spec.key} spec={spec} />
+            ) : (
+              <div
+                key={spec.key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: space(2),
+                  marginTop: space(2),
+                }}
+              >
+                <SwatchMark kind={spec.swatch} />
+                <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+                  {spec.label}
+                </span>
+                <span style={{ marginLeft: 'auto' }}>
+                  <BasisDot basis={spec.basis} />
+                </span>
+              </div>
+            ),
+          )}
           <p
             style={{
               margin: `${String(space(3))}px 0 0`,
@@ -453,6 +458,62 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The ground surface, as a scale rather than a colour chip.
+ *
+ * An 18-pixel gradient square says "this layer is a gradient" and nothing
+ * else: a reader looking at tan and blue-grey ground has no way to learn which
+ * is uphill. The bar is the full width of the legend with both ends named, so
+ * the key answers the question the layer raises.
+ *
+ * **Named, not numbered, and the reason is in `terrain.ts`.** The ramp is
+ * fitted between the 2nd and 98th percentiles of the ground in *this* extent,
+ * so a colour means "low for around here" rather than a height. The surface's
+ * own accuracy is about 25 cm, which would not support a scale in metres even
+ * if the ramp were absolute — and a metric axis would invite exactly the
+ * reading the layer cannot carry. Hence "Lower"/"Higher" and a line saying
+ * what they are relative to.
+ */
+function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
+  return (
+    <div style={{ marginTop: space(3) }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space(2) }}>
+        <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+          {spec.label}
+        </span>
+        <span style={{ marginLeft: 'auto' }}>
+          <BasisDot basis={spec.basis} />
+        </span>
+      </div>
+      <div
+        aria-hidden
+        style={{
+          height: 10,
+          marginTop: space(1),
+          borderRadius: radius.small,
+          border: `1px solid ${line.hair}`,
+          background: `linear-gradient(to right, ${RAMP_LOW_HEX}, ${RAMP_HIGH_HEX})`,
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 2,
+          font: type(text.micro, { leading: 1.4 }),
+          color: ink.subtle,
+        }}
+      >
+        <span>Lower</span>
+        <span>Higher</span>
+      </div>
+      <p style={{ margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle }}>
+        Relative to this area, not to sea level.
+      </p>
     </div>
   );
 }
