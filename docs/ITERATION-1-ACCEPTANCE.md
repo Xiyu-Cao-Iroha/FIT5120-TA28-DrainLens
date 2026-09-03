@@ -305,6 +305,8 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 >
 > **2.2.1.d is free here and would not be if the page did the arithmetic.** One file, one incident type, one six-year period, one counting basis — nothing on the page recomputes anything.
 >
+> **The control is a toggle, and that is AC 2.1.1.h rather than a nicety.** It called the top five the default view, and a view somebody cannot return to is not a default -- it is a state the page leaves them in. Expanded, the button reads *Show the top 5 only*; collapsing scrolls the list back into sight, because folding thirty rows away from under the button would otherwise drop the reader below the whole section.
+>
 > Clicked on 3 September: thirty rows, Bacchus Marsh still first and Keilor East last. The bars do not rescale when the list grows, because they are scaled against every published area rather than the visible ones — a picture that changed while the data did not would be its own small lie.
 
 ### AC 2.3.1 — View the data explanation
