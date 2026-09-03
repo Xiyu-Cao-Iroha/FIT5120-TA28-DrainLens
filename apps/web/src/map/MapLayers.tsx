@@ -23,6 +23,7 @@ import {
   type LayerState,
   PANEL_KEYS,
 } from './modes.js';
+import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from './terrain.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -118,8 +119,8 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
         <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
           <defs>
             <linearGradient id="dl-ramp" x1="0" x2="1">
-              <stop offset="0" stopColor="#6c8c9e" />
-              <stop offset="1" stopColor="#e2d4b2" />
+              <stop offset="0" stopColor={RAMP_LOW_HEX} />
+              <stop offset="1" stopColor={RAMP_HIGH_HEX} />
             </linearGradient>
           </defs>
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
@@ -356,8 +357,16 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
  * with the controls compressed into chips there is no room for it there, and a
  * tooltip is not something a layer *carries*. So it lives here, on screen
  * beside the mark it describes, for every layer that is currently drawn.
+ *
+ * **It folds, and folds to its own name rather than to nothing.** The map is
+ * the thing somebody came for and this sits over the bottom-left corner of it;
+ * on a laptop that is a real amount of map. Collapsed it keeps the words *Map
+ * legend* and the control, because a legend that vanishes completely is one
+ * nobody can find again — and the criterion it serves is about the key being
+ * *available*, which a fold does not break and a disappearance would.
  */
 export function MapLegend({ state }: { readonly state: LayerState }) {
+  const [open, setOpen] = useState(true);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
 
@@ -377,54 +386,138 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
         boxShadow: shadow.floating,
       }}
     >
-      <p
-        style={{
-          margin: `0 0 ${String(space(2))}px`,
-          font: type(text.micro, { weight: weight.semibold }),
-          letterSpacing: tracking.caps,
-          textTransform: 'uppercase',
-          color: ink.subtle,
-        }}
-      >
-        Map legend
-      </p>
-      {shown.map((spec) => (
-        <div
-          key={spec.key}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: space(3) }}>
+        <p
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: space(2),
-            marginTop: space(2),
+            margin: 0,
+            font: type(text.micro, { weight: weight.semibold }),
+            letterSpacing: tracking.caps,
+            textTransform: 'uppercase',
+            color: ink.subtle,
           }}
         >
-          <SwatchMark kind={spec.swatch} />
-          <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
-            {spec.label}
-          </span>
-          <span style={{ marginLeft: 'auto' }}>
-            <BasisDot basis={spec.basis} />
-          </span>
-        </div>
-      ))}
-      <p
+          Map legend
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v);
+          }}
+          aria-expanded={open}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.micro, { weight: weight.medium }),
+            color: ink.muted,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '\u2039 Hide' : '\u203a Show'}
+        </button>
+      </div>
+
+      {open && (
+        <>
+          {shown.map((spec) =>
+            spec.swatch === 'ramp' ? (
+              <TerrainScale key={spec.key} spec={spec} />
+            ) : (
+              <div
+                key={spec.key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: space(2),
+                  marginTop: space(2),
+                }}
+              >
+                <SwatchMark kind={spec.swatch} />
+                <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+                  {spec.label}
+                </span>
+                <span style={{ marginLeft: 'auto' }}>
+                  <BasisDot basis={spec.basis} />
+                </span>
+              </div>
+            ),
+          )}
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              paddingTop: space(2),
+              borderTop: `1px solid ${line.hair}`,
+              font: type(text.micro, { leading: 1.45 }),
+              color: ink.subtle,
+            }}
+          >
+            <BasisDot basis="Official recorded data" /> recorded by the council
+            <br />
+            <BasisDot basis="System-derived result" /> calculated by DrainLens
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The ground surface, as a scale rather than a colour chip.
+ *
+ * An 18-pixel gradient square says "this layer is a gradient" and nothing
+ * else: a reader looking at tan and blue-grey ground has no way to learn which
+ * is uphill. The bar is the full width of the legend with both ends named, so
+ * the key answers the question the layer raises.
+ *
+ * **Named, not numbered, and the reason is in `terrain.ts`.** The ramp is
+ * fitted between the 2nd and 98th percentiles of the ground in *this* extent,
+ * so a colour means "low for around here" rather than a height. The surface's
+ * own accuracy is about 25 cm, which would not support a scale in metres even
+ * if the ramp were absolute — and a metric axis would invite exactly the
+ * reading the layer cannot carry. Hence "Lower"/"Higher" and a line saying
+ * what they are relative to.
+ */
+function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
+  return (
+    <div style={{ marginTop: space(3) }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space(2) }}>
+        <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+          {spec.label}
+        </span>
+        <span style={{ marginLeft: 'auto' }}>
+          <BasisDot basis={spec.basis} />
+        </span>
+      </div>
+      <div
+        aria-hidden
         style={{
-          margin: `${String(space(3))}px 0 0`,
-          paddingTop: space(2),
-          borderTop: `1px solid ${line.hair}`,
-          font: type(text.micro, { leading: 1.45 }),
+          height: 10,
+          marginTop: space(1),
+          borderRadius: radius.small,
+          border: `1px solid ${line.hair}`,
+          background: `linear-gradient(to right, ${RAMP_LOW_HEX}, ${RAMP_HIGH_HEX})`,
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 2,
+          font: type(text.micro, { leading: 1.4 }),
           color: ink.subtle,
         }}
       >
-        <BasisDot basis="Official recorded data" /> recorded by the council
-        <br />
-        <BasisDot basis="System-derived result" /> calculated by DrainLens
+        <span>Lower</span>
+        <span>Higher</span>
+      </div>
+      <p style={{ margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle }}>
+        Relative to this area, not to sea level.
       </p>
     </div>
   );
 }
 
-/** The compact form of the basis label, where a full pill will not fit. */
 function BasisDot({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
   const recorded = which === 'Official recorded data';
   const tone = recorded ? basis.recorded : basis.derived;

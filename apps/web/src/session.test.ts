@@ -165,7 +165,7 @@ describe('changing the address', () => {
   });
 
   it('says an unsupported address back rather than guessing at one', () => {
-    // AC 1.1.7: explain, do not fabricate.
+    // AC 1.1.8: explain, do not fabricate.
     const end = play([{ type: 'address-rejected', typed: '1 Example Road, Outside Pilot' }]);
     expect(end.screen).toBe('unsupported');
     expect(end.rejectedAddress).toBe('1 Example Road, Outside Pilot');
@@ -450,6 +450,36 @@ describe('opening the map from the homepage', () => {
     // would imply the board says something about their street, which is the
     // reading the page exists to prevent. So it is carried and not consulted.
     expect(end.address).toEqual(GATEHOUSE);
+  });
+
+  it('remembers which page opened the map, and goes back to it — AC 1.1.10', () => {
+    // Two ways in, so a Back that always went home would be right half the
+    // time and silently wrong the other half.
+    const viaHome = play([{ type: 'map-opened', from: 'home' }, { type: 'leave-map' }]);
+    expect(viaHome.screen).toBe('home');
+
+    const viaBoard = play([
+      { type: 'history-opened' },
+      { type: 'map-opened', from: 'history' },
+      { type: 'leave-map' },
+    ]);
+    expect(viaBoard.screen).toBe('history');
+  });
+
+  it('treats an unnamed origin as the homepage', () => {
+    expect(play([{ type: 'map-opened' }, { type: 'leave-map' }]).screen).toBe('home');
+  });
+
+  it('replaces the origin rather than keeping the first one', () => {
+    const end = play([
+      { type: 'history-opened' },
+      { type: 'map-opened', from: 'history' },
+      { type: 'leave-map' },
+      { type: 'go-home' },
+      { type: 'map-opened', from: 'home' },
+      { type: 'leave-map' },
+    ]);
+    expect(end.screen).toBe('home');
   });
 
   it('goes back from the flood history to the homepage it was opened from', () => {

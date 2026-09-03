@@ -6,7 +6,7 @@ What "done" means. The work that produces it is in [ITERATION-1-TASKS.md](./ITER
 
 **Tick a criterion only when it has been seen working on the deployed build** — not when the code that should satisfy it has been merged.
 
-**Source:** *Epic 1-2 Revised*, received **3 September 2026**. Where this file and that document disagree, the document wins and this file has a bug.
+**Source:** *Epic 1-2 Revised (2)*, received **3 September 2026**, superseding *Epic 1-2 Revised* from earlier the same day. Where this file and that document disagree, the document wins and this file has a bug.
 
 ---
 
@@ -25,12 +25,30 @@ Three things, and the third is a hazard rather than a feature.
 | 1.1.1 Select a supported address | **1.1.3** | Same requirement, new number |
 | 1.1.2 Follow local water and drainage | **1.1.2** *(partly)* | The guided-task defaults are no longer a criterion; 1.1.2 is now *Open the Local Map* |
 | 1.1.3 Explore the full map | **1.1.4** + **1.1.5** | Split into modes and drainage layers |
-| 1.1.4 Enter an unsupported address | **1.1.7** | Same requirement, new number |
+| 1.1.4 Enter an unsupported address | **1.1.8** | Same requirement, new number |
 | 1.1.5 Choose another task | — | Dropped |
 | 1.2.1, 1.2.2 | **1.2.1, 1.2.2** | Unchanged, letters included |
 | 1.3.1 Street cross-section | — | Dropped. **1.3.1 is now *View the Local Terrain*** |
 | 1.3.2 Cross-section insufficient | — | Dropped. **1.3.2 is now *View Low Areas*** |
 | 2.1–2.3 Scenario explorer | — | Dropped. **Epic 2 is now flood history** |
+
+### The second revision, later on 3 September
+
+Two criteria were **added inside Epic 1**, which pushed three along again:
+
+| Revised | Revised (2) |
+| --- | --- |
+| — | **1.1.6 Expand or Collapse the Map Legend** (new) |
+| 1.1.6 View Information About a Map Element | **1.1.7** |
+| 1.1.7 Enter an Unsupported Address | **1.1.8** |
+| 1.1.8 Change the Selected Address | **1.1.9** |
+| — | **1.1.10 Return from the Local Map** (new) |
+| — | **2.1.2 Return from the Historical Flood Information Page** (new) |
+| — | **2.2.2 Show Fewer Locations** (new) |
+
+AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain **or low-area***, which the homepage's four cards already offered.
+
+**Three of the four new criteria describe work that already existed** when the document arrived — the legend folds, the flood list closes, and both were built the same afternoon for the same reasons the criteria give. Only AC 1.1.10 needed building.
 
 **The collisions to watch are 1.3.1, 1.3.2 and all of Epic 2**: those identifiers are live and mean something entirely different from what they meant on 29 August.
 
@@ -40,17 +58,21 @@ Three things, and the third is a hazard rather than a feature.
 
 ## Where this stands — 3 September 2026
 
-**Epic 1: 52 of 53 sub-criteria met, and one deliberate deviation.** AC 1.1.1's two open items closed when the flood board landed on 3 September. **AC 1.1.4.c is not met**, by a design decision taken the same day and recorded under that criterion — the map has no Drainage mode, because pits and pipes are chips of their own.
+**Epic 1: 70 of 71 sub-criteria met, and one deliberate deviation.** AC 1.1.1's two open items closed when the flood board landed on 3 September. **AC 1.1.4.c is not met**, by a design decision taken the same day and recorded under that criterion — the map has no Drainage mode, because pits and pipes are chips of their own.
 
-**Epic 2: 19 of 19 sub-criteria met, and clicked through on 3 September.** The board reads *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0), joined to ABS ASGS 2011 for the names. The data was verified before any of it was built — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
+**Epic 2: 25 of 25 sub-criteria met, and clicked through on 3 September.** The board reads *VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015* (Victoria State Emergency Service, via data.vic, CC BY 4.0), joined to ABS ASGS 2011 for the names. The data was verified before any of it was built — see [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) — and it reconciles against its own Data Quality Statement exactly: 13,339 SA1 rows, 144 of them suppressed for privacy.
 
 > **Three product decisions were taken with the measurements in front of them**, and each is on the artefact rather than in a screen, so the page cannot drift from what was decided. **Greater Melbourne**, because not one Melbourne area reaches the statewide top five. **Flood alone**, because the Data Quality Statement files flash flooding under Storm and ranking on Storm produces the Dandenongs. **The six-year total, with every year shown beside it**, because 2010-11 is most of the total and choosing a shorter window would be choosing the answer.
 
 > **Correction, 3 September.** An earlier note here said the file "stops in August 2015, and 2010–2014 are the five complete years". That came from the catalogue's description, which gives the collection period as July 2009 – 8 August 2015. The file itself has six financial-year columns, 2009-10 to 2014-15, and the Data Quality Statement states the reference period as **1 July 2009 – 30 June 2015**. All six are complete; there is no partial year to exclude. The reporting period AC 2.1.1.f must display is *six financial years, 1 July 2009 to 30 June 2015*.
 
-**What was rebuilt for this revision**, and clicked through in a browser on 3 September: the four modes and the drainage-layer switches (1.1.4, 1.1.5), the homepage's per-mode ways in (1.1.1, 1.1.2), the retention of modes across an address change (1.1.8.d), and the comparison's removal from the homepage, the task question and the address screen.
+**What was rebuilt for this revision**, and clicked through in a browser on 3 September: the four modes and the drainage-layer switches (1.1.4, 1.1.5), the homepage's per-mode ways in (1.1.1, 1.1.2), the retention of modes across an address change (1.1.9.d), and the comparison's removal from the homepage, the task question and the address screen.
 
-**What is carried over** from the 27 August criteria without re-clicking, because the code behind it did not change: 1.1.3, 1.1.6, 1.1.7, 1.2.1, 1.2.2, 1.3.2. Each was demonstrated on 1 September under its old number.
+**What is carried over** from the 27 August criteria without re-clicking, because the code behind it did not change: 1.1.3, 1.1.7, 1.1.8, 1.2.1, 1.2.2, 1.3.2. Each was demonstrated on 1 September under its old number.
+
+**The address screen and the task question are hidden.** From 3 September the homepage's two buttons are *Explore the map* and *See flood history*, and the first opens the map directly. Nothing routes to the standalone address field or to the task chooser any more.
+
+> That moves the implementation **towards** the criteria rather than away from them. AC 1.1.2 asks the map to open from the homepage carrying its own address search bar, and AC 1.1.3 opens *"given the user is on the local map"* — both describe naming an address on the map, which is now the only way to do it. The screens and their code are kept, like the comparison, and Iteration 2 decides whether they return or go.
 
 **Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
 
@@ -74,7 +96,7 @@ Three things, and the third is a hazard rather than a feature.
 
 ### AC 1.1.2 — Open the local map
 
-*Given the user is on the homepage, when the user selects a local drainage, water-flow or terrain option, then the system will:*
+*Given the user is on the homepage, when the user selects a local drainage, water-flow, terrain or low-area option, then the system will:*
 
 - [x] **1.1.2.a** Open the local map
 - [x] **1.1.2.b** Display an address search bar at the top of the map
@@ -97,6 +119,8 @@ Three things, and the third is a hazard rather than a feature.
 - [x] **1.1.3.e** Retain the selected address **only for the current browser session**
 - [x] **1.1.3.f** Clearly identify any missing, incomplete or uncertain information
 
+> **There is one way to name an address, and it is the map's own search bar.** The separate address screen is no longer on any route, so the criterion's *"given the user is on the local map"* is the only state it can be exercised from — which is what it describes.
+>
 > **1.1.3.e is met more strictly than it asks.** The address is held in memory for the life of the tab and in nothing else — not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. `session.test.ts` enforces this by running a whole session against traps in place of both storages, `history` and `document.cookie`, rather than by reading the source: a rule checked by grep is a rule a refactor walks around.
 >
 > *The address is also never sent*, and the reason is stronger than a guard — there is no request that could carry it. Every outbound call in `apps/web` is a `GET` of a static artefact, with no body and no query string.
@@ -161,39 +185,71 @@ Three things, and the third is a hazard rather than a feature.
 > evidence rather than a view of the world, and it is the one mark that says the map is
 > guessing.
 
-### AC 1.1.6 — View information about a map element
+### AC 1.1.6 — Expand or collapse the map legend
+
+*Given the user is viewing the local map, when the user selects the Map Legend control, then the system will:*
+
+- [x] **1.1.6.a** Expand the map legend when it is collapsed
+- [x] **1.1.6.b** Collapse the map legend when it is expanded
+- [x] **1.1.6.c** Display legend information relevant to the active mode and currently visible layers when expanded
+- [x] **1.1.6.d** Keep the Map Legend control available when the legend is collapsed
+- [x] **1.1.6.e** Retain the selected address, active mode, layer visibility and current map location
+
+> **Built before the criterion arrived, and 1.1.6.d is the reason it reads this way.** Collapsed, the legend keeps the words *Map legend* and its control rather than disappearing: a legend that vanishes completely is one nobody can find again. The criterion asks for exactly that, which is a pleasant way to find out a decision was the right one.
+>
+> **1.1.6.c is not a filter written twice.** The legend renders the layers that are currently visible — the same `LayerState` the canvas draws from — so a layer switched off leaves the key in the same render. There is no second list to fall out of step.
+>
+> **1.1.6.e is free, and that is the design.** The fold is local to the legend and touches nothing else; the address, the chips and the viewport are held elsewhere and never see it.
+
+### AC 1.1.7 — View information about a map element
 
 *Given the user is viewing a map containing selectable information, when the user selects an available map element, then the system will:*
 
-- [x] **1.1.6.a** Highlight the selected map element
-- [x] **1.1.6.b** Display the available information in a popup
-- [x] **1.1.6.c** Provide a short plain-English explanation of the selected information
-- [x] **1.1.6.d** Identify whether the information is official recorded data or system-derived information
-- [x] **1.1.6.e** Provide a relevant next action where one is available
-- [x] **1.1.6.f** Clearly identify any missing, incomplete or uncertain information
+- [x] **1.1.7.a** Highlight the selected map element
+- [x] **1.1.7.b** Display the available information in a popup
+- [x] **1.1.7.c** Provide a short plain-English explanation of the selected information
+- [x] **1.1.7.d** Identify whether the information is official recorded data or system-derived information
+- [x] **1.1.7.e** Provide a relevant next action where one is available
+- [x] **1.1.7.f** Clearly identify any missing, incomplete or uncertain information
 
-> **The street cross-section is now 1.1.6.e rather than a criterion of its own.** The revision dropped US 1.3's cross-section entirely; the feature is built, tested and kept, because it is exactly "a relevant next action" from a selected pit. Its two states carry 1.1.6.d and 1.1.6.f: **everything horizontal is recorded** — which pipes connect, on which side, their diameter and material — and **everything vertical is drawn**, said inside the figure rather than in a caption. The map artefact carries no invert level for any pit, so 726 of 895 pits can have a section and the other 169 get a screen that says what is missing and invents nothing.
+> **The street cross-section is now 1.1.7.e rather than a criterion of its own.** The revision dropped US 1.3's cross-section entirely; the feature is built, tested and kept, because it is exactly "a relevant next action" from a selected pit. Its two states carry 1.1.7.d and 1.1.7.f: **everything horizontal is recorded** — which pipes connect, on which side, their diameter and material — and **everything vertical is drawn**, said inside the figure rather than in a caption. The map artefact carries no invert level for any pit, so 726 of 895 pits can have a section and the other 169 get a screen that says what is missing and invents nothing.
 
-### AC 1.1.7 — Enter an unsupported address
+### AC 1.1.8 — Enter an unsupported address
 
 *Given the user is on the local map, when the user enters and confirms an address outside the supported pilot area, then the system will:*
 
-- [x] **1.1.7.a** Explain that detailed local drainage information is not available for the address
-- [x] **1.1.7.b** **Avoid** presenting local drainage results as if supported data were available
-- [x] **1.1.7.c** Allow the user to enter a different address
+- [x] **1.1.8.a** Explain that detailed local drainage information is not available for the address
+- [x] **1.1.8.b** **Avoid** presenting local drainage results as if supported data were available
+- [x] **1.1.8.c** Allow the user to enter a different address
 
 > The distinction this turns on is between *no such address* and *a real address we hold nothing for*, and they are different things to a resident. Neither is ever resolved to a nearby address.
 
-### AC 1.1.8 — Change the selected address
+### AC 1.1.9 — Change the selected address
 
 *Given an address is selected and the user is viewing the local map, when the user enters and confirms a different recognised address, then the system will:*
 
-- [x] **1.1.8.a** Replace the previously selected address
-- [x] **1.1.8.b** Centre the map on and mark the new address
-- [x] **1.1.8.c** Update the displayed information for the new address
-- [x] **1.1.8.d** Retain the active information mode where that mode is available
+- [x] **1.1.9.a** Replace the previously selected address
+- [x] **1.1.9.b** Centre the map on and mark the new address
+- [x] **1.1.9.c** Update the displayed information for the new address
+- [x] **1.1.9.d** Retain the active information mode where that mode is available
 
 > Clicked on 3 September with a non-default mode set: Low Areas was switched on, the address was changed from 32 Altona Street to 3 Bangalore Street, and all four modes were still on afterwards with the map recentred and the new address marked.
+
+### AC 1.1.10 — Return from the local map
+
+*Given the user has opened the local map from the homepage or the historical flood information page, when the user selects Back, then the system will:*
+
+- [x] **1.1.10.a** Return the user to the page from which the local map was opened
+- [x] **1.1.10.b** Retain the selected address only for the current browser session
+- [x] **1.1.10.c** Allow the user to return without relying on the browser's navigation controls
+
+> **1.1.10.a is the one that needed building, and the reason is that there are two ways in.** The map opens from the homepage and from the flood board, so the session records which, and Back follows it. A Back that always went home would have been right half the time and silently wrong the other half — the worst kind of navigation bug, because nothing about it looks broken.
+>
+> It is not the `back` event, which walks a fixed chain of screens. This one reads where the person actually came from.
+>
+> **Two controls, both named.** The breadcrumb's first crumb reads *Home* or *Flood history* to match, and the panel carries *← Back to the homepage* / *← Back to flood history*. Naming the destination is what makes it honest with two possible origins; a bare *Back* would be a guess.
+>
+> Clicked both ways on 3 September: from the board the crumb reads Flood history and Back lands on the board; from the homepage it reads Home and Back lands there.
 
 ---
 
@@ -284,6 +340,15 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 >
 > **2.1.1.i is made concrete by the pilot area.** Kensington recorded 39 or more incidents over the six years, which places it well down the list — said on the page, so the invitation to the map is not an abstract link and does not imply the pilot area is a hotspot.
 
+### AC 2.1.2 — Return from the historical flood information page
+
+*Given the user is viewing the historical flood information page, when the user selects Back, then the system will:*
+
+- [x] **2.1.2.a** Return the user to the homepage
+- [x] **2.1.2.b** Allow the user to return without relying on the browser's navigation controls
+
+> The breadcrumb already went home, and the control at the foot of the page is not redundant with it: this page is a ranking, six headed paragraphs of explanation and an invitation to the map, so by the time somebody has finished reading, the crumb is a long way up.
+
 ### AC 2.2.1 — Show more locations
 
 *Given the user is viewing the historical flood information page, when the user selects Show More Locations, then the system will:*
@@ -299,7 +364,24 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 >
 > **2.2.1.d is free here and would not be if the page did the arithmetic.** One file, one incident type, one six-year period, one counting basis — nothing on the page recomputes anything.
 >
+> **The control is a toggle, and that is AC 2.1.1.h rather than a nicety.** It called the top five the default view, and a view somebody cannot return to is not a default -- it is a state the page leaves them in. Expanded, the button reads *Show the top 5 only*; collapsing scrolls the list back into sight, because folding thirty rows away from under the button would otherwise drop the reader below the whole section.
+>
 > Clicked on 3 September: thirty rows, Bacchus Marsh still first and Keilor East last. The bars do not rescale when the list grows, because they are scaled against every published area rather than the visible ones — a picture that changed while the data did not would be its own small lie.
+
+### AC 2.2.2 — Show fewer locations
+
+*Given the page is displaying more than the default Top Five, when the user selects Show Fewer Locations, then the system will:*
+
+- [x] **2.2.2.a** Collapse the displayed results to the five highest-ranked locations
+- [x] **2.2.2.b** Retain the original ranking and reporting basis
+- [x] **2.2.2.c** Replace Show Fewer Locations with Show More Locations
+- [x] **2.2.2.d** Retain the user on the historical flood information page
+
+> **Built before the criterion arrived**, for the reason AC 2.1.1.h gives: it calls the top five the default view, and a view somebody cannot return to is not a default but a state the page leaves them in.
+>
+> **2.2.2.b is free because nothing is recomputed.** Expanding and collapsing slice the same ranked array; there is no second sort to disagree with the first.
+>
+> Collapsing also scrolls the list back into sight. The control sits under thirty rows, so folding them away without it drops the reader below the whole section with no sign that the list had shrunk — measured after the change at 138px of an 800px viewport.
 
 ### AC 2.3.1 — View the data explanation
 
@@ -351,7 +433,7 @@ From *Iteration 1 Requirements*. The revised criteria document does not restate 
 
 Behaviours the criteria express through state retention rather than as buttons. Covered on the golden path rather than by a criterion each — a back button that loses state is a defect, but it is not a separate acceptance conversation.
 
-- [ ] **Change address** from the map keeps the active modes and the map location *(AC 1.1.8.d)*
+- [ ] **Change address** from the map keeps the active modes and the map location *(AC 1.1.9.d)*
 - [ ] **Home** returns to the homepage from any screen and starts a fresh way in
 - [ ] The browser back button never strands the user on a screen whose state has been lost
 - [ ] No navigation writes the address to `localStorage`, `sessionStorage`, the URL, or history state; history state carries a screen identifier only

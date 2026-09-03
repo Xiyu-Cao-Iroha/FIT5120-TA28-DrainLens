@@ -104,7 +104,7 @@ US 1.3 is **eight criteria and nothing is built**. It is the largest remaining g
 
 The complication is that most of the work is not the drawing. **Pit depth is missing for 95.4% of the council's record**, and what survives is internally inconsistent, so for almost every location the honest screen is the unavailable one — *"a reliable cross-section cannot be provided here, and this is what is missing"*.
 
-> **Resolved 29 August, and re-scoped 3 September.** The cross-section was built: 726 of 895 pits get a drawing, the other 169 get the unavailable screen. The 3 September revision then dropped it as a criterion of its own — it is now a *relevant next action* under AC 1.1.6.e, and **AC 1.3.1 and 1.3.2 now mean terrain and low areas**. The numbers in the paragraph above are the 27 August set.
+> **Resolved 29 August, and re-scoped 3 September.** The cross-section was built: 726 of 895 pits get a drawing, the other 169 get the unavailable screen. The 3 September revision then dropped it as a criterion of its own — it is now a *relevant next action* under AC 1.1.7.e, and **AC 1.3.1 and 1.3.2 now mean terrain and low areas**. The numbers in the paragraph above are the 27 August set.
 
 Three ways to go:
 

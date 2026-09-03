@@ -20,7 +20,7 @@
  * quietly present "the five highest" as sharper than the counts behind it.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
   type FloodArea,
@@ -49,10 +49,13 @@ import {
 export interface FloodHistoryProps {
   readonly artefact: FloodHistoryArtefact;
   readonly onOpenMap: () => void;
+  /** AC 2.1.2: back to the homepage, without the browser's own control. */
+  readonly onBack: () => void;
 }
 
-export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
+export function FloodHistory({ artefact, onOpenMap, onBack }: FloodHistoryProps) {
   const [expanded, setExpanded] = useState(false);
+  const listRef = useRef<HTMLOListElement | null>(null);
   const shown = expanded ? artefact.areas : artefact.areas.slice(0, artefact.defaultAreas);
   const scale = barScale(artefact);
   const incomplete = incompleteCount(shown);
@@ -76,6 +79,7 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
         many.
       </p>
       <ol
+        ref={listRef}
         style={{
           listStyle: 'none',
           margin: 0,
@@ -101,11 +105,24 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
           marginTop: space(4),
         }}
       >
-        {hasMore(artefact) && !expanded && (
+        {/*
+          The control is a toggle, not a one-way door. AC 2.1.1.h calls the top
+          five the default view, and a view somebody cannot get back to is not
+          a default -- it is a state the page leaves you in.
+
+          Collapsing scrolls the list back into sight, because the button sits
+          under thirty rows and folding them away without it would drop the
+          reader below the whole section, looking at the explanation with no
+          idea the list had shrunk.
+        */}
+        {hasMore(artefact) && (
           <button
             type="button"
             onClick={() => {
-              setExpanded(true);
+              setExpanded((open) => {
+                if (open) listRef.current?.scrollIntoView({ block: 'start' });
+                return !open;
+              });
             }}
             style={{
               padding: `${String(space(2))}px ${String(space(4))}px`,
@@ -116,7 +133,7 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
               font: type(text.label, { weight: weight.semibold }),
             }}
           >
-            Show more locations
+            {expanded ? 'Show fewer locations' : 'Show more locations'}
           </button>
         )}
         <span style={{ font: type(text.small, { leading: 1.5 }), color: ink.subtle }}>
@@ -132,6 +149,27 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
 
       <Explanation artefact={artefact} />
       <ToTheMap artefact={artefact} onOpenMap={onOpenMap} />
+
+      {/*
+        AC 2.1.2. The breadcrumb already goes home, and this is not redundant
+        with it: the criterion asks for a control the reader can reach at the
+        end of the page, and after six screens of explanation the crumb is a
+        long way up.
+      */}
+      <button
+        type="button"
+        onClick={onBack}
+        style={{
+          marginTop: space(6),
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: type(text.label, { weight: weight.medium }),
+          color: brand.ink,
+        }}
+      >
+        ← Back to the homepage
+      </button>
     </div>
   );
 }

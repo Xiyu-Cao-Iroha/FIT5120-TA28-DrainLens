@@ -212,7 +212,7 @@ describe('relativeWidth', () => {
   });
 
   it('draws an unrecorded diameter at the minimum rather than an average', () => {
-    // Filling it with a neighbour's value is what AC 1.1.6.f forbids — an unsupported
+    // Filling it with a neighbour's value is what AC 1.1.7.f forbids — an unsupported
     // assumption dressed as a measurement.
     expect(relativeWidth(unknown, [wide, narrow, unknown])).toBe(0);
   });

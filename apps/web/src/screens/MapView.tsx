@@ -77,7 +77,9 @@ export interface MapViewProps {
   readonly task: Task | null;
   /** A mode named on the way in, which decides what is on when the map opens. */
   readonly mode?: MapMode | null;
-  readonly onBack: () => void;
+  /** Where Back goes, written as it should read after "Back to" — AC 1.1.10. */
+  readonly backTo?: string;
+  readonly onBack?: (() => void) | undefined;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
   /** Present only where the map is the whole screen and search makes sense. */
@@ -92,6 +94,7 @@ export function MapView({
   address,
   task,
   mode = null,
+  backTo,
   onBack,
   panel = true,
   index,
@@ -337,20 +340,29 @@ export function MapView({
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={onBack}
-                style={{
-                  marginTop: space(4),
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.label, { weight: weight.medium }),
-                  color: '#1a5d4d',
-                }}
-              >
-                ← Back to choose a task
-              </button>
+              {/*
+                AC 1.1.10: a way out of the map that names where it goes and is
+                not the browser's own Back. It sits at the foot of the panel
+                rather than in the chrome because that is where the one it
+                replaced sat, and it says the destination because the map has
+                two ways in — a bare "Back" would be a guess half the time.
+              */}
+              {onBack && backTo !== undefined && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  style={{
+                    marginTop: space(4),
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    font: type(text.label, { weight: weight.medium }),
+                    color: '#1a5d4d',
+                  }}
+                >
+                  ← Back to {backTo}
+                </button>
+              )}
             </>
           )}
         </aside>

@@ -155,10 +155,7 @@ export function App() {
             artefact={loaded.map}
             derived={loaded.derived}
             onOpenMap={(mode) => {
-              dispatch({ type: 'map-opened', ...(mode ? { mode } : {}) });
-            }}
-            onFindAddress={() => {
-              dispatch({ type: 'change-address' });
+              dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
             }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
@@ -184,7 +181,10 @@ export function App() {
           <FloodHistory
             artefact={loaded.history}
             onOpenMap={() => {
-              dispatch({ type: 'map-opened' });
+              dispatch({ type: 'map-opened', from: 'history' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
             }}
           />
         </Shell>
@@ -445,29 +445,22 @@ export function App() {
           credits={credits}
           crumbs={
             <>
-              {crumb('Home', () => {
-                dispatch({ type: 'go-home' });
+              {/*
+                The trail names the page the map was opened from, which is not
+                always the homepage: the flood board opens it too. A crumb
+                reading Home after arriving from the board would be a claim
+                about a route nobody took.
+
+                It is also two crumbs shorter than it was. The address field
+                and the task question are on no route at all now -- the
+                homepage opens the map directly and an address is named in the
+                map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
+                it.
+              */}
+              {crumb(session.mapOrigin === 'history' ? 'Flood history' : 'Home', () => {
+                dispatch({ type: 'leave-map' });
               })}
               {separator}
-              {/*
-                Only the screens somebody actually passed through.
-                Arriving from the homepage means the address field and the
-                task question were never seen, and a trail that lists them
-                is a claim about a route nobody took -- on a product whose
-                whole argument is that it does not imply what it cannot show.
-              */}
-              {session.address !== null && (
-                <>
-                  {crumb('Address search', () => {
-                    dispatch({ type: 'change-address' });
-                  })}
-                  {separator}
-                  {crumb('Choose a task', () => {
-                    dispatch({ type: 'back' });
-                  })}
-                  {separator}
-                </>
-              )}
               {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
             </>
           }
@@ -479,6 +472,10 @@ export function App() {
             address={session.address}
             task={session.task}
             mode={session.mapMode}
+            backTo={session.mapOrigin === 'history' ? 'flood history' : 'the homepage'}
+            onBack={() => {
+              dispatch({ type: 'leave-map' });
+            }}
             index={loaded.index}
             onAddress={(picked) =>
               dispatch({
@@ -491,7 +488,6 @@ export function App() {
                 },
               })
             }
-            onBack={() => dispatch({ type: 'back' })}
           />
         </Shell>
       );

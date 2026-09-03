@@ -1,7 +1,7 @@
 /**
  * A plain-English sentence about where water near one address may move.
  *
- * AC 1.1.6.c. The temptation is to write one sentence and show it to
+ * AC 1.1.7.c. The temptation is to write one sentence and show it to
  * everybody, which is not an explanation — it is a caption. So this measures
  * against the derived layers the person can see on the map beside it: the
  * nearest surface-water path, and the nearest low area it runs towards.

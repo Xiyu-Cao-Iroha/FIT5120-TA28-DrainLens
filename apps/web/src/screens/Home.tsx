@@ -132,17 +132,10 @@ export interface HomeProps {
   readonly derived: DerivedArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
-  readonly onFindAddress: () => void;
   readonly onOpenHistory: () => void;
 }
 
-export function Home({
-  artefact,
-  derived,
-  onOpenMap,
-  onFindAddress,
-  onOpenHistory,
-}: HomeProps) {
+export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps) {
   return (
     <div>
       {/*
@@ -156,7 +149,7 @@ export function Home({
         onOpenMap={() => {
           onOpenMap();
         }}
-        onFindAddress={onFindAddress}
+        onOpenHistory={onOpenHistory}
       />
       <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} />
       <Flow />
@@ -335,12 +328,12 @@ function Hero({
   artefact,
   derived,
   onOpenMap,
-  onFindAddress,
+  onOpenHistory,
 }: {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
   readonly onOpenMap: () => void;
-  readonly onFindAddress: () => void;
+  readonly onOpenHistory: () => void;
 }) {
   return (
     <section style={{ background: surface.page }}>
@@ -370,7 +363,7 @@ function Hero({
 
           <div style={{ display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
             <PrimaryButton label="Explore the map →" onPress={onOpenMap} />
-            <QuietButton label="Start from an address" onPress={onFindAddress} />
+            <QuietButton label="See flood history" onPress={onOpenHistory} />
           </div>
 
           <div
