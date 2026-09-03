@@ -356,8 +356,16 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
  * with the controls compressed into chips there is no room for it there, and a
  * tooltip is not something a layer *carries*. So it lives here, on screen
  * beside the mark it describes, for every layer that is currently drawn.
+ *
+ * **It folds, and folds to its own name rather than to nothing.** The map is
+ * the thing somebody came for and this sits over the bottom-left corner of it;
+ * on a laptop that is a real amount of map. Collapsed it keeps the words *Map
+ * legend* and the control, because a legend that vanishes completely is one
+ * nobody can find again — and the criterion it serves is about the key being
+ * *available*, which a fold does not break and a disappearance would.
  */
 export function MapLegend({ state }: { readonly state: LayerState }) {
+  const [open, setOpen] = useState(true);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
 
@@ -377,54 +385,78 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
         boxShadow: shadow.floating,
       }}
     >
-      <p
-        style={{
-          margin: `0 0 ${String(space(2))}px`,
-          font: type(text.micro, { weight: weight.semibold }),
-          letterSpacing: tracking.caps,
-          textTransform: 'uppercase',
-          color: ink.subtle,
-        }}
-      >
-        Map legend
-      </p>
-      {shown.map((spec) => (
-        <div
-          key={spec.key}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: space(3) }}>
+        <p
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: space(2),
-            marginTop: space(2),
+            margin: 0,
+            font: type(text.micro, { weight: weight.semibold }),
+            letterSpacing: tracking.caps,
+            textTransform: 'uppercase',
+            color: ink.subtle,
           }}
         >
-          <SwatchMark kind={spec.swatch} />
-          <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
-            {spec.label}
-          </span>
-          <span style={{ marginLeft: 'auto' }}>
-            <BasisDot basis={spec.basis} />
-          </span>
-        </div>
-      ))}
-      <p
-        style={{
-          margin: `${String(space(3))}px 0 0`,
-          paddingTop: space(2),
-          borderTop: `1px solid ${line.hair}`,
-          font: type(text.micro, { leading: 1.45 }),
-          color: ink.subtle,
-        }}
-      >
-        <BasisDot basis="Official recorded data" /> recorded by the council
-        <br />
-        <BasisDot basis="System-derived result" /> calculated by DrainLens
-      </p>
+          Map legend
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v);
+          }}
+          aria-expanded={open}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.micro, { weight: weight.medium }),
+            color: ink.muted,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '\u2039 Hide' : '\u203a Show'}
+        </button>
+      </div>
+
+      {open && (
+        <>
+          {shown.map((spec) => (
+            <div
+              key={spec.key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: space(2),
+                marginTop: space(2),
+              }}
+            >
+              <SwatchMark kind={spec.swatch} />
+              <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+                {spec.label}
+              </span>
+              <span style={{ marginLeft: 'auto' }}>
+                <BasisDot basis={spec.basis} />
+              </span>
+            </div>
+          ))}
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              paddingTop: space(2),
+              borderTop: `1px solid ${line.hair}`,
+              font: type(text.micro, { leading: 1.45 }),
+              color: ink.subtle,
+            }}
+          >
+            <BasisDot basis="Official recorded data" /> recorded by the council
+            <br />
+            <BasisDot basis="System-derived result" /> calculated by DrainLens
+          </p>
+        </>
+      )}
     </div>
   );
 }
 
-/** The compact form of the basis label, where a full pill will not fit. */
 function BasisDot({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
   const recorded = which === 'Official recorded data';
   const tone = recorded ? basis.recorded : basis.derived;
