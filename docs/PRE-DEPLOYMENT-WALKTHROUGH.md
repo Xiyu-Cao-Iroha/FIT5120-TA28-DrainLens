@@ -317,9 +317,9 @@ So the section splits itself, and says so inside the figure rather than in a cap
 
 > **Everything horizontal is recorded** — which pipes connect, on which side, their diameter and material. **Everything vertical is drawn.** The pipes are spaced evenly because the record gives no depth to space them by, and the vertical axis is labelled *depth not recorded — spacing illustrative*.
 
-**726 of 895 pits** get a drawing; the other **169** get the unavailable state (AC 1.1.6.f), which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
+**726 of 895 pits** get a drawing; the other **169** get the unavailable state (AC 1.1.7.f), which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
 
-A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is what AC 1.1.6.f forbids, an unsupported assumption dressed as a measurement.
+A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is what AC 1.1.7.f forbids, an unsupported assumption dressed as a measurement.
 
 **The line to have ready if asked about capacity:** a recorded diameter is a dimension, not a capacity. Going from one to the other needs a hydraulic model this project decided not to build (AD6), and the drawing says so on screen.
 

@@ -10,7 +10,7 @@
  * That decides the shape of this module. A cross-section is a *vertical*
  * drawing, and the one axis it exists to show is the one we have no data for.
  * So the vertical dimension here is presentation and nothing else, and it says
- * so in the drawing rather than in a caption somewhere: AC 1.1.6.d asks that
+ * so in the drawing rather than in a caption somewhere: AC 1.1.7.d asks that
  * recorded information be distinguishable from simplified presentation, and
  * the honest split is that **everything horizontal is recorded and everything
  * vertical is invented**.
@@ -53,7 +53,7 @@ export interface CrossSection {
 
 export interface SectionUnavailable {
   readonly kind: 'unavailable';
-  /** Which required information is missing — AC 1.1.6.f. */
+  /** Which required information is missing — AC 1.1.7.f. */
   readonly reasons: readonly string[];
 }
 
@@ -175,7 +175,7 @@ export function summarise(pipe: SectionPipe): string {
  * Scaled against the widest pipe *in this section* rather than against a fixed
  * maximum, so the comparison a reader makes is between pipes they can see. A
  * pipe with no recorded diameter gets the minimum and is labelled, never an
- * average of its neighbours — filling it in is what AC 1.1.6.f forbids.
+ * average of its neighbours — filling it in is what AC 1.1.7.f forbids.
  */
 export function relativeWidth(pipe: SectionPipe, all: readonly SectionPipe[]): number {
   if (pipe.diameterMm === null) return 0;

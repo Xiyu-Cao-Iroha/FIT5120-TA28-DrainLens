@@ -155,7 +155,7 @@ export function App() {
             artefact={loaded.map}
             derived={loaded.derived}
             onOpenMap={(mode) => {
-              dispatch({ type: 'map-opened', ...(mode ? { mode } : {}) });
+              dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
             }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
@@ -181,7 +181,10 @@ export function App() {
           <FloodHistory
             artefact={loaded.history}
             onOpenMap={() => {
-              dispatch({ type: 'map-opened' });
+              dispatch({ type: 'map-opened', from: 'history' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
             }}
           />
         </Shell>
@@ -442,18 +445,22 @@ export function App() {
           credits={credits}
           crumbs={
             <>
-              {crumb('Home', () => {
-                dispatch({ type: 'go-home' });
+              {/*
+                The trail names the page the map was opened from, which is not
+                always the homepage: the flood board opens it too. A crumb
+                reading Home after arriving from the board would be a claim
+                about a route nobody took.
+
+                It is also two crumbs shorter than it was. The address field
+                and the task question are on no route at all now -- the
+                homepage opens the map directly and an address is named in the
+                map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
+                it.
+              */}
+              {crumb(session.mapOrigin === 'history' ? 'Flood history' : 'Home', () => {
+                dispatch({ type: 'leave-map' });
               })}
               {separator}
-              {/*
-                Two crumbs shorter since 3 September. The address field and the
-                task question are no longer on any route: the homepage opens
-                the map directly and an address is named in the map's own
-                search bar, which is where AC 1.1.2 and AC 1.1.3 put it. A
-                trail listing screens nobody can reach is a claim about a route
-                that does not exist.
-              */}
               {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
             </>
           }
@@ -465,6 +472,10 @@ export function App() {
             address={session.address}
             task={session.task}
             mode={session.mapMode}
+            backTo={session.mapOrigin === 'history' ? 'flood history' : 'the homepage'}
+            onBack={() => {
+              dispatch({ type: 'leave-map' });
+            }}
             index={loaded.index}
             onAddress={(picked) =>
               dispatch({

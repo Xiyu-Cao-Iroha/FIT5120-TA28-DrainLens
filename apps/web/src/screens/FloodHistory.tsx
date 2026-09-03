@@ -49,9 +49,11 @@ import {
 export interface FloodHistoryProps {
   readonly artefact: FloodHistoryArtefact;
   readonly onOpenMap: () => void;
+  /** AC 2.1.2: back to the homepage, without the browser's own control. */
+  readonly onBack: () => void;
 }
 
-export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
+export function FloodHistory({ artefact, onOpenMap, onBack }: FloodHistoryProps) {
   const [expanded, setExpanded] = useState(false);
   const listRef = useRef<HTMLOListElement | null>(null);
   const shown = expanded ? artefact.areas : artefact.areas.slice(0, artefact.defaultAreas);
@@ -131,9 +133,7 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
               font: type(text.label, { weight: weight.semibold }),
             }}
           >
-            {expanded
-              ? `Show the top ${String(artefact.defaultAreas)} only`
-              : 'Show more locations'}
+            {expanded ? 'Show fewer locations' : 'Show more locations'}
           </button>
         )}
         <span style={{ font: type(text.small, { leading: 1.5 }), color: ink.subtle }}>
@@ -149,6 +149,27 @@ export function FloodHistory({ artefact, onOpenMap }: FloodHistoryProps) {
 
       <Explanation artefact={artefact} />
       <ToTheMap artefact={artefact} onOpenMap={onOpenMap} />
+
+      {/*
+        AC 2.1.2. The breadcrumb already goes home, and this is not redundant
+        with it: the criterion asks for a control the reader can reach at the
+        end of the page, and after six screens of explanation the crumb is a
+        long way up.
+      */}
+      <button
+        type="button"
+        onClick={onBack}
+        style={{
+          marginTop: space(6),
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: type(text.label, { weight: weight.medium }),
+          color: brand.ink,
+        }}
+      >
+        ← Back to the homepage
+      </button>
     </div>
   );
 }

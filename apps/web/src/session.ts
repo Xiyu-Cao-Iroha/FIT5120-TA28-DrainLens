@@ -62,6 +62,16 @@ export type Screen =
   | 'result'
   | 'unsupported';
 
+/**
+ * Where the map was opened from, so Back can go there.
+ *
+ * AC 1.1.10 asks that leaving the map return the person to the page they came
+ * from, and there are two: the homepage and the flood board. Storing the
+ * origin is the only way to tell them apart -- a Back that always went home
+ * would be right half the time and silently wrong the other half.
+ */
+export type MapOrigin = 'home' | 'history';
+
 /** The two guided tasks, plus the unguided map. */
 export type Task = 'follow' | 'compare' | 'full-map';
 
@@ -105,6 +115,8 @@ export interface Session {
    * map treats it as an opening value and owns its own state from there.
    */
   readonly mapMode: MapMode | null;
+  /** The page the map was opened from — AC 1.1.10. */
+  readonly mapOrigin: MapOrigin;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -126,6 +138,7 @@ export const INITIAL_SESSION: Session = {
   rejectedAddress: null,
   task: null,
   mapMode: null,
+  mapOrigin: 'home',
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -166,7 +179,7 @@ export type SessionEvent =
    * `mode` carries the homepage card that was pressed. Absent, the map opens
    * with everything on, which is what the unguided way in has always meant.
    */
-  | { readonly type: 'map-opened'; readonly mode?: MapMode }
+  | { readonly type: 'map-opened'; readonly mode?: MapMode; readonly from?: MapOrigin }
   /**
    * The flood-history board, from the homepage.
    *
@@ -176,6 +189,8 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  /** Back out of the map, to whichever page opened it — AC 1.1.10. */
+  | { readonly type: 'leave-map' }
   | { readonly type: 'go-home' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
@@ -260,7 +275,18 @@ export function reduce(session: Session, event: SessionEvent): Session {
       return { ...session, screen: BACK[session.screen] };
 
     case 'map-opened':
-      return { ...session, screen: 'explore', task: 'full-map', mapMode: event.mode ?? null };
+      return {
+        ...session,
+        screen: 'explore',
+        task: 'full-map',
+        mapMode: event.mode ?? null,
+        mapOrigin: event.from ?? 'home',
+      };
+
+    case 'leave-map':
+      // AC 1.1.10. Not `back`, which walks a fixed chain: the map has two ways
+      // in and the way out has to follow the one taken.
+      return { ...session, screen: session.mapOrigin === 'history' ? 'history' : 'home' };
 
     case 'history-opened':
       return { ...session, screen: 'history' };
