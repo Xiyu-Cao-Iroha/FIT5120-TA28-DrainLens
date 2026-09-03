@@ -2,6 +2,8 @@
 
 DrainLens · TA28 · **before re-taken and after taken, 31 August 2026**
 
+> **A dated record, not a description of the current build.** These figures were measured against the deployments of 31 August and 1 September and are left as they were taken. They are now wrong in a knowable direction: the scenario worker no longer starts on any reachable path, so five binary arrays totalling 5.25 MB are never fetched, and the flood-history artefact adds 5 KB. Re-run `tools/perf/measure.mjs` after the next deployment rather than adjusting these by hand — a measurement edited to look current is worse than one that is honestly out of date.
+
 **Deployed:** https://drainlens-205559161217.australia-southeast1.run.app
 
 | | before | after |

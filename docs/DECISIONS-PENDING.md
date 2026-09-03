@@ -136,7 +136,7 @@ The remaining time is almost entirely `test_terrain.py`, where nineteen tests ea
 
 ## 4 · Deployment — **DONE: deployed and verified 31 August**
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files; a first visit costs 1.36 MB over the wire. Every command was run by the user; nothing was executed from the assistant's machine.
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, and behind a password gate since 3 September. Twenty static files now, and the transfer figure below is from the 31 August build: see [deploy/README.md](../deploy/README.md) for what has changed and what has not been re-measured. Every command was run by the user; nothing was executed from the assistant's machine.
 
 **Cloud Storage + CDN was abandoned mid-way.** It needs a domain for a certificate and there is none, and the app's paths are absolute from `/`, so a bucket sub-path cannot serve it either. Firebase Hosting, the obvious alternative, had already been **rejected by the teacher** when the first System Architecture proposed it. Cloud Run is what survives all three constraints.
 

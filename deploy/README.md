@@ -2,9 +2,11 @@
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app
 
-Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **fourteen static files** — eleven artefacts, `index.html` and two hashed bundles. A first visit fetches four of them (**1.36 MB over the wire**, expanding to 6.43 MB); the scene arrays load when the scenario worker starts, and two published arrays are not fetched at all on the demonstration path. There is no application server: the map, the terrain, the drainage network and the address index are build products, and the scenario engine runs in the browser.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty static files** — twelve artefacts, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. There is no application server: the map, the terrain, the drainage network, the address index and the flood history are build products, and the scenario engine — when it is reachable at all — runs in the browser.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer. Everything below was run, not planned, and the verification was repeated in full after the second deployment rather than assumed to still hold.
+**What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
+
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, and again on **3 September 2026** to put the access gate in front of it. Everything below was run, not planned.
 
 | Redeployed 1 September | |
 |---|---|
@@ -14,6 +16,19 @@ Deployed **31 August 2026**, redeployed **1 September 2026** for the difference 
 | **AD1** | positive control shows system, system_event and stderr writing; **0 entries carrying a client IP**, no `requests` log |
 | Transfer | **1.36 MB over the wire, expanding to 6.43 MB (21%)** |
 | First visit, p95 | **692.4 ms** from a laptop, against the 34.5 ms localhost floor |
+
+### 3 September: the gate, and the failure that only shows for the right password
+
+The access gate went up. It answered a request with no credentials with a clean **401** and a request with the **correct** password with **500**.
+
+nginx opens `auth_basic_user_file` in a worker, and workers drop to an unprivileged user, while `entrypoint.sh` runs as root and wrote the file `600`. The worker got EACCES. The shape of that failure is what makes it worth recording: a request without credentials never opens the file, so it still gets a correct 401 and the gate looks like it is working — **it fails only for the person who actually has the password, and only after they type it correctly.** The file is `444` now, and the container log named it in one line.
+
+> **The lesson generalises past this bug.** The gate passed every local check written for it — four misconfigurations, the hash's shape, the CRLF, the quoting trap — and none of them tested that it lets the right person *in*, because that needs a running container and a real password. A 401 is only half the check. Both sides are in *Verify* below, and the 200 is the half that carries new information.
+
+| Not re-measured since 1 September | |
+|---|---|
+| Transfer and p95 | The 1.36 MB and 692.4 ms above are from the 1 September build. **They are now wrong in a knowable direction**: five binary arrays totalling 5.25 MB are no longer fetched, and the flood-history artefact adds 5 KB. Re-run `tools/perf/measure.mjs` after the next deployment rather than quoting these. |
+| Bundle | Changes with every build. Compare it, do not assume it. |
 
 ---
 
