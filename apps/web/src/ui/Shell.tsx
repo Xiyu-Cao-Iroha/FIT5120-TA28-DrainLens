@@ -67,6 +67,15 @@ export interface ShellProps {
   /** Where the person is, when they are somewhere with a way back. */
   readonly crumbs?: ReactNode;
   /**
+   * The way out, drawn as a control rather than as a place.
+   *
+   * A breadcrumb says where you *are*; the first crumb happens to be
+   * clickable, which is not the same thing as a way back and is not read as
+   * one. Screens that were opened from somewhere pass `back` and get a button
+   * that says so, at the top left where a person looks for it.
+   */
+  readonly back?: { readonly label: string; readonly onBack: () => void };
+  /**
    * Who the data belongs to, read from the artefacts.
    *
    * Optional only so a screen can render before the artefacts have loaded.
@@ -76,7 +85,7 @@ export interface ShellProps {
   readonly credits?: readonly Credit[];
 }
 
-export function Shell({ children, actions, crumbs, credits }: ShellProps) {
+export function Shell({ children, actions, crumbs, back, credits }: ShellProps) {
   return (
     <div
       style={{
@@ -157,10 +166,13 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
         {INDICATIVE}
       </div>
 
-      {crumbs !== undefined && (
+      {(crumbs !== undefined || back !== undefined) && (
         <nav
           aria-label="Breadcrumb"
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: space(4),
             padding: `${String(space(2))}px ${String(space(6))}px`,
             font: type(text.label, { leading: 1.4 }),
             color: ink.subtle,
@@ -169,6 +181,27 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
             flexShrink: 0,
           }}
         >
+          {back !== undefined && (
+            <button
+              type="button"
+              onClick={back.onBack}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: space(1),
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                border: `1px solid ${line.base}`,
+                borderRadius: radius.base,
+                background: surface.raised,
+                color: ink.strong,
+                font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              <span aria-hidden>←</span> {back.label}
+            </button>
+          )}
           {crumbs}
         </nav>
       )}
