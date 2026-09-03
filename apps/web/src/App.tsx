@@ -157,9 +157,6 @@ export function App() {
             onOpenMap={(mode) => {
               dispatch({ type: 'map-opened', ...(mode ? { mode } : {}) });
             }}
-            onFindAddress={() => {
-              dispatch({ type: 'change-address' });
-            }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
             }}
@@ -450,24 +447,13 @@ export function App() {
               })}
               {separator}
               {/*
-                Only the screens somebody actually passed through.
-                Arriving from the homepage means the address field and the
-                task question were never seen, and a trail that lists them
-                is a claim about a route nobody took -- on a product whose
-                whole argument is that it does not imply what it cannot show.
+                Two crumbs shorter since 3 September. The address field and the
+                task question are no longer on any route: the homepage opens
+                the map directly and an address is named in the map's own
+                search bar, which is where AC 1.1.2 and AC 1.1.3 put it. A
+                trail listing screens nobody can reach is a claim about a route
+                that does not exist.
               */}
-              {session.address !== null && (
-                <>
-                  {crumb('Address search', () => {
-                    dispatch({ type: 'change-address' });
-                  })}
-                  {separator}
-                  {crumb('Choose a task', () => {
-                    dispatch({ type: 'back' });
-                  })}
-                  {separator}
-                </>
-              )}
               {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
             </>
           }
@@ -491,7 +477,6 @@ export function App() {
                 },
               })
             }
-            onBack={() => dispatch({ type: 'back' })}
           />
         </Shell>
       );

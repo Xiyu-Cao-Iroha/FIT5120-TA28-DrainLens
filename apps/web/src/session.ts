@@ -30,16 +30,35 @@ import type {
 
 import type { MapMode } from './map/modes.js';
 
-/** Which screen the person is on. */
+/**
+ * Which screen the person is on.
+ *
+ * **Four of these are unreachable, and deliberately so.**
+ *
+ * `address` and `task` were the two steps between the homepage and the map.
+ * Since 3 September the homepage opens the map directly and an address is
+ * named in the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
+ * it. `scenario` and `result` are the drain-blockage comparison, which AC
+ * 1.1.1 requires to be absent from the Iteration 1 interface.
+ *
+ * All four are kept rather than deleted: their screens and tests are intact,
+ * and Iteration 2 decides whether to restore them or remove them. Nothing
+ * dispatches an event that reaches any of them, which is what makes them
+ * hidden rather than merely unvisited.
+ */
 export type Screen =
   /** What somebody lands on: what this is, before it asks anything of them. */
   | 'home'
   /** The recorded flood incidents, which are about the past and not this address. */
   | 'history'
+  /** Unreachable — the map's search bar took this over. */
   | 'address'
+  /** Unreachable — the homepage's cards took this over. */
   | 'task'
   | 'explore'
+  /** Unreachable — the comparison is out of the Iteration 1 interface. */
   | 'scenario'
+  /** Unreachable — as above. */
   | 'result'
   | 'unsupported';
 

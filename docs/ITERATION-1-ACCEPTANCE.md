@@ -52,6 +52,10 @@ Three things, and the third is a hazard rather than a feature.
 
 **What is carried over** from the 27 August criteria without re-clicking, because the code behind it did not change: 1.1.3, 1.1.6, 1.1.7, 1.2.1, 1.2.2, 1.3.2. Each was demonstrated on 1 September under its old number.
 
+**The address screen and the task question are hidden.** From 3 September the homepage's two buttons are *Explore the map* and *See flood history*, and the first opens the map directly. Nothing routes to the standalone address field or to the task chooser any more.
+
+> That moves the implementation **towards** the criteria rather than away from them. AC 1.1.2 asks the map to open from the homepage carrying its own address search bar, and AC 1.1.3 opens *"given the user is on the local map"* — both describe naming an address on the map, which is now the only way to do it. The screens and their code are kept, like the comparison, and Iteration 2 decides whether they return or go.
+
 **Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
 
 ---
@@ -97,6 +101,8 @@ Three things, and the third is a hazard rather than a feature.
 - [x] **1.1.3.e** Retain the selected address **only for the current browser session**
 - [x] **1.1.3.f** Clearly identify any missing, incomplete or uncertain information
 
+> **There is one way to name an address, and it is the map's own search bar.** The separate address screen is no longer on any route, so the criterion's *"given the user is on the local map"* is the only state it can be exercised from — which is what it describes.
+>
 > **1.1.3.e is met more strictly than it asks.** The address is held in memory for the life of the tab and in nothing else — not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. `session.test.ts` enforces this by running a whole session against traps in place of both storages, `history` and `document.cookie`, rather than by reading the source: a rule checked by grep is a rule a refactor walks around.
 >
 > *The address is also never sent*, and the reason is stronger than a guard — there is no request that could carry it. Every outbound call in `apps/web` is a `GET` of a static artefact, with no body and no query string.

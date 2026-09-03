@@ -77,7 +77,6 @@ export interface MapViewProps {
   readonly task: Task | null;
   /** A mode named on the way in, which decides what is on when the map opens. */
   readonly mode?: MapMode | null;
-  readonly onBack: () => void;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
   /** Present only where the map is the whole screen and search makes sense. */
@@ -92,7 +91,6 @@ export function MapView({
   address,
   task,
   mode = null,
-  onBack,
   panel = true,
   index,
   onAddress,
@@ -336,21 +334,6 @@ export function MapView({
                   </>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={onBack}
-                style={{
-                  marginTop: space(4),
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.label, { weight: weight.medium }),
-                  color: '#1a5d4d',
-                }}
-              >
-                ← Back to choose a task
-              </button>
             </>
           )}
         </aside>
