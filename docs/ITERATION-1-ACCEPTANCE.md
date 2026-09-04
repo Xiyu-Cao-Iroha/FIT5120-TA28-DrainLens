@@ -70,24 +70,30 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 
 **What is carried over** from the 27 August criteria without re-clicking, because the code behind it did not change: 1.1.3, 1.1.7, 1.1.8, 1.2.1, 1.2.2, 1.3.2. Each was demonstrated on 1 September under its old number.
 
-**The address screen and the task question are hidden.** From 3 September the homepage opens the map directly, and nothing routes to the standalone address field or to the task chooser any more. The hero carried two buttons that day, *Explore the map* and *See flood history*; from 4 September it carries only the first — see the mentor-feedback note below.
+**The address screen and the task question are hidden.** From 3 September the homepage opens the map directly, and nothing routes to the standalone address field or to the task chooser any more. The hero carried two buttons that day, *Explore the map* and *See flood history*; from 4 September it carries only the first, and the header carries two entries rather than five — see the mentor-feedback note below.
 
 > That moves the implementation **towards** the criteria rather than away from them. AC 1.1.2 asks the map to open from the homepage carrying its own address search bar, and AC 1.1.3 opens *"given the user is on the local map"* — both describe naming an address on the map, which is now the only way to do it. The screens and their code are kept, like the comparison, and Iteration 2 decides whether they return or go.
 
 **Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
 
-### Mentor feedback, 4 September — the first four changes
+### Mentor feedback, 4 September — six changes
 
-Four of eleven points from the mentor review are in. None of them changes a criterion's outcome; all four are recorded here because each one contradicts a sentence written above it on 3 September.
+Six of eleven points from the mentor review are in. None of them changes a criterion's outcome; all six are recorded here because each one contradicts a sentence written above it on 3 September.
 
 | # | Asked for | What changed | Criterion |
 |---|---|---|---|
+| 1 | Two entries in the header, not five | The three in-page anchors are gone; *Flood history* and *Explore map* remain | **1.1.1.c still met** — the anchors scrolled the page you were on, they were never entry points |
 | 3 | Remove the hero's *See flood history* | The hero asks for one thing. The board keeps its own way in further down the page, beside the paragraph that says what it is, and the header keeps its link | **1.1.1.c still met** — entry points, not entry buttons in one place |
+| 4 | Less text in *Start with what you want to understand* | Retitled *Four ways to understand your area*: a drawn thumbnail, a title and **one** sentence per card, and the whole card is now the button | **1.1.1.b, 1.1.2 still met** — re-clicked: the water-flow card opens the map with Water flow lit and the other three chips dark |
 | 8 | Legend at the top right | Moved from the bottom left, and it no longer places itself: it sits in the controls row and is laid out by flexbox, so a wrapped chip row pushes it instead of landing on it | **1.1.6** unaffected — the fold, the control and the per-layer basis are untouched |
 | 9 | A red pin, not a crosshair | The ring centred *on* the address became a teardrop standing beside it, tip on the point. At street zoom the ring sat over the pits and paths a person came to read | none — the address marker is named by no criterion |
 | 11 | Arrows on the water flow | An arrowhead every 46 screen pixels along each path, pointing downstream | **1.1.4.d** — still indicative paths, now with the one thing a dashed line cannot say |
 
 > **The arrows are the only one of the four that makes a new claim**, and it is a claim a reader can act on: an arrow pointing upstream is worse than no arrow. Vertex order is flow direction because `trace_channels` walks each path from its head down the D8 field one cell at a time and Douglas-Peucker drops vertices without reordering them — so that is now asserted in the pipeline's own tests (`never_runs_uphill`, `keeps_the_order_it_was_given`) rather than left as a property nobody was checking. The heading is taken in screen space, so the northing-up flip needs no correction, and that is tested too.
+>
+> **Point 4 removed sentences that were carefully written, and that is the point of recording it here.** The four cards carried two or three sentences each, and the qualifications in them — *"where a path stops because the record does rather than because the water does"*, *"not a statement that any of them has flooded or will"* — are the product's position, not filler. They are not lost: every one is still in *DrainLens does not provide* further down this page and in the per-layer basis labels on the map itself, where a person reads them next to the thing they qualify. A caveat nobody reads is not a caveat, and the mentor's observation was that nobody was reading these.
+>
+> **The card thumbnails are drawn, not screenshotted**, in the map's own palette constants rather than retyped hex — so a card cannot come to show a colour the map does not use. Nothing is fetched for them; this product loads nothing from a third party.
 >
 > **What the mentor asked for and did not get yet:** the pin's optional popup (point 9's *"甚至可以"*), which belongs with point 7's click-to-expand pit card rather than on its own.
 

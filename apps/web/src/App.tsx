@@ -16,7 +16,7 @@ import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
-import { Home, SECTIONS } from './screens/Home.js';
+import { Home } from './screens/Home.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
@@ -502,16 +502,21 @@ export function App() {
  * selection.
  */
 /**
- * The homepage's navigation.
+ * The homepage's navigation: the two places it can send you.
  *
- * In-page anchors, one link to the other page, and the button. "Flood history"
- * is a navigation item rather than an anchor because it is a different screen,
- * and it is here at all only since 3 September — until the board existed it
- * would have been a promise the site could not keep.
+ * **It used to carry three in-page anchors as well** — *What you can do*, *How
+ * it works*, *About the data* — and they are gone from 4 September. A header
+ * that mixes two kinds of control teaches neither: three of the five scrolled
+ * the page you were already on and two opened a different one, and nothing in
+ * the row said which was which. What is left is only the second kind.
  *
- * Hidden below 820px rather than collapsed into a menu. Anchors to sections on
- * a page somebody is already scrolling are not worth a drawer; the two
- * controls that go somewhere stay.
+ * They also disappeared below 820px, which meant the header a person met on a
+ * laptop and the header they met on a phone were different headers. This one
+ * is the same everywhere, which is the second reason to prefer it: the narrow
+ * layout was already the honest one.
+ *
+ * The sections themselves keep their ids — they are named by the acceptance
+ * criteria and are still there to scroll to.
  */
 function HomeNav({
   onOpenMap,
@@ -520,33 +525,8 @@ function HomeNav({
   readonly onOpenMap: () => void;
   readonly onOpenHistory: () => void;
 }) {
-  const jump = (id: string) => () => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-  const anchor = (label: string, id: string) => (
-    <button
-      key={id}
-      type="button"
-      onClick={jump(id)}
-      style={{
-        background: 'none',
-        border: 'none',
-        padding: 0,
-        font: type(text.label, { weight: weight.medium }),
-        color: ink.muted,
-      }}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
-      <span className="home-nav">
-        {anchor('What you can do', SECTIONS.paths)}
-        {anchor('How it works', SECTIONS.flow)}
-        {anchor('About the data', SECTIONS.limits)}
-      </span>
       <button
         type="button"
         onClick={onOpenHistory}
