@@ -76,13 +76,14 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 
 **Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
 
-### Mentor feedback, 4 September — six changes
+### Mentor feedback, 4 September — seven changes
 
-Six of eleven points from the mentor review are in. None of them changes a criterion's outcome; all six are recorded here because each one contradicts a sentence written above it on 3 September.
+Seven of eleven points from the mentor review are in. None of them changes a criterion's outcome; all six are recorded here because each one contradicts a sentence written above it on 3 September.
 
 | # | Asked for | What changed | Criterion |
 |---|---|---|---|
 | 1 | Two entries in the header, not five | The three in-page anchors are gone; *Flood history* and *Explore map* remain | **1.1.1.c still met** — the anchors scrolled the page you were on, they were never entry points |
+| 2 | The two homepage figures from the prototype | The framed map gains the pit card it was drawn with, pointing at a real selected pit; the flood band gains the top-five preview | **1.1.1.b strengthened** — the flood information is now introduced by showing it, not only by describing it |
 | 3 | Remove the hero's *See flood history* | The hero asks for one thing. The board keeps its own way in further down the page, beside the paragraph that says what it is, and the header keeps its link | **1.1.1.c still met** — entry points, not entry buttons in one place |
 | 4 | Less text in *Start with what you want to understand* | Retitled *Four ways to understand your area*: a drawn thumbnail, a title and **one** sentence per card, and the whole card is now the button | **1.1.1.b, 1.1.2 still met** — re-clicked: the water-flow card opens the map with Water flow lit and the other three chips dark |
 | 8 | Legend at the top right | Moved from the bottom left, and it no longer places itself: it sits in the controls row and is laid out by flexbox, so a wrapped chip row pushes it instead of landing on it | **1.1.6** unaffected — the fold, the control and the per-layer basis are untouched |
@@ -90,6 +91,10 @@ Six of eleven points from the mentor review are in. None of them changes a crite
 | 11 | Arrows on the water flow | An arrowhead every 46 screen pixels along each path, pointing downstream | **1.1.4.d** — still indicative paths, now with the one thing a dashed line cannot say |
 
 > **The arrows are the only one of the four that makes a new claim**, and it is a claim a reader can act on: an arrow pointing upstream is worse than no arrow. Vertex order is flow direction because `trace_channels` walks each path from its head down the D8 field one cell at a time and Douglas-Peucker drops vertices without reordering them — so that is now asserted in the pipeline's own tests (`never_runs_uphill`, `keeps_the_order_it_was_given`) rather than left as a property nobody was checking. The heading is taken in screen space, so the northing-up flip needs no correction, and that is tested too.
+>
+> **Point 2's second figure was a mock with invented numbers, and it is not shipped that way.** The prototype drew the ranking as *Area A … Area E* with totals of 42, 35, 30, 25 and 20, under the line *"Illustrative layout · exact period confirmed from source data"* — it was drawn before the data was verified and said so. What ships reads the same artefact the board reads, scaled by the same `barScale`, so the homepage shows **Bacchus Marsh 209, Croydon 196, Eltham 179, Boronia - The Basin 160+, Dandenong 133+**. Two things travel with those numbers because they must: the reporting period with its source, and the `+` on a total containing a count the publisher withheld. Putting five fabricated suburb rankings on the front page of this product was never an option; the mock's own footnote said as much.
+>
+> **The pit card names no asset number**, although the pit it points at is a real one — `previewPit` centres the frame on the pit nearest the middle of the extent **that has a pipe recorded leaving it**, because the card says *Show connected pipe*. The map already draws the number on the marker; printing it again six pixels away reads as two pits. The rule is small enough to get wrong silently, so it is tested (`FramedMap.test.ts`), including the case where the nearer pit is the unconnected one.
 >
 > **Point 4 removed sentences that were carefully written, and that is the point of recording it here.** The four cards carried two or three sentences each, and the qualifications in them — *"where a path stops because the record does rather than because the water does"*, *"not a statement that any of them has flooded or will"* — are the product's position, not filler. They are not lost: every one is still in *DrainLens does not provide* further down this page and in the per-layer basis labels on the map itself, where a person reads them next to the thing they qualify. A caveat nobody reads is not a caveat, and the mentor's observation was that nobody was reading these.
 >

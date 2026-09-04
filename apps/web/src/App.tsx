@@ -154,6 +154,7 @@ export function App() {
           <Home
             artefact={loaded.map}
             derived={loaded.derived}
+            history={loaded.history}
             onOpenMap={(mode) => {
               dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
             }}

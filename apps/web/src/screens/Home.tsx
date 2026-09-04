@@ -30,6 +30,12 @@ import { useState } from 'react';
 
 import type { DerivedArtefact } from '../map/derived.js';
 import { DERIVED_DAY } from '../map/derived.js';
+import {
+  type FloodHistoryArtefact,
+  barScale,
+  defaultView,
+  periodLabel,
+} from '../history/artefact.js';
 import type { MapArtefact } from '../map/artefact.js';
 import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
@@ -138,12 +144,13 @@ const WITHHOLDS: readonly string[] = [
 export interface HomeProps {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
+  readonly history: FloodHistoryArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
 }
 
-export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps) {
+export function Home({ artefact, derived, history, onOpenMap, onOpenHistory }: HomeProps) {
   return (
     <div>
       {/*
@@ -158,7 +165,7 @@ export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps)
           onOpenMap();
         }}
       />
-      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} />
+      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} history={history} />
       <Flow />
       <Limits />
       <ClosingNote />
@@ -606,12 +613,135 @@ function PathCard({
   );
 }
 
+/**
+ * The top of the flood board, on the homepage.
+ *
+ * **The numbers are the real ones**, read from the same artefact the board
+ * reads and scaled with the same `barScale`, so a bar here and a bar there
+ * mean the same thing. The layout this follows was drawn as a mock with
+ * *Area A … Area E* and invented totals, back when the data had not been
+ * verified; shipping that mock with its placeholders would put five fabricated
+ * suburb rankings on the front page of a product whose entire position is that
+ * it does not overstate what it knows.
+ *
+ * **Two things travel with the numbers or the numbers do not go.** The period
+ * and the source, because a league table of suburbs with nothing qualifying it
+ * is the one shape this data must never take — the same rule
+ * `assertFloodHistory` enforces at load. And the `+` on an incomplete total,
+ * because nine of the thirty areas contain a count the publisher withheld, and
+ * a floor shown as an exact figure is a wrong number rather than a rounded one.
+ *
+ * It is a preview, not a second board: no per-year sparkline, no tie flags, no
+ * *what a count means*. Those are on the page this links to, which is one
+ * press away and says all of it.
+ */
+function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
+  const top = defaultView(artefact);
+  const scale = barScale(artefact);
+  if (top.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: space(5) }}>
+      <ol
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          background: surface.raised,
+          border: `1px solid ${line.base}`,
+          borderRadius: radius.large,
+          overflow: 'hidden',
+        }}
+      >
+        {top.map((area) => (
+          <li
+            key={area.name}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto minmax(96px, 0.9fr) 1.6fr auto',
+              alignItems: 'center',
+              gap: space(3),
+              padding: `${String(space(3))}px ${String(space(4))}px`,
+              borderTop: area.rank === 1 ? 'none' : `1px solid ${line.hair}`,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 20,
+                textAlign: 'right',
+                font: type(text.small, { weight: weight.semibold }),
+                color: ink.subtle,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {area.rank}
+            </span>
+            <span
+              style={{
+                font: type(text.label, { weight: weight.semibold, leading: 1.3 }),
+                color: ink.strong,
+              }}
+            >
+              {area.name}
+            </span>
+            <span
+              aria-hidden
+              style={{
+                height: 8,
+                borderRadius: radius.pill,
+                background: surface.sunken,
+                overflow: 'hidden',
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  height: '100%',
+                  width: `${String(Math.max(2, Math.round((100 * area.total) / scale)))}%`,
+                  background: brand.base,
+                  borderRadius: radius.pill,
+                }}
+              />
+            </span>
+            <strong
+              style={{
+                minWidth: 40,
+                textAlign: 'right',
+                font: type(text.label, { weight: weight.semibold }),
+                color: ink.strong,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {area.total.toLocaleString()}
+              {!area.complete && <span style={{ color: ink.subtle }}>+</span>}
+            </strong>
+          </li>
+        ))}
+      </ol>
+      <p
+        style={{
+          margin: `${String(space(3))}px 0 0`,
+          font: type(text.small, { leading: 1.5 }),
+          color: ink.subtle,
+        }}
+      >
+        {artefact.incidentType} incidents recorded by {artefact.source.publisher}, {periodLabel(artefact)},
+        by {artefact.geography.unit} across {artefact.geography.scope}. A <strong>+</strong> means a
+        count inside that area was withheld, so the total is a floor.
+      </p>
+    </div>
+  );
+}
+
 function Paths({
   onOpenMap,
   onOpenHistory,
+  history,
 }: {
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  readonly history: FloodHistoryArtefact;
 }) {
   return (
     <Band tone="raised" id={SECTIONS.paths}>
@@ -647,10 +777,6 @@ function Paths({
       */}
       <article
         style={{
-          display: 'flex',
-          gap: space(5),
-          alignItems: 'center',
-          flexWrap: 'wrap',
           marginTop: space(6),
           padding: space(5),
           background: brand.wash,
@@ -658,38 +784,49 @@ function Paths({
           borderRadius: radius.large,
         }}
       >
-        <span style={{ flex: '1 1 320px' }}>
-          <h3
-            style={{
-              margin: `0 0 ${String(space(2))}px`,
-              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-              letterSpacing: tracking.title,
-              color: ink.strong,
-            }}
-          >
-            Recorded flood incidents across Greater Melbourne
-          </h3>
-          <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-            Which areas called the State Emergency Service about flooding most often between
-            2009-10 and 2014-15, what a count actually means, and why it is not a measure of how
-            bad the flooding was. This one is about the past, and about the whole city rather
-            than the pilot area.
-          </p>
-        </span>
-        <button
-          type="button"
-          onClick={onOpenHistory}
+        <div
           style={{
-            padding: `${String(space(3))}px ${String(space(5))}px`,
-            border: 'none',
-            borderRadius: radius.base,
-            background: brand.base,
-            color: ink.inverse,
-            font: type(text.label, { weight: weight.semibold }),
+            display: 'flex',
+            gap: space(5),
+            alignItems: 'center',
+            flexWrap: 'wrap',
           }}
         >
-          See flood history →
-        </button>
+          <span style={{ flex: '1 1 320px' }}>
+            <h3
+              style={{
+                margin: `0 0 ${String(space(2))}px`,
+                font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+                letterSpacing: tracking.title,
+                color: ink.strong,
+              }}
+            >
+              Recorded flood incidents across {history.geography.scope}
+            </h3>
+            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
+              Which areas called the State Emergency Service about flooding most often across{' '}
+              {periodLabel(history)}, what a count actually means, and why it is not a measure of
+              how bad the flooding was. This one is about the past, and about the whole city
+              rather than the pilot area.
+            </p>
+          </span>
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            style={{
+              padding: `${String(space(3))}px ${String(space(5))}px`,
+              border: 'none',
+              borderRadius: radius.base,
+              background: brand.base,
+              color: ink.inverse,
+              font: type(text.label, { weight: weight.semibold }),
+            }}
+          >
+            See flood history →
+          </button>
+        </div>
+
+        <FloodPreview artefact={history} />
       </article>
 
       {/*
