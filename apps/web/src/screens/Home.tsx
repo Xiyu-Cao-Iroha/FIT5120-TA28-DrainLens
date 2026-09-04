@@ -29,9 +29,18 @@
 import { useState } from 'react';
 
 import type { DerivedArtefact } from '../map/derived.js';
+import { DERIVED_DAY } from '../map/derived.js';
+import {
+  type FloodHistoryArtefact,
+  barScale,
+  defaultView,
+  periodLabel,
+} from '../history/artefact.js';
 import type { MapArtefact } from '../map/artefact.js';
+import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
+import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from '../map/terrain.js';
 import { PilotBadge } from '../ui/Shell.js';
 import {
   basis as basisTone,
@@ -57,45 +66,50 @@ export const SECTIONS = {
 /**
  * The four ways into the map, one per mode.
  *
- * The accents are the colours those layers are actually drawn in, so the card
- * a person pressed is recognisable in the map that opens. Water flow and low
- * areas are both blue because both are blue on the map; correcting that here
- * would make the homepage prettier and the map harder to read back.
+ * The accents are the colours those layers are actually drawn in, and they are
+ * imported from the map's own palettes rather than retyped, so the card a
+ * person pressed is recognisable in the map that opens and cannot drift from
+ * it. Water flow and low areas are both blue because both are blue on the map;
+ * correcting that here would make the homepage prettier and the map harder to
+ * read back. They are told apart by the shape of the picture instead.
+ *
+ * **One sentence each, from 4 September.** These carried two or three, and the
+ * mentor review's fourth point was that nobody reads them — which is worse
+ * than it sounds, because the sentences being skipped were the careful ones.
+ * The qualifications are not gone: what a layer is and is not stays on the map
+ * beside the layer (*Official recorded data* / *System-derived result*), and
+ * *DrainLens does not provide* further down this page still says, in full, that
+ * there are no forecasts and no depths. A caveat nobody reads is not a caveat.
  */
 const PATHS: readonly {
   readonly mode: MapMode;
   readonly title: string;
   readonly body: string;
-  readonly action: string;
   readonly accent: string;
 }[] = [
   {
     mode: 'drainage',
     title: 'Recorded drainage',
-    body: 'The public pits and pipes the council has a record of, and where a path stops because the record does rather than because the water does.',
-    action: 'Open drainage',
-    accent: '#1f6f5c',
+    body: 'The public pits and pipes the council has a record of.',
+    accent: DAY.pit,
   },
   {
     mode: 'water-flow',
     title: 'Where rainwater may move',
-    body: 'Indicative surface-water paths calculated from measured ground. They say which way water tends to run, not how much of it or how deep.',
-    action: 'Open water flow',
-    accent: '#2f7fb8',
+    body: 'Likely surface-water paths, calculated from measured ground.',
+    accent: DERIVED_DAY.channel,
   },
   {
     mode: 'terrain',
     title: 'The shape of the ground',
-    body: 'Elevation shading across the pilot area, so you can see which way is downhill from a street before reading anything else over it.',
-    action: 'Open terrain',
-    accent: '#6c8c9e',
+    body: 'Elevation shading, so you can see which way is downhill.',
+    accent: RAMP_LOW_HEX,
   },
   {
     mode: 'low-areas',
     title: 'Low points and depressions',
-    body: 'Places the calculated surface says water can collect. Indicative, and not a statement that any of them has flooded or will.',
-    action: 'Open low areas',
-    accent: '#5aa0cd',
+    body: 'Places the calculated surface says water can collect.',
+    accent: DERIVED_DAY.lowPointEdge,
   },
 ];
 
@@ -130,12 +144,13 @@ const WITHHOLDS: readonly string[] = [
 export interface HomeProps {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
+  readonly history: FloodHistoryArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
 }
 
-export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps) {
+export function Home({ artefact, derived, history, onOpenMap, onOpenHistory }: HomeProps) {
   return (
     <div>
       {/*
@@ -149,9 +164,8 @@ export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps)
         onOpenMap={() => {
           onOpenMap();
         }}
-        onOpenHistory={onOpenHistory}
       />
-      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} />
+      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} history={history} />
       <Flow />
       <Limits />
       <ClosingNote />
@@ -275,39 +289,6 @@ function PrimaryButton({
   );
 }
 
-function QuietButton({
-  label,
-  onPress,
-}: {
-  readonly label: string;
-  readonly onPress: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onPress}
-      onMouseEnter={() => {
-        setHovered(true);
-      }}
-      onMouseLeave={() => {
-        setHovered(false);
-      }}
-      style={{
-        padding: `${String(space(3))}px ${String(space(5))}px`,
-        font: type(text.body, { weight: weight.semibold }),
-        color: brand.ink,
-        background: hovered ? brand.wash : surface.raised,
-        border: `1px solid ${hovered ? brand.tint : line.strong}`,
-        borderRadius: radius.base,
-        transition: 'background-color 120ms ease, border-color 120ms ease',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
 function TickMark() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
@@ -328,12 +309,10 @@ function Hero({
   artefact,
   derived,
   onOpenMap,
-  onOpenHistory,
 }: {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
   readonly onOpenMap: () => void;
-  readonly onOpenHistory: () => void;
 }) {
   return (
     <section style={{ background: surface.page }}>
@@ -361,9 +340,18 @@ function Hero({
             water is likely to run around a local address.
           </p>
 
+          {/*
+            One button, not two.
+
+            The hero used to offer the map and the flood history side by side,
+            which made the first decision on the page a choice between two
+            things a first-time reader cannot yet tell apart. The flood board
+            keeps its own way in further down the page, where the paragraph
+            beside it has had a chance to say what it is; here the page asks
+            for one thing.
+          */}
           <div style={{ display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
             <PrimaryButton label="Explore the map →" onPress={onOpenMap} />
-            <QuietButton label="See flood history" onPress={onOpenHistory} />
           </div>
 
           <div
@@ -395,77 +383,388 @@ function Hero({
   );
 }
 
+/**
+ * The picture on each card, drawn rather than photographed.
+ *
+ * Four small SVGs, in the map's own colours, on the map's own ground tint.
+ * They are not screenshots: a screenshot of the pilot square kilometre at
+ * thumbnail size is a grey smear, and it would also go stale silently the
+ * next time the artefacts are rebuilt. These say what the *mark* looks like —
+ * dots and lines, arrows, a ramp, pooled shapes — which is the thing a person
+ * has to recognise when the map opens.
+ *
+ * No external images, and none fetched: this product loads nothing from a
+ * third party, and four thumbnails are not the place to start.
+ */
+function PathThumb({ mode }: { readonly mode: MapMode }) {
+  const frame = { width: '100%', height: 104, display: 'block' } as const;
+  const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
+
+  if (mode === 'drainage') {
+    return (
+      <svg {...common}>
+        <rect width="200" height="104" fill={DAY.ground} />
+        <path d="M-8 74h216M64 -8v120M110 -12 214 92" stroke={DAY.road} strokeWidth="13" fill="none" />
+        <path
+          d="M20 74h96M64 74V26M64 74l52 12M116 86h56"
+          stroke={DAY.pipe}
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {[
+          [20, 74],
+          [64, 74],
+          [64, 26],
+          [116, 86],
+          [172, 86],
+        ].map(([cx, cy]) => (
+          <circle
+            key={`${String(cx)}-${String(cy)}`}
+            cx={cx}
+            cy={cy}
+            r="5"
+            fill={DAY.pitEdge}
+            stroke={DAY.pit}
+            strokeWidth="2.4"
+          />
+        ))}
+      </svg>
+    );
+  }
+
+  if (mode === 'water-flow') {
+    // Straight segments converging on one outlet, so each arrowhead's angle is
+    // arithmetic rather than a hand-tuned rotation. The card is advertising the
+    // one thing the map's arrows say — which way — so a head at the wrong angle
+    // would be the exact mistake this picture exists to avoid.
+    const flows = [
+      [6, 12, 178, 44],
+      [6, 44, 178, 50],
+      [6, 74, 178, 56],
+      [6, 98, 178, 62],
+    ] as const;
+    return (
+      <svg {...common}>
+        <rect width="200" height="104" fill={DAY.ground} />
+        {flows.map(([x1, y1, x2, y2]) => {
+          const degrees = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+          const heads = [0.42, 0.78].map((at) => [
+            x1 + (x2 - x1) * at,
+            y1 + (y2 - y1) * at,
+          ]);
+          return (
+            <g key={`${String(x1)}-${String(y1)}`}>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={DERIVED_DAY.channel}
+                strokeWidth="2"
+                strokeDasharray="7 5"
+                strokeLinecap="round"
+              />
+              {/* Filled, exactly as they are on the map. */}
+              {heads.map(([hx, hy]) => (
+                <path
+                  key={`${String(hx)}-${String(hy)}`}
+                  d="M4 0 -4 4 -4 -4Z"
+                  fill={DERIVED_DAY.channel}
+                  transform={`translate(${String(hx)} ${String(hy)}) rotate(${String(degrees)})`}
+                />
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (mode === 'terrain') {
+    return (
+      <svg {...common}>
+        <defs>
+          <linearGradient id="drainlens-thumb-ramp" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stopColor={RAMP_LOW_HEX} />
+            <stop offset="1" stopColor={RAMP_HIGH_HEX} />
+          </linearGradient>
+        </defs>
+        <rect width="200" height="104" fill="url(#drainlens-thumb-ramp)" />
+        {[18, 40, 62, 84].map((offset) => (
+          <path
+            key={offset}
+            d={`M-10 ${String(offset + 26)}q50 -26 100 -18t110 -22`}
+            fill="none"
+            stroke="rgba(255,255,255,0.42)"
+            strokeWidth="1.6"
+          />
+        ))}
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...common}>
+      <rect width="200" height="104" fill={DAY.ground} />
+      <path d="M0 62h200M92 0v104" stroke={DAY.road} strokeWidth="12" fill="none" />
+      {(
+        [
+          [56, 34, 21, 13],
+          [128, 74, 26, 15],
+          [154, 30, 14, 9],
+        ] as const
+      ).map(([cx, cy, rx, ry]) => (
+        <g key={`${String(cx)}-${String(cy)}`}>
+          <ellipse
+            cx={cx}
+            cy={cy}
+            rx={rx}
+            ry={ry}
+            fill={DERIVED_DAY.lowPoint}
+            stroke={DERIVED_DAY.lowPointEdge}
+            strokeWidth="1.6"
+            strokeDasharray="3 3"
+          />
+          <ellipse cx={cx} cy={cy} rx={rx * 0.5} ry={ry * 0.5} fill={DERIVED_DAY.lowPoint} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * One way in, as a card you press rather than a card with a link in it.
+ *
+ * **The whole card is the button.** It used to be a heading, a paragraph and
+ * an *Open drainage →* link at the bottom, which makes the target the size of
+ * a line of text inside a target the size of a card. A person pointing at the
+ * picture and pressing is doing the obvious thing, and the obvious thing did
+ * nothing.
+ *
+ * The accent survives from the older design as the strip under the picture:
+ * it is the colour the layer is drawn in, and it is the fastest way to
+ * recognise the card you pressed in the map that opens.
+ */
+function PathCard({
+  path,
+  onOpen,
+}: {
+  readonly path: (typeof PATHS)[number];
+  readonly onOpen: () => void;
+}) {
+  const [raised, setRaised] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onMouseEnter={() => {
+        setRaised(true);
+      }}
+      onMouseLeave={() => {
+        setRaised(false);
+      }}
+      onFocus={() => {
+        setRaised(true);
+      }}
+      onBlur={() => {
+        setRaised(false);
+      }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        textAlign: 'left',
+        overflow: 'hidden',
+        background: surface.raised,
+        border: `1px solid ${raised ? path.accent : line.base}`,
+        borderRadius: radius.large,
+        boxShadow: raised ? shadow.lifted : shadow.resting,
+        padding: 0,
+        font: 'inherit',
+        color: 'inherit',
+        transition: 'box-shadow 120ms ease, border-color 120ms ease',
+      }}
+    >
+      <PathThumb mode={path.mode} />
+      <span style={{ display: 'block', height: 3, background: path.accent }} />
+      <span style={{ display: 'block', padding: space(5) }}>
+        <span
+          style={{
+            display: 'block',
+            marginBottom: space(2),
+            font: type(text.body, { weight: weight.semibold, leading: 1.3 }),
+            letterSpacing: tracking.title,
+            color: ink.strong,
+          }}
+        >
+          {path.title}
+        </span>
+        <span
+          style={{
+            display: 'block',
+            font: type(text.label, { leading: 1.55 }),
+            color: ink.muted,
+          }}
+        >
+          {path.body}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The top of the flood board, on the homepage.
+ *
+ * **The numbers are the real ones**, read from the same artefact the board
+ * reads and scaled with the same `barScale`, so a bar here and a bar there
+ * mean the same thing. The layout this follows was drawn as a mock with
+ * *Area A … Area E* and invented totals, back when the data had not been
+ * verified; shipping that mock with its placeholders would put five fabricated
+ * suburb rankings on the front page of a product whose entire position is that
+ * it does not overstate what it knows.
+ *
+ * **Two things travel with the numbers or the numbers do not go.** The period
+ * and the source, because a league table of suburbs with nothing qualifying it
+ * is the one shape this data must never take — the same rule
+ * `assertFloodHistory` enforces at load. And the `+` on an incomplete total,
+ * because nine of the thirty areas contain a count the publisher withheld, and
+ * a floor shown as an exact figure is a wrong number rather than a rounded one.
+ *
+ * It is a preview, not a second board: no per-year sparkline, no tie flags, no
+ * *what a count means*. Those are on the page this links to, which is one
+ * press away and says all of it.
+ */
+function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
+  const top = defaultView(artefact);
+  const scale = barScale(artefact);
+  if (top.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: space(5) }}>
+      <ol
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          background: surface.raised,
+          border: `1px solid ${line.base}`,
+          borderRadius: radius.large,
+          overflow: 'hidden',
+        }}
+      >
+        {top.map((area) => (
+          <li
+            key={area.name}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto minmax(96px, 0.9fr) 1.6fr auto',
+              alignItems: 'center',
+              gap: space(3),
+              padding: `${String(space(3))}px ${String(space(4))}px`,
+              borderTop: area.rank === 1 ? 'none' : `1px solid ${line.hair}`,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 20,
+                textAlign: 'right',
+                font: type(text.small, { weight: weight.semibold }),
+                color: ink.subtle,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {area.rank}
+            </span>
+            <span
+              style={{
+                font: type(text.label, { weight: weight.semibold, leading: 1.3 }),
+                color: ink.strong,
+              }}
+            >
+              {area.name}
+            </span>
+            <span
+              aria-hidden
+              style={{
+                height: 8,
+                borderRadius: radius.pill,
+                background: surface.sunken,
+                overflow: 'hidden',
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  height: '100%',
+                  width: `${String(Math.max(2, Math.round((100 * area.total) / scale)))}%`,
+                  background: brand.base,
+                  borderRadius: radius.pill,
+                }}
+              />
+            </span>
+            <strong
+              style={{
+                minWidth: 40,
+                textAlign: 'right',
+                font: type(text.label, { weight: weight.semibold }),
+                color: ink.strong,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {area.total.toLocaleString()}
+              {!area.complete && <span style={{ color: ink.subtle }}>+</span>}
+            </strong>
+          </li>
+        ))}
+      </ol>
+      <p
+        style={{
+          margin: `${String(space(3))}px 0 0`,
+          font: type(text.small, { leading: 1.5 }),
+          color: ink.subtle,
+        }}
+      >
+        {artefact.incidentType} incidents recorded by {artefact.source.publisher}, {periodLabel(artefact)},
+        by {artefact.geography.unit} across {artefact.geography.scope}. A <strong>+</strong> means a
+        count inside that area was withheld, so the total is a floor.
+      </p>
+    </div>
+  );
+}
+
 function Paths({
   onOpenMap,
   onOpenHistory,
+  history,
 }: {
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  readonly history: FloodHistoryArtefact;
 }) {
   return (
     <Band tone="raised" id={SECTIONS.paths}>
       <SectionHeading
-        title="Start with what you want to understand."
-        body="Four ways in, each opening the same map with a different question already asked. None of them makes you learn the whole map first, and every one of them can be switched to the others once you are there."
+        eyebrow="What you can explore"
+        title="Four ways to understand your area"
+        body="Each one shows a different piece of the picture, and opens the same map with that question already asked. You can turn them on and off at any time once you are there."
       />
       <div
         style={{
           display: 'grid',
           gap: space(5),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
         }}
       >
         {PATHS.map((path) => (
-          <article
+          <PathCard
             key={path.title}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              background: surface.raised,
-              border: `1px solid ${line.base}`,
-              borderTop: `3px solid ${path.accent}`,
-              borderRadius: radius.large,
-              boxShadow: shadow.resting,
-              padding: space(5),
+            path={path}
+            onOpen={() => {
+              onOpenMap(path.mode);
             }}
-          >
-            <h3
-              style={{
-                margin: `0 0 ${String(space(2))}px`,
-                font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-                letterSpacing: tracking.title,
-                color: ink.strong,
-              }}
-            >
-              {path.title}
-            </h3>
-            <p
-              style={{
-                margin: `0 0 ${String(space(5))}px`,
-                flex: 1,
-                font: type(text.label, { leading: 1.6 }),
-                color: ink.muted,
-              }}
-            >
-              {path.body}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onOpenMap(path.mode);
-              }}
-              style={{
-                alignSelf: 'flex-start',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                font: type(text.label, { weight: weight.semibold }),
-                color: brand.ink,
-              }}
-            >
-              {path.action} →
-            </button>
-          </article>
+          />
         ))}
       </div>
 
@@ -478,10 +777,6 @@ function Paths({
       */}
       <article
         style={{
-          display: 'flex',
-          gap: space(5),
-          alignItems: 'center',
-          flexWrap: 'wrap',
           marginTop: space(6),
           padding: space(5),
           background: brand.wash,
@@ -489,38 +784,49 @@ function Paths({
           borderRadius: radius.large,
         }}
       >
-        <span style={{ flex: '1 1 320px' }}>
-          <h3
-            style={{
-              margin: `0 0 ${String(space(2))}px`,
-              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-              letterSpacing: tracking.title,
-              color: ink.strong,
-            }}
-          >
-            Recorded flood incidents across Greater Melbourne
-          </h3>
-          <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-            Which areas called the State Emergency Service about flooding most often between
-            2009-10 and 2014-15, what a count actually means, and why it is not a measure of how
-            bad the flooding was. This one is about the past, and about the whole city rather
-            than the pilot area.
-          </p>
-        </span>
-        <button
-          type="button"
-          onClick={onOpenHistory}
+        <div
           style={{
-            padding: `${String(space(3))}px ${String(space(5))}px`,
-            border: 'none',
-            borderRadius: radius.base,
-            background: brand.base,
-            color: ink.inverse,
-            font: type(text.label, { weight: weight.semibold }),
+            display: 'flex',
+            gap: space(5),
+            alignItems: 'center',
+            flexWrap: 'wrap',
           }}
         >
-          See flood history →
-        </button>
+          <span style={{ flex: '1 1 320px' }}>
+            <h3
+              style={{
+                margin: `0 0 ${String(space(2))}px`,
+                font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+                letterSpacing: tracking.title,
+                color: ink.strong,
+              }}
+            >
+              Recorded flood incidents across {history.geography.scope}
+            </h3>
+            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
+              Which areas called the State Emergency Service about flooding most often across{' '}
+              {periodLabel(history)}, what a count actually means, and why it is not a measure of
+              how bad the flooding was. This one is about the past, and about the whole city
+              rather than the pilot area.
+            </p>
+          </span>
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            style={{
+              padding: `${String(space(3))}px ${String(space(5))}px`,
+              border: 'none',
+              borderRadius: radius.base,
+              background: brand.base,
+              color: ink.inverse,
+              font: type(text.label, { weight: weight.semibold }),
+            }}
+          >
+            See flood history →
+          </button>
+        </div>
+
+        <FloodPreview artefact={history} />
       </article>
 
       {/*

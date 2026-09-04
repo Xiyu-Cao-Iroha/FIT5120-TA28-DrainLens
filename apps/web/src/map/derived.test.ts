@@ -15,9 +15,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
 import {
+  ARROW_MIN_PATH_PX,
+  ARROW_SPACING_PX,
   type DerivedArtefact,
   DerivedError,
   HATCH_SPACING_PX,
+  arrowsAlong,
   assertDerived,
   drawDerived,
 } from './derived.js';
@@ -274,5 +277,137 @@ describe('what is drawn and what is not', () => {
     const lastStroke = context.calls.map((call) => call.op).lastIndexOf('stroke');
     expect(firstFill).toBeGreaterThan(-1);
     expect(lastStroke).toBeGreaterThan(firstFill);
+  });
+});
+
+/**
+ * The arrows on the surface-water paths.
+ *
+ * These are the one mark on this map that makes a claim a dashed line does
+ * not: *which way*. An arrow pointing the wrong way is worse than no arrow,
+ * because a person can act on it — so what is tested here is the heading, not
+ * that arrowheads exist.
+ */
+describe('which way the water runs', () => {
+  const horizontal = (length: number) =>
+    [
+      [0, 0],
+      [length, 0],
+    ] as const;
+
+  it('points along the vertex order, which is downstream', () => {
+    // `trace_channels` walks head to outlet, so later vertices are further
+    // down. Both directions are checked: a bug that ignores the order
+    // entirely would pass one of them by luck.
+    const east = arrowsAlong(horizontal(400));
+    for (const arrow of east) expect(Math.cos(arrow.angle)).toBeGreaterThan(0.99);
+
+    const west = arrowsAlong([
+      [400, 0],
+      [0, 0],
+    ]);
+    for (const arrow of west) expect(Math.cos(arrow.angle)).toBeLessThan(-0.99);
+  });
+
+  it('turns with the path rather than pointing at the outlet', () => {
+    // A path that runs east and then south is not one heading averaged; the
+    // arrow on each leg belongs to that leg.
+    const bend = arrowsAlong(
+      [
+        [0, 0],
+        [200, 0],
+        [200, 200],
+      ],
+      50,
+    );
+    const headings = bend.map((a) => Math.round((a.angle * 180) / Math.PI));
+    expect(headings).toContain(0);
+    expect(headings).toContain(90);
+  });
+
+  it('spaces them evenly along the line', () => {
+    const arrows = arrowsAlong(horizontal(400), 100);
+    const gaps = arrows.slice(1).map((a, i) => a.x - (arrows[i]?.x ?? 0));
+    for (const gap of gaps) expect(gap).toBeCloseTo(100);
+  });
+
+  it('keeps the spacing in screen pixels, so density does not change with zoom', () => {
+    // The same channel drawn twice as large gets twice as many arrows. The
+    // alternative — spacing in metres — is a solid row of heads when zoomed
+    // out and none at all when zoomed in.
+    const near = arrowsAlong(horizontal(400));
+    const far = arrowsAlong(horizontal(800));
+    // Within one, not exactly double: both ends are inset by half a spacing,
+    // so the count is the length over the spacing give or take the tail.
+    expect(Math.abs(far.length - near.length * 2)).toBeLessThanOrEqual(1);
+  });
+
+  it('gives a short path one arrow rather than none', () => {
+    // A path shorter than the spacing would otherwise fall between two marks
+    // and be the only unlabelled line on the screen.
+    const length = (ARROW_MIN_PATH_PX + ARROW_SPACING_PX) / 2;
+    const short = arrowsAlong(horizontal(length));
+    expect(short).toHaveLength(1);
+    expect(short[0]?.x).toBeCloseTo(length / 2);
+  });
+
+  it('leaves a path too short to read unmarked', () => {
+    expect(arrowsAlong(horizontal(ARROW_MIN_PATH_PX - 1))).toHaveLength(0);
+    expect(arrowsAlong([[0, 0]])).toHaveLength(0);
+    expect(arrowsAlong([])).toHaveLength(0);
+  });
+
+  it('ignores a repeated vertex instead of dividing by zero', () => {
+    const arrows = arrowsAlong([
+      [0, 0],
+      [0, 0],
+      [400, 0],
+    ]);
+    expect(arrows.length).toBeGreaterThan(0);
+    for (const arrow of arrows) expect(Number.isFinite(arrow.angle)).toBe(true);
+  });
+
+  it('draws them downhill on the canvas, with northing-up already flipped', () => {
+    // The one place the sign can go wrong. A channel running from high
+    // northing to low is running south, which on a canvas is *down* the
+    // screen, and the arrow has to agree with the line it sits on.
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ channel: [line([[500, 900], [500, 100]])] }),
+      view,
+      { show: { channel: true, lowPoint: false, unavailable: false } },
+    );
+
+    const heads = context.calls.filter((call) => call.op === 'moveTo' && call.dash.length === 0);
+    expect(heads.length).toBeGreaterThan(0);
+
+    // Each arrowhead is moveTo(nose) then two lineTo(corners). The nose is
+    // below both corners when the arrow points down the screen.
+    for (const head of heads) {
+      const at = context.calls.indexOf(head);
+      const corners = context.calls.slice(at + 1, at + 3);
+      expect(corners.every((c) => c.op === 'lineTo')).toBe(true);
+      const noseY = head.args[1] as number;
+      for (const corner of corners) expect(noseY).toBeGreaterThan(corner.args[1] as number);
+    }
+  });
+
+  it('fills the heads rather than stroking them, so they stay solid under a dashed line', () => {
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ channel: [line([[100, 100], [900, 900]])] }),
+      view,
+      { show: { channel: true, lowPoint: false, unavailable: false } },
+    );
+    // The line's own strokes keep their dash — the rule the whole file is
+    // about — and the heads are fills with no dash in force.
+    for (const call of context.calls.filter((c) => c.op === 'stroke')) {
+      expect(call.dash.length).toBeGreaterThan(0);
+    }
+    const fills = context.calls.filter((c) => c.op === 'fill');
+    expect(fills.length).toBeGreaterThan(0);
+    for (const fill of fills) expect(fill.dash).toHaveLength(0);
   });
 });

@@ -76,6 +76,15 @@ export interface ShellProps {
    */
   readonly back?: { readonly label: string; readonly onBack: () => void };
   /**
+   * The right-hand end of the breadcrumb row.
+   *
+   * One caller uses it, for the map's *tutorial* control. It is here rather
+   * than in `actions` because the header is the site's own furniture — name,
+   * navigation — and this is a control that belongs to one screen. The
+   * prototype put it on this row for the same reason.
+   */
+  readonly trailing?: ReactNode;
+  /**
    * Who the data belongs to, read from the artefacts.
    *
    * Optional only so a screen can render before the artefacts have loaded.
@@ -85,7 +94,7 @@ export interface ShellProps {
   readonly credits?: readonly Credit[];
 }
 
-export function Shell({ children, actions, crumbs, back, credits }: ShellProps) {
+export function Shell({ children, actions, crumbs, back, trailing, credits }: ShellProps) {
   return (
     <div
       style={{
@@ -203,6 +212,9 @@ export function Shell({ children, actions, crumbs, back, credits }: ShellProps) 
             </button>
           )}
           {crumbs}
+          {trailing !== undefined && (
+            <span style={{ marginLeft: 'auto', display: 'inline-flex' }}>{trailing}</span>
+          )}
         </nav>
       )}
 

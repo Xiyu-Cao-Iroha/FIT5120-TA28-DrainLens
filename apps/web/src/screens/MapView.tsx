@@ -197,10 +197,19 @@ export function MapView({
             {index && onAddress && <MapSearch index={index} address={address} onPick={onAddress} />}
             <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
           </div>
+
+          {/*
+            The legend, at the top right and in the same row as the controls
+            rather than pinned to a corner of its own. Two absolutely
+            positioned overlays cannot see each other, so on a narrow window
+            the chips wrapped onto a second line and landed on top of it. Here
+            flexbox keeps them apart: `marginLeft: auto` holds the legend to
+            the right, and if there is no room for both it wraps below the
+            chips instead of under them.
+          */}
+          <MapLegend state={layers} />
         </div>
       )}
-
-      {panel && <MapLegend state={layers} />}
 
       {panel && (
         <aside
@@ -368,7 +377,7 @@ function MapSearch({
   );
 
   return (
-    <div style={{ position: 'relative', width: 268 }}>
+    <div data-tour="address" style={{ position: 'relative', width: 268 }}>
       <div
         style={{
           display: 'flex',
