@@ -74,7 +74,7 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 
 > That moves the implementation **towards** the criteria rather than away from them. AC 1.1.2 asks the map to open from the homepage carrying its own address search bar, and AC 1.1.3 opens *"given the user is on the local map"* — both describe naming an address on the map, which is now the only way to do it. The screens and their code are kept, like the comparison, and Iteration 2 decides whether they return or go.
 
-**Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
+**Deployed 5 September**, revision `drainlens-00011-pzw`, and the live page loads the bundle a local build of `main` produces. Everything below describes `main` and `main` is what is serving.
 
 ### Mentor feedback, 4–5 September — nine changes
 
