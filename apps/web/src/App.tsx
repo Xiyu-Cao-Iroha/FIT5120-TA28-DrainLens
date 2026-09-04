@@ -159,8 +159,6 @@ export function App() {
           }
         >
           <Home
-            artefact={loaded.map}
-            derived={loaded.derived}
             history={loaded.history}
             onOpenMap={(mode) => {
               dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
@@ -485,6 +483,9 @@ function MapScreen({
   return (
     <Shell
       credits={credits}
+      // Inside the map, the name at the top tells somebody something they
+      // worked out by arriving. The row below carries the way back out.
+      masthead={false}
       /*
         The Back control names where it goes, because the map has two ways
         in -- the homepage and the flood board -- and with two possible

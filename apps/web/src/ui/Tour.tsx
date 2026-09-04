@@ -24,15 +24,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import {
-  type Box,
-  type Placement,
-  TOUR_STEPS,
-  type TourTarget,
-  caretAt,
-  placeCard,
-  spotlightFor,
-} from './tourPlan.js';
+import { type Box, type Placement, caretAt, placeCard, spotlightFor } from './callout.js';
+import { TOUR_STEPS, type TourTarget } from './tourPlan.js';
 import {
   ink,
   line,
