@@ -2,7 +2,7 @@
 
 DrainLens · TA28 · **before re-taken and after taken, 31 August 2026**
 
-> **A dated record, not a description of the current build.** These figures were measured against the deployments of 31 August and 1 September and are left as they were taken. They are now wrong in a knowable direction: the scenario worker no longer starts on any reachable path, so five binary arrays totalling 5.25 MB are never fetched, and the flood-history artefact adds 5 KB. Re-run `tools/perf/measure.mjs` after the next deployment rather than adjusting these by hand — a measurement edited to look current is worse than one that is honestly out of date.
+> **A dated record, not a description of the current build.** Each block below was measured on the day it names and is left as it was taken. The most recent is **5 September**, at the foot of this file.
 
 **Deployed:** https://drainlens-205559161217.australia-southeast1.run.app
 
@@ -139,3 +139,27 @@ The local server in `tools/perf/serve.mjs` sets these, and the deployment must m
 ## Still to do, and not mine to take
 
 **The log exclusion filter must be configured before the first request, not after.** A filter added later cannot unwrite the lines already stored, and an IP in a log is exactly what AD1 says this product does not keep. This is the one deployment step that is a correctness requirement rather than an operational one.
+
+---
+
+## Re-measured 5 September, after the mentor review's changes
+
+Against the live site, from a laptop, with `DRAINLENS_BASIC_AUTH` set — the site has been behind a password gate since 3 September and an unauthenticated run would have measured 401s.
+
+| | 1 Sep | 5 Sep |
+|---|---:|---:|
+| First visit, p95 | 692.4 ms | **217.5 ms** |
+| First visit, p50 | — | **191.4 ms** |
+| Transfer | 1.36 MB (21%) | **1.03 MB (29%)** |
+| Decoded | 6.43 MB | **3.51 MB** |
+| Fetch failures | 0 of 60 | **0 of 1,000** |
+
+> **The transfer fell because five arrays stopped being fetched.** `flow`, `depressions`, `coverage`, `rim-depth` and `measured` — about 4.5 MB — are still published and are read by nothing on any reachable screen. `loadScene` runs in the scenario worker; `useScenario` is enabled only on the scenario and result screens, and the Iteration 1 interface routes to neither. `tools/perf/critical-path.mjs` was measuring all four of the arrays `loadScene` reads, which reported a first visit nobody makes; it now measures the one `terrain.ts` fetches.
+>
+> **The ratio moved from 21% to 29% and that is not a regression.** The arrays that left compressed better than what remains. `elevation.bin` is 788 KB of the 1.03 MB — 76% of the visit — and the slowest single resource, at a p95 of 126 ms.
+>
+> **Do not read the whole 475 ms of the p95 improvement as the payload.** Both figures are from a laptop over a home connection to Sydney, and that link moved 185 ms between 31 August and 1 September with the payload unchanged. Some of this is 4.5 MB that is no longer requested and some is the link; one pair of runs cannot separate them. The transfer figure is the one that is comparable, which is why it is the one quoted elsewhere.
+>
+> **0 of 1,000 requests failed**, so not one was answered 401 — the gate and the credentials held for the whole run.
+
+**AD1, verified again after real traffic:** five requests, then ninety seconds, then `httpRequest.remoteIp:*` returned nothing, while `system`, `system_event` and `stderr` entries were being written and no `requests` log existed. The second query is what makes the first mean anything: an empty log during a quiet hour proves nothing.

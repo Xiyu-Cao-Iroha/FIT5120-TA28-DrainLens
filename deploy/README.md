@@ -6,7 +6,7 @@ Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twe
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, and again on **3 September 2026** to put the access gate in front of it. Everything below was run, not planned.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and again on **5 September 2026** with the mentor review's changes. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -25,10 +25,30 @@ nginx opens `auth_basic_user_file` in a worker, and workers drop to an unprivile
 
 > **The lesson generalises past this bug.** The gate passed every local check written for it — four misconfigurations, the hash's shape, the CRLF, the quoting trap — and none of them tested that it lets the right person *in*, because that needs a running container and a real password. A 401 is only half the check. Both sides are in *Verify* below, and the 200 is the half that carries new information.
 
-| Not re-measured since 1 September | |
+### 5 September: re-measured, and the arrays that stopped being fetched
+
+| Redeployed 5 September | |
 |---|---|
-| Transfer and p95 | The 1.36 MB and 692.4 ms above are from the 1 September build. **They are now wrong in a knowable direction**: five binary arrays totalling 5.25 MB are no longer fetched, and the flood-history artefact adds 5 KB. Re-run `tools/perf/measure.mjs` after the next deployment rather than quoting these. |
+| Revision | `drainlens-00011-pzw`, serving 100% |
+| Bundle | `index-etSUqsfy.js`, matching a local build of `main` — checked, not assumed |
+| Gate | **401** without credentials, **200** with them. The 200 is the half that carries new information; see 3 September above for why |
+| **AD1** | positive control shows system, system_event and stderr writing; **0 entries carrying a client IP**, no `requests` log |
+| Transfer | **1.03 MB over the wire, expanding to 3.51 MB (29%)** |
+| First visit, p95 | **217.5 ms** from a laptop · p50 191.4 ms · max 535.0 ms |
+| Fetch failures | **0 of 1,000** |
+
+> **The transfer fell because five arrays stopped being fetched, not because anything got smaller.** `flow`, `depressions`, `coverage`, `rim-depth` and `measured` — about 4.5 MB — are still published and are now read by nothing: `loadScene` runs in the scenario worker, and `useScenario` is enabled only on the scenario and result screens, neither of which is on any route in the Iteration 1 interface. They are still in the image because the comparison returns in Iteration 2.
+>
+> **The compression ratio got worse and that is not a regression either.** 21% to 29% means the arrays that left compressed better than what remains. `elevation.bin` is now 788 KB of a 1.03 MB visit — 76% of it — and the slowest single resource at a p95 of 126 ms.
+>
+> **The p95 comparison is the one to be careful with.** 692.4 ms on 1 September and 217.5 ms now are both from a laptop over a home connection to Sydney, and that link moved 185 ms between two runs on consecutive days in September with nothing deployed in between. Some of this improvement is 4.5 MB that is no longer requested. How much is the link and how much is the payload, one pair of runs cannot say — which is why the transfer figure, not the latency, is the one this document leans on.
+>
+> **0 of 1,000 requests failed**, which also means not one of them was answered 401. The gate and the credentials held for the whole run, which is a stronger statement than a single 200.
+
+| Still true of every deployment | |
+|---|---|
 | Bundle | Changes with every build. Compare it, do not assume it. |
+| Credentials | The container refuses to start without them. A deployment that quietly loses its gate looks exactly like one that never had it. |
 
 ---
 
