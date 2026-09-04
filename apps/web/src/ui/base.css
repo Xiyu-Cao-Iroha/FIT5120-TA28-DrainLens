@@ -184,15 +184,3 @@ button:disabled {
   }
 }
 
-/* The homepage's own navigation, which only it has. */
-.home-nav {
-  display: none;
-  align-items: center;
-  gap: 22px;
-}
-
-@media (min-width: 820px) {
-  .home-nav {
-    display: flex;
-  }
-}

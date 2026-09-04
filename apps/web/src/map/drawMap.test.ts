@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
-import { DAY, LABEL_MIN_SCALE, PIT_MIN_SCALE, drawMap } from './draw.js';
+import { DAY, LABEL_MIN_SCALE, PIN_DROP, PIN_HEAD_R, PIT_MIN_SCALE, drawMap } from './draw.js';
 import { ICON_MIN_SCALE } from './pitIcon.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
@@ -45,6 +45,7 @@ function recorder() {
     moveTo: note('moveTo'),
     lineTo: note('lineTo'),
     arc: note('arc'),
+    ellipse: note('ellipse'),
     // The pit marker transforms the context to place the grate inside
     // its ring. A double that does not answer for the whole surface a
     // caller uses fails as a missing function rather than as a wrong
@@ -59,9 +60,6 @@ function recorder() {
     fillRect: note('fillRect'),
     fillText: note('fillText'),
     strokeText: note('strokeText'),
-    save: note('save'),
-    restore: note('restore'),
-    translate: note('translate'),
     rotate: note('rotate'),
     measureText: (text: string) => ({ width: text.length * 6 }),
   };
@@ -247,29 +245,60 @@ describe('selection', () => {
 });
 
 describe('the address marker', () => {
-  /** The ring is radius 8; no pit at these scales is drawn larger than 7. */
-  const ringCalls = (context: ReturnType<typeof recorder>) =>
-    context.calls.filter((call) => call.op === 'arc' && call.args[2] === 8);
+  /**
+   * The pin's head, found by its radius.
+   *
+   * `PIN_HEAD_R` is 7.5 and no pit at these scales is drawn at that radius,
+   * so the head is identifiable without the drawing code cooperating. The
+   * eye inside it is 2.8, which is why the radius is matched exactly rather
+   * than by "the largest arc".
+   */
+  const headCalls = (context: ReturnType<typeof recorder>) =>
+    context.calls.filter((call) => call.op === 'arc' && call.args[2] === PIN_HEAD_R);
 
   it('is drawn when an address is given', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
-    expect(ringCalls(context).length).toBeGreaterThan(0);
+    expect(headCalls(context).length).toBeGreaterThan(0);
   });
 
   it('is not drawn when there is no address', () => {
     const context = recorder();
     drawMap(context, FULL, view());
-    expect(ringCalls(context)).toHaveLength(0);
+    expect(headCalls(context)).toHaveLength(0);
   });
 
-  it('is drawn where the address is', () => {
+  it('puts its tip on the address and its head above', () => {
+    // The whole point of a pin over a ring: the mark is beside the place, and
+    // exactly one part of it claims a position. If the head were what landed
+    // on the address the marker would be off by its own height.
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
     const [x, y] = toScreen(view(), [400, 400]);
-    const ring = ringCalls(context)[0];
-    expect(ring?.args[0]).toBeCloseTo(x);
-    expect(ring?.args[1]).toBeCloseTo(y);
+
+    const head = headCalls(context)[0];
+    expect(head?.args[0]).toBeCloseTo(x);
+    expect(head?.args[1]).toBeCloseTo(y - PIN_DROP);
+
+    const tip = context.calls.filter(
+      (call) =>
+        call.op === 'lineTo' &&
+        Math.abs((call.args[0] as number) - x) < 0.001 &&
+        Math.abs((call.args[1] as number) - y) < 0.001,
+    );
+    expect(tip.length).toBeGreaterThan(0);
+  });
+
+  it('closes its outline on the tangents, so it is one shape and not a lollipop', () => {
+    // The tangent is the only thing that makes a circle and a point read as a
+    // teardrop, and it is arithmetic rather than taste: get it wrong and the
+    // sides either cross the head or leave a notch beside it.
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [400, 400] });
+    const head = headCalls(context)[0];
+    const spread = Math.acos(PIN_HEAD_R / PIN_DROP);
+    expect(head?.args[3]).toBeCloseTo(Math.PI / 2 + spread);
+    expect(head?.args[4]).toBeCloseTo(Math.PI / 2 - spread);
   });
 
   it('does not borrow the pit colour', () => {
@@ -282,9 +311,11 @@ describe('the address marker', () => {
   it('is drawn after every layer, so nothing paints over it', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
-    const lastRing = context.calls.map((c) => c.op === 'arc' && c.args[2] === 8).lastIndexOf(true);
+    const lastHead = context.calls
+      .map((c) => c.op === 'arc' && c.args[2] === PIN_HEAD_R)
+      .lastIndexOf(true);
     const lastLabel = context.calls.map((c) => c.op === 'fillText').lastIndexOf(true);
-    expect(lastRing).toBeGreaterThan(lastLabel);
+    expect(lastHead).toBeGreaterThan(lastLabel);
   });
 
   it('is drawn even when it sits outside the visible window', () => {
@@ -292,6 +323,6 @@ describe('the address marker', () => {
     // know which way to pan back, so it is never culled.
     const context = recorder();
     drawMap(context, FULL, { ...view(4), centre: [100, 100] }, { address: [900, 900] });
-    expect(ringCalls(context).length).toBeGreaterThan(0);
+    expect(headCalls(context).length).toBeGreaterThan(0);
   });
 });

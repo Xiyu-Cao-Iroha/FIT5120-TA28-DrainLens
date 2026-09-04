@@ -403,12 +403,49 @@ export interface DrawOptions {
   readonly groundAlreadyDrawn?: boolean;
 }
 
+/** The address pin: head radius, and the drop from the head's centre to the tip. */
+export const PIN_HEAD_R = 7.5;
+export const PIN_DROP = 21;
+
+/**
+ * The outline of a map pin whose tip is exactly on the point it marks.
+ *
+ * A teardrop is a circle plus the two tangent lines from the tip to it, and
+ * the tangency is what makes the shape read as one form rather than as a
+ * lollipop. For a tip at distance `PIN_DROP` from a head of radius
+ * `PIN_HEAD_R`, each tangent point sits `acos(r / d)` around the head from the
+ * line joining the two centres — which is why the head has to be smaller than
+ * the drop, and why this is computed rather than eyeballed.
+ *
+ * Exported for the test, which checks the tangent rather than the pixels.
+ */
+export function pinOutline(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+): void {
+  const cy = y - PIN_DROP;
+  const spread = Math.acos(PIN_HEAD_R / PIN_DROP);
+  const down = Math.PI / 2;
+  context.beginPath();
+  // The long way around, over the top of the head, between the two tangents.
+  context.arc(x, cy, PIN_HEAD_R, down + spread, down - spread);
+  context.lineTo(x, y);
+  context.closePath();
+}
+
 /**
  * The selected address.
  *
- * A ring rather than a filled dot, so it reads as "here" rather than as one
- * more asset in a layer of dots — and it is deliberately the one thing on this
- * map that is not drawn from an artefact.
+ * **A pin standing on the point, not a ring around it.** The ring this
+ * replaced was centred on the address, which put the mark and the thing it
+ * marks in the same place: at street zoom it sat over the very pits and paths
+ * a person had come to read, and it was reported — fairly — as looking like a
+ * crosshair rather than like *you are here*. A pin occupies the empty space
+ * above instead, and its tip is the only part that claims a position.
+ *
+ * It is deliberately the one thing on this map that is not drawn from an
+ * artefact, and it keeps the warm colour no layer uses.
  */
 export function drawAddress(
   context: CanvasRenderingContext2D,
@@ -417,21 +454,26 @@ export function drawAddress(
   palette: Palette,
 ): void {
   const [x, y] = toScreen(viewport, at);
-  context.lineWidth = 3;
-  context.strokeStyle = palette.addressHalo;
-  context.beginPath();
-  context.arc(x, y, 8, 0, Math.PI * 2);
-  context.stroke();
 
+  // A shadow on the ground, so the pin reads as standing on the point rather
+  // than as floating above it with its tip pointing at nothing.
+  context.beginPath();
+  context.ellipse(x, y, 4, 1.6, 0, 0, Math.PI * 2);
+  context.fillStyle = 'rgba(15, 23, 42, 0.22)';
+  context.fill();
+
+  pinOutline(context, x, y);
   context.lineWidth = 2.5;
-  context.strokeStyle = palette.address;
-  context.beginPath();
-  context.arc(x, y, 8, 0, Math.PI * 2);
+  context.strokeStyle = palette.addressHalo;
   context.stroke();
-
-  context.beginPath();
-  context.arc(x, y, 2.5, 0, Math.PI * 2);
   context.fillStyle = palette.address;
+  context.fill();
+
+  // The eye. It sits on the head's centre, which `pinOutline` also uses, so
+  // the two cannot drift apart when the proportions are changed.
+  context.beginPath();
+  context.arc(x, y - PIN_DROP, 2.8, 0, Math.PI * 2);
+  context.fillStyle = palette.addressHalo;
   context.fill();
 }
 

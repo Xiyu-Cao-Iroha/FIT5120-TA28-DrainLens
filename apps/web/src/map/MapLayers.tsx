@@ -146,6 +146,7 @@ function Chip({
   on,
   disabled,
   title,
+  tour,
   onToggle,
 }: {
   readonly label: string;
@@ -153,11 +154,14 @@ function Chip({
   readonly on: boolean;
   readonly disabled: boolean;
   readonly title: string;
+  /** The tour's name for this chip, so the overlay can find it. */
+  readonly tour: string;
   readonly onToggle: () => void;
 }) {
   return (
     <button
       type="button"
+      data-tour={tour}
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={on}
@@ -213,7 +217,12 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}>
+    <div
+      // Named for the tour, which points at this row as a whole for its second
+      // step and at four of its chips individually after that.
+      data-tour="chips"
+      style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
+    >
       {CHIP_KEYS.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
@@ -225,6 +234,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
             on={state[key]}
             disabled={disabled}
             title={disabled ? `${spec.label} is still loading` : spec.label}
+            tour={`chip-${key}`}
             onToggle={() => {
               onToggle(key);
             }}
@@ -235,6 +245,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
       <div style={{ position: 'relative' }}>
         <button
           type="button"
+          data-tour="layers"
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -359,11 +370,18 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
  * beside the mark it describes, for every layer that is currently drawn.
  *
  * **It folds, and folds to its own name rather than to nothing.** The map is
- * the thing somebody came for and this sits over the bottom-left corner of it;
- * on a laptop that is a real amount of map. Collapsed it keeps the words *Map
- * legend* and the control, because a legend that vanishes completely is one
- * nobody can find again — and the criterion it serves is about the key being
- * *available*, which a fold does not break and a disappearance would.
+ * the thing somebody came for and this sits over a corner of it; on a laptop
+ * that is a real amount of map. Collapsed it keeps the words *Map legend* and
+ * the control, because a legend that vanishes completely is one nobody can
+ * find again — and the criterion it serves is about the key being *available*,
+ * which a fold does not break and a disappearance would.
+ *
+ * **It does not place itself.** It used to be absolutely positioned at the
+ * bottom left; it now sits at the top right, in the same row as the search box
+ * and the chips, laid out by flexbox rather than by two corners that know
+ * nothing about each other. That is what stops it colliding when the chips
+ * wrap on a narrow window — pinned to a corner it would simply be underneath
+ * them — and it is why the caller owns the position now.
  */
 export function MapLegend({ state }: { readonly state: LayerState }) {
   const [open, setOpen] = useState(true);
@@ -373,11 +391,10 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
   return (
     <div
       style={{
-        position: 'absolute',
-        left: space(4),
-        bottom: space(4),
-        zIndex: 3,
-        maxWidth: 260,
+        pointerEvents: 'auto',
+        marginLeft: 'auto',
+        width: 260,
+        maxWidth: '100%',
         padding: `${String(space(3))}px ${String(space(4))}px`,
         background: 'rgba(255, 255, 255, 0.94)',
         backdropFilter: 'blur(6px)',
