@@ -149,7 +149,6 @@ export function Home({ artefact, derived, onOpenMap, onOpenHistory }: HomeProps)
         onOpenMap={() => {
           onOpenMap();
         }}
-        onOpenHistory={onOpenHistory}
       />
       <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} />
       <Flow />
@@ -275,39 +274,6 @@ function PrimaryButton({
   );
 }
 
-function QuietButton({
-  label,
-  onPress,
-}: {
-  readonly label: string;
-  readonly onPress: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onPress}
-      onMouseEnter={() => {
-        setHovered(true);
-      }}
-      onMouseLeave={() => {
-        setHovered(false);
-      }}
-      style={{
-        padding: `${String(space(3))}px ${String(space(5))}px`,
-        font: type(text.body, { weight: weight.semibold }),
-        color: brand.ink,
-        background: hovered ? brand.wash : surface.raised,
-        border: `1px solid ${hovered ? brand.tint : line.strong}`,
-        borderRadius: radius.base,
-        transition: 'background-color 120ms ease, border-color 120ms ease',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
 function TickMark() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
@@ -328,12 +294,10 @@ function Hero({
   artefact,
   derived,
   onOpenMap,
-  onOpenHistory,
 }: {
   readonly artefact: MapArtefact;
   readonly derived: DerivedArtefact;
   readonly onOpenMap: () => void;
-  readonly onOpenHistory: () => void;
 }) {
   return (
     <section style={{ background: surface.page }}>
@@ -361,9 +325,18 @@ function Hero({
             water is likely to run around a local address.
           </p>
 
+          {/*
+            One button, not two.
+
+            The hero used to offer the map and the flood history side by side,
+            which made the first decision on the page a choice between two
+            things a first-time reader cannot yet tell apart. The flood board
+            keeps its own way in further down the page, where the paragraph
+            beside it has had a chance to say what it is; here the page asks
+            for one thing.
+          */}
           <div style={{ display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
             <PrimaryButton label="Explore the map →" onPress={onOpenMap} />
-            <QuietButton label="See flood history" onPress={onOpenHistory} />
           </div>
 
           <div

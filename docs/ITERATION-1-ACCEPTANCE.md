@@ -70,11 +70,26 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 
 **What is carried over** from the 27 August criteria without re-clicking, because the code behind it did not change: 1.1.3, 1.1.7, 1.1.8, 1.2.1, 1.2.2, 1.3.2. Each was demonstrated on 1 September under its old number.
 
-**The address screen and the task question are hidden.** From 3 September the homepage's two buttons are *Explore the map* and *See flood history*, and the first opens the map directly. Nothing routes to the standalone address field or to the task chooser any more.
+**The address screen and the task question are hidden.** From 3 September the homepage opens the map directly, and nothing routes to the standalone address field or to the task chooser any more. The hero carried two buttons that day, *Explore the map* and *See flood history*; from 4 September it carries only the first — see the mentor-feedback note below.
 
 > That moves the implementation **towards** the criteria rather than away from them. AC 1.1.2 asks the map to open from the homepage carrying its own address search bar, and AC 1.1.3 opens *"given the user is on the local map"* — both describe naming an address on the map, which is now the only way to do it. The screens and their code are kept, like the comparison, and Iteration 2 decides whether they return or go.
 
 **Not yet deployed.** The live service still serves the 1 September build. Everything below describes `main`.
+
+### Mentor feedback, 4 September — the first four changes
+
+Four of eleven points from the mentor review are in. None of them changes a criterion's outcome; all four are recorded here because each one contradicts a sentence written above it on 3 September.
+
+| # | Asked for | What changed | Criterion |
+|---|---|---|---|
+| 3 | Remove the hero's *See flood history* | The hero asks for one thing. The board keeps its own way in further down the page, beside the paragraph that says what it is, and the header keeps its link | **1.1.1.c still met** — entry points, not entry buttons in one place |
+| 8 | Legend at the top right | Moved from the bottom left, and it no longer places itself: it sits in the controls row and is laid out by flexbox, so a wrapped chip row pushes it instead of landing on it | **1.1.6** unaffected — the fold, the control and the per-layer basis are untouched |
+| 9 | A red pin, not a crosshair | The ring centred *on* the address became a teardrop standing beside it, tip on the point. At street zoom the ring sat over the pits and paths a person came to read | none — the address marker is named by no criterion |
+| 11 | Arrows on the water flow | An arrowhead every 46 screen pixels along each path, pointing downstream | **1.1.4.d** — still indicative paths, now with the one thing a dashed line cannot say |
+
+> **The arrows are the only one of the four that makes a new claim**, and it is a claim a reader can act on: an arrow pointing upstream is worse than no arrow. Vertex order is flow direction because `trace_channels` walks each path from its head down the D8 field one cell at a time and Douglas-Peucker drops vertices without reordering them — so that is now asserted in the pipeline's own tests (`never_runs_uphill`, `keeps_the_order_it_was_given`) rather than left as a property nobody was checking. The heading is taken in screen space, so the northing-up flip needs no correction, and that is tested too.
+>
+> **What the mentor asked for and did not get yet:** the pin's optional popup (point 9's *"甚至可以"*), which belongs with point 7's click-to-expand pit card rather than on its own.
 
 ---
 
@@ -195,6 +210,8 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 - [x] **1.1.6.d** Keep the Map Legend control available when the legend is collapsed
 - [x] **1.1.6.e** Retain the selected address, active mode, layer visibility and current map location
 
+> **It is at the top right from 4 September**, at the mentor's request, and the move changed how it is positioned rather than only where. It used to be pinned to the bottom-left corner while the chips were pinned to the top; two absolutely positioned overlays cannot see each other, so on a narrow window one lands on the other. It is now the second child of the controls row, held right by `marginLeft: auto`, and wraps below the chips when there is no room for both.
+>
 > **Built before the criterion arrived, and 1.1.6.d is the reason it reads this way.** Collapsed, the legend keeps the words *Map legend* and its control rather than disappearing: a legend that vanishes completely is one nobody can find again. The criterion asks for exactly that, which is a pleasant way to find out a decision was the right one.
 >
 > **1.1.6.c is not a filter written twice.** The legend renders the layers that are currently visible — the same `LayerState` the canvas draws from — so a layer switched off leaves the key in the same render. There is no second list to fall out of step.

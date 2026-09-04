@@ -81,6 +81,24 @@ class TestTraceChannels:
             columns = [c for _, c in path]
             assert columns == sorted(columns), "a channel on an eastward slope runs east"
 
+    def test_never_runs_uphill(self):
+        """Vertex order *is* flow direction, and the map now says so out loud.
+
+        The web map draws an arrowhead along each channel's vertex order. That
+        turns the ordering from an implementation detail into a claim a reader
+        can act on: reversed, the arrows would point confidently upstream. So
+        the invariant is asserted on the conditioned surface the tracing
+        actually walks, rather than left to `test_follows_the_slope`, which
+        only holds for a fixture that happens to fall eastward.
+        """
+        surface = condition(valley(30, 30))
+        direction = d8(surface)
+        paths = dv.trace_channels(direction, dv.flow_accumulation(direction, surface), percentile=TEST_PERCENTILE)
+        assert paths
+        for path in paths:
+            heights = [surface[r, c] for r, c in path]
+            assert heights == sorted(heights, reverse=True), "a channel runs downhill, in order"
+
     def test_draws_a_shared_trunk_once(self):
         # Without claiming, every headwater redraws the whole trunk below it
         # and the map goes solid where the most water is.
@@ -134,6 +152,18 @@ class TestSimplify:
             staircase.append((float(step), float(step)))
             staircase.append((float(step + 1), float(step)))
         assert len(dv.simplify(staircase, 0.1)) > len(dv.simplify(staircase, 2.0))
+
+    def test_keeps_the_order_it_was_given(self):
+        # Simplification runs after tracing and before the arrows are drawn.
+        # It may drop vertices; reversing or reordering them would flip an
+        # arrowhead without changing the shape of the line under it.
+        path = [(0.0, 0.0), (5.0, 0.0), (10.0, 5.0), (10.0, 10.0), (20.0, 30.0)]
+        simplified = dv.simplify(path, 0.5)
+        assert simplified[0] == path[0]
+        assert simplified[-1] == path[-1]
+        assert [path.index(point) for point in simplified] == sorted(
+            path.index(point) for point in simplified
+        )
 
     def test_a_short_path_is_returned_as_it_is(self):
         assert dv.simplify([(0.0, 0.0), (1.0, 1.0)], 0.5) == [(0.0, 0.0), (1.0, 1.0)]
