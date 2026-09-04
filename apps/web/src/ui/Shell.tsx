@@ -85,6 +85,22 @@ export interface ShellProps {
    */
   readonly trailing?: ReactNode;
   /**
+   * The name and mark at the top, which the map does without.
+   *
+   * On the homepage the masthead says what this is to somebody who has just
+   * arrived. On the map it says it again to somebody who is already inside,
+   * and costs 56 pixels of the thing they came for — stacked with the
+   * advisory banner and the breadcrumb, the map was starting an eighth of the
+   * way down a laptop window. Nothing goes with it: the mark is not a link,
+   * and the way back is the Back control on the row below.
+   *
+   * **The advisory banner is not part of this and cannot be turned off.** It
+   * is the one line that stops a simplified drainage map being read as an
+   * official flood map, and the screen most likely to be mistaken for one is
+   * exactly the screen this prop exists for.
+   */
+  readonly masthead?: boolean;
+  /**
    * Who the data belongs to, read from the artefacts.
    *
    * Optional only so a screen can render before the artefacts have loaded.
@@ -94,7 +110,15 @@ export interface ShellProps {
   readonly credits?: readonly Credit[];
 }
 
-export function Shell({ children, actions, crumbs, back, trailing, credits }: ShellProps) {
+export function Shell({
+  children,
+  actions,
+  crumbs,
+  back,
+  trailing,
+  masthead = true,
+  credits,
+}: ShellProps) {
   return (
     <div
       style={{
@@ -107,55 +131,57 @@ export function Shell({ children, actions, crumbs, back, trailing, credits }: Sh
         background: surface.page,
       }}
     >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: space(3),
-          padding: `${String(space(3))}px ${String(space(6))}px`,
-          background: surface.raised,
-          borderBottom: `1px solid ${line.base}`,
-          flexShrink: 0,
-        }}
-      >
-        <span
-          aria-hidden
+      {masthead && (
+        <header
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: radius.base,
-            background: ink.strong,
-            color: ink.inverse,
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 17,
-            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: space(3),
+            padding: `${String(space(3))}px ${String(space(6))}px`,
+            background: surface.raised,
+            borderBottom: `1px solid ${line.base}`,
+            flexShrink: 0,
           }}
         >
-          ≈
-        </span>
-        <span>
-          <strong
-            style={{
-              display: 'block',
-              font: type(text.lead, { weight: weight.semibold, leading: 1.15 }),
-              letterSpacing: tracking.title,
-              color: ink.strong,
-            }}
-          >
-            DrainLens
-          </strong>
           <span
+            aria-hidden
             style={{
-              font: type(text.small, { leading: 1.3 }),
-              color: ink.subtle,
+              width: 32,
+              height: 32,
+              borderRadius: radius.base,
+              background: ink.strong,
+              color: ink.inverse,
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 17,
+              lineHeight: 1,
             }}
           >
-            Local drainage explorer
+            ≈
           </span>
-        </span>
-        <span style={{ marginLeft: 'auto' }}>{actions}</span>
-      </header>
+          <span>
+            <strong
+              style={{
+                display: 'block',
+                font: type(text.lead, { weight: weight.semibold, leading: 1.15 }),
+                letterSpacing: tracking.title,
+                color: ink.strong,
+              }}
+            >
+              DrainLens
+            </strong>
+            <span
+              style={{
+                font: type(text.small, { leading: 1.3 }),
+                color: ink.subtle,
+              }}
+            >
+              Local drainage explorer
+            </span>
+          </span>
+          <span style={{ marginLeft: 'auto' }}>{actions}</span>
+        </header>
+      )}
 
       <div
         role="note"

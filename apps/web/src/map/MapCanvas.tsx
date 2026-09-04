@@ -65,6 +65,16 @@ export interface MapCanvasProps {
    */
   readonly difference?: DifferenceArea | null;
   readonly onSelect?: (hit: Hit | null) => void;
+  /**
+   * The current viewport, whenever it changes.
+   *
+   * The map owns its own pan and zoom — that is view state and nothing above
+   * it should be re-rendering on every drag. But a caller that wants to put
+   * something *at* a feature needs the same transform the canvas drew with,
+   * and deriving a second one outside would be two answers to one question.
+   * So the viewport is reported rather than lifted.
+   */
+  readonly onViewport?: (viewport: Viewport | null) => void;
 }
 
 export function MapCanvas({
@@ -80,6 +90,7 @@ export function MapCanvas({
   trace = null,
   difference = null,
   onSelect,
+  onViewport,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -207,6 +218,13 @@ export function MapCanvas({
     },
     [viewport, artefact, onSelect, at],
   );
+
+  // Reported, not lifted: the caller is told where the transform ended up and
+  // does not get to set it. Keyed on the viewport object, which only changes
+  // when the map really moved.
+  useEffect(() => {
+    onViewport?.(viewport);
+  }, [viewport, onViewport]);
 
   // Move when the address actually changes, and only then.
   useEffect(() => {
