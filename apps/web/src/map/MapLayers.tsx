@@ -146,6 +146,7 @@ function Chip({
   on,
   disabled,
   title,
+  tour,
   onToggle,
 }: {
   readonly label: string;
@@ -153,11 +154,14 @@ function Chip({
   readonly on: boolean;
   readonly disabled: boolean;
   readonly title: string;
+  /** The tour's name for this chip, so the overlay can find it. */
+  readonly tour: string;
   readonly onToggle: () => void;
 }) {
   return (
     <button
       type="button"
+      data-tour={tour}
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={on}
@@ -213,7 +217,12 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}>
+    <div
+      // Named for the tour, which points at this row as a whole for its second
+      // step and at four of its chips individually after that.
+      data-tour="chips"
+      style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
+    >
       {CHIP_KEYS.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
@@ -225,6 +234,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
             on={state[key]}
             disabled={disabled}
             title={disabled ? `${spec.label} is still loading` : spec.label}
+            tour={`chip-${key}`}
             onToggle={() => {
               onToggle(key);
             }}
@@ -235,6 +245,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
       <div style={{ position: 'relative' }}>
         <button
           type="button"
+          data-tour="layers"
           onClick={() => {
             setOpen((v) => !v);
           }}

@@ -26,9 +26,16 @@ import { ink, line, radius, shadow, space, surface, text, type, weight } from '.
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
-import { INITIAL_SESSION, type Session, type SupportedAddress, reduce } from './session.js';
+import {
+  INITIAL_SESSION,
+  type Session,
+  type SessionEvent,
+  type SupportedAddress,
+  reduce,
+} from './session.js';
 import { Shell } from './ui/Shell.js';
-import { creditsFor } from './ui/attribution.js';
+import { Tour } from './ui/Tour.js';
+import { type Credit, creditsFor } from './ui/attribution.js';
 
 interface Loaded {
   readonly map: MapArtefact;
@@ -440,54 +447,146 @@ export function App() {
 
     default:
       return (
-        <Shell
+        <MapScreen
           credits={credits}
-          /*
-            The Back control names where it goes, because the map has two ways
-            in -- the homepage and the flood board -- and with two possible
-            origins a bare "Back" is a guess.
-
-            The trail beside it is one crumb now. It used to lead with a
-            clickable Home, which was doing two jobs badly: a breadcrumb says
-            where you *are*, and a person looking for the way out does not read
-            a location as an exit. The button is the exit; the crumb says where
-            they are.
-          */
-          back={{
-            label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
-            onBack: () => {
-              dispatch({ type: 'leave-map' });
-            },
-          }}
-          crumbs={crumb(
-            session.task === 'full-map' ? 'Full map' : 'Explore drainage',
-            undefined,
-            true,
-          )}
-        >
-          <MapView
-            map={loaded.map}
-            derived={loaded.derived}
-            trace={loaded.trace}
-            address={session.address}
-            task={session.task}
-            mode={session.mapMode}
-            index={loaded.index}
-            onAddress={(picked) =>
-              dispatch({
-                type: 'address-moved',
-                address: {
-                  id: picked.id,
-                  label: picked.label,
-                  eastingM: picked.e,
-                  northingM: picked.n,
-                },
-              })
-            }
-          />
-        </Shell>
+          loaded={loaded}
+          session={session}
+          dispatch={dispatch}
+          crumb={crumb}
+        />
       );
   }
+}
+
+/**
+ * The map, its frame, and the tour that points at the frame's controls.
+ *
+ * A component of its own because the tour is state, and the screen it belongs
+ * to was the default arm of a switch inside `App` — where a `useState` cannot
+ * go. The tour also has to sit outside `MapView`: its button belongs on the
+ * breadcrumb row, which is the Shell's, and its overlay covers the whole
+ * window rather than the map pane.
+ */
+function MapScreen({
+  credits,
+  loaded,
+  session,
+  dispatch,
+  crumb,
+}: {
+  readonly credits: readonly Credit[];
+  readonly loaded: Loaded;
+  readonly session: Session;
+  readonly dispatch: (event: SessionEvent) => void;
+  readonly crumb: (label: string, onClick?: () => void, current?: boolean) => React.ReactNode;
+}) {
+  const [touring, setTouring] = useState(false);
+
+  return (
+    <Shell
+      credits={credits}
+      /*
+        The Back control names where it goes, because the map has two ways
+        in -- the homepage and the flood board -- and with two possible
+        origins a bare "Back" is a guess.
+
+        The trail beside it is one crumb now. It used to lead with a
+        clickable Home, which was doing two jobs badly: a breadcrumb says
+        where you *are*, and a person looking for the way out does not read
+        a location as an exit. The button is the exit; the crumb says where
+        they are.
+      */
+      back={{
+        label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+        onBack: () => {
+          dispatch({ type: 'leave-map' });
+        },
+      }}
+      crumbs={crumb(
+        session.task === 'full-map' ? 'Full map' : 'Explore drainage',
+        undefined,
+        true,
+      )}
+      trailing={
+        <TourButton
+          onOpen={() => {
+            setTouring(true);
+          }}
+        />
+      }
+    >
+      <MapView
+        map={loaded.map}
+        derived={loaded.derived}
+        trace={loaded.trace}
+        address={session.address}
+        task={session.task}
+        mode={session.mapMode}
+        index={loaded.index}
+        onAddress={(picked) =>
+          dispatch({
+            type: 'address-moved',
+            address: {
+              id: picked.id,
+              label: picked.label,
+              eastingM: picked.e,
+              northingM: picked.n,
+            },
+          })
+        }
+      />
+      {touring && (
+        <Tour
+          onClose={() => {
+            setTouring(false);
+          }}
+        />
+      )}
+    </Shell>
+  );
+}
+
+/**
+ * The way in, and the reason the tour needs no stored state.
+ *
+ * It does not open by itself on a first visit. Deciding whether this *is* a
+ * first visit means writing something to the browser and reading it back, and
+ * a product whose position is that it holds nothing about you should not begin
+ * by storing a fact about you in order to be helpful. A control that is always
+ * there costs a person one press and costs the product nothing.
+ */
+function TourButton({ onOpen }: { readonly onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: space(2),
+        padding: `${String(space(1))}px ${String(space(3))}px`,
+        border: `1px solid ${line.base}`,
+        borderRadius: radius.base,
+        background: surface.raised,
+        color: ink.strong,
+        font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+        <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path
+          d="M5.9 6.1a2.1 2.1 0 1 1 2.5 2.1v1.2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <circle cx="8.4" cy="11.6" r="0.95" fill="currentColor" />
+      </svg>
+      Tutorial
+    </button>
+  );
 }
 
 /**

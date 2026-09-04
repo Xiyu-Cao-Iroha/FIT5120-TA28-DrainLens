@@ -377,7 +377,7 @@ function MapSearch({
   );
 
   return (
-    <div style={{ position: 'relative', width: 268 }}>
+    <div data-tour="address" style={{ position: 'relative', width: 268 }}>
       <div
         style={{
           display: 'flex',
