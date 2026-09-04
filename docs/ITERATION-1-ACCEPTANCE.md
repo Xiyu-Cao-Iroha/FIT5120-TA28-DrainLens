@@ -120,6 +120,8 @@ Nine of eleven points from the mentor review are in. None of them changes a crit
 >
 > **Two things a panel never had to handle, because a panel does not move.** A card taller than the map cannot sit above or below the pit, so it is capped and scrolls rather than falling back to the middle of the screen and covering the controls. And a selection survives panning — losing it because you looked next door would be worse — so a card whose anchor has left the canvas hides, and comes back with the mark, instead of sitting against an edge pointing at nothing.
 >
+> **The masthead goes with the panel, and only the masthead.** Inside the map, the name and mark at the top were telling somebody something they had worked out by arriving, and the map was starting 149 px down a laptop window; it starts at 82 px now, which is 67 px more of the thing they came for. Nothing went with it: the mark was never a link, and the way back is the Back control on the row below. **The advisory banner stays, and is the one piece of chrome that cannot be turned off** — it is the line that stops a simplified drainage map being read as an official flood map, and the map is the screen most likely to be mistaken for one. The CC BY footer stays for the same kind of reason: the licence requires it wherever the work is.
+>
 > **The placement arithmetic is now shared with the tour** (`ui/callout.ts`), because it is one problem seen twice: a small target at a known position, a card of a known size, and a box neither may leave. Its tests came with it.
 >
 > **What the mentor asked for and did not get yet:** the pin's optional popup (point 9's *"甚至可以"*), which belongs with point 7's click-to-expand pit card rather than on its own.
