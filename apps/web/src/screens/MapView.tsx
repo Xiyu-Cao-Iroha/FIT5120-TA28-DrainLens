@@ -26,7 +26,9 @@ import { MAX_SUGGESTIONS, search } from '../address/search.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
+import { MapCallout } from '../map/MapCallout.js';
 import { MapCanvas } from '../map/MapCanvas.js';
+import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
 import {
   ALL_ON,
@@ -103,7 +105,19 @@ export function MapView({
   const [hit, setHit] = useState<Hit | null>(null);
   const [following, setFollowing] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
-  const [chromeOpen, setChromeOpen] = useState(true);
+  // The transform the canvas drew with, reported upward so a callout can be
+  // put at a feature rather than beside the map.
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  // Dismissed by the person, not by the address changing: picking a new
+  // address should say something about the new one.
+  const [addressCardOpen, setAddressCardOpen] = useState(true);
+  useEffect(() => {
+    setAddressCardOpen(true);
+    // A new address is a new question. Leaving the previous pit selected would
+    // answer the old one beside the new mark.
+    setHit(null);
+    setFollowing(null);
+  }, [address]);
 
   // Painted once, then reused for every pan and zoom. A failure here leaves
   // the layer off rather than breaking the map: the terrain is context, and
@@ -168,6 +182,7 @@ export function MapView({
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
+        onViewport={setViewport}
         onSelect={(next) => {
           setHit(next);
           // Selecting something else abandons the path. Leaving it drawn
@@ -211,144 +226,146 @@ export function MapView({
         </div>
       )}
 
-      {panel && (
-        <aside
-          style={{
-            position: 'absolute',
-            left: space(4),
-            top: 64,
-            width: 320,
-            maxHeight: 'calc(100% - 84px)',
-            overflow: 'auto',
-            zIndex: 3,
-            padding: `${String(space(4))}px ${String(space(4))}px`,
-            background: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(8px)',
-            border: `1px solid ${line.base}`,
-            borderRadius: radius.large,
-            boxShadow: shadow.floating,
+      {/*
+        What was pressed, said where it was pressed — AC 1.1.7.b.
+
+        This replaced a 320-pixel panel pinned to the left edge. The panel was
+        not what the criterion asks for and it was not what a person needs: a
+        pit on the right of the screen put the answer as far from the question
+        as the window allowed, and the panel covered a quarter of the map on a
+        laptop. Nothing it held was dropped. The short explanation is on the
+        card, and everything AC 1.1.7.f requires — the recorded fields, the
+        cross-section, the reason a path stops — is behind *More information*,
+        which opens in place.
+      */}
+      {panel && viewport !== null && hit?.kind === 'pit' && onScreen(hit.feature.c, viewport) && (
+        <MapCallout
+          at={toScreen(viewport, hit.feature.c)}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title="Drainage pit"
+          basis="Official recorded data"
+          action={
+            followed === null
+              ? {
+                  label: 'Show connected pipe',
+                  onPress: () => {
+                    setFollowing(String(hit.feature.asset_number));
+                  },
+                }
+              : {
+                  label: 'Hide the connected pipe',
+                  onPress: () => {
+                    setFollowing(null);
+                  },
+                }
+          }
+          more={
+            <PitDetail
+              pit={hit.feature}
+              map={map}
+              artefact={trace}
+              trace={followed}
+              onFollow={() => {
+                setFollowing(String(hit.feature.asset_number));
+              }}
+              onClear={() => {
+                setFollowing(null);
+              }}
+            />
+          }
+          onClose={() => {
+            setHit(null);
+            setFollowing(null);
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: space(2) }}>
-            <span style={{ flex: 1 }}>
-              <span
-                style={{
-                  display: 'block',
-                  font: type(text.micro, { weight: weight.semibold }),
-                  letterSpacing: tracking.caps,
-                  textTransform: 'uppercase',
-                  color: ink.subtle,
-                }}
-              >
-                Selected address
-              </span>
-              <strong
-                style={{
-                  display: 'block',
-                  marginTop: space(1),
-                  font: type(text.body, { weight: weight.semibold, leading: 1.35 }),
-                  color: ink.strong,
-                }}
-              >
-                {address?.label ?? 'No address selected'}
-              </strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setChromeOpen((v) => !v);
-              }}
-              aria-expanded={chromeOpen}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                font: type(text.label, { weight: weight.medium }),
-                color: ink.muted,
-              }}
-            >
-              {chromeOpen ? '‹ Hide' : '› More'}
-            </button>
-          </div>
+          This pit collects surface water from the street and connects it to the recorded
+          drainage network.
+        </MapCallout>
+      )}
 
-          {chromeOpen && (
+      {panel && viewport !== null && hit?.kind === 'pipe' && onScreen(midpoint(hit.feature.c), viewport) && (
+        <MapCallout
+          at={toScreen(viewport, midpoint(hit.feature.c))}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
+          basis="Official recorded data"
+          onClose={() => {
+            setHit(null);
+          }}
+        >
+          {hit.feature.diameter === undefined && hit.feature.material === undefined ? (
+            'The record names this pipe but holds neither a diameter nor a material for it.'
+          ) : (
             <>
-              {guided && (
-                <p
-                  style={{
-                    margin: `${String(space(3))}px 0 0`,
-                    padding: `${String(space(3))}px ${String(space(3))}px`,
-                    background: basisTone.recorded.fill,
-                    borderRadius: radius.base,
-                    font: type(text.label, { leading: 1.5 }),
-                    color: ink.base,
-                  }}
-                >
-                  <strong style={{ display: 'block', fontWeight: weight.semibold }}>
-                    Your next step
-                  </strong>
-                  Select a highlighted surface-water path or a nearby drainage pit.
-                </p>
-              )}
-
-              {explanation !== null && (
-                <p
-                  style={{
-                    margin: `${String(space(3))}px 0 0`,
-                    padding: `${String(space(3))}px ${String(space(3))}px`,
-                    background: basisTone.derived.fill,
-                    borderRadius: radius.base,
-                    font: type(text.label, { leading: 1.5 }),
-                    color: ink.base,
-                  }}
-                >
-                  {explanation}
-                  <Badge basis={NEARBY_BASIS} />
-                </p>
-              )}
-
-              <div
-                style={{
-                  marginTop: space(4),
-                  paddingTop: space(3),
-                  borderTop: `1px solid ${line.hair}`,
-                  minHeight: 44,
-                }}
-              >
-                {hit === null ? (
-                  <span style={{ color: ink.subtle, font: type(text.label) }}>
-                    Select a drainage pit or pipe.
-                  </span>
-                ) : hit.kind === 'pit' ? (
-                  <PitDetail
-                    pit={hit.feature}
-                    map={map}
-                    artefact={trace}
-                    trace={followed}
-                    onFollow={() => {
-                      setFollowing(String(hit.feature.asset_number));
-                    }}
-                    onClear={() => {
-                      setFollowing(null);
-                    }}
-                  />
-                ) : (
-                  <>
-                    <strong style={{ color: ink.strong }}>Pipe {hit.feature.ref}</strong>
-                    <div style={{ color: ink.muted, font: type(text.label) }}>
-                      {hit.feature.diameter ? `${String(hit.feature.diameter)} mm · ` : ''}
-                      {hit.feature.material}
-                    </div>
-                    <Badge basis="Official recorded data" />
-                  </>
-                )}
-              </div>
+              {hit.feature.diameter !== undefined && `${String(hit.feature.diameter)} mm wide. `}
+              {hit.feature.material !== undefined && `Made of ${hit.feature.material}. `}
+              Recorded underground, so its depth is not shown — the council record leaves that
+              out for almost every asset here.
             </>
           )}
-        </aside>
+        </MapCallout>
+      )}
+
+      {/*
+        The address callout, and the mentor's *"even a small popup"* for the
+        pin. It carries what the panel used to say about the address — AC
+        1.1.9.c — and the derived sentence keeps its own badge rather than
+        borrowing the card's, because the address is the person's own and
+        belongs to no dataset.
+
+        It does not draw while a feature is selected: two cards on one map is
+        one card too many, and the one somebody just pressed is the one they
+        are reading.
+      */}
+      {panel &&
+        viewport !== null &&
+        address !== null &&
+        hit === null &&
+        addressCardOpen &&
+        onScreen([address.eastingM, address.northingM], viewport) && (
+        <MapCallout
+          at={toScreen(viewport, [address.eastingM, address.northingM])}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title={address.label}
+          onClose={() => {
+            setAddressCardOpen(false);
+          }}
+        >
+          {explanation === null ? (
+            'No surface-water path or low area was measured close enough to this address to say anything about it.'
+          ) : (
+            <>
+              {explanation} <Badge basis={NEARBY_BASIS} />
+            </>
+          )}
+          {guided && (
+            <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
+              Select a drainage pit or pipe to read what the council recorded about it.
+            </span>
+          )}
+        </MapCallout>
       )}
     </>
   );
+}
+
+/**
+ * Is the thing the card points at still on the map?
+ *
+ * Panning does not clear a selection — losing it because you looked next door
+ * would be worse — but a card whose anchor has left the canvas is placed by
+ * the clamp alone and sits against an edge pointing at nothing. Off screen,
+ * the card goes with it and comes back when the mark does.
+ */
+function onScreen(point: Local, viewport: Viewport): boolean {
+  const [x, y] = toScreen(viewport, point);
+  return x >= 0 && y >= 0 && x <= viewport.widthPx && y <= viewport.heightPx;
+}
+
+/** The middle vertex of a polyline, which is where a pipe's card points. */
+function midpoint(path: readonly Local[]): Local {
+  const middle = path[Math.floor(path.length / 2)];
+  return middle ?? [0, 0];
 }
 
 /**

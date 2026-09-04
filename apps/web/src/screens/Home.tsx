@@ -28,7 +28,6 @@
 
 import { useState } from 'react';
 
-import type { DerivedArtefact } from '../map/derived.js';
 import { DERIVED_DAY } from '../map/derived.js';
 import {
   type FloodHistoryArtefact,
@@ -36,7 +35,6 @@ import {
   defaultView,
   periodLabel,
 } from '../history/artefact.js';
-import type { MapArtefact } from '../map/artefact.js';
 import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
@@ -142,15 +140,13 @@ const WITHHOLDS: readonly string[] = [
 ];
 
 export interface HomeProps {
-  readonly artefact: MapArtefact;
-  readonly derived: DerivedArtefact;
   readonly history: FloodHistoryArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
 }
 
-export function Home({ artefact, derived, history, onOpenMap, onOpenHistory }: HomeProps) {
+export function Home({ history, onOpenMap, onOpenHistory }: HomeProps) {
   return (
     <div>
       {/*
@@ -159,8 +155,6 @@ export function Home({ artefact, derived, history, onOpenMap, onOpenHistory }: H
         is expected is a mode nobody chose.
       */}
       <Hero
-        artefact={artefact}
-        derived={derived}
         onOpenMap={() => {
           onOpenMap();
         }}
@@ -305,15 +299,7 @@ function TickMark() {
   );
 }
 
-function Hero({
-  artefact,
-  derived,
-  onOpenMap,
-}: {
-  readonly artefact: MapArtefact;
-  readonly derived: DerivedArtefact;
-  readonly onOpenMap: () => void;
-}) {
+function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
   return (
     <section style={{ background: surface.page }}>
       <div
@@ -377,7 +363,7 @@ function Hero({
           </div>
         </div>
 
-        <FramedMap artefact={artefact} derived={derived} />
+        <FramedMap />
       </div>
     </section>
   );
