@@ -384,7 +384,7 @@ The mentor may ask "why did you choose X". Each of these has a rejected alternat
 | Choice | Instead of | Why |
 |---|---|---|
 | Canvas | MapLibre / Leaflet | No basemap, no layer composition, already projected. A library would own the render loop and add a second coordinate frame. |
-| Static artefacts | REST API + database | AD1. No endpoint that receives an address can leak one. |
+| Static artefacts | REST API + database | AD1. No endpoint that receives an address can leak one. **Revisited 5 September** — that reason supports a narrower conclusion than it was used for, and a database is planned for Iteration 2. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md). The address index still does not move. |
 | Web Worker | Main thread, or a server | A million cells solved twice per position; a frozen map reads as a crash. Server-side would break reproducibility (AC 2.2). |
 | npm workspaces + project references | Separate repos, or one flat package | The schema is shared by three consumers; TypeScript project references make a breaking change a build failure rather than a runtime surprise. |
 | Own SMRF in numpy | PDAL | PDAL would not install on the team's machines. Eighty lines, and we understand every one. |
