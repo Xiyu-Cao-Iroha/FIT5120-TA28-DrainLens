@@ -35,6 +35,7 @@ import {
 } from './session.js';
 import { Shell } from './ui/Shell.js';
 import { Tour } from './ui/Tour.js';
+import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
 
 interface Loaded {
@@ -480,6 +481,26 @@ function MapScreen({
 }) {
   const [touring, setTouring] = useState(false);
 
+  /*
+    Open it once, for somebody who has not had it.
+
+    In an effect rather than in the initial state, because it writes: the
+    first thing it does is record that the tour has been shown, so a person
+    who dismisses it immediately is not met with it again on their way back
+    in. Recorded on opening rather than on finishing, so somebody who closes
+    the tab halfway through has still been offered it.
+
+    Nothing here waits for the map. A step whose target is not on screen
+    yet degrades to a card with no spotlight -- `useTargetBox` returns null
+    and re-measures on the next resize -- and by this point `loaded` has
+    already resolved, so the controls are in the same commit as this effect.
+  */
+  useEffect(() => {
+    if (tourGate.seen()) return;
+    tourGate.remember();
+    setTouring(true);
+  }, []);
+
   return (
     <Shell
       credits={credits}
@@ -548,13 +569,25 @@ function MapScreen({
 }
 
 /**
- * The way in, and the reason the tour needs no stored state.
+ * The way back in, for anybody who has already been shown it.
  *
- * It does not open by itself on a first visit. Deciding whether this *is* a
- * first visit means writing something to the browser and reading it back, and
- * a product whose position is that it holds nothing about you should not begin
- * by storing a fact about you in order to be helpful. A control that is always
- * there costs a person one press and costs the product nothing.
+ * **This used to say the tour does not open by itself, and why.** The argument
+ * was that deciding whether this *is* a first visit means writing something to
+ * the browser and reading it back, and that a product whose position is that
+ * it holds nothing about you should not begin by storing a fact about you in
+ * order to be helpful. It is written out here rather than deleted, because the
+ * reversal is the decision worth being able to find.
+ *
+ * What changed is the weighing, not the principle. A first-time visitor
+ * arriving on a map with no basemap, four layers and a mode switch should not
+ * have to find a button to be told what they are looking at, and the thing
+ * being stored — `drainlens.tour.seen`, holding `"1"` — says only that
+ * somebody on this browser has been shown it once. No address, no identifier,
+ * no timestamp, no count. `tourGate.ts` states what is written and what is
+ * not, and `session.ts` still writes nothing at all.
+ *
+ * The button stays, because "seen once" and "understood" are different, and a
+ * tour that can only be seen once is a tour somebody will want back.
  */
 function TourButton({ onOpen }: { readonly onOpen: () => void }) {
   return (

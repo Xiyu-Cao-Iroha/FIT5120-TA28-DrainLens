@@ -61,7 +61,7 @@ Type `46 Gatehouse Drive` — do not paste, so you see the suggestions appear.
 | 1.1.1.a | The chosen address is shown on the next screen | | |
 | 1.1.1.b | The task page opens | | |
 | 1.1.1.c | All three tasks are offered, named as the criterion words them | | |
-| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too | | |
+| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too. One key is expected and is not a failure: `drainlens.tour.seen`, holding `1` — it says the map tour has been shown once on this browser and nothing more. Anything else in there is a defect | | |
 
 Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 
