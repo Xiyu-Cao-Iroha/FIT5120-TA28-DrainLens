@@ -251,6 +251,68 @@ describe('what it does when it cannot answer', () => {
   });
 });
 
+describe('what a browser needs before it will look at any of this', () => {
+  it('allows the deployed site to read it', async () => {
+    // The site and the API are two Cloud Run services and therefore two
+    // origins. Without this header the browser discards every response before
+    // the page sees it, and reports a network error with no body -- which
+    // looks like the API being down and is not.
+    const response = await app.request('/api/map/kensington', {
+      headers: { Origin: 'https://drainlens-205559161217.australia-southeast1.run.app' },
+    });
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'https://drainlens-205559161217.australia-southeast1.run.app',
+    );
+  });
+
+  it('allows the local dev server, so the fallback is not what gets developed against', async () => {
+    const response = await app.request('/api/flood-history', {
+      headers: { Origin: 'http://localhost:5183' },
+    });
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:5183');
+  });
+
+  it('does not allow an origin nobody named', async () => {
+    const response = await app.request('/api/map/kensington', {
+      headers: { Origin: 'https://not-drainlens.example' },
+    });
+    expect(response.headers.get('access-control-allow-origin')).not.toBe(
+      'https://not-drainlens.example',
+    );
+    expect(response.headers.get('access-control-allow-origin')).not.toBe('*');
+  });
+
+  it('answers a preflight, which is what a browser sends first', async () => {
+    const response = await app.request('/api/map/kensington', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://drainlens-205559161217.australia-southeast1.run.app',
+        'Access-Control-Request-Method': 'GET',
+      },
+    });
+    expect(response.status).toBeLessThan(300);
+  });
+});
+
+describe('how long an answer may be reused', () => {
+  it('lets a browser keep an artefact for five minutes', async () => {
+    const response = await app.request('/api/map/kensington');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=300');
+  });
+
+  it('never caches the health check', async () => {
+    // A health check answered from a cache is a health check of the cache.
+    const response = await app.request('/health');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('does not cache a 404, which would outlive the migration that fixes it', async () => {
+    const response = await app.request('/api/map/not-an-extent');
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).not.toBe('public, max-age=300');
+  });
+});
+
 describe('the same request twice', () => {
   it('returns byte-identical bytes, because the order is fixed in SQL', async () => {
     // An unordered query may return rows in whatever order a vacuum last left

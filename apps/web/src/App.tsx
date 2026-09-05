@@ -35,6 +35,7 @@ import {
 } from './session.js';
 import { Shell } from './ui/Shell.js';
 import { Tour } from './ui/Tour.js';
+import { API_BASE, EXTENT, type Origin, fetchArtefact, served } from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
 
@@ -45,30 +46,75 @@ interface Loaded {
   readonly index: AddressIndex;
   readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
+  /** Where the four database-backed artefacts actually came from. */
+  readonly servedFrom: Origin | 'mixed';
 }
 
 async function load(): Promise<Loaded> {
+  // Four artefacts come from the database through the API, each falling back
+  // to the copy in this container if it cannot answer. `source.ts` says why
+  // the fallback exists and why it is not hidden.
+  //
   // The flood history is 5.4 KB and joins the others rather than being
   // fetched when the board opens: a separate round trip for five kilobytes
   // buys a loading state nobody needed.
-  const [map, derived, trace, addresses, history] = await Promise.all([
-    fetch('/data/map.json').then((r) => r.json()),
-    fetch('/data/derived.json').then((r) => r.json()),
-    fetch('/data/trace.json').then((r) => r.json()),
-    fetch('/data/addresses.json').then((r) => r.json()),
-    fetch('/data/flood-history.json').then((r) => r.json()),
-  ]);
+  const at = (path: string) => (API_BASE === '' ? null : `${API_BASE}${path}`);
 
-  assertUsable(map);
-  assertDerived(derived);
-  assertTrace(trace);
-  assertFloodHistory(history);
+  // A fallback that says nothing is indistinguishable from an API nobody is
+  // using. The footer tells a visitor which source answered; this tells
+  // whoever is looking at a console *why*, which the footer cannot.
+  const note = (url: string, reason: string) => {
+    console.warn(`DrainLens: ${url} did not answer (${reason}); using the bundled copy`);
+  };
+
+  const [map, derived, trace, history, addresses] = await Promise.all([
+    fetchArtefact<MapArtefact>({
+      api: at(`/api/map/${EXTENT}`),
+      bundled: '/data/map.json',
+      guard: assertUsable,
+      onFallback: note,
+    }),
+    fetchArtefact<DerivedArtefact>({
+      api: at(`/api/derived/${EXTENT}`),
+      bundled: '/data/derived.json',
+      guard: assertDerived,
+      onFallback: note,
+    }),
+    fetchArtefact<TraceArtefact>({
+      api: at(`/api/trace/${EXTENT}`),
+      bundled: '/data/trace.json',
+      guard: assertTrace,
+      onFallback: note,
+    }),
+    fetchArtefact<FloodHistoryArtefact>({
+      api: at('/api/flood-history'),
+      bundled: '/data/flood-history.json',
+      guard: assertFloodHistory,
+      onFallback: note,
+    }),
+    // **Never from a server, and not routed through `fetchArtefact` so that no
+    // later edit there can change that.** The landing page tells a resident the
+    // search runs in their browser and that nothing about the address is sent
+    // anywhere; an address index fetched from an API would still keep that
+    // promise, and an index fetched *per query* would not. Bundled is the shape
+    // that cannot drift into the second.
+    fetch('/data/addresses.json').then((r) => r.json()),
+  ]);
 
   const index = addresses as AddressIndex & { fixture?: string };
   if (!Array.isArray(index.addresses)) {
     throw new Error('the address index carries no addresses');
   }
-  return { map, derived, trace, index, history, fixtureNote: index.fixture };
+
+  return {
+    map: map.value,
+    derived: derived.value,
+    trace: trace.value,
+    history: history.value,
+    index,
+    fixtureNote: index.fixture,
+    servedFrom: served([map.from, derived.from, trace.from, history.from]),
+  };
 }
 
 export function App() {
@@ -148,6 +194,7 @@ export function App() {
       return (
         <Shell
           credits={credits}
+          servedFrom={loaded.servedFrom}
           actions={
             <HomeNav
               onOpenMap={() => {
@@ -175,6 +222,7 @@ export function App() {
       return (
         <Shell
           credits={credits}
+          servedFrom={loaded.servedFrom}
           back={{
             label: 'Home',
             onBack: () => {
@@ -198,7 +246,8 @@ export function App() {
     case 'address':
     case 'unsupported':
       return (
-        <Shell credits={credits}>
+        <Shell credits={credits}
+          servedFrom={loaded.servedFrom}>
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -222,6 +271,7 @@ export function App() {
       return (
         <Shell
           credits={credits}
+          servedFrom={loaded.servedFrom}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -290,6 +340,7 @@ export function App() {
       return (
         <Shell
           credits={credits}
+          servedFrom={loaded.servedFrom}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -504,6 +555,7 @@ function MapScreen({
   return (
     <Shell
       credits={credits}
+          servedFrom={loaded.servedFrom}
       // Inside the map, the name at the top tells somebody something they
       // worked out by arriving. The row below carries the way back out.
       masthead={false}
