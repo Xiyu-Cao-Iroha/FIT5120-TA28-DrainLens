@@ -108,6 +108,15 @@ export interface ShellProps {
    * requires the credit to be visible wherever the work is.
    */
   readonly credits?: readonly Credit[];
+  /**
+   * Where the artefacts on this screen came from: the API over the database,
+   * the copies bundled with the site, or some of each.
+   *
+   * Shown because a fallback nobody can see is indistinguishable from an API
+   * nobody is using -- and because "this map is the database's answer" is a
+   * claim, and a claim this product makes visible rather than asserts.
+   */
+  readonly servedFrom?: 'api' | 'bundled' | 'mixed';
 }
 
 export function Shell({
@@ -118,6 +127,7 @@ export function Shell({
   trailing,
   masthead = true,
   credits,
+  servedFrom,
 }: ShellProps) {
   return (
     <div
@@ -248,7 +258,9 @@ export function Shell({
         {children}
       </main>
 
-      {credits !== undefined && credits.length > 0 && <Attribution credits={credits} />}
+      {credits !== undefined && credits.length > 0 && (
+        <Attribution credits={credits} servedFrom={servedFrom} />
+      )}
     </div>
   );
 }
@@ -261,7 +273,21 @@ export function Shell({
  * as the indicative banner above it. It is small and quiet, which the licence
  * permits; it is not absent, which the licence does not.
  */
-function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
+const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
+  api: 'Served from the DrainLens database.',
+  bundled: 'Served from the copy bundled with this site.',
+  mixed: 'Served partly from the DrainLens database and partly from the bundled copy.',
+};
+
+function Attribution({
+  credits,
+  servedFrom,
+}: {
+  readonly credits: readonly Credit[];
+  // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
+  // treats those as different, and the caller always passes the key.
+  readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
+}) {
   return (
     <footer
       style={{
@@ -288,6 +314,7 @@ function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
         </span>
       ))}
       <span>{CHANGES_NOTICE}</span>
+      {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
     </footer>
   );
 }
