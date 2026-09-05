@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc --build",
     "start": "node dist/server.js",
+    "migrate": "node dist/migrate.js",
     "load": "node dist/load.js"
   },
   "devDependencies": {
