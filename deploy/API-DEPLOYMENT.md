@@ -1,10 +1,40 @@
 # Deploying the DrainLens API
 
-**Not deployed yet.** This is the runbook, written before the first run rather than after it, and every claim in it that has not been checked against a real instance says so. When it has been run, the measurements go at the top the way they do in [`deploy/README.md`](README.md) — and anything here that turned out to be wrong gets corrected rather than quietly dropped.
+**Live:** https://drainlens-api-205559161217.australia-southeast1.run.app/health
+
+Deployed **5 September 2026**. This file was written as a runbook before any of it was run, and it has been corrected in three places since — two PowerShell quoting traps that made commands here fail, and one claim about the instance's addressing that was stronger than what was deployed. Those corrections are in place rather than in a footnote, because a runbook that records what somebody meant to type is worse than no runbook.
 
 A second Cloud Run service, `drainlens-api`, over a Cloud SQL for PostgreSQL instance. Five `GET` routes returning the artefacts the frontend already accepts, rebuilt from rows. Same project `fit5120-504507`, same region `australia-southeast1`, same log exclusion — that last one has to be *verified*, not inherited by assumption, and step 2 is where.
 
 **The site does not depend on this.** `apps/web` still fetches its five JSON files from its own container and does not know the API exists. That is deliberate for one iteration: it means this can be deployed, measured, shown and switched off without the site being down for a minute of it, and it means switching the frontend over later is a URL and a CORS header rather than a release.
+
+---
+
+## What the first deployment measured
+
+| 5 September 2026 | |
+|---|---|
+| Revision | `drainlens-api-00001-69r`, serving 100% |
+| Image | `api:d3ce975` — the same short SHA as `main`'s head. Compared, not assumed |
+| Data | `/health` answers `{"status":"ok","pits":895,"areas":30}`. Those are the counts `apps/api/test-db/load.test.ts` asserts, so the migration job reached the database rather than the service starting against an empty one |
+| Responses | `tools/deploy/verify-api.mjs` passed **all eight checks** against the deployed URL. Every response deep-equals the published artefact |
+| **AD1** | `httpRequest.remoteIp:*` over the whole project, one hour, 150 requests in the window: **no entries**. Positive control in the same window shows `system_event`, `varlog/system`, `stdout` and `activity` writing — and **no `run.googleapis.com/requests` log at all** |
+| **Cloud SQL logs** | `postgres.log` is being written and contains only internal maintenance (`automatic analyze of ... heartbeat`, with `db=` and `user=` both empty). **No connection entries**, which is `log_connections=off` doing its job and not a query that matched nothing |
+| Failures | **0 of 150 requests** |
+
+Latency, thirty samples per route, from a laptop over a home connection to Sydney — the same caveat as the site's figures: this measures that link as much as the service.
+
+| Route | p50 | p95 | max | Body |
+|---|---|---|---|---|
+| `/health` | 31.5 ms | 35.0 ms | 343.8 ms | — |
+| `/api/flood-history` | 36.6 ms | 56.5 ms | 306.8 ms | 5.4 KB |
+| `/api/trace/kensington` | 44.7 ms | 50.0 ms | 54.6 ms | 36.8 KB |
+| `/api/derived/kensington` | 50.9 ms | 60.4 ms | 76.0 ms | 135.6 KB |
+| `/api/map/kensington` | 71.2 ms | 85.1 ms | 85.8 ms | 315.9 KB |
+
+The two maxima over 300 ms are cold starts — `--min-instances=0` means the first request after an idle period pays for the container and the connector coming up. That is the cost of not paying for an idle instance, and at this stage it is the right trade.
+
+> **`/` answers 404, and that is correct.** There is no root route: this is five `GET`s, not a website. The first thing anybody does with a new URL is open it in a browser, so it is worth saying here rather than discovering it as a fault.
 
 ---
 
@@ -47,6 +77,20 @@ gcloud sql instances delete drainlens-db --project=fit5120-504507
 
 ---
 
+## PowerShell rewrites arguments before gcloud sees them
+
+Both failures of the first deployment were this, and neither looked like it. The commands are correct; PowerShell changed them on the way past.
+
+**A comma makes an array.** `--database-flags=a=off,b=off,c=none` is parsed as three elements, which PowerShell then joins with spaces when it hands them to a native command. gcloud received `--database-flags=a=off b=off c=none` and answered `Failed to set log_connections: off log_disconnections=off log_statement=none is not on/off` — a message about a value nobody typed. **Wrap any argument containing a comma in single quotes.**
+
+**Inner double quotes are lost.** `gcloud` on Windows is `gcloud.cmd`, and an argument whose value contains `"` is re-parsed on the way through. A logging filter written `'resource.labels.database_id="fit5120-504507:drainlens-db"'` arrived unquoted, and the parser stopped on the colon: `syntax error at line 1, column 124, token ':'` — for a filter only 95 characters long, because gcloud prepends `timestamp>="..."` from `--freshness`, and 124 lands exactly on that colon.
+
+The fix for filters is not more quoting. It is **filters with no spaces and no quotes in them at all**, which step 10 now uses.
+
+This is the same family as *Quote the hash with single quotes* in [`deploy/README.md`](README.md), where double quotes reduced an apr1 hash to a single character and nginx accepted it. In all three cases the shell edited the value and nothing downstream could tell.
+
+---
+
 ## The order, and why it is this order
 
 ### 1. Enable the APIs
@@ -86,8 +130,10 @@ They are in the command below. `log_statement=none` is Postgres's default; it is
 ### 4. Create the instance — this is the step that starts costing money
 
 ```bash
-gcloud sql instances create drainlens-db --project=fit5120-504507 --database-version=POSTGRES_16 --edition=enterprise --tier=db-f1-micro --region=australia-southeast1 --availability-type=zonal --storage-type=HDD --storage-size=10GB --no-storage-auto-increase --no-backup --database-flags=log_connections=off,log_disconnections=off,log_statement=none
+gcloud sql instances create drainlens-db --project=fit5120-504507 --database-version=POSTGRES_16 --edition=enterprise --tier=db-f1-micro --region=australia-southeast1 --availability-type=zonal --storage-type=HDD --storage-size=10GB --no-storage-auto-increase --no-backup '--database-flags=log_connections=off,log_disconnections=off,log_statement=none'
 ```
+
+**The single quotes around `--database-flags` are not decoration** — see *PowerShell rewrites arguments before gcloud sees them* above. Without them this command fails with `off log_disconnections=off log_statement=none is not on/off`.
 
 **Postgres 16 because that is what the tests run against** — `db/docker-compose.yml` and the CI service container are both `postgres:16-alpine`. A migration that applies on 16 and not on 17 is a thing to find out in `npm run test:db`, not in a job execution.
 
@@ -99,51 +145,33 @@ The instance keeps its default public IP with **no authorized networks**, which 
 gcloud sql databases create drainlens --instance=drainlens-db --project=fit5120-504507
 ```
 
-### 5. Create the user — the password is never typed into a command
+### 5 and 6. The password, and the secret it goes into — one block, because nobody should have to remember it
 
-```bash
-gcloud sql users create drainlens --instance=drainlens-db --prompt-for-password --project=fit5120-504507
-```
-
-`--prompt-for-password` reads it from the terminal. **Never pass `--password=`**: that lands in shell history, in the terminal scrollback, and on Windows in `ConsoleHost_history.txt`, which is a plain file that survives reboots.
-
-Generate one that needs no escaping, on your own machine:
-
-```bash
-openssl rand -hex 32
-```
+The password is needed exactly twice: to create the user, and to build the connection string. After that the job and the service read the secret, and no human touches it again. So it is generated, used twice and discarded inside one block, and is never displayed, never written to a file that outlives the command, and never typed by anybody.
 
 ```powershell
-& "C:\Program Files\Git\usr\bin\openssl.exe" rand -hex 32
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $pw = ($b | ForEach-Object { $_.ToString('x2') }) -join ''; gcloud sql users create drainlens --instance=drainlens-db --password=$pw --project=fit5120-504507; $f = Join-Path $env:TEMP "dburl.txt"; [IO.File]::WriteAllText($f, "postgresql://drainlens:$pw@localhost/drainlens?host=/cloudsql/fit5120-504507:australia-southeast1:drainlens-db"); gcloud secrets create drainlens-db-url --replication-policy=automatic --data-file="$f" --project=fit5120-504507; Remove-Item $f; Remove-Variable b, pw, f
 ```
 
-**Hex is not fussiness.** The password goes inside a URL in step 6, and a `#`, `@`, `/` or `?` there silently truncates it — the same failure class as the apr1 hash that double quotes reduced to one character and that nginx then accepted. The gate looked like it was working; it was locked against everybody.
+**The connection string is** `postgresql://drainlens:PASSWORD@localhost/drainlens?host=/cloudsql/fit5120-504507:australia-southeast1:drainlens-db`. `localhost` is a placeholder the parser requires and does not use: `host=` names a **directory**, and Cloud Run mounts the connector's unix socket there. There is no TCP connection and no port.
 
-### 6. Put the connection string in Secret Manager, not in the deploy command
+**Hexadecimal, and that is not fussiness.** The password goes inside a URL, where a `#`, `@`, `/` or `?` silently truncates it — the same failure class as the apr1 hash that double quotes reduced to one character and that nginx then accepted. The gate looked like it was working; it was locked against everybody.
 
-```
-postgresql://drainlens:THE-PASSWORD@localhost/drainlens?host=/cloudsql/fit5120-504507:australia-southeast1:drainlens-db
-```
+**`[IO.File]::WriteAllText`, not `notepad` or `Out-File`.** Notepad may write a BOM and `Out-File` appends a newline, and either would go into the secret: `host=/cloudsql/...drainlens-db\r\n` names a directory that does not exist, and the failure reads as a connection error rather than as three stray bytes. `WriteAllText` writes UTF-8 with no BOM and no trailing newline.
 
-`localhost` is a placeholder the parser requires and does not use: `host=` names a **directory**, and Cloud Run mounts the connector's unix socket there. There is no TCP connection and no port.
+**The one trade in that block is `--password=$pw`.** For the seconds it runs, the password is on the gcloud process's command line, where another process on the machine could read it. What it buys is that the password is *not* in `ConsoleHost_history.txt` — PowerShell records the literal `--password=$pw`, not its value — not echoed to the screen, and not on disk. On a single laptop that is the better side of the trade: a process command line lives for seconds, and the history file survives reboots.
 
-Passed as `--set-env-vars`, that string would be readable in the Cloud Console, in `gcloud run services describe`, and in the shell history of whoever deployed it. A secret is one extra step and removes all three.
+If you would rather it were interactive, `gcloud sql users create drainlens --instance=drainlens-db --prompt-for-password` reads it from the terminal instead — but then you hold it in the clipboard to paste into the secret, which is its own exposure.
+
+Check the secret without printing it:
 
 ```bash
-gcloud secrets create drainlens-db-url --replication-policy=automatic --data-file=- --project=fit5120-504507
+(gcloud secrets versions access latest --secret=drainlens-db-url --project=fit5120-504507).Length
 ```
 
-In Git Bash: paste the URL, then press Ctrl-D. Nothing is written to disk.
+**171**, exactly: 23 characters of prefix, 64 of hexadecimal password, 84 of suffix. One over is a trailing newline, three over is a BOM, short is a truncated password — all three are fixed with a new version, and none of them requires showing the value.
 
-```powershell
-notepad $env:TEMP\dburl.txt
-gcloud secrets create drainlens-db-url --replication-policy=automatic --data-file="$env:TEMP\dburl.txt" --project=fit5120-504507
-Remove-Item $env:TEMP\dburl.txt
-```
-
-PowerShell has no usable Ctrl-D, so it goes through a file — written, added, deleted, in that order. Check the file is gone before you walk away.
-
-To change it later, `gcloud secrets versions add drainlens-db-url --data-file=...`. The job and the service both reference `:latest`, so a new version takes effect on the next execution and the next revision — not on the running one.
+Nothing needs to remember the password afterwards. To change it: `gcloud sql users set-password drainlens --instance=drainlens-db --prompt-for-password`, then `gcloud secrets versions add drainlens-db-url --data-file=...`. The job and the service both reference `:latest`, so a new version takes effect on the next execution and the next revision — not on the running one.
 
 ### 7. Create the image repository, and build
 
@@ -229,23 +257,27 @@ node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-so
 
 That fetches all five routes and compares each response against the published artefact it is supposed to reproduce — **deeply**, not by shape. The frontend's guards accept a trace with keys missing and links whose reason was dropped; four such changes reached a passing test suite before a whole-response comparison caught them. A shape check here would find none of them either.
 
-Then the log check, which is two questions and not one:
+Then the log check, which is two questions and not one. **Run the verifier first**, so the window has traffic in it — a log check over an hour in which nobody visited proves nothing whichever way it comes out.
 
 ```bash
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="drainlens-api" AND httpRequest.remoteIp!=""' --limit=20 --freshness=1h --project=fit5120-504507
+gcloud logging read httpRequest.remoteIp:* --limit=20 --freshness=1h --project=fit5120-504507
 ```
+
+Expected: **nothing**. `field:*` is the existence test, and this filter is deliberately one token with no spaces and no quotes — see *PowerShell rewrites arguments* above. It is also **stronger than scoping it to the service**: it asks whether any log entry anywhere in this project, from either Cloud Run service, carries a client address.
 
 ```bash
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="drainlens-api"' --limit=10 --freshness=1h --project=fit5120-504507 --format="value(logName)"
+gcloud logging read 'resource.type="cloud_run_revision"' --limit=10 --freshness=1h --project=fit5120-504507 --format="value(logName)"
 ```
 
-**Zero results from the first query proves nothing on its own.** It is the same result you get from a typo in the service name, from a stale freshness window, or from a service nobody has visited. The second query — the positive control — has to come back non-empty, naming `system`, `stderr` or `varlog`, before the first one means what it says.
+**Zero results from the first query proves nothing on its own.** It is the same result you get from a stale freshness window, a service nobody has visited, or a filter that is quietly wrong. This one — the positive control — has to come back non-empty before the first one means what it says. On 5 September it returned `cloudaudit/system_event`, `run/varlog/system`, `run/stdout` and `cloudaudit/activity` — and **no `run.googleapis.com/requests`**, which is the entry the exclusion drops.
 
 Do the same for the database, once:
 
 ```bash
-gcloud logging read 'resource.type="cloudsql_database" AND resource.labels.database_id="fit5120-504507:drainlens-db"' --limit=20 --freshness=1h --project=fit5120-504507
+gcloud logging read resource.type=cloudsql_database --limit=20 --freshness=1h --project=fit5120-504507
 ```
+
+The instance name is not in the filter because there is one instance in this project, and adding it would put a colon inside quotes — which is the argument PowerShell destroys. **This query carries its own positive control**: `postgres.log` comes back non-empty, full of internal maintenance lines with `db=` and `user=` empty, and not one connection entry. Logging works, and connections are not in it.
 
 ---
 
