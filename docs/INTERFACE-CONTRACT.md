@@ -133,6 +133,10 @@ Listed because each looks like a natural thing to move, and each would break som
 
 **All navigation state.** Address, chosen task and scenario inputs live in one object for the life of the tab: not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie` and plays a whole session.
 
+**One exception, and it is the only one: `drainlens.tour.seen`.** Since 5 September 2026 the map tour opens by itself for somebody who has not been shown it, which needs one `localStorage` key holding the string `"1"`. It records that a tour was shown once on this browser and nothing else — no address, no identifier, no timestamp, no count, no record of what was looked at. `apps/web/src/ui/tourGate.ts` is the only code that reads or writes it, and `tourGate.test.ts` asserts the value is exactly that one character, so a later addition of a step number or a date fails a test rather than passing review.
+
+> **This reverses a decision, deliberately.** The tour originally had no stored state at all, on the argument that a product whose position is that it holds nothing about you should not start by writing a fact about you in order to be helpful. What changed is the weighing: a first-time visitor should not have to find a button to be told what an unlabelled map is, and a tour that reopens on every visit is a larger imposition than one boolean. The principle is unchanged — the session reducer still writes to nothing, and the address rule above is untouched and still enforced by its own test.
+
 ---
 
 ## Shared vocabulary
