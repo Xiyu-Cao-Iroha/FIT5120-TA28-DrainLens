@@ -36,6 +36,8 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 
 Serve them, gzipped, with a cache policy that lets a version be replaced. Nothing else. There is no endpoint behind them and no request to authorise.
 
+> **Revisited 5 September 2026.** A database is planned for Iteration 2 and the artefacts below will be assembled from it — in the same shapes, so the frontend and its assertions do not change. What follows stays true of derivation: the pipeline computes, the database stores. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md).
+
 They are **versioned build products**, not a database. When the extent changes, the pipeline is re-run and the files are replaced wholesale. A backend that tried to assemble these per request would be rebuilding a pipeline that already exists and can be checked offline.
 
 ---

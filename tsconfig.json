@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/schema" },
-    { "path": "./packages/scenario" },
-    { "path": "./apps/web" }
+    {
+      "path": "./packages/schema"
+    },
+    {
+      "path": "./packages/scenario"
+    },
+    {
+      "path": "./apps/web"
+    },
+    {
+      "path": "./apps/api"
+    }
   ]
 }

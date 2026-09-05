@@ -1,0 +1,21 @@
+{
+  "name": "@drainlens/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The read-only interface over the DrainLens database. Every route is a GET, and none of them takes anything that identifies a person.",
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/server.js",
+    "load": "node dist/load.js"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "hono": "^4.13.7",
+    "pg": "^8.23.0"
+  },
+  "main": "./dist/server.js"
+}
