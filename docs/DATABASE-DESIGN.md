@@ -135,6 +135,44 @@ The third is the one worth remembering. It would have loaded without error
 against a plausible-looking artefact, and produced a table that answered
 questions confidently and wrongly.
 
+### Four things the deep comparison caught that the guards did not
+
+The API's first version passed `assertUsable`, `assertDerived`, `assertTrace`
+and `assertFloodHistory`, and passed spot checks on layer counts and one pit.
+It was still wrong in four ways, all found by comparing a whole response with
+the file it replaces.
+
+**Thirty-seven links lost their reason.** 697 of the 734 name the pit a pipe
+reaches; the other 37 name the pipe and a reason the destination is unknown —
+the record has the pipe and not its end. Stored as `to_pit NULL` with `ends`
+dropped, they came back as `{ pipe, to: null }`. `traceDownstream` tests
+`link.to === undefined`, which `null` is not, **so the client would have walked
+into a pit that does not exist** instead of stopping and saying why. There is a
+CHECK constraint on it now: a link has a destination or a reason, never both
+and never neither.
+
+**Two hundred and fifteen pits lost their key.** The artefact carries an empty
+array for a pit with nothing leaving it, and `traceDownstream` documents the
+difference: an absent key is *a pit we do not carry*, an empty array is *the
+record says there is no pipe*. They render alike today and are different
+questions. Rebuilding is a left join from `pit` now.
+
+**Every street lost its display name.** The artefact carries `name`
+(`SMITHFIELD  ROAD`) and `maplabel` (`Smithfield  Road`), and `draw.ts` reads
+`maplabel ?? name`. The column did not exist, so all 163 streets would have
+been drawn in capitals.
+
+**Twenty-two pits had their links reordered**, because the query sorted by pipe
+id and the artefact uses the pipeline's order. `traceDownstream` walks them in
+the order it is given, so which path a resident is shown first would have
+depended on an id. `trace_link.position` keeps it.
+
+> **The lesson is about the tests, not the schema.** Guards check that an
+> artefact can qualify itself; they do not check that it says the same thing as
+> the one it replaces. Counts and spot checks miss a dropped field on every row.
+> Only a comparison with no opinion about which fields matter finds these, and
+> it found four.
+
 ### Two decisions that became measurements
 
 **No foreign key on `pipe.dnstr_pit`.** Sixty-nine of the 893 pipes name a
@@ -148,6 +186,10 @@ on the map, as a path that stops because the record stops.
 recorded*; an empty string would print as a value.
 
 ## What the API serves
+
+Built, running, and answering on every route. `apps/api`, Hono on Node, with
+`pg` and a pool of five.
+
 
 `apps/api` — Node, TypeScript, Hono, on Cloud Run beside the existing service.
 

@@ -54,6 +54,29 @@ CREATE TABLE IF NOT EXISTS extent (
   crs       text NOT NULL
 );
 
+-- The prose and provenance each artefact carries around its data.
+--
+-- **The line this draws is worth stating, because jsonb invites erosion.**
+-- Anything a query filters, sorts, joins or counts gets a real column: pits,
+-- pipes, counts, years. What goes in here is the envelope -- the note saying
+-- what a layer is not, the reporting period, the basis, the coordinate frame
+-- -- which the API serves back whole and never searches.
+--
+-- It exists because the frontend's guards check it. `assertDerived` refuses an
+-- artefact whose basis is not 'derived'; `assertFloodHistory` refuses one with
+-- no reporting period, no geographic unit, or no sentence saying what a count
+-- is. Those sentences are authored in the pipeline, and re-typing them in the
+-- API would be a second copy that drifts in silence.
+--
+-- If a future query needs to filter on something in here, that something has
+-- earned a column.
+CREATE TABLE IF NOT EXISTS artefact_envelope (
+  name        text PRIMARY KEY,   -- 'map', 'derived', 'trace', 'flood-history'
+  extent_id   text REFERENCES extent(id) ON DELETE CASCADE,
+  version     integer NOT NULL,
+  envelope    jsonb NOT NULL
+);
+
 -- ---------------------------------------------------------------------------
 -- The recorded drainage network
 -- ---------------------------------------------------------------------------
@@ -107,10 +130,18 @@ CREATE TABLE IF NOT EXISTS road (
 
 CREATE INDEX IF NOT EXISTS road_extent_idx ON road (extent_id);
 
+-- Two names, and the map draws the second one.
+--
+-- `name` is the council's, in capitals: SMITHFIELD  ROAD. `maplabel` is the
+-- display form: Smithfield  Road. `draw.ts` reads `maplabel ?? name`, so
+-- dropping the column -- which the first version of this schema did -- puts
+-- every street on the map in shouting capitals. The guards accept it and a
+-- reader sees it immediately.
 CREATE TABLE IF NOT EXISTS street_label (
   id          bigserial PRIMARY KEY,
   extent_id   text NOT NULL REFERENCES extent(id) ON DELETE CASCADE,
   name        text NOT NULL,
+  maplabel    text,
   path        jsonb NOT NULL,
   dataset_id  text NOT NULL REFERENCES source(dataset_id)
 );
@@ -135,12 +166,31 @@ CREATE INDEX IF NOT EXISTS derived_shape_extent_layer_idx ON derived_shape (exte
 -- Where a followed path stops, and why
 -- ---------------------------------------------------------------------------
 
+-- One row per pipe leaving a pit.
+--
+-- **`to_pit` and `ends` are mutually exclusive, and that is the record
+-- speaking.** 697 of the 734 links name the pit the pipe reaches. The other 37
+-- name a pipe that leaves and a reason the destination is unknown -- the
+-- council record has the pipe and not its end. Storing those as `to_pit NULL`
+-- and dropping the reason, which the first version of the loader did, turns
+-- "a pipe leaves and we cannot say where it goes" into "a pipe leaves and goes
+-- nowhere named", and the client then walks into a pit that does not exist
+-- instead of stopping and saying why.
 CREATE TABLE IF NOT EXISTS trace_link (
-  from_pit    bigint NOT NULL,
-  to_pit      bigint,
-  via_pipe    bigint,
   extent_id   text NOT NULL REFERENCES extent(id) ON DELETE CASCADE,
-  PRIMARY KEY (extent_id, from_pit, via_pipe)
+  from_pit    bigint NOT NULL,
+  via_pipe    bigint NOT NULL,
+  to_pit      bigint,
+  ends        text,
+  -- Where this link sits in the pit's own list, so the rebuilt artefact keeps
+  -- the pipeline's order. Sorting by pipe id instead reordered the outgoing
+  -- links of 22 pits, and `traceDownstream` walks them in the order it is
+  -- given -- so which path a resident is shown first would have depended on
+  -- an id rather than on the record.
+  position    integer NOT NULL,
+  PRIMARY KEY (extent_id, from_pit, via_pipe),
+  CONSTRAINT link_has_a_destination_or_a_reason
+    CHECK ((to_pit IS NULL) <> (ends IS NULL))
 );
 
 -- Why a path can stop, and the sentence shown when it does.

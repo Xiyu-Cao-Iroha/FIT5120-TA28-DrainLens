@@ -88,7 +88,8 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
   await client.query(`
     TRUNCATE flood_area_coverage, flood_area, flood_incident, sa1_region,
              trace_reason, trace_link, derived_shape, street_label,
-             road, pipe, pit, extent, population, source RESTART IDENTITY;
+             road, pipe, pit, artefact_envelope, extent, population,
+             source RESTART IDENTITY;
   `);
 
   // --- Provenance -----------------------------------------------------------
@@ -159,6 +160,34 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
   );
   count('extent', 1);
 
+  // --- The envelope each artefact carries around its data --------------------
+
+  // Everything but the bulk arrays. The guards in the frontend check these
+  // fields, and the sentences in them are authored in the pipeline -- retyping
+  // them here would be a second copy that drifts without anybody noticing.
+  const envelopes: [string, Artefact, readonly string[]][] = [
+    ['map', map, ['layers']],
+    ['derived', derived, ['layers']],
+    ['trace', trace, ['links']],
+    ['flood-history', flood, ['areas']],
+  ];
+  for (const [name, artefact, bulk] of envelopes) {
+    const envelope = Object.fromEntries(
+      Object.entries(artefact).filter(([key]) => !bulk.includes(key)),
+    );
+    await client.query(
+      `INSERT INTO artefact_envelope (name, extent_id, version, envelope) VALUES ($1, $2, $3, $4)`,
+      [
+        name,
+        // The flood history is Greater Melbourne, not the pilot extent.
+        name === 'flood-history' ? null : EXTENT,
+        need(artefact.version as number | undefined, `a version on ${name}`),
+        JSON.stringify(envelope),
+      ],
+    );
+  }
+  count('artefact_envelope', envelopes.length);
+
   // --- The recorded network -------------------------------------------------
 
   const layers = need(
@@ -225,10 +254,14 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
   const labels = layers['street-name'] ?? [];
   for (const label of labels) {
     await client.query(
-      `INSERT INTO street_label (extent_id, name, path, dataset_id) VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO street_label (extent_id, name, maplabel, path, dataset_id)
+       VALUES ($1, $2, $3, $4, $5)`,
       [
         EXTENT,
         need(label.name as string | undefined, 'a name on a street label'),
+        // The display form. The map draws `maplabel ?? name`, so losing this
+        // puts every street in capitals.
+        label.maplabel ?? null,
         JSON.stringify(label.c),
         datasetFor('street-name'),
       ],
@@ -259,21 +292,42 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
 
   // `links` is a map from a pit to the pipes leaving it, not a list of edges.
   const links = need(
-    trace.links as Record<string, readonly { pipe: string; to: string }[]> | undefined,
+    trace.links as
+      | Record<string, readonly { pipe: string; to?: string; ends?: string }[]>
+      | undefined,
     'links on the trace artefact',
   );
   let edges = 0;
   for (const [from, outgoing] of Object.entries(links)) {
-    for (const edge of outgoing) {
+    for (const [position, edge] of outgoing.entries()) {
+      // A link names the pit it reaches, or the reason the record does not.
+      // Never both, never neither -- the schema has a CHECK for it, because
+      // the first version stored `to` as NULL and dropped `ends`, which made
+      // thirty-seven pipes look like they went nowhere named rather than
+      // stopping with a reason.
+      if ((edge.to === undefined) === (edge.ends === undefined)) {
+        throw new LoadError(
+          `link ${from} -> ${edge.pipe} has ${edge.to === undefined ? 'neither' : 'both'} a destination and a reason`,
+        );
+      }
       await client.query(
-        `INSERT INTO trace_link (extent_id, from_pit, to_pit, via_pipe) VALUES ($1, $2, $3, $4)
-         ON CONFLICT DO NOTHING`,
-        [EXTENT, from, edge.to, edge.pipe],
+        `INSERT INTO trace_link (extent_id, from_pit, via_pipe, to_pit, ends, position)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
+        [EXTENT, from, edge.pipe, edge.to ?? null, edge.ends ?? null, position],
       );
       edges += 1;
     }
   }
   count('trace_link', edges);
+
+  // The artefact keys every pit, including the 215 with nothing leaving them,
+  // and that set is exactly the pits in this extent -- checked, not assumed.
+  // Rebuilding the map is a left join from `pit`, so no table is needed here.
+  if (Object.keys(links).length !== pits.length) {
+    throw new LoadError(
+      `the trace keys ${String(Object.keys(links).length)} pits and the map has ${String(pits.length)}`,
+    );
+  }
 
   // `terminations` is the vocabulary of reasons and their sentences, and
   // `counts` is how many pits fall into each. Neither says which pit ends for
