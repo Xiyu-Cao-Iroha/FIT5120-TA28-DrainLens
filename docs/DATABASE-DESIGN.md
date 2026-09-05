@@ -250,6 +250,12 @@ product refuses to fabricate.
 
 ## How it is deployed
 
+**Live since 5 September 2026:**
+https://drainlens-api-205559161217.australia-southeast1.run.app/health —
+`drainlens-api-00001-69r`, over a `db-f1-micro` Cloud SQL instance in
+`australia-southeast1`, serving 895 pits and 30 areas. Every response was
+compared against the artefact it reproduces and matched.
+
 The runbook is [`deploy/API-DEPLOYMENT.md`](../deploy/API-DEPLOYMENT.md): a
 Cloud SQL instance, an image built from `deploy/api/Dockerfile`, a Cloud Run
 job that migrates and loads, and a Cloud Run service that serves. The job and
