@@ -1,6 +1,6 @@
 # The database, and what it is allowed to hold
 
-DrainLens · TA28 · **proposed 5 September 2026, not yet built**
+DrainLens · TA28 · **proposed and built, 5 September 2026**
 
 Iteration 1 shipped with no application server and no database, and that was a
 recorded decision. It is being reversed for Iteration 2. This document says
@@ -73,99 +73,79 @@ offline — which is what the interface contract says, and it is still right.
 
 ---
 
-## Schema
+## Built and verified, 5 September
 
-Written against the artefacts as they exist today, not invented. Coordinates
-are metres east and north of the extent's south-west corner, to a decimetre —
-the same frame every artefact uses, so nothing is reprojected on the way in.
+The schema and the loader exist and were run. Against Postgres 16:
 
-```sql
--- Reference data: one row per published extent, so a second pilot area does
--- not mean a second database.
-CREATE TABLE extent (
-  id            text PRIMARY KEY,          -- 'kensington'
-  min_e         double precision NOT NULL,
-  min_n         double precision NOT NULL,
-  width_m       double precision NOT NULL,
-  height_m      double precision NOT NULL,
-  crs           text NOT NULL,             -- 'EPSG:28355'
-  built_at      timestamptz NOT NULL
-);
+| Table | Rows | Matches |
+|---|---:|---|
+| `pit` · `pipe` · `road` · `street_label` | 895 · 893 · 220 · 163 | `map.json` exactly |
+| `derived_shape` | 394 | 38 channels + 310 low points + 46 unavailable |
+| `trace_link` · `trace_reason` | 734 · 4 | `trace.json` exactly |
+| `flood_area` · `flood_area_coverage` | 180 · 30 | thirty areas over six years |
+| `flood_incident` · `population` | 0 · 0 | empty on purpose, see above |
 
--- Every dataset the product redistributes, so provenance is a row and not a
--- string repeated in five artefacts. AC 1.1.4.g and the CC BY attribution both
--- read from here.
-CREATE TABLE source (
-  dataset_id    text PRIMARY KEY,
-  title         text NOT NULL,
-  publisher     text NOT NULL,
-  licence       text NOT NULL,
-  retrieved     date NOT NULL
-);
+**Two design decisions stopped being assertions and became measurements.**
+Sixty-nine of the 893 pipes name a downstream pit that is not in this extent —
+a foreign key on `dnstr_pit` would have rejected sixty-nine rows the council
+record actually contains. And twenty-two of the 895 pits have no recorded
+object type, which is the nullable column doing the work AC 1.1.7.f needs.
 
-CREATE TABLE pit (
-  asset_number  bigint PRIMARY KEY,
-  extent_id     text NOT NULL REFERENCES extent(id),
-  e_m           double precision NOT NULL,
-  n_m           double precision NOT NULL,
-  description   text,                      -- NULL means the record is empty,
-  object_type   text,                      -- not that we chose not to show it
-  dataset_id    text NOT NULL REFERENCES source(dataset_id)
-);
+The board rebuilds from rows: Bacchus Marsh 209, Croydon 196, Eltham 179,
+Boronia - The Basin 160 (incomplete), Dandenong 133 (incomplete) — **and the
+query finds the Dandenong/Gisborne tie at 133** rather than silently ordering
+one above the other.
 
-CREATE TABLE pipe (
-  ref           bigint PRIMARY KEY,
-  extent_id     text NOT NULL REFERENCES extent(id),
-  upstr_pit     bigint REFERENCES pit(asset_number),
-  dnstr_pit     bigint REFERENCES pit(asset_number),
-  diameter_mm   integer,
-  material      text,
-  path          double precision[][] NOT NULL,
-  dataset_id    text NOT NULL REFERENCES source(dataset_id)
-);
-
--- Why a path ends, kept beside the edge rather than derived in the client.
-CREATE TABLE trace_termination (
-  pit           bigint PRIMARY KEY REFERENCES pit(asset_number),
-  reason        text NOT NULL              -- 'no-recorded-connection', ...
-);
-
--- Flood incidents, at the grain the source publishes them: one row per SA1
--- region per financial year. 13,339 regions x 6 years, with NULL where the
--- publisher withheld the count for privacy.
-CREATE TABLE flood_incident (
-  sa1_code_2011 char(7) NOT NULL,
-  financial_year char(7) NOT NULL,         -- '2009-10'
-  incident_type text NOT NULL,             -- 'Flood'
-  count         integer,                   -- NULL = withheld, not zero
-  PRIMARY KEY (sa1_code_2011, financial_year, incident_type)
-);
-
-CREATE TABLE sa1_region (
-  sa1_code_2011 char(7) PRIMARY KEY,
-  sa2_name      text NOT NULL,             -- the name the board ranks by
-  greater_capital text NOT NULL            -- 'Greater Melbourne'
-);
-
--- New, and the reason this database exists. Grain to be fixed once the
--- dataset is verified -- see Open questions.
-CREATE TABLE population (
-  area_code     text NOT NULL,
-  area_level    text NOT NULL,             -- 'SA1' or 'SA2'
-  as_at         date NOT NULL,
-  persons       integer NOT NULL,
-  dataset_id    text NOT NULL REFERENCES source(dataset_id),
-  PRIMARY KEY (area_code, area_level, as_at)
-);
-```
-
-**`count` is nullable and that is load-bearing.** The publisher withholds
-counts for privacy in 144 of the 13,339 regions. A withheld count is not zero,
-and a schema that stored it as zero would produce a ranking that is quietly
-wrong. Nine of the thirty published areas contain one, which is why the board
-shows those totals as floors with a `+`.
+Twelve integration tests assert all of it, behind `npm run test:db` with its
+own CI job and a Postgres service container. They are not in the five-second
+suite, because tests that need a container do not fail without one — they
+refuse to start, and nobody could then test anything.
 
 ---
+
+## Schema
+
+**`db/migrations/001_init.sql` is the schema. This section is not a copy of
+it** — a second copy drifts, and the one in a design document drifts silently.
+Read the migration; it carries a comment per decision.
+
+### Three things the draft got wrong, found by running it
+
+The first draft of this section was written from the artefacts as I understood
+them. Loading the real files broke it three times, and each break was the
+schema claiming something the data does not say.
+
+**`source.title NOT NULL`.** The map artefact names a dataset id, a publisher
+and a licence per layer and carries **no human title**. The load failed on the
+first row. Writing the id into the column to fill it would have invented a
+title; the column is nullable now.
+
+**`retrieved date`.** The artefacts record `last_modified` — when the
+*publisher* last changed the dataset. That is not when we fetched it. A column
+named for one fact holding the other is a lie that survives every future
+reader, so the column is `last_modified`.
+
+**`trace_termination (pit, reason)`.** This was fiction. The artefact does not
+say which pit ends for which reason: it publishes the four reasons, the
+sentence shown for each, and how many pits fall into each. Which reason applies
+to a given pit depends on where the walk started and is worked out when a path
+is followed. It is `trace_reason` — a vocabulary — now.
+
+The third is the one worth remembering. It would have loaded without error
+against a plausible-looking artefact, and produced a table that answered
+questions confidently and wrongly.
+
+### Two decisions that became measurements
+
+**No foreign key on `pipe.dnstr_pit`.** Sixty-nine of the 893 pipes name a
+downstream pit that is not in this extent. A constraint would have rejected
+sixty-nine rows the council record actually contains — the database editing the
+record rather than storing it. It is also the same fact a resident already sees
+on the map, as a path that stops because the record stops.
+
+**`pit.object_type` nullable.** Twenty-two of the 895 pits have none. NULL is
+"the council record has no value here", which `PitDetail` renders as *Not
+recorded*; an empty string would print as a value.
 
 ## What the API serves
 
@@ -195,19 +175,34 @@ suite is still testing the thing that ships, and a rollback is a URL change.
 
 ## Getting the data in
 
-`drainlens_pipeline` gains a `--to-database` flag alongside its file output. It
-does not replace the file output — the two run from one pass so they cannot
-disagree, and the files remain the artefact of record for a build.
+**Changed on 5 September, while building it.** This section first said the
+pipeline would gain a `--to-database` flag and write rows alongside files. That
+is two writers and two truths that can disagree, and the disagreement would be
+invisible until somebody compared a map with a query.
+
+The loader reads the **published artefacts** instead. There is one derivation,
+one writer, one language touching the connection, and a database that can be
+rebuilt from a checkout at any time.
 
 ```
-pipeline  ──derives──>  rows  ──>  Cloud SQL
-              │
-              └────────>  JSON artefacts (unchanged)
+pipeline  ──derives──>  JSON artefacts  ──loader──>  Postgres
+                        (the record)
 ```
 
-Loading is `COPY` from the pipeline's own output, inside one transaction, into
-a schema created by a numbered migration. A load that fails leaves the previous
-rows in place rather than a half-populated table.
+`apps/api/src/load.ts`, in one transaction, truncating before it inserts so a
+re-run replaces rather than doubles. A load that throws leaves the previous
+rows in place rather than a half-populated map, and every field it reads is one
+the artefact is contracted to carry — a missing one throws with its name rather
+than becoming a NULL that reads as "the council recorded nothing".
+
+**What this costs is the SA1 grain.** The published artefact holds the
+thirty-area rollup; the 13,339 regions underneath it are computed by the
+pipeline and discarded at build time. Loading them means the pipeline emitting
+the full grain as a file, which means re-fetching the VICSES and ABS sources,
+which are downloaded per run and not kept in the repository. Until then
+`flood_incident` is declared and empty — as is `population` — because inventing
+SA1 codes to make a table look loaded would be fabricating the identifiers this
+product refuses to fabricate.
 
 ---
 

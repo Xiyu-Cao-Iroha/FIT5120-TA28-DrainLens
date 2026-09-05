@@ -6,5 +6,11 @@
   "description": "The read-only interface over the DrainLens database. Every route is a GET, and none of them takes anything that identifies a person.",
   "scripts": {
     "build": "tsc --build"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
   }
 }

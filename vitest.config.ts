@@ -18,7 +18,19 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary', 'lcov'],
       include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/index.ts', '**/*.d.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/index.ts',
+        '**/*.d.ts',
+        // Covered by `npm run test:db`, not by this run, and excluded here so
+        // that the percentage stays a statement about the unit suite rather
+        // than a number nobody can act on. It is not untested: twelve tests in
+        // `apps/api/test-db/load.test.ts` load it against a real Postgres and
+        // reconcile every table against the published artefacts. Excluding it
+        // *before* those existed would have been hiding untested code behind a
+        // gate, which is a different thing entirely.
+        'apps/api/src/load.ts',
+      ],
       thresholds: {
         lines: 88,
         functions: 88,

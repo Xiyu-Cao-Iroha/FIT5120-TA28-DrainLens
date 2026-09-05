@@ -29,10 +29,18 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 -- attribution both read from it and they must not be able to drift apart.
 CREATE TABLE IF NOT EXISTS source (
   dataset_id  text PRIMARY KEY,
-  title       text NOT NULL,
+  -- Nullable, because most of these datasets do not have one. The map
+  -- artefact carries an id, a publisher and a licence per layer and no human
+  -- title; the flood history carries a dataset name. Writing the id into this
+  -- column to make it look filled would be inventing a title.
+  title       text,
   publisher   text NOT NULL,
   licence     text NOT NULL,
-  retrieved   date
+  -- When the *publisher* last changed the dataset, which is what the
+  -- artefacts record. It is not when we downloaded it: those are different
+  -- facts and a column named for one holding the other is a lie that survives
+  -- every future reader.
+  last_modified date
 );
 
 -- One row per published extent, so a second pilot area is more rows rather
@@ -57,7 +65,8 @@ CREATE TABLE IF NOT EXISTS pit (
   n_m           double precision NOT NULL,
   -- Nullable, and the distinction is the point: NULL is "the council record
   -- has no value here", which is a different statement from an empty string
-  -- and from a value we chose not to display. AC 1.1.7.f turns on it.
+  -- and from a value we chose not to display. AC 1.1.7.f turns on it, and it
+  -- is not hypothetical -- 22 of the 895 pits have no recorded object type.
   description   text,
   object_type   text,
   dataset_id    text NOT NULL REFERENCES source(dataset_id)
@@ -68,10 +77,13 @@ CREATE INDEX IF NOT EXISTS pit_extent_idx ON pit (extent_id);
 CREATE TABLE IF NOT EXISTS pipe (
   ref           bigint PRIMARY KEY,
   extent_id     text NOT NULL REFERENCES extent(id) ON DELETE CASCADE,
-  -- Not foreign keys to pit. The council record names pits that are outside
-  -- this extent, and a constraint here would reject rows the source actually
-  -- contains -- which would be the database editing the record rather than
-  -- storing it. Whether a pit is present is a question the API answers.
+  -- Not foreign keys to pit, and this is measured rather than assumed:
+  -- **69 of the 893 pipes name a downstream pit that is not in this extent.**
+  -- A constraint here would reject sixty-nine rows the council record actually
+  -- contains -- the database editing the record rather than storing it. It is
+  -- also the same fact the map already shows a resident, as a path that stops
+  -- because the record stops. Whether a pit is present is a question the API
+  -- answers, not one the schema forbids asking.
   upstr_pit     bigint,
   dnstr_pit     bigint,
   diameter_mm   integer,
@@ -131,24 +143,41 @@ CREATE TABLE IF NOT EXISTS trace_link (
   PRIMARY KEY (extent_id, from_pit, via_pipe)
 );
 
-CREATE TABLE IF NOT EXISTS trace_termination (
+-- Why a path can stop, and the sentence shown when it does.
+--
+-- **This is a vocabulary, not a per-pit assignment**, and the first draft of
+-- this schema got that wrong. The artefact does not say which pit ends for
+-- which reason: it publishes the four reasons, the sentence for each, and how
+-- many pits fall into each. Which reason applies to a given pit is worked out
+-- when a path is followed, because it depends on where the walk started.
+--
+-- Storing a `reason` per pit would have looked reasonable and been fiction.
+CREATE TABLE IF NOT EXISTS trace_reason (
   extent_id   text NOT NULL REFERENCES extent(id) ON DELETE CASCADE,
-  pit         bigint NOT NULL,
-  -- 'no-recorded-connection', 'unrecorded-destination', 'leaves-mapped-area',
-  -- 'cycle-guard'. Stored rather than recomputed, because the reason a path
-  -- stops is a statement about the record and the client must not have to
-  -- infer it.
-  reason      text NOT NULL,
-  PRIMARY KEY (extent_id, pit)
+  reason      text NOT NULL,   -- 'no-recorded-connection', 'cycle-guard', ...
+  sentence    text NOT NULL,   -- shown to a resident, in the record's words
+  occurrences integer,         -- NULL where the artefact publishes no count
+  PRIMARY KEY (extent_id, reason)
 );
 
 -- ---------------------------------------------------------------------------
 -- Recorded flood incidents
 -- ---------------------------------------------------------------------------
 
--- At the grain the source publishes: one row per SA1 region per financial
--- year. The artefact holds thirty named areas; this holds all 13,339 regions,
--- which is the reason there is a database at all.
+-- The finest grain the source publishes: one row per SA1 region per financial
+-- year, all 13,339 of them.
+--
+-- **Nothing loads this yet, and the reason is worth writing down.** The
+-- published artefact holds the thirty-area rollup, not the regions underneath
+-- it -- the pipeline computes 13,339 and discards them at build time. Filling
+-- this table means the pipeline emitting the full grain as a file the loader
+-- can read, which in turn means re-fetching the VICSES and ABS sources: they
+-- are downloaded per run and are not kept in the repository.
+--
+-- It is declared now because it is the table the population join needs, and
+-- because the alternative -- inventing SA1 codes for thirty areas so that a
+-- table looks populated -- would be fabricating the identifiers this whole
+-- product refuses to fabricate.
 CREATE TABLE IF NOT EXISTS flood_incident (
   sa1_code_2011   char(7) NOT NULL,
   financial_year  char(7) NOT NULL,
@@ -163,6 +192,34 @@ CREATE TABLE IF NOT EXISTS flood_incident (
 );
 
 CREATE INDEX IF NOT EXISTS flood_incident_year_idx ON flood_incident (financial_year);
+
+-- The published rollup: one row per named area per financial year, which is
+-- exactly what flood-history.json carries and what the board reads.
+--
+-- It is a table rather than a view **for now**. When the pipeline emits the
+-- SA1 grain, this becomes a view over flood_incident joined to sa1_region and
+-- the two can no longer disagree; today it is loaded directly, because a view
+-- over an empty table would serve an empty board.
+CREATE TABLE IF NOT EXISTS flood_area (
+  extent_scope        text NOT NULL,        -- 'Greater Melbourne'
+  area_name           text NOT NULL,
+  financial_year      char(7) NOT NULL,
+  incident_type       text NOT NULL,
+  count               integer NOT NULL,     -- the published rollup omits none
+  PRIMARY KEY (extent_scope, area_name, financial_year, incident_type)
+);
+
+-- Per-area facts that do not vary by year, kept beside the counts rather than
+-- recomputed.  is false where a region inside the area had its count
+-- withheld, which makes the area total a floor rather than a figure.
+CREATE TABLE IF NOT EXISTS flood_area_coverage (
+  extent_scope        text NOT NULL,
+  area_name           text NOT NULL,
+  regions             integer NOT NULL,
+  suppressed_regions  integer NOT NULL,
+  complete            boolean NOT NULL,
+  PRIMARY KEY (extent_scope, area_name)
+);
 
 CREATE TABLE IF NOT EXISTS sa1_region (
   sa1_code_2011    char(7) PRIMARY KEY,
