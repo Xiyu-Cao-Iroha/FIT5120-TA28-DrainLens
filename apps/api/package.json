@@ -1,0 +1,10 @@
+{
+  "name": "@drainlens/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The read-only interface over the DrainLens database. Every route is a GET, and none of them takes anything that identifies a person.",
+  "scripts": {
+    "build": "tsc --build"
+  }
+}
