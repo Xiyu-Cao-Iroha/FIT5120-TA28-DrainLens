@@ -248,6 +248,17 @@ product refuses to fabricate.
 
 ---
 
+## How it is deployed
+
+The runbook is [`deploy/API-DEPLOYMENT.md`](../deploy/API-DEPLOYMENT.md): a
+Cloud SQL instance, an image built from `deploy/api/Dockerfile`, a Cloud Run
+job that migrates and loads, and a Cloud Run service that serves. The job and
+the service are the same image, because a migration built from a different
+commit than the server it migrates for is a failure nobody can reproduce
+afterwards.
+
+---
+
 ## What must still be true afterwards
 
 1. **No endpoint receives an address.** Every route above takes an extent id or
@@ -258,12 +269,23 @@ product refuses to fabricate.
    way it was verified against the site — with a positive control, because an
    empty log during a quiet hour proves nothing.
 3. **Cloud SQL logs are a second place IPs can appear.** `log_connections` and
-   `log_disconnections` record client addresses. They are off by default on
-   Cloud SQL; that has to be checked rather than assumed, and checked again
-   after any flag change.
-4. **The database is reachable only from the API**, over the Cloud SQL
-   connector with no public IP. A student project with an open Postgres port is
-   found by scanners in hours.
+   `log_disconnections` record client addresses. Rather than rely on a default
+   nobody checked, the instance is created with both set to `off` explicitly —
+   a flag that is set can be read back, and a default cannot be told apart from
+   an oversight. `deploy/API-DEPLOYMENT.md` step 3.
+4. **The database accepts no direct connection.** This is weaker than what this
+   document first said, and the difference is worth writing down rather than
+   quietly softening. "No public IP" would need a VPC and either a serverless
+   connector or Direct VPC egress — more moving parts and, for the connector,
+   more money than the database. What is deployed instead is an instance with
+   its default public IP and **no authorized networks**, which is not the same
+   as reachable: with no network authorised, the only way in is the Cloud SQL
+   Auth connector, over TLS, with IAM. A scanner finding the address finds a
+   port that refuses it.
+
+   The failure mode to watch for is somebody adding an authorized network to
+   make a connection work. That solves an IAM problem by opening the instance
+   to the internet, and the runbook says so where it would be tempting.
 5. **`FORBIDDEN_WIRE_KEYS` still applies.** Adding a server does not make
    `photo`, `image` or `imageData` acceptable on the wire; AD10 keeps the
    classification on the device.
