@@ -8,7 +8,7 @@ Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twe
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and again on **5 September 2026** with the mentor review's changes. Everything below was run, not planned, and every command was run by the team on their own machine.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and twice on **5 September 2026** — once with the mentor review's changes, and again that afternoon so the map tour opens by itself. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -47,10 +47,29 @@ nginx opens `auth_basic_user_file` in a worker, and workers drop to an unprivile
 >
 > **0 of 1,000 requests failed**, which also means not one of them was answered 401. The gate and the credentials held for the whole run, which is a stronger statement than a single 200.
 
+### 5 September, later: the tour opens by itself
+
+The map tour now opens once for a visitor who has not been shown it, which is the first change to `apps/web` since the morning's deployment.
+
+| Redeployed 5 September | |
+|---|---|
+| Revision | `drainlens-00012-skx`, serving 100% |
+| Bundle | `index-BxMtDgV4.js`, matching a local build of `main` at `c9e2dfc` — checked against the built file, not assumed |
+| Build | First line said `Building using Dockerfile`. It is worth reading every time; the alternative fails silently |
+| Gate | **401** without credentials, and the credentials carried over untouched — `gcloud run deploy` inherits environment variables you do not name, so the apr1 hash never had to be quoted a second time |
+| Transfer | **1.03 MB over the wire, expanding to 3.52 MB (29%)** |
+| First visit, p95 | **286.2 ms** from a laptop · p50 260.1 ms · max 920.8 ms |
+| Fetch failures | **0 of 1,000** |
+
+> **p95 went from 217.5 ms to 286.2 ms and that is not attributable to this change.** The wire figure is identical at 1.03 MB and the decoded total moved by 10 KB, which is the size of the code that was added — there is no payload here to explain a 69 ms difference. The same link moved 185 ms between two runs on consecutive days with nothing deployed in between, which is the measurement this document already records and the reason it leans on the transfer figure rather than the latency. Two runs cannot separate a link from a build, and pretending otherwise would make the number worse than useless.
+>
+> `elevation.bin` remains the slowest single resource — 788 KB, p95 170.3 ms, still 76% of a visit.
+
 | Still true of every deployment | |
 |---|---|
 | Bundle | Changes with every build. Compare it, do not assume it. |
 | Credentials | The container refuses to start without them. A deployment that quietly loses its gate looks exactly like one that never had it. |
+| Measuring behind the gate | `measure.mjs` refuses to run without `DRAINLENS_BASIC_AUTH`. It used to time the 401s instead — fast, plausible, and of nothing. |
 
 ---
 
