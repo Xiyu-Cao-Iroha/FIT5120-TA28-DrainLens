@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
+import { cors } from 'hono/cors';
 import pg from 'pg';
 
 import {
@@ -35,8 +36,49 @@ import {
   traceArtefact,
 } from './queries.js';
 
+/**
+ * The origins allowed to read this from a browser.
+ *
+ * The site and the API are two Cloud Run services and therefore two origins,
+ * so without this the browser refuses every response before the page sees it.
+ *
+ * **A list rather than `*`.** Everything here is published council data and
+ * no request carries a credential, so `*` would leak nothing — but an
+ * allow-list is a statement about who this is for, and it is the kind of
+ * setting that is easy to widen later and impossible to narrow once something
+ * unknown depends on it. `ALLOWED_ORIGINS` overrides it for a preview
+ * deployment without a code change.
+ */
+export const DEFAULT_ORIGINS = [
+  'https://drainlens-205559161217.australia-southeast1.run.app',
+  // `npm run dev`, from .claude/launch.json.
+  'http://localhost:5183',
+  'http://127.0.0.1:5183',
+];
+
+export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
+  if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;
+  return env
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => o !== '');
+}
+
+/**
+ * How long a browser may reuse an answer.
+ *
+ * These artefacts change when the migration job runs and at no other time, so
+ * a visitor who opens the map twice in five minutes should not fetch 316 KB
+ * twice. It matches the `/data` tier in `deploy/nginx.conf`, so moving a
+ * screen from the bundled copy to the API does not change how often it is
+ * re-fetched.
+ */
+export const ARTEFACT_CACHE = 'public, max-age=300';
+
 export function createApp(pool: pg.Pool): Hono {
   const app = new Hono();
+
+  app.use('*', cors({ origin: allowedOrigins() }));
 
   /**
    * Answer, or say plainly what is missing.
@@ -49,10 +91,15 @@ export function createApp(pool: pg.Pool): Hono {
   const answer = async (
     c: Context,
     work: (client: pg.PoolClient) => Promise<unknown>,
+    cache: string = ARTEFACT_CACHE,
   ) => {
     const client = await pool.connect();
     try {
-      return c.json((await work(client)) as Record<string, unknown>);
+      const body = (await work(client)) as Record<string, unknown>;
+      // Only on an answer. A 404 cached for five minutes is a missing extent
+      // that stays missing after the migration job has put it there.
+      c.header('Cache-Control', cache);
+      return c.json(body);
     } catch (error) {
       if (error instanceof NotFound) return c.json({ error: error.message }, 404);
       console.error(error);
@@ -70,7 +117,9 @@ export function createApp(pool: pg.Pool): Hono {
       const counts = await loaded(client);
       if (counts.pits === 0) throw new NotFound('the database holds no drainage network');
       return { status: 'ok', ...counts };
-    }),
+      // Never cached. A health check answered from a cache is a health check
+      // of the cache.
+    }, 'no-store'),
   );
 
   app.get('/api/map/:extent', (c) =>

@@ -30,6 +30,25 @@ COPY apps/web/package.json apps/web/
 RUN npm ci
 
 COPY . .
+
+# Where the built site looks for the database.
+#
+# Vite inlines this at build time, so it is a property of the image rather than
+# of the running container -- there is no way to change it with `--set-env-vars`
+# afterwards, and pretending otherwise would produce a deployment that silently
+# kept reading files.
+#
+# **It defaults to the deployed API rather than to nothing**, because
+# `gcloud run deploy --source=.` has no way to pass a build argument: whatever
+# is written here is what ships. A checkout still defaults to the bundled files
+# — `source.ts` reads an unset variable as "do not ask a server" — so `npm run
+# dev` does not reach across the internet to a production database.
+#
+# To build a site that ignores the API entirely:
+#   docker build --build-arg VITE_API_BASE= -t drainlens .
+ARG VITE_API_BASE=https://drainlens-api-205559161217.australia-southeast1.run.app
+ENV VITE_API_BASE=$VITE_API_BASE
+
 RUN npm run build --workspace @drainlens/web
 
 FROM nginx:1.27-alpine AS runtime

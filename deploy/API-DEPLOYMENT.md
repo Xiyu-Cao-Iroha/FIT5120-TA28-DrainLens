@@ -6,7 +6,9 @@ Deployed **5 September 2026**. This file was written as a runbook before any of 
 
 A second Cloud Run service, `drainlens-api`, over a Cloud SQL for PostgreSQL instance. Five `GET` routes returning the artefacts the frontend already accepts, rebuilt from rows. Same project `fit5120-504507`, same region `australia-southeast1`, same log exclusion — that last one has to be *verified*, not inherited by assumption, and step 2 is where.
 
-**The site does not depend on this.** `apps/web` still fetches its five JSON files from its own container and does not know the API exists. That is deliberate for one iteration: it means this can be deployed, measured, shown and switched off without the site being down for a minute of it, and it means switching the frontend over later is a URL and a CORS header rather than a release.
+**The site reads four of its five artefacts from here**, and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. The footer of every screen says which source answered. See `apps/web/src/data/source.ts`.
+
+The address index is the fifth artefact and stays bundled, deliberately and permanently.
 
 ---
 
@@ -286,7 +288,8 @@ The instance name is not in the filter because there is one instance in this pro
 | | |
 |---|---|
 | **AD1** | No log entry from either service carries a client address, and the positive control shows that logging is happening at all |
-| **The frontend is unchanged** | `apps/web` fetches its own files. Switching it to the API is a separate decision that needs a CORS header this server does not send, and it should not be made inside a deployment |
+| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
+| **CORS names the site, not `*`** | `allowedOrigins()` lists the site and the dev server. Nothing here is secret and no request carries a credential, so `*` would leak nothing — but a list is easy to widen later and impossible to narrow once something unknown depends on it |
 | **`FORBIDDEN_WIRE_KEYS`** | Still nothing on the wire that names a person. Every route is a `GET` with no body; there is no path that could carry one |
 | **The database is derived** | Nothing is written here that is not in the repository. If that stops being true — Epic 4's drain checks would be the first — this document is wrong and `--no-backup` is wrong with it |
 | **The tag on the image** | Names the commit it was built from. Compare it against `git rev-parse --short HEAD`; do not assume it |

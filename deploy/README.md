@@ -2,7 +2,7 @@
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app
 
-**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). The site does not depend on it and is not redeployed when it changes.
+**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four of its five artefacts from it**, falling back to the copies in this container when it cannot answer — so a change to the API does not need the site redeployed, and the API being stopped does not take the site down.
 
 Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty static files** — twelve artefacts, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. There is no application server: the map, the terrain, the drainage network, the address index and the flood history are build products, and the scenario engine — when it is reachable at all — runs in the browser.
 

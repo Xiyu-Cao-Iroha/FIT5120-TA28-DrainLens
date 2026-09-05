@@ -34,9 +34,15 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 
 ### What the backend must do about these
 
-Serve them, gzipped, with a cache policy that lets a version be replaced. Nothing else. There is no endpoint behind them and no request to authorise.
+Serve them, gzipped, with a cache policy that lets a version be replaced. There is still no endpoint that takes anything from a person and nothing to authorise.
 
-> **Revisited 5 September 2026.** A database is planned for Iteration 2 and the artefacts below will be assembled from it — in the same shapes, so the frontend and its assertions do not change. What follows stays true of derivation: the pipeline computes, the database stores. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md).
+> **This changed on 5 September 2026, and the change is smaller than it sounds.** Four of the five JSON artefacts — `map`, `derived`, `trace` and `flood-history` — are now read from the API over the database, in the same shapes, checked by the same guards. What the browser asks for is an extent id and an area board; what it sends is nothing.
+>
+> **Each one falls back to the copy in the site's own container** if the API cannot answer, and the footer says which source answered. That is not defensiveness for its own sake: the Cloud SQL instance behind the API is expected to be *stopped between demonstrations to save money*, so "the API is unavailable" is a planned state rather than an incident, and a site that went blank in it would be a worse product than one that never used its database. `apps/web/src/data/source.ts` holds the rule and its tests.
+>
+> **The address index is the exception and stays bundled.** The landing page tells a resident the search runs in their browser and that nothing about the address is sent anywhere. It is fetched directly in `App.tsx` rather than through `fetchArtefact`, so no later edit to the fallback can route it through a server by accident.
+>
+> The derivation story is unchanged: the pipeline computes, the database stores, the API reassembles. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md).
 
 They are **versioned build products**, not a database. When the extent changes, the pipeline is re-run and the files are replaced wholesale. A backend that tried to assemble these per request would be rebuilding a pipeline that already exists and can be checked offline.
 

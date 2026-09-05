@@ -1,4 +1,9 @@
 node_modules/
+
+# Local environment overrides. VITE_API_BASE points a checkout at an API;
+# it is per-developer and must never be committed.
+.env.local
+.env.*.local
 dist/
 coverage/
 *.tsbuildinfo
