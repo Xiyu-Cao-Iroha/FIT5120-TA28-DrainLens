@@ -456,7 +456,7 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 
 The old Epic 2, built and demonstrated on 1 September, and now out of the interface by AC 1.1.1.e. Kept here so the work is not lost and its criteria can be found under the numbers the source still cites.
 
-The engine (`packages/scenario`), the worker, the difference layer, the setup and result screens and their tests are all in the repository and all still tested — 532 tests pass with the comparison unreachable. What was demonstrated: a person chose a pit, a blockage assumption and an accumulated rainfall amount; the run compared that against the same rainfall with every drain clear; the result showed **the difference only**, never a depth, and refused to answer where the information could not support one.
+The engine (`packages/scenario`), the worker, the difference layer, the setup and result screens and their tests are all in the repository and all still tested — the whole suite passes with the comparison unreachable (622 unit tests, re-measured 5 September 2026; it was 532 when this was written on 3 September, and the figure is dated rather than kept current by hand). What was demonstrated: a person chose a pit, a blockage assumption and an accumulated rainfall amount; the run compared that against the same rainfall with every drain clear; the result showed **the difference only**, never a depth, and refused to answer where the information could not support one.
 
 Comments in `apps/web/src/scenario/`, `screens/ScenarioSetup.tsx`, `screens/Result.tsx`, `map/difference.ts` and the scenario parts of `session.ts` cite `AC 2.x (Aug-27 set)`. Those numbers refer to the 27 August document, not to the flood-history criteria above.
 

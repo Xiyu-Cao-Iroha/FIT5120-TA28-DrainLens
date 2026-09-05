@@ -72,6 +72,28 @@ describe('creditsFor', () => {
     expect(credits).toHaveLength(3);
   });
 
+  it('does not merge two different publishers whose names run into their licences', () => {
+    // The separator, finally tested. `keeps a publisher whose name contains
+    // spaces intact` reads like it covers this and does not: the credit holds
+    // the publisher and the licence as their own fields, so the name survives
+    // whatever the grouping key is made of. What the key can still do is
+    // *collide* — "Water Corp" + "CC BY 4.0" and "Water" + "Corp CC BY 4.0"
+    // join on a space to the same string, and one of these two credits would
+    // disappear.
+    //
+    // It failed for thirty seconds on 5 September, when a quality pass rewrote
+    // the line and put the space back. Nothing went red, which is why this is
+    // here.
+    const credits = creditsFor(
+      artefactWith([
+        source({ publisher: 'Water Corp', licence: 'CC BY 4.0' }),
+        source({ publisher: 'Water', licence: 'Corp CC BY 4.0' }),
+      ]),
+    );
+    expect(credits).toHaveLength(2);
+    expect(credits.map((c) => c.publisher)).toEqual(['Water Corp', 'Water']);
+  });
+
   it('reports the most recent update across the group', () => {
     const credits = creditsFor(
       artefactWith([

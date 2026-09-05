@@ -34,6 +34,18 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Stray table rows, ragged tables, unclosed fences, broken relative links
+      # -- and any tracked text file carrying a raw NUL byte, which makes it
+      # binary to git and invisible to every grep run against this repository.
+      #
+      # This script was written in 0.21.1 *because* a malformed table reached
+      # `main` and every check in use was a grep for a string, so nothing
+      # noticed. It then sat in the repository and in nobody's pipeline for
+      # four days, running only when somebody remembered -- which is the same
+      # failure one level up. It runs here now.
+      - name: Check the documentation and the source encoding
+        run: node tools/docs/check.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage
