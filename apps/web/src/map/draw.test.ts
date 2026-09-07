@@ -6,6 +6,10 @@ import {
   labelAnchor,
   overlaps,
   placeLabels,
+  PIN_DROP,
+  PIN_HEAD_R,
+  PIN_TOUCH_PAD_PX,
+  pressedThePin,
 } from './draw.js';
 import type { Local } from './viewport.js';
 
@@ -160,5 +164,56 @@ describe('placing street labels', () => {
 
   it('places nothing when there is nothing to place', () => {
     expect(placeLabels([])).toEqual([]);
+  });
+});
+
+/**
+ * The pin's target, which is not the pin's drawing.
+ *
+ * A teammate reported the address pin as not clickable, and it was not: the
+ * hit test knew about pits and pipes, and the pin is neither — it is the
+ * person's own location, drawn from no artefact. These check the target is
+ * where the mark is, because the failure that pairs them wrongly is a pin
+ * somebody can see and cannot press, which reads as the application ignoring
+ * them.
+ */
+describe('pressing the address pin', () => {
+  const tip: readonly [number, number] = [200, 300];
+
+  it('counts a press on the tip, which is the point it marks', () => {
+    expect(pressedThePin([200, 300], tip)).toBe(true);
+  });
+
+  it('counts a press on the head, which is where the eye goes', () => {
+    // The head's centre is PIN_DROP above the tip. It is the biggest part of
+    // the shape and the part somebody aims at.
+    expect(pressedThePin([200, 300 - PIN_DROP], tip)).toBe(true);
+  });
+
+  it('counts a press just outside the shape, because a pin is smaller than a finger', () => {
+    expect(pressedThePin([200 + PIN_HEAD_R + PIN_TOUCH_PAD_PX - 1, 300 - PIN_DROP], tip)).toBe(true);
+  });
+
+  it('does not reach the ground beside it', () => {
+    expect(pressedThePin([200 + PIN_HEAD_R + PIN_TOUCH_PAD_PX + 2, 300 - PIN_DROP], tip)).toBe(false);
+  });
+
+  it('does not reach below the tip, where the map continues', () => {
+    // Everything under the tip is the street the pin is standing on. A target
+    // that reached down there would take presses from the pits drawn on it.
+    expect(pressedThePin([200, 300 + PIN_TOUCH_PAD_PX + 2], tip)).toBe(false);
+  });
+
+  it('does not reach above the head', () => {
+    expect(
+      pressedThePin([200, 300 - PIN_DROP - PIN_HEAD_R - PIN_TOUCH_PAD_PX - 2], tip),
+    ).toBe(false);
+  });
+
+  it('follows the pin when the pin moves', () => {
+    // The target is built from the same constants as the drawing, so this is
+    // the property that keeps them from drifting apart.
+    expect(pressedThePin([200, 300 - PIN_DROP], [500, 700])).toBe(false);
+    expect(pressedThePin([500, 700 - PIN_DROP], [500, 700])).toBe(true);
   });
 });
