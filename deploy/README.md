@@ -8,7 +8,7 @@ Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twe
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and again on **7 September 2026** with the team's own review list. Everything below was run, not planned, and every command was run by the team on their own machine.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -109,6 +109,22 @@ Eight changes, all in `apps/web`: the six items on the team's own review list, t
 > **The record of the 5 September afternoon deployment was written on 5 September and reached this file on 7 September, because the commit carrying it was never pushed.** Two sessions were working in one checkout; a branch was switched under a running command, the commit landed on a local `main` instead of on the branch that was pushed, and the pull request that was opened for it therefore merged an empty diff. Nothing failed, and the pull request looked exactly like every other one.
 >
 > **The check that would have caught it is one line**: after pushing, confirm the remote branch contains the commit — `git branch -r --contains HEAD` — rather than reading the pull request URL as proof. A pull request is evidence that a branch was merged, not evidence of what was on it.
+
+### 7 September, later: the pit card as designed
+
+| Redeployed 7 September | |
+|---|---|
+| Revision | `drainlens-00015-lxc`, serving 100% |
+| Bundle | `index-DFGygy6v.js`, matching a local build of `main` at `639fd2e` **with `VITE_API_BASE` set** |
+| Transfer | **1.04 MB over the wire, expanding to 3.53 MB (29%)** |
+| First visit, p95 | **283.3 ms** from a laptop · p50 254.4 ms · max 616.6 ms |
+| Fetch failures | **0 of 1,000** |
+
+> **This is the first redeployment whose transfer figure moved and could be accounted for.** 1.03 MB to 1.04 MB: the JavaScript bundle grew 631 bytes gzipped for three inline SVG icons, and `base.css` gained a container query and a keyframe, which is a new hashed stylesheet. Ten kilobytes, spent on a card that says what the data does not show and on a mark that says the page is working rather than broken.
+>
+> The p95 moved 273.6 ms to 283.3 ms and is **not** part of that. Ten kilobytes do not cost ten milliseconds on a link that has moved 185 ms between two runs with nothing deployed at all. The rule this file has used since 1 September holds: the transfer figure is the one to read, and the latency is recorded rather than interpreted.
+
+> **The revision id for the earlier deployment on this day was not captured**, which is why that row has none. `gcloud run revisions list --service=drainlens --region=australia-southeast1` still holds it; it is recorded here as missing rather than filled in from a guess about the numbering.
 
 | Still true of every deployment | |
 |---|---|
