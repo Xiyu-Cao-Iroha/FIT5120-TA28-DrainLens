@@ -70,12 +70,25 @@ export const NO_OUTLET_NOTE =
  * is read by the person who was already going to read it; three sentences with
  * a heading are read by the person the drawing was for.
  */
-export const PLAIN_LIMITS: readonly { readonly title: string; readonly said: string }[] = [
-  { title: 'Depth', said: 'We do not know how deep the pipes or the pit are.' },
-  { title: 'Blockages', said: 'We do not know whether the pipes are blocked.' },
+export const PLAIN_LIMITS: readonly {
+  readonly title: string;
+  readonly said: string;
+  readonly icon: 'depth' | 'blockages' | 'capacity';
+}[] = [
+  {
+    title: 'Depth',
+    said: 'We don\u2019t know how deep the pipes or pit are.',
+    icon: 'depth',
+  },
+  {
+    title: 'Blockages',
+    said: 'We don\u2019t know whether the pipes are blocked.',
+    icon: 'blockages',
+  },
   {
     title: 'Capacity',
     said: 'Pipe size alone does not tell us how much water the system can carry.',
+    icon: 'capacity',
   },
 ];
 
@@ -125,16 +138,37 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
         onClick={() => setSectionOpen((open) => !open)}
         aria-expanded={sectionOpen}
         style={{
-          margin: '12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          width: '100%',
+          margin: '14px 0 12px',
+          paddingTop: 14,
+          borderTop: '1px solid #e6ebe4',
           background: 'none',
           border: 'none',
-          padding: 0,
+          borderTopWidth: 1,
+          borderTopStyle: 'solid',
+          borderTopColor: '#e6ebe4',
           font: 'inherit',
-          color: '#1f6f5c',
+          fontWeight: 500,
+          textAlign: 'left',
+          color: '#1f5b4e',
           cursor: 'pointer',
         }}
       >
-        {sectionOpen ? 'Hide technical details ⌃' : 'View technical details ⌄'}
+        <span
+          aria-hidden
+          style={{
+            display: 'inline-block',
+            width: 14,
+            transform: sectionOpen ? 'rotate(180deg)' : 'none',
+            transformOrigin: '50% 45%',
+          }}
+        >
+          ⌄
+        </span>
+        {sectionOpen ? 'Hide technical details' : 'View technical details'}
       </button>
 
       {sectionOpen && (
@@ -286,40 +320,131 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
  * is recorded for any pit in this area" is a thing an engineer can check.
  * Both are on the card.
  */
+const ICON_INK = '#2f5b70';
+const ALERT = '#e07b1f';
+
+/**
+ * The three icons, drawn rather than fetched.
+ *
+ * Inline SVG for the reason every other mark in this product is inline: an
+ * icon font or a sprite from a CDN would make the reader's browser tell a
+ * third party which page they are on, and this product's contract says it does
+ * not do that. They are also the only three icons here, so a library would be
+ * several hundred kilobytes to save sixty lines.
+ */
+function LimitIcon({ kind }: { readonly kind: 'depth' | 'blockages' | 'capacity' }) {
+  const common = { width: 30, height: 30, viewBox: '0 0 32 32', 'aria-hidden': true } as const;
+
+  if (kind === 'depth') {
+    // Two surfaces we cannot measure between: the dotted lines are the unknown
+    // ones, which is the whole point of the card.
+    return (
+      <svg {...common}>
+        <line x1="6" y1="5" x2="26" y2="5" stroke={ICON_INK} strokeWidth="1.6" strokeDasharray="2 3" strokeLinecap="round" />
+        <line x1="6" y1="27" x2="26" y2="27" stroke={ICON_INK} strokeWidth="1.6" strokeDasharray="2 3" strokeLinecap="round" />
+        <line x1="16" y1="10" x2="16" y2="22" stroke={ICON_INK} strokeWidth="1.6" />
+        <polygon points="16,6.5 12.6,11.5 19.4,11.5" fill={ICON_INK} />
+        <polygon points="16,25.5 12.6,20.5 19.4,20.5" fill={ICON_INK} />
+      </svg>
+    );
+  }
+
+  if (kind === 'blockages') {
+    // A length of pipe with a question over it.
+    return (
+      <svg {...common}>
+        <path
+          d="M6 11h11v10H6z"
+          fill="none"
+          stroke={ICON_INK}
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <ellipse cx="6" cy="16" rx="2.6" ry="5" fill="none" stroke={ICON_INK} strokeWidth="1.8" />
+        <line x1="17" y1="11" x2="17" y2="21" stroke={ICON_INK} strokeWidth="1.8" />
+        <circle cx="23.5" cy="21.5" r="7" fill={ALERT} />
+        <text
+          x="23.5"
+          y="25"
+          textAnchor="middle"
+          fontSize="10"
+          fontWeight="700"
+          fill="#ffffff"
+        >
+          ?
+        </text>
+      </svg>
+    );
+  }
+
+  // A gauge, because capacity is the thing people expect a size to be a
+  // reading of, and it is not.
+  return (
+    <svg {...common}>
+      <path
+        d="M4.5 23a11.5 11.5 0 1 1 23 0"
+        fill="none"
+        stroke={ICON_INK}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <line x1="16" y1="23" x2="10" y2="14.5" stroke={ICON_INK} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="16" cy="23" r="1.9" fill={ICON_INK} />
+      <line x1="6.5" y1="16.5" x2="8.4" y2="17.6" stroke={ICON_INK} strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="16" y1="11.5" x2="16" y2="13.7" stroke={ICON_INK} strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="25.5" y1="16.5" x2="23.6" y2="17.6" stroke={ICON_INK} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * What the data does not show, before anybody has to ask.
+ *
+ * Three columns divided by hairlines where there is room for them, one under
+ * another where there is not. That rule is in `base.css` as a container query
+ * rather than here, because it depends on the width of the box this sits in —
+ * a 296-pixel map callout on one screen, and a wider panel elsewhere — and a
+ * style attribute cannot ask a question about its own container.
+ *
+ * The wording is the design owner's, and it is deliberately plainer than the
+ * sentences it replaced: "we don't know how deep the pipes are" is something a
+ * resident can act on.
+ */
 function PlainLimits() {
   return (
     <div
+      className="limits"
       style={{
         marginTop: 12,
-        padding: '10px 12px',
+        padding: '14px 16px',
         background: '#fdf7ec',
         border: '1px solid #eadfc6',
-        borderRadius: 10,
+        borderRadius: 12,
       }}
     >
-      <strong
-        style={{
-          display: 'block',
-          marginBottom: 8,
-          fontSize: 13,
-          color: '#1e2b36',
-        }}
-      >
-        What the data does not show
-      </strong>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: 10,
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+          <circle cx="11" cy="11" r="11" fill={ALERT} />
+          <rect x="10" y="5" width="2" height="8" rx="1" fill="#ffffff" />
+          <circle cx="11" cy="16" r="1.3" fill="#ffffff" />
+        </svg>
+        <strong style={{ fontSize: 15, color: '#1e2b36' }}>
+          {'What the data doesn\u2019t show'}
+        </strong>
+      </div>
+
+      <div className="limits__row">
         {PLAIN_LIMITS.map((limit) => (
-          <div key={limit.title}>
-            <strong style={{ display: 'block', fontSize: 12, color: '#1e2b36' }}>
-              {limit.title}
-            </strong>
-            <span style={{ fontSize: 12, color: '#5b6e7e' }}>{limit.said}</span>
+          <div className="limits__item" key={limit.title}>
+            <LimitIcon kind={limit.icon} />
+            <div>
+              <strong style={{ display: 'block', fontSize: 13, color: '#1e2b36', marginBottom: 2 }}>
+                {limit.title}
+              </strong>
+              <span style={{ fontSize: 12.5, lineHeight: 1.45, color: '#5b6e7e' }}>
+                {limit.said}
+              </span>
+            </div>
           </div>
         ))}
       </div>
