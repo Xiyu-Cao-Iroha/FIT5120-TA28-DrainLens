@@ -4,11 +4,11 @@
 
 **This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four of its five artefacts from it**, falling back to the copies in this container when it cannot answer — so a change to the API does not need the site redeployed, and the API being stopped does not take the site down.
 
-Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty static files** — twelve artefacts, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. There is no application server: the map, the terrain, the drainage network, the address index and the flood history are build products, and the scenario engine — when it is reachable at all — runs in the browser.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty static files** — twelve artefacts, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. This container runs no application server of its own: everything it serves is a build product, and the scenario engine — when it is reachable at all — runs in the browser. Since 5 September the *browser* also reads four of those artefacts from the API instead, and the files here are what it falls back to.
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and twice on **5 September 2026** — once with the mentor review's changes, and again that afternoon so the map tour opens by itself. Everything below was run, not planned, and every command was run by the team on their own machine.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and again on **7 September 2026** with the team's own review list. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -64,6 +64,51 @@ The map tour now opens once for a visitor who has not been shown it, which is th
 > **p95 went from 217.5 ms to 286.2 ms and that is not attributable to this change.** The wire figure is identical at 1.03 MB and the decoded total moved by 10 KB, which is the size of the code that was added — there is no payload here to explain a 69 ms difference. The same link moved 185 ms between two runs on consecutive days with nothing deployed in between, which is the measurement this document already records and the reason it leans on the transfer figure rather than the latency. Two runs cannot separate a link from a build, and pretending otherwise would make the number worse than useless.
 >
 > `elevation.bin` remains the slowest single resource — 788 KB, p95 170.3 ms, still 76% of a visit.
+
+### 5 September, later still: the site reads the database
+
+The map, the derived layers, the drainage graph and the flood board are fetched from the API. Each falls back to the copy in this container if the API cannot answer, and the footer of every screen names which source answered — see [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md) and `apps/web/src/data/source.ts`.
+
+**The API was deployed first, deliberately.** In the other order the site's first request is refused by CORS, it falls back to its bundled copies, and the result looks exactly like a working deployment that is not using the database.
+
+| Redeployed 5 September, both services | |
+|---|---|
+| Site revision | `drainlens-00013-lgj`, serving 100% |
+| API revision | `drainlens-api-00002-lkb`, serving 100% |
+| Bundle | `index-BLGM03Nj.js` — see the trap below before comparing it |
+| Build | `Building using Dockerfile` |
+| CORS | `access-control-allow-origin` echoing the site's origin, with `vary: Origin` — the second half matters: without it a cache can hand one origin's permission to another |
+| Cache | `cache-control: public, max-age=300` on artefacts, matching the `/data` tier nginx already serves |
+| Gate | 401 without credentials, unchanged; the credentials carried over again |
+| **Live footer** | **"Served from the DrainLens database."** — read on the deployed site, which is the only check that proves the database is load-bearing rather than merely reachable |
+| First visit, p95 | **not re-measured.** The two attempts ran without `DRAINLENS_BASIC_AUTH` and `measure.mjs` refused, correctly. Carrying 5 September's figure forward as if it were this deployment's would be the thing this file exists to prevent |
+
+> **Comparing the bundle now needs the variable, and getting that wrong proves the opposite of what it looks like.** `VITE_API_BASE` is inlined at build time, so a plain `npm run build` produces a *different* bundle from the container's: `index-B6zjlpI5.js` against `index-BLGM03Nj.js` on this commit. Compare against a build that sets it:
+>
+> ```bash
+> VITE_API_BASE=https://drainlens-api-205559161217.australia-southeast1.run.app npm run build --workspace @drainlens/web
+> ```
+>
+> The failure this guards against is the quiet one. If the `ARG` in the Dockerfile ever stopped taking effect, the deployed site would be the no-API build: it would load, draw, and answer every check in this file, with a footer saying it was served from the bundled copies — which is also what a working site looks like on a day the database is stopped. The bundle hash is what tells the two apart.
+
+### 7 September: the team's review list, and two readability passes
+
+Eight changes, all in `apps/web`: the six items on the team's own review list, then a readability pass over them and a second over the palette underneath. The API, the schema and the loader were untouched, so only this service was redeployed.
+
+| Redeployed 7 September | |
+|---|---|
+| Bundle | `index-Cpom7AqE.js`, matching a local build of `main` **with `VITE_API_BASE` set** — the caveat below, needed for the second deployment running |
+| Transfer | **1.03 MB over the wire, expanding to 3.52 MB (29%)** — unchanged to three figures |
+| First visit, p95 | **273.6 ms** from a laptop · p50 199.9 ms · max 597.1 ms |
+| Slowest resource | `elevation.bin` again: 788 KB, p95 131.2 ms, 76% of the visit |
+| Fetch failures | **0 of 1,000** |
+| Also served | `/quality.html`, a standalone page for the I2 deck — no scripts, no external requests, `noindex`, behind the same gate, outside the application build |
+
+> **Nothing here is a performance claim.** The transfer is identical to 5 September's to three significant figures, because the changes were arrowheads, folds and colours. p95 moved 286.2 ms to 273.6 ms, which is a twelfth of the 185 ms this link has moved between two runs with nothing deployed at all. It is recorded because the measurement is taken every time, not because it means anything.
+
+> **The record of the 5 September afternoon deployment was written on 5 September and reached this file on 7 September, because the commit carrying it was never pushed.** Two sessions were working in one checkout; a branch was switched under a running command, the commit landed on a local `main` instead of on the branch that was pushed, and the pull request that was opened for it therefore merged an empty diff. Nothing failed, and the pull request looked exactly like every other one.
+>
+> **The check that would have caught it is one line**: after pushing, confirm the remote branch contains the commit — `git branch -r --contains HEAD` — rather than reading the pull request URL as proof. A pull request is evidence that a branch was merged, not evidence of what was on it.
 
 | Still true of every deployment | |
 |---|---|
