@@ -79,7 +79,7 @@ export const PLAIN_LIMITS: readonly { readonly title: string; readonly said: str
   },
 ];
 
-const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#8593a0' };
+const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#61707c' };
 
 const BADGE: React.CSSProperties = {
   display: 'inline-block',
@@ -157,8 +157,16 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
               const recorded = value !== undefined && value !== null && String(value).trim() !== '';
               return (
                 <div key={key} style={{ display: 'contents' }}>
-                  <dt style={{ color: '#6b7a88' }}>{label}</dt>
-                  <dd style={{ margin: 0, color: recorded ? '#1e2b36' : '#94a2ae' }}>
+                  <dt style={{ color: '#5b6e7e' }}>{label}</dt>
+                  {/*
+                    "Not recorded" was #94a2ae -- 2.6:1, the faintest text in
+                    the product, on the words that say the council holds no
+                    value. A product whose argument is that absence should be
+                    visible was rendering absence at a quarter of the contrast
+                    of presence. It is quieter than a recorded value and it is
+                    legible.
+                  */}
+                  <dd style={{ margin: 0, color: recorded ? '#1e2b36' : '#61707c' }}>
                     {recorded ? String(value) : NOT_RECORDED}
                   </dd>
                 </div>
@@ -166,7 +174,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
             })}
           </dl>
 
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6b7a88' }}>{DEPTH_NOTE}</p>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: '#5b6e7e' }}>{DEPTH_NOTE}</p>
 
           <SectionNotes outcome={outcome} />
         </div>
@@ -184,7 +192,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
               borderRadius: 8,
               border: 'none',
               background: followable ? '#1f6f5c' : '#dde3dd',
-              color: followable ? '#ffffff' : '#8593a0',
+              color: followable ? '#ffffff' : '#61707c',
               font: 'inherit',
               cursor: followable ? 'pointer' : 'default',
             }}
@@ -192,7 +200,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
             Follow the recorded downstream path
           </button>
           {!followable && (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#8593a0' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#61707c' }}>
               {hasRecord
                 ? 'Every pipe leaving this pit stops at the edge of the record, so there is no path to follow.'
                 : 'The record has no pipe leaving this pit, so there is no path to follow.'}
@@ -248,7 +256,7 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
         ))}
       </ul>
 
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6b7a88' }}>{NO_OUTLET_NOTE}</p>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
 
       <button
         type="button"

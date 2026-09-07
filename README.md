@@ -86,10 +86,19 @@ Re-measured on **5 September 2026**, on this laptop, in a quality pass that ran 
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
 | CI green rate | ≥ 95% | tracked on the Actions tab |
+| Legibility | 4.5:1 for normal text, nothing under 10 px | **met on the homepage, the map and the flood board**, measured 7 September — see below |
 
 > **The runtime gate cannot be failed or passed, because it never said which number it means.** Three consecutive runs of `npm test` on 5 September: Vitest reported **3.74 s, 3.69 s and 5.12 s**, and the wall clock for the same three commands was **6.42 s, 6.42 s and 8.10 s**. Vitest's figure excludes the transform and collect phases it prints beside it; the wall clock includes npm's own start-up. One is under the gate twice out of three and the other is never under it, and both are honest measurements of different things.
 >
 > This is not a reason to pick the flattering one. It is the reason the gate needs restating before it can be enforced: *five seconds of what, measured how, on whose machine.* The decision is open in [DECISIONS-PENDING.md](./docs/DECISIONS-PENDING.md), and picking a number here to make the table green would be the one outcome worse than the breach.
+
+> **This row is new, and the reason it is new is that nothing in this repository had ever said a person has to be able to read the screen.** There are rules here about provenance, about what may be logged, about not presenting a guess as a measurement — and none about contrast or type size. The first measurement found 25 strings below the 4.5:1 that normal text needs, including the **CC BY attribution**, which this repository argues elsewhere must be *visible* to the person using the work and was rendering at eleven pixels and 3.34:1.
+>
+> `ink.subtle` was `#7d8f9d` — 3.34:1 on white, 3.13:1 on the page — and is `#61707c`, which measures 5.10, 4.77 and 4.58 on white, the page and a sunken block. It is still the quietest ink in the palette: quiet is a relationship to the text around it, not a contrast ratio.
+>
+> **Nothing enforces this.** It was measured by walking the rendered DOM in a browser and computing every ratio, and it will drift the moment somebody types a hex value. An automated check belongs in CI and is not there yet.
+>
+> Two related findings are open rather than fixed. The **mobile layout** is an unticked definition-of-done item, and at 375 px the map legend covers more than half the map. And two text links are under the 24 px minimum tap target: the breadcrumb back-link and the licence link.
 
 **The Python suite still breaches this gate, and it is recorded rather than rounded off.** It was 88 s; one test was 32.7 s of that. Re-measured on 5 September: **377 tests in 75 s** without coverage on this laptop.
 
