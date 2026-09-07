@@ -292,22 +292,71 @@ Verified before deploying, by running the entrypoint's guard directly:
 The studio asks for a Git tag per iteration, an accessible deployed version of
 each, and clear iteration URLs.
 
-**The tag.** `iteration-1-final` marks the commit that was demonstrated and
-deployed -- not the current `main`, which has moved on. A tag that points at
-code nobody ran is a worse record than no tag.
+**The tags, and why there are two.** A tag must point at code somebody ran;
+that rule is what produced the second one rather than a rewrite of the first.
+
+| Tag | Commit | Marks |
+|---|---|---|
+| `iteration-1-final` | `0a0a4d6` | the **5 September** deployment, `drainlens-00011-pzw`, bundle `index-etSUqsfy.js` |
+| `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` -- what is live |
 
 ```bash
-git tag -a iteration-1-final <commit> -m "Iteration 1 as demonstrated, 1 September 2026"
-git push origin iteration-1-final
+git tag -a iteration-1-frozen <commit> -m "Iteration 1 frozen, 8 September 2026"
+git push origin iteration-1-frozen
 ```
 
-**The URL.** Cloud Run gives every *service* its own hostname, so a second
-service is the closest thing available to the subdomain pattern:
+> **`iteration-1-final` was not moved onto the newer commit, and the reason is
+> not sentiment.** Its annotation carries that deployment's measured figures --
+> the revision, the bundle hash, the test counts, 1.03 MB and a p95 of 217.5 ms
+> -- and `git tag -f` replaces the annotation along with the target. Moving it
+> would delete a dated measurement to make one label tidy, which is the house
+> rule this repository breaks least often: **a figure is either re-measured or
+> dated, never adjusted by hand to look current.** Two tags with two dates say
+> what happened. One tag pointed at the newer commit would say the 5 September
+> deployment never had its own figures.
 
-| | |
-|---|---|
-| `drainlens` | the current build, redeployed as work continues |
-| `drainlens-iteration1` | deployed once from the tag, then left alone |
+**What the freeze verified, on the day.** Every gate re-run rather than read
+off the last record: 683 Node tests across 37 files at 92.56%, 377 Python at
+91.79%, `tsc --build --force` clean, `tools/docs/check.mjs` clean, and a local
+build **with `VITE_API_BASE` set** reproducing `index-DFGygy6v.js` -- the
+bundle the live container serves. That last one is the check that the tag and
+the running service are the same code; the rest is the code being fit to
+freeze.
+
+> **Freezing the site does not freeze what it reads.** The Dockerfile's
+> `VITE_API_BASE` defaults to the shared API, so `drainlens-iteration1` will
+> point at the same service `drainlens` does. If the API changes, both change;
+> if it is stopped, both fall back to the artefacts baked into their own
+> images and say so in the footer. That is the designed behaviour rather than
+> an oversight -- but it means the frozen URL is frozen in its *code*, not in
+> everything it can show.
+
+**The URL.** Cloud Run gives every *service* its own hostname, so a service per
+role is the closest thing available to the subdomain pattern the studio draws:
+
+| Role | The studio's shape | Here |
+|---|---|---|
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev`, **not yet created** |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration, preserved | `drainlens-iteration1`, then one per iteration |
+
+> **`drainlens` has been filling two of those roles at once, and the freeze is
+> the moment that stops being safe.** It has been redeployed eight times as
+> work continued, which is the *dev* behaviour -- correct while there was no
+> completed iteration to protect, and that is the studio's own first case: at
+> the start there is no previous version, so the root can carry the work.
+>
+> From the first Iteration 2 deployment it is wrong. The root must keep showing
+> Iteration 1 while Iteration 2 is built, so **Iteration 2 work deploys to
+> `drainlens-dev` and never to `drainlens`**, and `drainlens` moves only when
+> Iteration 2 is complete -- deployed from its tag to the root and to
+> `drainlens-iteration2` in the same pass.
+>
+> **Today the rule is already satisfied without touching the root.** The studio
+> asks that after Iteration 1 the same stable build be reachable from both the
+> root and the Iteration 1 URL, and `drainlens` is already serving
+> `index-DFGygy6v.js`, which is what `iteration-1-frozen` builds. So the freeze
+> is **one deployment** -- `drainlens-iteration1` -- and nothing else moves.
 
 A subdirectory (`/iteration1`) is **not** an option here and the reason is
 already recorded above: every path this app fetches is absolute from `/`, which
@@ -320,13 +369,25 @@ hosting platform requires a branch to deploy from; `gcloud run deploy --source`
 takes whatever is checked out, so a tag is enough.
 
 ```bash
-git checkout iteration-1-final
+git checkout iteration-1-frozen
 gcloud run deploy drainlens-iteration1 --project=fit5120-504507 --source=. \
   --region=australia-southeast1 --allow-unauthenticated --port=8080 \
   --memory=512Mi --max-instances=1 \
   --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
 git checkout main
 ```
+
+> **Two things to read from the build output, in this order.** The first line
+> must say `Building using Dockerfile` -- `--source=.` falls back to Buildpacks
+> without erroring, and this repository has already shipped that failure once.
+> Then check the served bundle is `index-DFGygy6v.js`: the frozen service is
+> only frozen if it built the tag's code, and a container that quietly built
+> something else looks identical from the outside.
+>
+> Single quotes around `--set-env-vars` are not optional on PowerShell. A comma
+> makes an array there, which is rejoined with spaces, so the variables arrive
+> as a value nobody typed. That is recorded in full in
+> [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md); it bit a `--database-flags` first.
 
 > `--allow-unauthenticated` stays on both. It governs Cloud Run's own IAM,
 > which is a different gate from the one in nginx: leaving it off would demand
