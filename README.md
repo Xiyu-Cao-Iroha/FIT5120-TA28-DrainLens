@@ -74,14 +74,14 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **5 September 2026** and again after the site was moved onto the API, on this laptop, in a quality pass that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
+Re-measured on **7 September 2026**, on this laptop, in a quality pass that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.42%** Node · **91.79%** Python |
+| Coverage, overall | ≥ 88% | **92.56%** Node · **91.79%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **642** Node unit across 35 files · **42** database · **377** Python across 17 — 1,061 |
+| Tests | — | **680** Node unit across 37 files · **42** database · **377** Python across 17 — **1,099** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |

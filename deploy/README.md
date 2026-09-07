@@ -8,7 +8,7 @@ Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twe
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, and again so the site reads its artefacts from the database. Everything below was run, not planned, and every command was run by the team on their own machine.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and again on **7 September 2026** with the team's own review list. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -90,6 +90,25 @@ The map, the derived layers, the drainage graph and the flood board are fetched 
 > ```
 >
 > The failure this guards against is the quiet one. If the `ARG` in the Dockerfile ever stopped taking effect, the deployed site would be the no-API build: it would load, draw, and answer every check in this file, with a footer saying it was served from the bundled copies — which is also what a working site looks like on a day the database is stopped. The bundle hash is what tells the two apart.
+
+### 7 September: the team's review list, and two readability passes
+
+Eight changes, all in `apps/web`: the six items on the team's own review list, then a readability pass over them and a second over the palette underneath. The API, the schema and the loader were untouched, so only this service was redeployed.
+
+| Redeployed 7 September | |
+|---|---|
+| Bundle | `index-Cpom7AqE.js`, matching a local build of `main` **with `VITE_API_BASE` set** — the caveat below, needed for the second deployment running |
+| Transfer | **1.03 MB over the wire, expanding to 3.52 MB (29%)** — unchanged to three figures |
+| First visit, p95 | **273.6 ms** from a laptop · p50 199.9 ms · max 597.1 ms |
+| Slowest resource | `elevation.bin` again: 788 KB, p95 131.2 ms, 76% of the visit |
+| Fetch failures | **0 of 1,000** |
+| Also served | `/quality.html`, a standalone page for the I2 deck — no scripts, no external requests, `noindex`, behind the same gate, outside the application build |
+
+> **Nothing here is a performance claim.** The transfer is identical to 5 September's to three significant figures, because the changes were arrowheads, folds and colours. p95 moved 286.2 ms to 273.6 ms, which is a twelfth of the 185 ms this link has moved between two runs with nothing deployed at all. It is recorded because the measurement is taken every time, not because it means anything.
+
+> **The record of the 5 September afternoon deployment was written on 5 September and reached this file on 7 September, because the commit carrying it was never pushed.** Two sessions were working in one checkout; a branch was switched under a running command, the commit landed on a local `main` instead of on the branch that was pushed, and the pull request that was opened for it therefore merged an empty diff. Nothing failed, and the pull request looked exactly like every other one.
+>
+> **The check that would have caught it is one line**: after pushing, confirm the remote branch contains the commit — `git branch -r --contains HEAD` — rather than reading the pull request URL as proof. A pull request is evidence that a branch was merged, not evidence of what was on it.
 
 | Still true of every deployment | |
 |---|---|
