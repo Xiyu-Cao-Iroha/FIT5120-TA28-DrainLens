@@ -40,7 +40,8 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
-import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
+import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
+import { WaterCompass } from '../map/WaterCompass.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
@@ -159,7 +160,7 @@ export function MapView({
     () =>
       address === null
         ? null
-        : describeWaterNearby(derived, [address.eastingM, address.northingM]),
+        : waterNearby(derived, [address.eastingM, address.northingM]),
     [derived, address],
   );
 
@@ -374,7 +375,8 @@ export function MapView({
             'No surface-water path or low area was measured close enough to this address to say anything about it.'
           ) : (
             <>
-              {explanation} <Badge basis={NEARBY_BASIS} />
+              <WaterCompass near={explanation} />
+              <Badge basis={NEARBY_BASIS} />
             </>
           )}
           {guided && (
