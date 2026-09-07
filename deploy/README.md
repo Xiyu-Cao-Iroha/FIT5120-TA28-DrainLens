@@ -331,13 +331,32 @@ freeze.
 > an oversight -- but it means the frozen URL is frozen in its *code*, not in
 > everything it can show.
 
-**The URL.** Cloud Run gives every *service* its own hostname, so a second
-service is the closest thing available to the subdomain pattern:
+**The URL.** Cloud Run gives every *service* its own hostname, so a service per
+role is the closest thing available to the subdomain pattern the studio draws:
 
-| | |
-|---|---|
-| `drainlens` | the current build, redeployed as work continues |
-| `drainlens-iteration1` | deployed once from `iteration-1-frozen`, then left alone |
+| Role | The studio's shape | Here |
+|---|---|---|
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev`, **not yet created** |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration, preserved | `drainlens-iteration1`, then one per iteration |
+
+> **`drainlens` has been filling two of those roles at once, and the freeze is
+> the moment that stops being safe.** It has been redeployed eight times as
+> work continued, which is the *dev* behaviour -- correct while there was no
+> completed iteration to protect, and that is the studio's own first case: at
+> the start there is no previous version, so the root can carry the work.
+>
+> From the first Iteration 2 deployment it is wrong. The root must keep showing
+> Iteration 1 while Iteration 2 is built, so **Iteration 2 work deploys to
+> `drainlens-dev` and never to `drainlens`**, and `drainlens` moves only when
+> Iteration 2 is complete -- deployed from its tag to the root and to
+> `drainlens-iteration2` in the same pass.
+>
+> **Today the rule is already satisfied without touching the root.** The studio
+> asks that after Iteration 1 the same stable build be reachable from both the
+> root and the Iteration 1 URL, and `drainlens` is already serving
+> `index-DFGygy6v.js`, which is what `iteration-1-frozen` builds. So the freeze
+> is **one deployment** -- `drainlens-iteration1` -- and nothing else moves.
 
 A subdirectory (`/iteration1`) is **not** an option here and the reason is
 already recorded above: every path this app fetches is absolute from `/`, which
