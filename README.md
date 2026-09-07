@@ -4,9 +4,9 @@ Stormwater flood risk for residents of Greater Melbourne communities that flood 
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, behind a password gate since 3 September 2026.
 
-**API:** https://drainlens-api-205559161217.australia-southeast1.run.app/health — a second Cloud Run service over Cloud SQL, live since 5 September 2026, serving the same artefacts rebuilt from rows. The site does not depend on it.
+**API:** https://drainlens-api-205559161217.australia-southeast1.run.app/health — a second Cloud Run service over Cloud SQL, live since 5 September 2026, serving the same artefacts rebuilt from rows. **The site reads four of its five artefacts from it**, falling back to the copies in its own container when it cannot answer, with the footer naming which source answered.
 
-Deployed from `main` on **5 September 2026** and verified against it: the live page loads `index-BxMtDgV4.js`, which is the bundle a local build produces. That check is run every time rather than assumed, because a deployment has already silently shipped something other than this repository once — see `deploy/README.md`.
+Deployed from `main` and verified against it every time, because a deployment has already silently shipped something other than this repository once. **The bundle hash lives in [deploy/README.md](./deploy/README.md), beside the deployment that produced it, rather than here** — it changes with every build, and a hash written in an introduction is a line that is wrong more often than it is right. This paragraph went stale three times in three days before it was moved.
 
 FIT5120 S2 2026 · Disaster Resilience (SDG 11) · Team TA28
 
@@ -74,14 +74,14 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **5 September 2026**, on this laptop, in a quality pass that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
+Re-measured on **7 September 2026**, on this laptop, in a quality pass that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.34%** Node · **91.79%** Python |
+| Coverage, overall | ≥ 88% | **92.56%** Node · **91.79%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **623** Node unit across 33 files · **35** database · **377** Python across 17 — 1,035 |
+| Tests | — | **680** Node unit across 37 files · **42** database · **377** Python across 17 — **1,099** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
