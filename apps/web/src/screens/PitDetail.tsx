@@ -17,7 +17,7 @@ import { useState } from 'react';
 
 import type { MapArtefact, Pit } from '../map/artefact.js';
 import { sectionFor } from '../crosssection/section.js';
-import { CrossSection } from './CrossSection.js';
+import { CrossSection, SectionNotes } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
 
@@ -56,6 +56,29 @@ export const NO_OUTLET_NOTE =
   'This area has no recorded outfall, so a path always ends where the record ' +
   'ends rather than where the water leaves the drainage system.';
 
+/**
+ * The three limits, in the words somebody who is not an engineer would use.
+ *
+ * These are a summary and they are not a replacement. `DEPTH_IS_ABSENT` and
+ * `NO_CAPACITY_CLAIM` are still on the card, in full, behind *View technical
+ * details*, because the difference between "we do not show depth" and "no
+ * depth is recorded for any pit in this area" is the difference between a
+ * choice we made and a fact about the council's record -- and the criteria are
+ * written against the second.
+ *
+ * What this fixes is who reads them. A block of qualification under a drawing
+ * is read by the person who was already going to read it; three sentences with
+ * a heading are read by the person the drawing was for.
+ */
+export const PLAIN_LIMITS: readonly { readonly title: string; readonly said: string }[] = [
+  { title: 'Depth', said: 'We do not know how deep the pipes or the pit are.' },
+  { title: 'Blockages', said: 'We do not know whether the pipes are blocked.' },
+  {
+    title: 'Capacity',
+    said: 'Pipe size alone does not tell us how much water the system can carry.',
+  },
+];
+
 const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#8593a0' };
 
 const BADGE: React.CSSProperties = {
@@ -83,50 +106,70 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
   const followable = links !== undefined && links.some((link) => link.to !== undefined);
   const hasRecord = links !== undefined && links.length > 0;
 
+  const outcome = sectionFor(map, pit);
+
   return (
     <div>
-      <span style={LABEL}>SELECTED PIT</span>
-      <div style={{ margin: '4px 0 8px' }}>
-        <span style={BADGE}>{RECORDED_BADGE}</span>
-      </div>
+      {/*
+        The drawing first. A resident opening a pit gets a picture of what a
+        pit is and what runs through it before they get an asset number: the
+        fields answer a question you can only ask once you know what you are
+        looking at.
+      */}
+      <CrossSection outcome={outcome} />
 
-      <dl style={{ margin: '0 0 12px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
-        {FIELDS.map(({ key, label }) => {
-          const value = pit[key];
-          const recorded = value !== undefined && value !== null && String(value).trim() !== '';
-          return (
-            <div key={key} style={{ display: 'contents' }}>
-              <dt style={{ color: '#6b7a88' }}>{label}</dt>
-              <dd style={{ margin: 0, color: recorded ? '#1e2b36' : '#94a2ae' }}>
-                {recorded ? String(value) : NOT_RECORDED}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-
-      <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6b7a88' }}>{DEPTH_NOTE}</p>
+      <PlainLimits />
 
       <button
         type="button"
         onClick={() => setSectionOpen((open) => !open)}
         aria-expanded={sectionOpen}
         style={{
-          marginBottom: 12,
+          margin: '12px 0',
           background: 'none',
           border: 'none',
           padding: 0,
           font: 'inherit',
           color: '#1f6f5c',
-          textDecoration: 'underline',
           cursor: 'pointer',
         }}
       >
-        {sectionOpen ? 'Hide the street cross-section' : 'Open the street cross-section'}
+        {sectionOpen ? 'Hide technical details ⌃' : 'View technical details ⌄'}
       </button>
 
       {sectionOpen && (
-        <CrossSection outcome={sectionFor(map, pit)} onClose={() => setSectionOpen(false)} />
+        <div style={{ marginBottom: 12 }}>
+          <span style={LABEL}>SELECTED PIT</span>
+          <div style={{ margin: '4px 0 8px' }}>
+            <span style={BADGE}>{RECORDED_BADGE}</span>
+          </div>
+
+          <dl
+            style={{
+              margin: '0 0 12px',
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              gap: '4px 12px',
+            }}
+          >
+            {FIELDS.map(({ key, label }) => {
+              const value = pit[key];
+              const recorded = value !== undefined && value !== null && String(value).trim() !== '';
+              return (
+                <div key={key} style={{ display: 'contents' }}>
+                  <dt style={{ color: '#6b7a88' }}>{label}</dt>
+                  <dd style={{ margin: 0, color: recorded ? '#1e2b36' : '#94a2ae' }}>
+                    {recorded ? String(value) : NOT_RECORDED}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6b7a88' }}>{DEPTH_NOTE}</p>
+
+          <SectionNotes outcome={outcome} />
+        </div>
       )}
 
       {trace === null ? (
@@ -221,6 +264,57 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
       >
         Clear the followed path
       </button>
+    </div>
+  );
+}
+
+/**
+ * What the data does not show, before anybody has to ask.
+ *
+ * Three columns on a card wide enough and one under the other when it is not.
+ * The wording is a teammate's, from the 7 September list, and it is
+ * deliberately plainer than the sentences it summarises: "we do not know how
+ * deep the pipes are" is a thing a resident can act on, and "no invert level
+ * is recorded for any pit in this area" is a thing an engineer can check.
+ * Both are on the card.
+ */
+function PlainLimits() {
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: '10px 12px',
+        background: '#fdf7ec',
+        border: '1px solid #eadfc6',
+        borderRadius: 10,
+      }}
+    >
+      <strong
+        style={{
+          display: 'block',
+          marginBottom: 8,
+          fontSize: 13,
+          color: '#1e2b36',
+        }}
+      >
+        What the data does not show
+      </strong>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {PLAIN_LIMITS.map((limit) => (
+          <div key={limit.title}>
+            <strong style={{ display: 'block', fontSize: 12, color: '#1e2b36' }}>
+              {limit.title}
+            </strong>
+            <span style={{ fontSize: 12, color: '#6b7a88' }}>{limit.said}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

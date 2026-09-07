@@ -27,6 +27,7 @@ import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
+import { PIT_SUMMARY, surfaceEntryOf } from '../crosssection/section.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
@@ -317,8 +318,7 @@ export function MapView({
             setFollowing(null);
           }}
         >
-          This pit collects surface water from the street and connects it to the recorded
-          drainage network.
+          {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
         </MapCallout>
       )}
 
