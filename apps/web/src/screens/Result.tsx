@@ -76,7 +76,7 @@ export function Result({
           : 'No difference is drawn on the map for this result.'}
       </p>
 
-      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7a88' }}>{RESULT_DISCLAIMER}</p>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#5b6e7e' }}>{RESULT_DISCLAIMER}</p>
 
       <section
         style={{
@@ -87,7 +87,7 @@ export function Result({
           marginBottom: 14,
         }}
       >
-        <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#8593a0' }}>{shown.band}</span>
+        <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#61707c' }}>{shown.band}</span>
         <h2 style={{ margin: '4px 0 8px', fontSize: 17 }}>{shown.finding}</h2>
         <p style={{ margin: 0, color: '#4d5f6e', fontSize: 14 }}>{shown.body}</p>
 
@@ -204,7 +204,7 @@ export function Result({
           margin: '18px 0 8px',
           fontSize: 11,
           letterSpacing: 0.6,
-          color: '#8593a0',
+          color: '#61707c',
         }}
       >
         WHAT WOULD YOU LIKE TO DO NEXT?
@@ -304,7 +304,7 @@ function RainfallControl({
         background: '#ffffff',
       }}
     >
-      <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#8593a0' }}>
+      <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#61707c' }}>
         ACCUMULATED RAINFALL
       </span>
       <div style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
@@ -333,7 +333,7 @@ function RainfallControl({
           );
         })}
       </div>
-      <p style={{ margin: 0, fontSize: 12, color: '#6b7a88' }}>{RAINFALL_CONTROL_NOTE}</p>
+      <p style={{ margin: 0, fontSize: 12, color: '#5b6e7e' }}>{RAINFALL_CONTROL_NOTE}</p>
     </section>
   );
 }
@@ -341,7 +341,7 @@ function RainfallControl({
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <span>
-      <dt style={{ fontSize: 11, letterSpacing: 0.4, color: '#8593a0', margin: 0 }}>
+      <dt style={{ fontSize: 11, letterSpacing: 0.4, color: '#61707c', margin: 0 }}>
         {label.toUpperCase()}
       </dt>
       <dd style={{ margin: 0, fontWeight: 600 }}>{value}</dd>
