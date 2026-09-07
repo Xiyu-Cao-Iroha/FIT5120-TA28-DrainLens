@@ -248,6 +248,184 @@ product refuses to fabricate.
 
 ---
 
+## The entity relationship diagram
+
+Generated from `db/migrations/001_init.sql` rather than drawn beside it, so a
+column that changes in one and not the other is a diff rather than a
+disagreement nobody notices.
+
+**Read the line style first.** A solid line is a foreign key the database
+enforces. **A dashed line is a join the data cannot support**, and every one of
+them is dashed for a measured reason rather than for convenience:
+
+| Dashed | Why the constraint is absent |
+|---|---|
+| `pipe` → `pit` | **69 of 893 pipes** name an upstream or downstream pit outside this extent. A foreign key would reject rows the council record actually contains, and the map draws those as a path that stops |
+| `trace_link` → `pit`, `pipe` | The trace is derived from the same incomplete topology. **37 links** name no destination at all and carry a reason instead |
+| `flood_incident` → `sa1_region` | The intended join, and `flood_incident` is **empty**: the SA1 grain is not in any published artefact. Declared so the shape is visible, unconstrained so nobody reads an empty table as a satisfied one |
+| `flood_area` → `flood_area_coverage` | Two halves of one published rollup, joined on `(extent_scope, area_name)`. Neither owns the other |
+
+```mermaid
+erDiagram
+    source ||--o{ pit : attributes
+    source ||--o{ pipe : attributes
+    source ||--o{ road : attributes
+    source ||--o{ street_label : attributes
+    source ||--o{ population : attributes
+
+    extent ||--o{ pit : holds
+    extent ||--o{ pipe : holds
+    extent ||--o{ road : holds
+    extent ||--o{ street_label : holds
+    extent ||--o{ derived_shape : holds
+    extent ||--o{ trace_link : holds
+    extent ||--o{ trace_reason : holds
+    extent ||--o{ artefact_envelope : describes
+
+    pit ||..o{ pipe : "is upstream of"
+    pit ||..o{ pipe : "is downstream of"
+    pit ||..o{ trace_link : "water leaves"
+    pipe ||..o{ trace_link : "water travels along"
+    trace_reason ||..o{ trace_link : "explains an ending"
+
+    sa1_region ||..o{ flood_incident : "counted in"
+    flood_area_coverage ||..o{ flood_area : "qualifies"
+
+    source {
+        text dataset_id PK
+        text title "nullable: not one of the seven sources carries one"
+        text publisher
+        text licence
+        date last_modified
+    }
+
+    extent {
+        text id PK
+        float min_e "metres east of the frame origin"
+        float min_n
+        float width_m
+        float height_m
+        text crs
+    }
+
+    artefact_envelope {
+        text name PK
+        text extent_id FK
+        int version
+        jsonb envelope "the prose and provenance, served back untouched"
+    }
+
+    pit {
+        bigint asset_number PK
+        text extent_id FK
+        text dataset_id FK
+        float e_m "metres east of the extent corner, not longitude"
+        float n_m
+        text description
+        text object_type "NULL for 22 of 895"
+    }
+
+    pipe {
+        bigint ref PK
+        text extent_id FK
+        text dataset_id FK
+        bigint upstr_pit "not a foreign key"
+        bigint dnstr_pit "not a foreign key"
+        int diameter_mm "a dimension, never a capacity"
+        text material
+        jsonb path
+    }
+
+    road {
+        bigint id PK
+        text extent_id FK
+        text dataset_id FK
+        text str_type
+        text seg_descr
+        jsonb rings
+    }
+
+    street_label {
+        bigint id PK
+        text extent_id FK
+        text dataset_id FK
+        text name
+        text maplabel "the cased form of name; the API dropped it once and 163 streets shouted"
+        jsonb path
+    }
+
+    derived_shape {
+        bigint id PK
+        text extent_id FK
+        text layer "channel, low-point or unavailable"
+        text geometry "line or polygon"
+        jsonb coordinates
+    }
+
+    trace_link {
+        text extent_id PK
+        bigint from_pit PK
+        bigint via_pipe PK
+        bigint to_pit "NULL exactly when ends is set"
+        text ends "why the path stops, when it does"
+        int position
+    }
+
+    trace_reason {
+        text extent_id PK
+        text reason PK
+        text sentence "shown to a resident, in the record's words"
+        int occurrences
+    }
+
+    sa1_region {
+        char7 sa1_code_2011 PK
+        text sa2_name "SA2 contains SA1s, not the reverse"
+        text greater_capital
+    }
+
+    flood_incident {
+        char7 sa1_code_2011 PK
+        char7 financial_year PK
+        text incident_type PK
+        int count "NULL means withheld for privacy, never zero"
+    }
+
+    flood_area {
+        text extent_scope PK
+        text area_name PK
+        char7 financial_year PK
+        text incident_type PK
+        int count
+    }
+
+    flood_area_coverage {
+        text extent_scope PK
+        text area_name PK
+        int regions
+        int suppressed_regions
+        bool complete "false where a region was withheld, so the total is a floor"
+    }
+
+    population {
+        text area_code PK
+        text area_level PK
+        date as_at PK
+        int persons
+        text dataset_id FK
+    }
+```
+
+**`flood_incident` and `population` are drawn and empty.** That is the state
+they are in, and a diagram that omitted them would hide the join the flood
+board is eventually meant to make — incidents per person — behind a table
+nobody can see is missing.
+
+**`schema_migration` is not drawn.** It records which migrations have run and
+has no relationship to anything the product is about.
+
+---
+
 ## How it is deployed
 
 **Live since 5 September 2026:**
