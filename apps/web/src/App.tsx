@@ -34,6 +34,7 @@ import {
   reduce,
 } from './session.js';
 import { Shell } from './ui/Shell.js';
+import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
 import { API_BASE, EXTENT, type Origin, fetchArtefact, served } from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
@@ -159,7 +160,7 @@ export function App() {
   if (loaded === null) {
     return (
       <Shell>
-        <p style={{ padding: 24 }}>Loading the pilot area…</p>
+        <Spinner label="Loading the pilot area…" />
       </Shell>
     );
   }

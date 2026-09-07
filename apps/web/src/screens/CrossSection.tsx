@@ -16,8 +16,6 @@
 
 import {
   type CrossSection as Section,
-  DEPTH_IS_ABSENT,
-  NO_CAPACITY_CLAIM,
   SURFACE_ENTRY_NOTE,
   type SectionOutcome,
   type SectionPipe,
@@ -98,51 +96,31 @@ export function CrossSection({ outcome }: CrossSectionProps) {
 }
 
 /**
- * Everything the drawing implies and does not say, in the words it was written
- * in.
+ * What the record holds about each connected pipe, behind the disclosure.
  *
- * Behind a disclosure on the card, under three plain sentences that summarise
- * it. The summary is what most people need; these are the sentences the
- * criteria are written against, and shortening them into the summary would
- * have lost the distinction between "we do not show depth" and "no depth is
- * recorded for any pit in this area".
+ * **The block of qualification that used to sit here was removed on 7
+ * September**, at the design owner's call, in favour of the three plain limits
+ * above the disclosure. `DEPTH_IS_ABSENT` and `NO_CAPACITY_CLAIM` went with
+ * it, and the Depth and Capacity cards now say those in plainer words.
+ *
+ * What is genuinely gone is the per-pit half: how many of these pipes have no
+ * recorded diameter, and whether the record has a pipe arriving here but none
+ * leaving. Nothing states those in prose any more. **They are still drawn** —
+ * a pit with nothing arriving has no arriving pipe in the figure, and a pipe
+ * with no recorded diameter is labelled `not recorded` on its own line — so
+ * the figure carries them, which the paragraph also did and no longer does.
  */
 export function SectionNotes({ outcome }: { readonly outcome: SectionOutcome }) {
   if (outcome.kind === 'unavailable') return null;
   const all = [...outcome.incoming, ...outcome.outgoing];
   return (
-    <>
-      <ul style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13, color: '#3d5265' }}>
-        {all.map((pipe) => (
-          <li key={`${pipe.direction}-${pipe.ref}`} style={{ marginBottom: 3 }}>
-            {summarise(pipe)}
-          </li>
-        ))}
-      </ul>
-
-      <div
-        style={{
-          padding: '10px 12px',
-          background: '#f6f8f4',
-          border: '1px solid #e6ebe4',
-          borderRadius: 8,
-          fontSize: 12,
-          color: '#4d5f6e',
-        }}
-      >
-        <strong style={{ display: 'block', marginBottom: 4, color: '#1e2b36' }}>
-          What is missing or uncertain here
-        </strong>
-        <ul style={{ margin: 0, paddingLeft: 16 }}>
-          {outcome.missing.map((item) => (
-            <li key={item} style={{ marginBottom: 3 }}>
-              {item}
-            </li>
-          ))}
-        </ul>
-        <p style={{ margin: '8px 0 0' }}>{NO_CAPACITY_CLAIM}</p>
-      </div>
-    </>
+    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#3d5265' }}>
+      {all.map((pipe) => (
+        <li key={`${pipe.direction}-${pipe.ref}`} style={{ marginBottom: 3 }}>
+          {summarise(pipe)}
+        </li>
+      ))}
+    </ul>
   );
 }
 

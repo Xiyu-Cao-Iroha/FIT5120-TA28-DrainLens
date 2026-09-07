@@ -184,3 +184,77 @@ button:disabled {
   }
 }
 
+
+/*
+ * The three limits on a pit card: "What the data doesn't show".
+ *
+ * Here rather than in an inline style because the layout the design asks for
+ * is conditional — three columns divided by hairlines when there is room, one
+ * under another when there is not — and a rule that depends on the width of
+ * the box it is in cannot be written as a style attribute.
+ *
+ * A container query rather than a media query: this block sits inside a
+ * 296-pixel map callout on one screen and could sit in a full-width panel on
+ * another, and what decides the layout is the space it has, not the size of
+ * the window around it.
+ */
+.limits {
+  container-type: inline-size;
+}
+
+.limits__row {
+  display: grid;
+  gap: 12px;
+}
+
+.limits__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+@container (min-width: 430px) {
+  .limits__row {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  /* The dividers in the design: between the columns, never before the first. */
+  .limits__item + .limits__item {
+    padding-left: 16px;
+    border-left: 1px solid #ead9bb;
+  }
+
+  .limits__item {
+    padding-right: 16px;
+  }
+}
+
+/*
+ * The loading spinner.
+ *
+ * A keyframe animation, so it is here rather than in a style attribute.
+ *
+ * **It slows down rather than stopping under `prefers-reduced-motion`.** A
+ * spinner is the one animation on this site that carries information — it says
+ * the page is working rather than broken — so removing it entirely would take
+ * away the answer to the question the reader is actually asking. Four seconds
+ * a turn is slow enough not to pull at the eye and fast enough to still read
+ * as movement.
+ */
+@keyframes drainlens-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: drainlens-spin 900ms linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 4s;
+  }
+}
