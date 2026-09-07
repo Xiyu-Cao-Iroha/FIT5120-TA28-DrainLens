@@ -311,7 +311,7 @@ function PlainLimits() {
             <strong style={{ display: 'block', fontSize: 12, color: '#1e2b36' }}>
               {limit.title}
             </strong>
-            <span style={{ fontSize: 12, color: '#6b7a88' }}>{limit.said}</span>
+            <span style={{ fontSize: 12, color: '#5b6e7e' }}>{limit.said}</span>
           </div>
         ))}
       </div>

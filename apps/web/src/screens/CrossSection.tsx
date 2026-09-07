@@ -29,6 +29,16 @@ import {
 const RECORDED = '#1f5b4e';
 const RECORDED_TINT = '#dcece6';
 const DRAWN = '#8593a0';
+
+/**
+ * The colour of a line and the colour of a word are different requirements.
+ *
+ * `DRAWN` is right for the dashed axis it names — a line only has to be seen —
+ * and wrong for the words beside it, where it measures 3.1:1 against the 4.5:1
+ * normal text needs. Captions in this figure use this instead, and the drawn
+ * marks keep `DRAWN`.
+ */
+const CAPTION = '#5b6e7e';
 const SURFACE = '#c7b299';
 
 /**
@@ -43,7 +53,14 @@ const SURFACE = '#c7b299';
 const WATER = '#2f7fb5';
 const WATER_TINT = '#cfe4f3';
 
-const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#8593a0' };
+/**
+ * The same distinction again: a mark only has to be seen, a word has to be
+ * read. `WATER` measures 4.35:1 on white -- fine for an arrow, just under the
+ * 4.5:1 its labels need.
+ */
+const WATER_INK = '#2a6f9e';
+
+const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: CAPTION };
 
 export interface CrossSectionProps {
   readonly outcome: SectionOutcome;
@@ -223,7 +240,7 @@ function Figure({ section, all }: { readonly section: Section; readonly all: rea
             points={`${pitMid},${GROUND_Y - 3} ${pitMid - 5},${GROUND_Y - 12} ${pitMid + 5},${GROUND_Y - 12}`}
             fill={WATER}
           />
-          <text x={pitMid - 10} y={GROUND_Y - 34} fontSize="10" fill={WATER} textAnchor="end">
+          <text x={pitMid - 10} y={GROUND_Y - 34} fontSize="10" fill={WATER_INK} textAnchor="end">
             water flows in
           </text>
         </g>
@@ -232,7 +249,7 @@ function Figure({ section, all }: { readonly section: Section; readonly all: rea
       {/* Street surface, recorded in the sense that the street is there. */}
       <rect x="10" y={GROUND_Y - 12} width={WIDTH - 20} height="12" fill="#eef3ea" />
       <line x1="10" y1={GROUND_Y} x2={WIDTH - 10} y2={GROUND_Y} stroke={SURFACE} strokeWidth="3" />
-      <text x="14" y={GROUND_Y - 18} fontSize="10" fill={DRAWN} letterSpacing="0.6">
+      <text x="14" y={GROUND_Y - 18} fontSize="10" fill={CAPTION} letterSpacing="0.6">
         STREET SURFACE
       </text>
 
@@ -250,8 +267,8 @@ function Figure({ section, all }: { readonly section: Section; readonly all: rea
         <text
           x={WIDTH - 20}
           y={(GROUND_Y + PIT_BOTTOM) / 2}
-          fontSize="9"
-          fill={DRAWN}
+          fontSize="10"
+          fill={CAPTION}
           transform={`rotate(90 ${WIDTH - 20} ${(GROUND_Y + PIT_BOTTOM) / 2})`}
           textAnchor="middle"
         >
@@ -307,11 +324,11 @@ function Figure({ section, all }: { readonly section: Section; readonly all: rea
       <text x={pitMid} y={PIT_BOTTOM + 16} fontSize="10" fill={RECORDED} textAnchor="middle">
         Pit {section.assetNumber}
       </text>
-      <text x={pitMid} y={PIT_BOTTOM + 29} fontSize="10" fill={WATER} textAnchor="middle">
+      <text x={pitMid} y={PIT_BOTTOM + 29} fontSize="10" fill={WATER_INK} textAnchor="middle">
         collects and passes water
       </text>
 
-      <text x="14" y={HEIGHT - 8} fontSize="9" fill={DRAWN}>
+      <text x="14" y={HEIGHT - 8} fontSize="10" fill={CAPTION}>
         Horizontal: recorded · Vertical: illustrative · Blue: what a pit does, not a measurement
       </text>
     </svg>
@@ -359,11 +376,11 @@ function PipeRun({
         strokeLinecap="butt"
       />
       <polygon points={`${ax + 8},${ay} ${ax},${ay - 5} ${ax},${ay + 5}`} fill={RECORDED} />
-      <text x={x1 + 4} y={y1 - width / 2 - 4} fontSize="9" fill={RECORDED}>
+      <text x={x1 + 4} y={y1 - width / 2 - 5} fontSize="10" fill={RECORDED}>
         {label}
       </text>
       {flow !== null && (
-        <text x={x1 + 4} y={y1 + width / 2 + 11} fontSize="9" fill={WATER}>
+        <text x={x1 + 4} y={y1 + width / 2 + 12} fontSize="10" fill={WATER_INK}>
           {flow}
         </text>
       )}

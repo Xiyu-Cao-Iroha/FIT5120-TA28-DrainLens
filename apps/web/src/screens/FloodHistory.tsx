@@ -601,7 +601,13 @@ function Point({ title, children }: { readonly title: string; readonly children:
           }}
         >
           <span style={{ flex: 1 }}>{title}</span>
-          <span aria-hidden style={{ color: ink.subtle }}>
+          {/*
+            The only mark saying this opens, so it is coloured like something
+            to see: `ink.subtle` measures 3.1:1 on this card, below the 4.5:1
+            normal text needs, and an affordance nobody notices is a paragraph
+            nobody knows is there.
+          */}
+          <span aria-hidden style={{ color: ink.muted }}>
             {open ? '⌃' : '⌄'}
           </span>
         </button>
