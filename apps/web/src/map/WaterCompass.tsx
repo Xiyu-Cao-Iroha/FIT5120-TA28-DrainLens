@@ -46,6 +46,18 @@ const FAINT = '#dfe5da';
 const INK = '#4d5f6e';
 
 /**
+ * Captions are read, so they are coloured like something to read.
+ *
+ * The first version used the palette's `subtle` grey at nine pixels for the
+ * line saying the drawing is not to scale — measured at **3.1:1**, against the
+ * 4.5:1 that normal text needs, and the smallest type anywhere in the product.
+ * The one sentence stopping the figure from being taken for a map was the
+ * hardest thing on it to read.
+ */
+const CAPTION = '#5b6e7e';
+const CAPTION_PX = 10;
+
+/**
  * Screen coordinates for a compass angle.
  *
  * North is up, which is the one thing about this figure a reader has to be
@@ -98,7 +110,7 @@ function Ray({
       <text
         x={tx}
         y={ty + (above ? -1 : 9)}
-        fontSize="10"
+        fontSize="11"
         fill={INK}
         textAnchor={across < -0.3 ? 'end' : across > 0.3 ? 'start' : 'middle'}
       >
@@ -122,7 +134,14 @@ export function WaterCompass({ near }: { readonly near: WaterNearby }) {
       style={{ width: '100%', height: 'auto', display: 'block', margin: '4px 0 2px' }}
     >
       <circle cx={CX} cy={CY} r={ARROW + 4} fill="none" stroke={FAINT} strokeWidth="1" />
-      <text x={CX} y={CY - ARROW - 9} fontSize="10" fill="#8593a0" textAnchor="middle">
+      <text
+        x={CX}
+        y={CY - ARROW - 9}
+        fontSize="11"
+        fill={CAPTION}
+        fontWeight="600"
+        textAnchor="middle"
+      >
         N
       </text>
 
@@ -146,7 +165,13 @@ export function WaterCompass({ near }: { readonly near: WaterNearby }) {
       {/* The address, last, so nothing is drawn over the person's own mark. */}
       <circle cx={CX} cy={CY} r="5" fill={ADDRESS} stroke="#ffffff" strokeWidth="2" />
 
-      <text x={CX} y={HEIGHT - 6} fontSize="9" fill="#8593a0" textAnchor="middle">
+      <text
+        x={CX}
+        y={HEIGHT - 6}
+        fontSize={CAPTION_PX}
+        fill={CAPTION}
+        textAnchor="middle"
+      >
         Directions and distances as measured · not to scale
       </text>
     </svg>
