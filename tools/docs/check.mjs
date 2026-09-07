@@ -115,7 +115,7 @@ for (const file of files) {
  * that already runs over what is tracked, and a check nobody runs is what
  * `docs/check.mjs` was written after in the first place.
  */
-const TEXT = /\.(ts|tsx|js|mjs|cjs|jsx|md|json|yml|yaml|sql|py|sh|html|css|toml|txt)$/;
+const TEXT = /\.(ts|tsx|js|mjs|cjs|jsx|md|json|yml|yaml|sql|py|sh|html|css|svg|toml|txt)$/;
 const textFiles = tracked('*').filter((f) => TEXT.test(f));
 
 for (const file of textFiles) {
