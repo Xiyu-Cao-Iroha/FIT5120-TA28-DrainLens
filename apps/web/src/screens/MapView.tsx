@@ -26,7 +26,8 @@ import { MAX_SUGGESTIONS, search } from '../address/search.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
-import { MapCallout } from '../map/MapCallout.js';
+import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
+import { PIT_SUMMARY, surfaceEntryOf } from '../crosssection/section.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
@@ -39,7 +40,8 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
-import { NEARBY_BASIS, describeWaterNearby } from '../map/nearby.js';
+import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
+import { WaterCompass } from '../map/WaterCompass.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
@@ -103,6 +105,16 @@ export function MapView({
   const guided = task !== 'full-map';
   const [layers, setLayers] = useState<LayerState>(() => openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
+  /**
+   * The pit's card is folded away, and the pit is still selected.
+   *
+   * Two states rather than one, because "I have finished with this pit" and
+   * "I want to see what is under this card" are different intentions and the
+   * card only offered the first. Reset whenever the selection changes: a new
+   * pit is a new question, and answering it with a folded card would look
+   * like the press did nothing.
+   */
+  const [minimised, setMinimised] = useState(false);
   const [following, setFollowing] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
   // The transform the canvas drew with, reported upward so a callout can be
@@ -148,7 +160,7 @@ export function MapView({
     () =>
       address === null
         ? null
-        : describeWaterNearby(derived, [address.eastingM, address.northingM]),
+        : waterNearby(derived, [address.eastingM, address.northingM]),
     [derived, address],
   );
 
@@ -183,8 +195,19 @@ export function MapView({
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         onViewport={setViewport}
+        onAddressPress={() => {
+          // The pin is the way back to the address card after it has been
+          // closed. Whatever was selected is let go: two cards on one map is
+          // one too many, which is the rule the address card is already
+          // written to.
+          setHit(null);
+          setFollowing(null);
+          setMinimised(false);
+          setAddressCardOpen(true);
+        }}
         onSelect={(next) => {
           setHit(next);
+          setMinimised(false);
           // Selecting something else abandons the path. Leaving it drawn
           // would attach the previous answer to the new question.
           if (next?.kind !== 'pit' || String(next.feature.asset_number) !== following) {
@@ -238,7 +261,22 @@ export function MapView({
         cross-section, the reason a path stops — is behind *More information*,
         which opens in place.
       */}
-      {panel && viewport !== null && hit?.kind === 'pit' && onScreen(hit.feature.c, viewport) && (
+      {panel && viewport !== null && hit?.kind === 'pit' && minimised && onScreen(hit.feature.c, viewport) && (
+        <MinimisedCallout
+          at={toScreen(viewport, hit.feature.c)}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title={`Drainage pit ${String(hit.feature.asset_number)}`}
+          onExpand={() => {
+            setMinimised(false);
+          }}
+          onClose={() => {
+            setHit(null);
+            setFollowing(null);
+          }}
+        />
+      )}
+
+      {panel && viewport !== null && hit?.kind === 'pit' && !minimised && onScreen(hit.feature.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
@@ -273,13 +311,15 @@ export function MapView({
               }}
             />
           }
+          onMinimise={() => {
+            setMinimised(true);
+          }}
           onClose={() => {
             setHit(null);
             setFollowing(null);
           }}
         >
-          This pit collects surface water from the street and connects it to the recorded
-          drainage network.
+          {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
         </MapCallout>
       )}
 
@@ -335,7 +375,8 @@ export function MapView({
             'No surface-water path or low area was measured close enough to this address to say anything about it.'
           ) : (
             <>
-              {explanation} <Badge basis={NEARBY_BASIS} />
+              <WaterCompass near={explanation} />
+              <Badge basis={NEARBY_BASIS} />
             </>
           )}
           {guided && (

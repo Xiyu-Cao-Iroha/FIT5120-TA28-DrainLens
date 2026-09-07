@@ -57,6 +57,10 @@ const WIDTH = 296;
  */
 const MAX_HEIGHT = 360;
 
+/** The pill a minimised card folds into. Wide enough for a title, and no more. */
+const MINIMISED_WIDTH = 210;
+const MINIMISED_HEIGHT = 34;
+
 export interface MapCalloutProps {
   /** Where the thing is, in the canvas's own pixels. */
   readonly at: readonly [number, number];
@@ -77,6 +81,19 @@ export interface MapCalloutProps {
   readonly action?: { readonly label: string; readonly onPress: () => void };
   /** The rest of what is recorded, opened in place rather than elsewhere. */
   readonly more?: ReactNode;
+  /**
+   * Fold the card away without letting go of what it is about.
+   *
+   * A teammate reported the card sitting over the very pipe it describes: the
+   * answer covers the thing the question was about, and the only way to see
+   * past it was to close it, which also dropped the selection and the pipe
+   * that had been drawn for it. Minimising keeps the pit selected, the
+   * connected pipe on screen, and one press to bring the card back.
+   *
+   * Omitted where there is nothing worth keeping: a pipe's card holds two
+   * sentences and covers nothing anybody is following.
+   */
+  readonly onMinimise?: () => void;
   readonly onClose: () => void;
 }
 
@@ -88,6 +105,7 @@ export function MapCallout({
   children,
   action,
   more,
+  onMinimise,
   onClose,
 }: MapCalloutProps) {
   const [open, setOpen] = useState(false);
@@ -164,6 +182,25 @@ export function MapCallout({
         >
           {title}
         </strong>
+        {onMinimise && (
+          <button
+            type="button"
+            onClick={onMinimise}
+            aria-label="Minimise"
+            title="Minimise, keeping this pit selected"
+            style={{
+              flexShrink: 0,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              lineHeight: 1,
+              font: type(text.body),
+              color: ink.subtle,
+            }}
+          >
+            −
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -250,6 +287,97 @@ export function MapCallout({
           {open && <div style={{ marginTop: space(3) }}>{more}</div>}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * What a minimised card leaves behind.
+ *
+ * Small enough to see the map through, and anchored the same way the card is,
+ * so it does not appear somewhere unrelated to the thing still selected. It
+ * says what is still selected rather than only offering to restore: a bare
+ * chevron would be a control with no subject.
+ */
+export function MinimisedCallout({
+  at,
+  within,
+  title,
+  onExpand,
+  onClose,
+}: {
+  readonly at: readonly [number, number];
+  readonly within: { readonly width: number; readonly height: number };
+  readonly title: string;
+  readonly onExpand: () => void;
+  readonly onClose: () => void;
+}) {
+  const spot = spotlightFor(
+    {
+      x: at[0] - MARK_RADIUS_PX,
+      y: at[1] - MARK_RADIUS_PX,
+      width: MARK_RADIUS_PX * 2,
+      height: MARK_RADIUS_PX * 2,
+    },
+    2,
+  );
+  const pill: Box = { x: 0, y: 0, width: MINIMISED_WIDTH, height: MINIMISED_HEIGHT };
+  const placement = placeCard(spot, pill, within);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: placement.left,
+        top: placement.top,
+        width: MINIMISED_WIDTH,
+        maxWidth: 'calc(100% - 32px)',
+        zIndex: 6,
+        display: 'flex',
+        alignItems: 'center',
+        gap: space(2),
+        padding: `${String(space(1))}px ${String(space(2))}px ${String(space(1))}px ${String(space(3))}px`,
+        background: 'rgba(255, 255, 255, 0.97)',
+        backdropFilter: 'blur(8px)',
+        border: `1px solid ${line.base}`,
+        borderRadius: radius.pill,
+        boxShadow: shadow.floating,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onExpand}
+        style={{
+          flex: 1,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          textAlign: 'left',
+          font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+          color: ink.strong,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {title} ⌄
+      </button>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        style={{
+          flexShrink: 0,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          lineHeight: 1,
+          font: type(text.body),
+          color: ink.subtle,
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }

@@ -187,7 +187,14 @@ export function App() {
       </strong>
     );
 
-  const separator = <span style={{ margin: '0 8px', color: '#c3cdba' }}>›</span>;
+  // Decorative: it repeats a gap the layout already makes, so a screen
+  // reader is not given it. It is still coloured to be seen, because a
+  // separator nobody can see is a pair of crumbs that look like one.
+  const separator = (
+    <span aria-hidden style={{ margin: '0 8px', color: ink.subtle }}>
+      ›
+    </span>
+  );
 
   switch (session.screen) {
     case 'home':

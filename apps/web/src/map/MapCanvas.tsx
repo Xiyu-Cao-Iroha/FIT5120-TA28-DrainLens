@@ -13,7 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
-import { drawMap } from './draw.js';
+import { drawMap, pressedThePin } from './draw.js';
 import { type Hit, pick } from './hit.js';
 import {
   MAX_SCALE,
@@ -24,6 +24,7 @@ import {
   focus,
   pan,
   scaleToCover,
+  toScreen,
   zoomAt,
 } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
@@ -66,6 +67,16 @@ export interface MapCanvasProps {
   readonly difference?: DifferenceArea | null;
   readonly onSelect?: (hit: Hit | null) => void;
   /**
+   * The address pin was pressed.
+   *
+   * Separate from `onSelect` rather than a third kind of `Hit`, because the
+   * pin is not a feature: it is the person's own location, drawn from no
+   * artefact, and everything downstream that switches on a hit is asking a
+   * question about the council's record. A pin that arrived as a `Hit` would
+   * have to be excluded again at every one of those places.
+   */
+  readonly onAddressPress?: () => void;
+  /**
    * The current viewport, whenever it changes.
    *
    * The map owns its own pan and zoom — that is view state and nothing above
@@ -90,6 +101,7 @@ export function MapCanvas({
   trace = null,
   difference = null,
   onSelect,
+  onAddressPress,
   onViewport,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -214,9 +226,20 @@ export function MapCanvas({
       // A drag that ends over a pit is still a drag. Selecting on it would
       // change what the panel is about every time somebody moved the map.
       if (drag.moved > DRAG_SLOP_PX) return;
+
+      // The pin first, and only when it is drawn. It stands *above* the point
+      // it marks, in space no feature occupies, so testing it before the
+      // network cannot steal a press from a pit -- and testing it after would
+      // let a pipe running under the pin's head take one from the pin.
+      const press = at(event);
+      if (address && pressedThePin(press, toScreen(viewport, address))) {
+        onAddressPress?.();
+        return;
+      }
+
       onSelect?.(pick(at(event), viewport, artefact.layers));
     },
-    [viewport, artefact, onSelect, at],
+    [viewport, artefact, onSelect, at, address, onAddressPress],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and

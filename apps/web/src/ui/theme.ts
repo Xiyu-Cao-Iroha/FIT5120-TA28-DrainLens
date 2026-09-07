@@ -32,8 +32,26 @@ export const ink = {
   base: '#33475a',
   /** Secondary text: descriptions, helper lines, the sentence under a field. */
   muted: '#5b6e7e',
-  /** Labels, captions, units — present, deliberately quiet. */
-  subtle: '#7d8f9d',
+  /**
+   * Labels, captions, units — present, deliberately quiet.
+   *
+   * **Darkened on 7 September, from `#7d8f9d`, because quiet had become
+   * unreadable.** Measured in the browser rather than judged: 3.34:1 on white
+   * and 3.13:1 on the page, against the 4.5:1 normal text needs. This value is
+   * 5.10, 4.77 and 4.58 on white, the page and a sunken block, so it passes on
+   * every surface the product puts it on.
+   *
+   * Forty-four usages, and the ones that made the change necessary rather than
+   * merely correct: the **CC BY attribution** in the footer — which this
+   * repository argues elsewhere must be *visible* to the person using the
+   * work, and was rendering at eleven pixels and 3.34:1 — the flood board's
+   * rank numbers and its provenance labels, and the map legend. None of those
+   * is decoration.
+   *
+   * It is still the quietest ink here. Quiet is a relationship to the text
+   * around it, not a contrast ratio.
+   */
+  subtle: '#61707c',
   /** On a dark or brand-filled surface. */
   inverse: '#ffffff',
 } as const;

@@ -482,28 +482,43 @@ function Explanation({ artefact }: { readonly artefact: FloodHistoryArtefact }) 
         What these numbers are, and what they are not
       </h2>
 
-      <Point title="One count is one crew dispatch">
+      <p
+        style={{
+          margin: `0 0 ${String(space(4))}px`,
+          font: type(text.label, { leading: 1.6 }),
+          color: ink.muted,
+        }}
+      >
+        Six things this ranking cannot tell you. Each one says what it says here; open it for
+        the detail behind it.
+      </p>
+
+      <Point title="One count is one crew dispatch, not one flood">
         {artefact.note} It is recorded by {artefact.source.publisher} in{' '}
         {artefact.source.dataset}, published under {artefact.source.licence}.
       </Point>
 
-      <Point title="It does not measure severity or damage">
+      <Point title="Not a measure of severity or damage">
         A dispatch to a flooded garage and a dispatch to a flooded street are one count each.
         Nothing in this data says how deep the water was, how long it stayed, or what it cost —
         and a higher count does not mean worse flooding, only more calls attended.
       </Point>
 
-      <Point title="It is not current, and it is not a forecast">
+      <Point
+        title={`The record ends ${readableDate(artefact.reportingPeriod.end)}, and describes no conditions since`}
+      >
         The record ends on {readableDate(artefact.reportingPeriod.end)}. Drainage, development and
         rainfall have all changed since. Nothing here describes conditions today or predicts them.
       </Point>
 
-      <Point title="Flash flooding is counted somewhere else">
+      <Point title="Flash flooding is counted somewhere else, so it is not in these totals">
         {artefact.excludes} An area whose flooding arrives as sudden run-off in a heavy storm can
         therefore sit lower on this list than a resident would expect.
       </Point>
 
-      <Point title="Some counts are withheld, and the totals are floors">
+      <Point
+        title={`${String(withheld)} small areas had counts withheld, so some totals are floors`}
+      >
         {withheld} of the {artefact.counts.regions.toLocaleString()} small areas behind this
         ranking had their counts withheld under the Privacy and Data Protection Act 2014, because
         too few people live there for a count to be published safely. Any area marked{' '}
@@ -511,7 +526,7 @@ function Explanation({ artefact }: { readonly artefact: FloodHistoryArtefact }) 
         measurement.
       </Point>
 
-      <Point title="A count depends on who calls">
+      <Point title="A count depends on who calls, which varies by area">
         Areas differ in population, in how much of the drainage is public, and in how likely people
         are to call the SES rather than the council or nobody. The ranking reflects those
         differences as much as it reflects water.
@@ -538,21 +553,77 @@ function readableDate(iso: string): string {
   return `${String(Number(match[3]))} ${month} ${String(match[1])}`;
 }
 
+/**
+ * One limitation, folded, with the claim on the outside.
+ *
+ * **The face has to be the assertion, not a label for it.** "Severity" folded
+ * away says nothing; "Not a measure of severity or damage" says the whole
+ * thing and offers the paragraph to anybody who wants the rest. Folding then
+ * costs detail and never costs the claim -- which matters here more than
+ * anywhere else on the site, because AC 2.3.1.c and 2.3.1.d *are* two of these
+ * six, and a reader who never expands one has still been told.
+ *
+ * Each keeps its own heading and its own paragraph. The acceptance file
+ * records that as a decision, and a collapsible does not merge them into a
+ * clause inside something else.
+ */
 function Point({ title, children }: { readonly title: string; readonly children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <div style={{ marginBottom: space(4) }}>
-      <h3
-        style={{
-          margin: `0 0 ${String(space(1))}px`,
-          font: type(text.label, { weight: weight.semibold, leading: 1.4 }),
-          color: ink.strong,
-        }}
-      >
-        {title}
+    <div
+      style={{
+        marginBottom: space(2),
+        border: `1px solid ${line.hair}`,
+        borderRadius: radius.base,
+        background: surface.page,
+      }}
+    >
+      <h3 style={{ margin: 0 }}>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((was) => !was);
+          }}
+          aria-expanded={open}
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: space(3),
+            width: '100%',
+            padding: `${String(space(3))}px ${String(space(4))}px`,
+            background: 'none',
+            border: 'none',
+            textAlign: 'left',
+            font: type(text.label, { weight: weight.semibold, leading: 1.4 }),
+            color: ink.strong,
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ flex: 1 }}>{title}</span>
+          {/*
+            The only mark saying this opens, so it is coloured like something
+            to see: `ink.subtle` measures 3.1:1 on this card, below the 4.5:1
+            normal text needs, and an affordance nobody notices is a paragraph
+            nobody knows is there.
+          */}
+          <span aria-hidden style={{ color: ink.muted }}>
+            {open ? '⌃' : '⌄'}
+          </span>
+        </button>
       </h3>
-      <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-        {children}
-      </p>
+      {open && (
+        <p
+          style={{
+            margin: 0,
+            padding: `0 ${String(space(4))}px ${String(space(3))}px`,
+            font: type(text.label, { leading: 1.6 }),
+            color: ink.muted,
+          }}
+        >
+          {children}
+        </p>
+      )}
     </div>
   );
 }

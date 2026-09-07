@@ -452,6 +452,8 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 >
 > **2.3.1.c and 2.3.1.d are the same commitment the rest of the product makes**, applied to a new kind of number. Each is its own headed paragraph, not a clause inside another one.
 
+> **The six are collapsible since 7 September, and the heading carries the claim rather than naming it.** Folded, 2.3.1.c reads *"Not a measure of severity or damage"* and 2.3.1.d reads *"The record ends 30 June 2015, and describes no conditions since"* — so a reader who never opens one has still been told, and opening it costs them the detail rather than the point. That is the condition the change had to meet: a fold whose face said *Severity* would have hidden a criterion behind a click.
+
 ## Deferred to Iteration 2 — the drain-blockage comparison
 
 The old Epic 2, built and demonstrated on 1 September, and now out of the interface by AC 1.1.1.e. Kept here so the work is not lost and its criteria can be found under the numbers the source still cites.

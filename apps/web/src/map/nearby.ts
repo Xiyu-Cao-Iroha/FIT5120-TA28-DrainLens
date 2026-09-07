@@ -111,6 +111,44 @@ export function nearestOnRings(
 const roughly = (metres: number): number =>
   Math.max(DISTANCE_ROUNDING_M, Math.round(metres / DISTANCE_ROUNDING_M) * DISTANCE_ROUNDING_M);
 
+/** One thing found near an address, as the interface reports it. */
+export interface NearbyThing {
+  /** Already rounded, because the drawing must not claim more than the words. */
+  readonly distanceM: number;
+  readonly bearing: Compass;
+}
+
+/**
+ * What was measured near an address, or null when nothing was.
+ *
+ * The same two facts the sentence is built from, before they become a
+ * sentence. The figure needs them separately -- it has to point somewhere --
+ * and deriving the picture from the prose by parsing it back apart would be a
+ * second implementation of the same measurement.
+ *
+ * **Distances here are the rounded ones.** A figure drawn from the unrounded
+ * distance beside a label reading "about 30 m" would be a picture claiming a
+ * precision the caption disclaims.
+ */
+export interface WaterNearby {
+  readonly channel: NearbyThing | null;
+  readonly low: NearbyThing | null;
+}
+
+export function waterNearby(derived: DerivedArtefact, at: Local): WaterNearby | null {
+  const channel = nearestOnLines(derived.layers.channel ?? [], at);
+  const low = nearestOnRings(derived.layers['low-point'] ?? [], at);
+
+  const nearChannel = channel !== null && channel.distanceM <= RELEVANT_RADIUS_M;
+  const nearLow = low !== null && low.distanceM <= RELEVANT_RADIUS_M;
+  if (!nearChannel && !nearLow) return null;
+
+  return {
+    channel: nearChannel ? { distanceM: roughly(channel.distanceM), bearing: bearingFrom(at, channel.at) } : null,
+    low: nearLow ? { distanceM: roughly(low.distanceM), bearing: bearingFrom(at, low.at) } : null,
+  };
+}
+
 /**
  * The sentence, or null when nothing derived is near enough to be about here.
  *
@@ -119,37 +157,61 @@ const roughly = (metres: number): number =>
  * be water somewhere" is worse than no paragraph.
  */
 export function describeWaterNearby(derived: DerivedArtefact, at: Local): string | null {
-  const channels = derived.layers.channel ?? [];
-  const lowPoints = derived.layers['low-point'] ?? [];
+  const near = waterNearby(derived, at);
+  if (near === null) return null;
+  return describe(near);
+}
 
-  const channel = nearestOnLines(channels, at);
-  const low = nearestOnRings(lowPoints, at);
+/**
+ * The same three sentences, from the structure rather than from the artefact.
+ *
+ * Separated so the figure and the wording are two readings of one measurement.
+ * It is also what a screen reader is given for the figure, which is the case
+ * that would otherwise quietly lose the low area when the drawing gained it.
+ */
+export function describe(near: WaterNearby): string {
+  const { channel, low } = near;
 
-  const nearChannel = channel !== null && channel.distanceM <= RELEVANT_RADIUS_M;
-  const nearLow = low !== null && low.distanceM <= RELEVANT_RADIUS_M;
-
-  if (!nearChannel && !nearLow) return null;
-
-  if (nearChannel && nearLow) {
+  if (channel !== null && low !== null) {
     return (
-      `Surface water near this address may run along a path about ${roughly(channel.distanceM)} m ` +
-      `to the ${bearingFrom(at, channel.at)}, towards a low area about ${roughly(low.distanceM)} m ` +
-      `to the ${bearingFrom(at, low.at)} where water may collect.`
+      `Surface water near this address may run along a path about ${channel.distanceM} m ` +
+      `to the ${channel.bearing}, towards a low area about ${low.distanceM} m ` +
+      `to the ${low.bearing} where water may collect.`
     );
   }
 
-  if (nearChannel) {
+  if (channel !== null) {
     return (
-      `Surface water near this address may run along a path about ${roughly(channel.distanceM)} m ` +
-      `to the ${bearingFrom(at, channel.at)}. No low area where water collects was measured nearby.`
+      `Surface water near this address may run along a path about ${channel.distanceM} m ` +
+      `to the ${channel.bearing}. No low area where water collects was measured nearby.`
     );
   }
 
   return (
-    `A low area where surface water may collect was measured about ${roughly(low!.distanceM)} m ` +
-    `to the ${bearingFrom(at, low!.at)} of this address.`
+    `A low area where surface water may collect was measured about ${low!.distanceM} m ` +
+    `to the ${low!.bearing} of this address.`
   );
 }
+
+/**
+ * Where a compass point lies, as an angle in the map frame.
+ *
+ * **The figure points at the reported eighth, not at the true bearing.** The
+ * sentence says "to the north-west" because the direction is rounded to an
+ * eighth before anybody sees it; an arrow drawn at the unrounded angle beside
+ * that label would be a picture asserting a precision the words disclaim, and
+ * the two would disagree by up to 22 degrees for no gain.
+ */
+export const COMPASS_ANGLE: Record<Compass, number> = {
+  east: 0,
+  'north-east': 45,
+  north: 90,
+  'north-west': 135,
+  west: 180,
+  'south-west': 225,
+  south: 270,
+  'south-east': 315,
+};
 
 /**
  * The label that must sit beside the sentence.

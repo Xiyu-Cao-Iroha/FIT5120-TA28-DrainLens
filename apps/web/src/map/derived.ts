@@ -112,8 +112,20 @@ export const HATCH_SPACING_PX = 7;
  * a zoomed-in one has none.
  */
 export const ARROW_SPACING_PX = 46;
-export const ARROW_LENGTH_PX = 7;
-export const ARROW_HALF_WIDTH_PX = 4;
+
+/**
+ * Enlarged on 7 September, on a teammate's report that the direction could not
+ * be read at a glance.
+ *
+ * 7x8 pixels was a mark you had to already know was an arrow. The line under
+ * it is a 3-pixel dashed stroke, and a head no wider than twice the line it
+ * sits on reads as a thickening of the dash rather than as a point. 11x12 is
+ * legible without being a decoration: at the default zoom a channel carries
+ * three or four of them, and the spacing is unchanged, so the density people
+ * are used to is unchanged with it.
+ */
+export const ARROW_LENGTH_PX = 11;
+export const ARROW_HALF_WIDTH_PX = 6;
 
 /** A short line still gets one arrow, at its middle, if it is at least this long. */
 export const ARROW_MIN_PATH_PX = 26;
