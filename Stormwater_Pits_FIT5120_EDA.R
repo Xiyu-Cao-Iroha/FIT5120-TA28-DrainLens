@@ -237,6 +237,20 @@ leaflet(stormwater %>% sample_n(3000)) %>%
   addScaleBar(position = "bottomleft")
 
 
+head(stormwater)
+stormwater <- stormwater %>%
+  select(
+    -id,
+    -construction_material_lupvalue,
+    -grate_length,
+    -grate_material_lupvalue,
+    -grate_width,
+    -model_descr_lupvalue,
+    -model_no_lupvalue,
+    -overflow_kerb_lupvalue,
+    -construction_material_group
+  )
+names(stormwater)
+
 write_csv(stormwater, "Stormwater_Pits_Cleaned.csv")
 
-getwd()

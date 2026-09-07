@@ -10,6 +10,7 @@ library(car)
 library(sf)
 library(spatstat)
 library(nortest)
+library(tibble)
 
 # Read dataset
 drainpipe <- read_csv("Drainpipes.csv")
@@ -20,6 +21,7 @@ drainpipe <- clean_names(drainpipe)
 
 #verify column names
 names(drainpipe)
+
 
 
 drainpipe <- drainpipe %>% distinct()
@@ -204,6 +206,116 @@ leaflet(drainpipe_pts) %>%
           lat = mean(drainpipe_pts$lat, na.rm = TRUE),
           zoom = 12)
 
+# Select one pipe with valid geometry
+pipe_shape <- drainpipe$geo_shape[
+  which(!is.na(drainpipe$pipe_length_m))[1]
+]
+
+# Read the GeoJSON geometry
+parsed <- fromJSON(pipe_shape)
+coords <- parsed$coordinates
+
+if (is.list(coords)) {
+  coords <- coords[[1]]
+}
+
+# Create a table of coordinate vertices
+vertices <- as_tibble(coords) %>%
+  setNames(c("lon", "lat")) %>%
+  mutate(vertex_id = row_number())
+
+# Calculate distance between two consecutive vertices
+vertices <- vertices %>%
+  mutate(
+    seg_length_m = c(
+      distGeo(
+        as.matrix(vertices[-nrow(vertices), c("lon", "lat")]),
+        as.matrix(vertices[-1, c("lon", "lat")])
+      ),
+      NA
+    )
+  )
+
+# Calculate total pipe length
+total_length <- sum(vertices$seg_length_m, na.rm = TRUE)
+
+# Create labels for each segment
+vertices <- vertices %>%
+  mutate(
+    mid_lon = (lon + lead(lon)) / 2,
+    mid_lat = (lat + lead(lat)) / 2,
+    segment_label = ifelse(
+      !is.na(seg_length_m),
+      paste0(round(seg_length_m, 1), " m"),
+      NA
+    )
+  )
+
+# Plot a visualisation
+ggplot(vertices, aes(x = lon, y = lat)) +
+  
+  # Pipe geometry
+  geom_path(linewidth = 1) +
+  
+  # Vertices
+  geom_point(size = 3) +
+  
+  # Vertex numbers
+  geom_text(
+    aes(label = paste0("V", vertex_id)),
+    vjust = -1,
+    size = 4
+  ) +
+  
+  # Distance of each segment
+  geom_text(
+    data = vertices %>% filter(!is.na(seg_length_m)),
+    aes(
+      x = mid_lon,
+      y = mid_lat,
+      label = segment_label
+    ),
+    vjust = -1.5,
+    size = 3.5
+  ) +
+  
+  coord_fixed() +
+  
+  labs(
+    title = "Pipe Length Calculation from Line Geometry",
+    subtitle = paste0(
+      "Total pipe length = ",
+      round(total_length, 1),
+      " metres"
+    ),
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  
+  theme_minimal()
+
+
+drainpipe <- drainpipe %>%
+  select(
+    -geo_point_2d,
+    -geo_shape,
+    -built,
+    -upstr_inv,
+    -width_mm,
+    -condition,
+    -operator,
+    -height_mm, 
+    -mat_desc,
+    -dnstr_inv,
+    -connection_status,
+    -pipe_length_m,
+    -pipe_age_yr
+  )
+head(drainpipe)
 
 write_csv(drainpipe, "DrainPipe_Cleaned.csv")
+
+
+
+
 
