@@ -435,6 +435,44 @@ export function pinOutline(
 }
 
 /**
+ * How far from the pin a press still counts as pressing it.
+ *
+ * A pin is 15 pixels across and 28 tall, which is smaller than a fingertip and
+ * about the size of a careless mouse. The pad is added around the shape rather
+ * than baked into a bigger drawing: the mark stays the size it should be and
+ * the target is the size a hand needs.
+ */
+export const PIN_TOUCH_PAD_PX = 6;
+
+/**
+ * Is this press on the address pin?
+ *
+ * **Built from the same two constants that draw it**, so the target and the
+ * mark cannot drift apart — the failure that would produce is a pin somebody
+ * can see and cannot press, which reads as the application ignoring them.
+ *
+ * A rectangle rather than the teardrop itself. Pointer accuracy is worth more
+ * here than geometric honesty, and the difference between the box and the
+ * shape is a few pixels of empty ground beside a mark nothing else occupies.
+ */
+export function pressedThePin(
+  press: readonly [number, number],
+  pin: readonly [number, number],
+): boolean {
+  const [px, py] = press;
+  const [x, tip] = pin;
+  const halfWidth = PIN_HEAD_R + PIN_TOUCH_PAD_PX;
+  // The head's top is PIN_DROP + PIN_HEAD_R above the tip; the tip is the
+  // bottom of the shape.
+  return (
+    px >= x - halfWidth &&
+    px <= x + halfWidth &&
+    py >= tip - PIN_DROP - PIN_HEAD_R - PIN_TOUCH_PAD_PX &&
+    py <= tip + PIN_TOUCH_PAD_PX
+  );
+}
+
+/**
  * The selected address.
  *
  * **A pin standing on the point, not a ring around it.** The ring this
