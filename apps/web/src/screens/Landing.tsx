@@ -82,6 +82,22 @@ export interface LandingProps {
   readonly fixtureNote?: string | undefined;
   readonly onFound: (address: IndexedAddress) => void;
   readonly onUnsupported: (typed: string) => void;
+  /**
+   * Leave without giving an address.
+   *
+   * **This screen had no way out.** It is reached from the chooser, and it was
+   * the only screen in the guided path with neither *Back* nor *Home* — so
+   * somebody who opened it to look, or who picked the wrong section, could
+   * only go on or use the browser's own back button. Every other screen in
+   * this flow carries both, and a screen that asks for a home address is the
+   * last one that should feel like it will not let go.
+   *
+   * Both are optional so that the screen still renders in isolation, and so
+   * that a future caller with genuinely nowhere to go back to does not have to
+   * invent a destination.
+   */
+  readonly onBack?: (() => void) | undefined;
+  readonly onHome?: (() => void) | undefined;
 }
 
 type Problem =
@@ -119,7 +135,14 @@ function ShieldMark() {
   );
 }
 
-export function Landing({ index, fixtureNote, onFound, onUnsupported }: LandingProps) {
+export function Landing({
+  index,
+  fixtureNote,
+  onFound,
+  onUnsupported,
+  onBack,
+  onHome,
+}: LandingProps) {
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
@@ -157,6 +180,34 @@ export function Landing({ index, fixtureNote, onFound, onUnsupported }: LandingP
         padding: `${String(space(12))}px ${String(space(6))}px ${String(space(16))}px`,
       }}
     >
+      {/*
+        The way out, in the same two places every other screen keeps it: Back
+        on the left, Home on the right. `justifyContent` puts Home against the
+        right edge even when there is no Back beside it.
+      */}
+      {(onBack ?? onHome) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: onBack ? 'space-between' : 'flex-end',
+            gap: space(4),
+            marginBottom: space(6),
+          }}
+        >
+          {onBack && (
+            <button type="button" onClick={onBack} style={quiet}>
+              ← Back
+            </button>
+          )}
+          {onHome && (
+            <button type="button" onClick={onHome} style={quiet}>
+              Home
+            </button>
+          )}
+        </div>
+      )}
+
       <PilotBadge />
 
       <h1
@@ -489,3 +540,16 @@ function UnsupportedNotice({
     </div>
   );
 }
+
+/**
+ * The way-out buttons, in the chooser's own style so the two screens read as
+ * one flow rather than as two pages that happen to follow each other.
+ */
+const quiet = {
+  border: 'none',
+  background: 'none',
+  padding: space(2),
+  font: type(text.lead, { weight: weight.semibold }),
+  color: ink.strong,
+  cursor: 'pointer',
+} as const;

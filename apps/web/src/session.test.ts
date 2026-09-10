@@ -205,6 +205,30 @@ describe('going back', () => {
     expect(asked.screen).toBe('address');
     expect(reduce(asked, { type: 'back' }).screen).toBe('home');
   });
+
+  it('leaves the address screen for the chooser when a guide sent you there', () => {
+    /*
+     * The address screen was the one screen in the guided path with no way
+     * out on it -- no Back, no Home, only the browser's own button. It has
+     * both now, and *where* Back goes is decided here rather than in the
+     * view: a pending guide section is exactly what says the chooser asked
+     * for the address, and having the view read that would put the rule in
+     * two places.
+     */
+    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(chosen.screen).toBe('address');
+    expect(reduce(chosen, { type: 'address-abandoned' }).screen).toBe('choose');
+  });
+
+  it('leaves it for the homepage when nothing was waiting for the address', () => {
+    const asked = reduce(INITIAL_SESSION, { type: 'change-address' });
+    expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
+  });
+
+  it('keeps the chosen section, because Back is not un-choosing it', () => {
+    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
+  });
 });
 
 describe('the insufficient-information outcome', () => {

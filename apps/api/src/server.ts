@@ -52,10 +52,37 @@ import {
  */
 export const DEFAULT_ORIGINS = [
   'https://drainlens-205559161217.australia-southeast1.run.app',
+  /*
+    The dev service, and the reason this list is a thing that can be wrong
+    without anybody being told.
+
+    Iteration 2 moved to three URLs on 11 September -- root, archive, dev --
+    and this list was not one of the things that moved. The dev service is a
+    different origin, so the browser dropped every response from this API
+    before the page saw it, and `fetchTogether` did exactly what it is for:
+    fell back to the copy in the container. The footer said so in plain words
+    -- *the wider council map needs the database, which is not answering* --
+    and it was right, from where the browser was standing.
+
+    What it looked like was the council extent not working. What it was is
+    this array. **A CORS list is not a feature flag, but it behaves like one**:
+    the whole Iteration 2 URL had been serving one square kilometre for a day.
+  */
+  'https://drainlens-dev-205559161217.australia-southeast1.run.app',
   // `npm run dev`, from .claude/launch.json.
   'http://localhost:5183',
   'http://127.0.0.1:5183',
 ];
+
+/*
+  `drainlens-iteration1` is deliberately **not** here.
+
+  It serves the frozen Iteration 1 bundle, which asks for `/api/map/kensington`
+  -- an extent this database no longer holds. Letting it through would give it
+  a 404 and the same fallback it gets now, by accident instead of on purpose.
+  An archive should not depend on a live database that has moved on; it holds
+  its own copies and that is what makes it an archive.
+*/
 
 export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
   if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;

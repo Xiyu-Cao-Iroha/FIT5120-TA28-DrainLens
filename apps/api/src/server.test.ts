@@ -20,6 +20,28 @@ describe('who may read this from a browser', () => {
     expect(DEFAULT_ORIGINS).toContain('http://localhost:5183');
   });
 
+  it('allows the dev service, which is where Iteration 2 is looked at', () => {
+    /*
+     * **This was missing for a day and nothing failed.** Iteration 2 moved to
+     * three URLs on 11 September and this list did not move with them, so the
+     * browser dropped every API response on the dev origin and the site fell
+     * back to the square kilometre in its own container. It reported that
+     * honestly — *the wider council map needs the database, which is not
+     * answering* — and the sentence was true from where the browser stood.
+     *
+     * It read as the council extent being broken. It was an array.
+     */
+    expect(DEFAULT_ORIGINS).toContain(
+      'https://drainlens-dev-205559161217.australia-southeast1.run.app',
+    );
+  });
+
+  it('leaves the archive out, so it cannot depend on a database that moved on', () => {
+    // `drainlens-iteration1` serves the frozen bundle, which asks for an
+    // extent this database no longer holds. Its own copies are the point.
+    expect(DEFAULT_ORIGINS.join(' ')).not.toContain('drainlens-iteration1');
+  });
+
   it('is not a wildcard', () => {
     // Nothing here is secret and no request carries a credential, so `*` would
     // leak nothing. It is still a list: this is the kind of setting that is

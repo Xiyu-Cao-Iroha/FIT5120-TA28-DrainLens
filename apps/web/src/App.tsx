@@ -346,6 +346,14 @@ export function App() {
               })
             }
             onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
+            // The chooser, or the homepage -- the reducer knows which, from
+            // whether a guide section is pending.
+            onBack={() => {
+              dispatch({ type: 'address-abandoned' });
+            }}
+            onHome={() => {
+              dispatch({ type: 'go-home' });
+            }}
           />
         </Shell>
       );
