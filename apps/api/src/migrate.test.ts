@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { MigrateError, plan, versionOf } from './migrate.js';
+import { BUNDLED, COUNCIL } from './load.js';
+import { MigrateError, plan, sourceFrom, versionOf } from './migrate.js';
 
 describe('reading a version off a filename', () => {
   it('takes the leading number', () => {
@@ -57,5 +58,56 @@ describe('deciding what to apply', () => {
 
   it('refuses an unnumbered migration rather than putting it last', () => {
     expect(() => plan(['001_init.sql', 'hotfix.sql'], new Set())).toThrow(MigrateError);
+  });
+});
+
+/**
+ * Which extent the job loads, which is the argument nobody can check by
+ * looking at the service afterwards.
+ *
+ * A deployment that loaded the wrong one answers every route, draws a map and
+ * says nothing is wrong; it is just a different city than the one that was
+ * asked for. So each way of getting it wrong is a refusal here, and the
+ * refusal says what the right values are.
+ */
+describe('choosing the extent to load', () => {
+  it('defaults to the extent that ships, so a bare run means what it always did', () => {
+    expect(sourceFrom([])).toBe(BUNDLED);
+    expect(sourceFrom(['--schema-only'])).toBe(BUNDLED);
+  });
+
+  it('takes a published extent by name', () => {
+    expect(sourceFrom(['--extent', 'city-of-melbourne'])).toBe(COUNCIL);
+    expect(sourceFrom(['--extent', 'kensington'])).toBe(BUNDLED);
+  });
+
+  it('refuses an unknown extent, and lists the ones that exist', () => {
+    // Never a fall back to the default: that is the failure that looks healthy.
+    expect(() => sourceFrom(['--extent', 'melbourne'])).toThrow(MigrateError);
+    expect(() => sourceFrom(['--extent', 'melbourne'])).toThrow(
+      'city-of-melbourne, kensington',
+    );
+  });
+
+  it('refuses a directory with no extent to write onto its rows', () => {
+    expect(() => sourceFrom(['--data', '/tmp/whatever'])).toThrow('does not name its extent');
+  });
+
+  it('takes a directory when it is told what is in it', () => {
+    const from = sourceFrom(['--data', '/tmp/rebuilt', '--extent', 'city-of-melbourne']);
+    expect(from.extent).toBe('city-of-melbourne');
+    expect(from.dir).not.toBe(COUNCIL.dir);
+  });
+
+  it('is not confused by --replace sitting between the flag and its value', () => {
+    expect(sourceFrom(['--replace', '--extent', 'city-of-melbourne'])).toBe(COUNCIL);
+    expect(sourceFrom(['--extent', 'city-of-melbourne', '--replace'])).toBe(COUNCIL);
+  });
+
+  it('refuses a flag whose value is the next flag', () => {
+    // `--extent --schema-only` would otherwise look for an extent called
+    // '--schema-only' and report that as the unknown one.
+    expect(() => sourceFrom(['--extent', '--schema-only'])).toThrow('--extent needs a value');
+    expect(() => sourceFrom(['--data'])).toThrow('--data needs a value');
   });
 });

@@ -44,12 +44,42 @@ export interface Source {
  *
  * A second extent is a second `load` against a different directory, not a
  * second database -- which is what the schema means by "one row per published
- * extent". `city-of-melbourne` is built into the pipeline's own working
- * directory and loaded from there; it is far too large to commit.
+ * extent".
  */
 export const BUNDLED: Source = {
   dir: path.resolve(HERE, '../../web/public/data'),
   extent: 'kensington',
+};
+
+/**
+ * The council, committed beside the API because the image is where it is read.
+ *
+ * **This is the one place in the repository where a built artefact is
+ * committed outside `apps/web/public/data`, and it is deliberate.** `/data` is
+ * git-ignored *and* dockerignored, so an artefact built there cannot reach the
+ * build context at all: the migration job would apply two migrations against a
+ * Cloud SQL instance and then load Kensington into it, which is a service
+ * answering confidently for a square kilometre after being told to serve a
+ * council. The load has to read the file, the file has to be in the image, and
+ * the image is built from this repository -- so the file is in this
+ * repository.
+ *
+ * 7.6 MB, 1.3 MB of it as git objects. It is paid once per rebuild of the
+ * council extent, which is a pipeline run nobody does casually.
+ *
+ * `../data` from `apps/api/src` and from `apps/api/dist` are the same
+ * directory, which is the same reason the container preserves the layout for
+ * `BUNDLED` and for `db/migrations`.
+ */
+export const COUNCIL: Source = {
+  dir: path.resolve(HERE, '../data/city-of-melbourne'),
+  extent: 'city-of-melbourne',
+};
+
+/** Every extent this can load, by the name it is asked for. */
+export const SOURCES: Readonly<Record<string, Source>> = {
+  [BUNDLED.extent]: BUNDLED,
+  [COUNCIL.extent]: COUNCIL,
 };
 
 /** Greater Melbourne, which the flood board covers and no pilot extent does. */
@@ -87,9 +117,22 @@ interface Artefact {
   readonly [key: string]: unknown;
 }
 
+/** How to treat a pilot extent that is already in the database. */
+export interface LoadOptions {
+  /**
+   * Remove the other pilot extent first, instead of refusing.
+   *
+   * Off by default, because it deletes rows nobody asked about. It is what a
+   * deployment that is changing which extent it serves wants, and it has to be
+   * asked for by name.
+   */
+  readonly replace?: boolean;
+}
+
 export async function load(
   client: pg.ClientBase,
   from: Source = BUNDLED,
+  options: LoadOptions = {},
 ): Promise<Record<string, number>> {
   const EXTENT = from.extent;
   const read = async (name: string): Promise<Artefact> =>
@@ -98,7 +141,22 @@ export async function load(
   const map = await read('map.json');
   const derived = await read('derived.json');
   const trace = await read('trace.json');
-  const flood = await read('flood-history.json');
+
+  /*
+    The flood board is read from the bundled directory whichever extent is
+    being loaded, because it is not this extent's.
+
+    It counts SES dispatches by SA2 across Greater Melbourne; it says nothing
+    about Kensington or the council in particular and is written against
+    `FLOOD_EXTENT` a few lines down regardless of `from`. It was briefly copied
+    into the council directory as well, and the copy was byte-identical -- two
+    files that must stay equal, with nothing to notice when they stop, in a
+    codebase whose argument against two writers is written at the top of this
+    one.
+  */
+  const flood = JSON.parse(
+    await readFile(path.join(BUNDLED.dir, 'flood-history.json'), 'utf8'),
+  ) as Artefact;
 
   const counted: Record<string, number> = {};
   const count = (table: string, n: number) => {
@@ -106,7 +164,7 @@ export async function load(
   };
 
   /*
-    This extent's rows go; every other extent's stay.
+    This extent's rows go; every other extent's stay, unless asked below.
 
     It used to TRUNCATE the whole schema, which was right while there was one
     extent and becomes wrong the moment there are two: loading the council
@@ -121,6 +179,46 @@ export async function load(
     run should leave them correct rather than absent.
   */
   await client.query('DELETE FROM extent WHERE id = $1', [EXTENT]);
+
+  /*
+    The other pilot extent, if it is there and this load was told to take it.
+
+    **Two published extents cannot be in one database, and the DELETE above is
+    not what stops it.** That one removes the extent being *loaded*, so it
+    leaves the other one exactly where it was -- and the two overlap, because
+    Kensington is a square kilometre inside the council and its 895 pits are
+    895 of the council's 21,113 under the same `asset_number`. The insert then
+    dies on `pit_pkey`, in both directions, whichever was there first.
+
+    That is the primary key being right. What was wrong was finding out about
+    it as `duplicate key value violates unique constraint "pit_pkey"` at pit
+    number 896 of a Cloud Run job, three minutes into a migration that had
+    already applied two schema changes. So this asks first, and says what to do
+    about it in the sentence rather than in a stack trace.
+
+    Replacing is not the default. It deletes rows nobody named, and there is a
+    future in which two pilot areas that do not overlap should both be here --
+    the schema was written for it. `--replace` is for the deployment that is
+    changing which extent it serves, which is a thing somebody is doing on
+    purpose.
+  */
+  const others = await client.query<{ id: string }>(
+    'SELECT id FROM extent WHERE id <> $1 AND id <> $2 ORDER BY id',
+    [EXTENT, FLOOD_EXTENT],
+  );
+  if (others.rows.length > 0) {
+    const names = others.rows.map((r) => r.id).join(', ');
+    if (!options.replace) {
+      throw new LoadError(
+        `the database holds ${names}, which overlaps ${EXTENT}: the same assets would be ` +
+          `stored twice in two coordinate frames, and the insert would fail on pit_pkey. ` +
+          `Load with --replace to remove ${names} first.`,
+      );
+    }
+    await client.query('DELETE FROM extent WHERE id <> $1 AND id <> $2', [EXTENT, FLOOD_EXTENT]);
+    count(`replaced ${names}`, others.rows.length);
+  }
+
   await client.query(`
     TRUNCATE flood_area_coverage, flood_area, flood_incident, sa1_region,
              population RESTART IDENTITY;

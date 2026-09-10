@@ -3,6 +3,14 @@
  * shaped like them?
  *
  *   node tools/deploy/verify-api.mjs https://drainlens-api-....run.app
+ *   node tools/deploy/verify-api.mjs https://drainlens-api-....run.app city-of-melbourne
+ *
+ * **The extent is an argument because the instance holds one of two.** This was
+ * five hardcoded `/api/map/kensington` routes, which against a council-loaded
+ * instance is a 404 on the first one — the script dies before printing a
+ * single result, having verified nothing, and the deployment it was run to
+ * check looks unverified rather than wrong. Each extent is compared against
+ * its own published artefacts, in its own coordinate frame.
  *
  * `apps/api/test-db` asks this of a local Postgres and answers it in thirty
  * tests. This asks it of the instance that is actually serving, because a
@@ -30,11 +38,36 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DATA = path.resolve(HERE, '../../apps/web/public/data');
+
+/** Where each published extent's artefacts are, mirroring `apps/api/src/load.ts`. */
+const EXTENTS = {
+  kensington: path.resolve(HERE, '../../apps/web/public/data'),
+  'city-of-melbourne': path.resolve(HERE, '../../apps/api/data/city-of-melbourne'),
+};
+
+/**
+ * The flood board, which is Greater Melbourne's and not any pilot extent's.
+ * One copy, read from the bundled directory whichever extent is being checked
+ * — the same rule `load.ts` follows when it puts it in the database.
+ */
+const SHARED = EXTENTS.kensington;
 
 const BASE = (process.argv[2] ?? '').replace(/\/$/, '');
+const EXTENT = process.argv[3] ?? 'kensington';
 if (!BASE) {
-  console.error('usage: node tools/deploy/verify-api.mjs https://the-deployed-url');
+  console.error(
+    'usage: node tools/deploy/verify-api.mjs https://the-deployed-url [extent]\n' +
+      `       extent is one of: ${Object.keys(EXTENTS).sort().join(', ')}`,
+  );
+  process.exit(2);
+}
+const DATA = EXTENTS[EXTENT];
+if (!DATA) {
+  // Never a fall back to the default: verifying the wrong extent against a
+  // service that answers for it is the one outcome worse than not verifying.
+  console.error(
+    `${EXTENT} is not a published extent (${Object.keys(EXTENTS).sort().join(', ')})`,
+  );
   process.exit(2);
 }
 
@@ -47,12 +80,45 @@ const get = async (route) => {
       `${route} answered ${String(response.status)}: this measured the gate, not the API`,
     );
   }
-  if (!response.ok) throw new Error(`${route} answered ${String(response.status)}`);
+  if (!response.ok) {
+    // Read to the end before throwing, rather than left unread or cancelled.
+    // An unfinished body holds its socket, and the process then exits over a
+    // live handle -- on Windows that is `Assertion failed: !(handle->flags &
+    // UV_HANDLE_CLOSING)` and **exit code 127**, which is not the 1 this
+    // script means by "checks failed" and not what a caller reading the code
+    // would conclude. The 404 body also names the extent, which is the useful
+    // half of the message.
+    const body = (await response.text()).trim().slice(0, 120);
+    throw new Error(`${route} answered ${String(response.status)}${body ? `: ${body}` : ''}`);
+  }
   return response.json();
+};
+
+/**
+ * Fetch now; fail inside whichever check needs the answer.
+ *
+ * Each of these was a bare top-level `await get(...)`, which was fine while
+ * every route answered and a stack trace with no summary the moment one did
+ * not — a wrong extent argument 404s on the first map route and the run ends
+ * there, having printed one result and looked like a crash rather than a
+ * finding. Attaching the handler here also means the rejection is never an
+ * unhandled one.
+ */
+const later = (route) => {
+  const settled = get(route).then(
+    (value) => () => value,
+    (error) => () => {
+      throw error;
+    },
+  );
+  return async () => (await settled)();
 };
 
 const published = async (name) =>
   JSON.parse(await readFile(path.join(DATA, name), 'utf8'));
+
+const shared = async (name) =>
+  JSON.parse(await readFile(path.join(SHARED, name), 'utf8'));
 
 /** Sorted JSON of each element: same features, order not asserted. */
 const asSet = (list) => [...list].map((f) => JSON.stringify(f)).sort();
@@ -74,43 +140,56 @@ const report = async (label, work) => {
 
 console.log(`\nDrainLens API verification`);
 console.log(`  target   ${BASE}`);
+console.log(`  extent   ${EXTENT}`);
 console.log(`  taken    ${new Date().toISOString()}\n`);
+
+const mapFile = await published('map.json');
+const floodFile = await shared('flood-history.json');
 
 // Health first. Everything below it is meaningless against an empty database,
 // and an empty database is what a service that started before its migration
 // job ran looks like.
-const health = await get('/health');
-await report('health reports the data is in, not merely that the process is up', () => {
-  assert.equal(health.status, 'ok');
-  assert.equal(health.pits, 895, `serving ${String(health.pits)} pits`);
-  assert.equal(health.areas, 30, `serving ${String(health.areas)} areas`);
+//
+// The counts are read off the artefacts rather than typed in. 895 and 30 were
+// right for one extent and are two more things to remember to change for the
+// other -- and a stale expectation here passes against the wrong city.
+const health = later('/health');
+const map = later(`/api/map/${EXTENT}`);
+const derived = later(`/api/derived/${EXTENT}`);
+const traced = later(`/api/trace/${EXTENT}`);
+const flooded = later('/api/flood-history');
+
+await report('health reports the data is in, not merely that the process is up', async () => {
+  const it = await health();
+  assert.equal(it.status, 'ok');
+  assert.equal(it.pits, mapFile.layers.pit.length, `serving ${String(it.pits)} pits`);
+  assert.equal(it.areas, floodFile.areas.length, `serving ${String(it.areas)} areas`);
 });
 
-const map = await get('/api/map/kensington');
-const mapFile = await published('map.json');
-await report('map: every recorded feature, in every layer', () => {
-  assert.deepEqual(Object.keys(map.layers).sort(), Object.keys(mapFile.layers).sort());
+await report('map: every recorded feature, in every layer', async () => {
+  const it = await map();
+  assert.deepEqual(Object.keys(it.layers).sort(), Object.keys(mapFile.layers).sort());
   for (const layer of Object.keys(mapFile.layers)) {
     assert.deepEqual(
-      asSet(map.layers[layer]),
+      asSet(it.layers[layer]),
       asSet(mapFile.layers[layer]),
       `layer ${layer} differs`,
     );
   }
 });
 
-const derived = await get('/api/derived/kensington');
 await report('derived: the calculated layers, still labelled as calculated', async () => {
-  assert.deepEqual(derived.layers, (await published('derived.json')).layers);
+  assert.deepEqual((await derived()).layers, (await published('derived.json')).layers);
 });
 
-const trace = await get('/api/trace/kensington');
 const traceFile = await published('trace.json');
-await report('trace: links and terminations, empty keys and reasons included', () => {
+await report('trace: links and terminations, empty keys and reasons included', async () => {
+  const trace = await traced();
   assert.deepEqual(trace.links, traceFile.links);
   assert.deepEqual(trace.terminations, traceFile.terminations);
 });
-await report('trace: no link has a null destination and no reason', () => {
+await report('trace: no link has a null destination and no reason', async () => {
+  const trace = await traced();
   // Thirty-seven pipes leave a pit and the record does not say where they go.
   // Sent as `to: null`, the client walks into a pit that does not exist.
   for (const [from, links] of Object.entries(trace.links)) {
@@ -125,15 +204,16 @@ await report('trace: no link has a null destination and no reason', () => {
   }
 });
 
-const flood = await get('/api/flood-history');
 await report('flood history: every area, rank, tie and yearly count', async () => {
-  assert.deepEqual(flood.areas, (await published('flood-history.json')).areas);
+  // `floodFile` comes from `shared`, not `published`: there is one flood board
+  // and the council directory does not carry a copy of it.
+  assert.deepEqual((await flooded()).areas, floodFile.areas);
 });
 
 await report('the same request twice returns the same bytes', async () => {
   const [a, b] = await Promise.all([
-    fetch(`${BASE}/api/map/kensington`).then((r) => r.text()),
-    fetch(`${BASE}/api/map/kensington`).then((r) => r.text()),
+    fetch(`${BASE}/api/map/${EXTENT}`).then((r) => r.text()),
+    fetch(`${BASE}/api/map/${EXTENT}`).then((r) => r.text()),
   ]);
   assert.equal(a, b, 'two identical requests answered differently');
 });
@@ -149,4 +229,15 @@ console.log(
     ? '\n  Every response matched the published artefact.\n'
     : `\n  ${String(failed)} check(s) failed.\n`,
 );
-process.exit(failed === 0 ? 0 : 1);
+/*
+  `process.exitCode`, not `process.exit()`.
+
+  `process.exit()` tears the loop down under whatever is still open. On Windows
+  and Node 26 that surfaced as `Assertion failed: !(handle->flags &
+  UV_HANDLE_CLOSING)` and **exit code 127** on exactly the runs that had
+  something to report -- so a verifier that had just found five real problems
+  reported them as a crash, and any caller reading the code saw 127, which
+  means "command not found". Setting the code and letting the process end on
+  its own gives 1, which is what the summary above says.
+*/
+process.exitCode = failed === 0 ? 0 : 1;

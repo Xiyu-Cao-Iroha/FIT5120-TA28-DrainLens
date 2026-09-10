@@ -66,6 +66,15 @@ COPY apps/web/public/data/map.json \
      apps/web/public/data/flood-history.json \
      apps/web/public/data/
 
+# The council extent, which is what the migration job loads when it is given
+# `--extent city-of-melbourne`. It is committed rather than built here because
+# `/data` -- where the pipeline writes it -- is in `.dockerignore`, so an
+# artefact built into the working directory is not in the build context and
+# cannot be copied out of it. No flood history: that board is Greater
+# Melbourne's and is read from the bundled copy above whichever extent is
+# loaded.
+COPY apps/api/data apps/api/data
+
 # Nothing here writes to disk, so it has no reason to be able to.
 USER node
 
