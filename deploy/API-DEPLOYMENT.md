@@ -386,6 +386,8 @@ The log to expect, copied from the rehearsal against the local database rather t
 
 `replaced kensington` appears only when there was something to replace; a second execution omits it and prints the same table counts.
 
+> **That block is the deployed job's own log, not the rehearsal's.** It ran on 11 September as `drainlens-migrate-nsv7x`, applied migrations 2 and 3 against an instance that had only ever seen 1, replaced Kensington, and exited 0. The rehearsal's output was identical apart from `schema  already current`.
+
 Then redeploy the service on the same image, so the server and the migration that filled its database were built from one commit:
 
 ```bash
@@ -409,6 +411,32 @@ node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-so
 ```
 
 It compares every response against `apps/api/data/city-of-melbourne` deeply, and the flood board against the bundled copy. **This is the check that found the one real defect in the council load**: `ref` stopped being the pipe primary key in migration 003, `queries.ts` still mapped it as `Number(r.ref)`, and `Number(null)` is `0` — so the 85 council pipes the council identified with nothing came back carrying *reference number zero*. Not missing, not flagged, indistinguishable from an asset id. Every shape-based check passed.
+
+### What the council deployment measured, 11 September 2026
+
+| | |
+|---|---|
+| Revision | `drainlens-api-00003-g7k`, serving 100% |
+| Image | `api:5156e68` — the merge commit on `develop`, compared rather than assumed. `main` is unchanged at `138a002` for the whole of Iteration 2 |
+| Migration job | `drainlens-migrate-nsv7x`, exit 0. `schema applied 2, 3`, `replaced kensington 1`, then the row counts above |
+| Data | `/health` answers `{"status":"ok","pits":21113,"areas":30}` |
+| Responses | `verify-api.mjs … city-of-melbourne` passed **all eight checks**. Every response deep-equals the committed artefact |
+| **AD1** | `httpRequest.remoteIp:*` over the whole project, one hour, 100 requests in the window: **no entries**. Positive control in the same window returns `system_event`, `varlog/system`, `stdout` and `activity` — and **no `run.googleapis.com/requests` log at all**, which is the exclusion working rather than a filter that matched nothing. Checked again because a new revision is a new chance for it to stop being true, not because anything suggested it had |
+| Failures | **0 of 100 requests** |
+
+Latency, from a laptop over a home connection to Sydney — the same caveat as every other figure on this page: it measures that link as much as the service. Sample counts differ per route because the map is now twenty times the size it was in September's table, and thirty samples of it is 208 MB of egress to learn what ten will tell you.
+
+| Route | n | p50 | p95 | max | Body |
+|---|---|---|---|---|---|
+| `/health` | 30 | 33.0 ms | 36.4 ms | 312.4 ms | — |
+| `/api/flood-history` | 30 | 36.3 ms | 41.9 ms | 53.5 ms | 5.4 KB |
+| `/api/derived/city-of-melbourne` | 15 | 55.0 ms | 66.3 ms | 66.3 ms | 162.6 KB |
+| `/api/trace/city-of-melbourne` | 15 | 191.0 ms | 247.5 ms | 247.5 ms | 693.2 KB |
+| `/api/map/city-of-melbourne` | 10 | **749.6 ms** | **1556.5 ms** | 1556.5 ms | **6.78 MB** |
+
+The single 312 ms on `/health` is a cold start, as it was in September; `--min-instances=0` means the first request after an idle period pays for the container and the connector.
+
+> **Nothing here is compressed, and at council scale that is the finding.** There is no `Content-Encoding` on any response and no compression middleware in `server.ts` — the map goes out as **6,942,917 bytes on the wire**, where the same JSON gzips to about 1.2 MB. It was never worth noticing at 316 KB. It is now the largest single cost of entering the map for anybody the API is answering, and it is **the opposite way round from the fallback**: nginx compresses the copies in the site's own container, so the offline path is the fast one. Recorded rather than fixed in the same breath, because it is a change to the service and this section is a record of what was deployed.
 
 ### What changes on the site, and what does not
 
