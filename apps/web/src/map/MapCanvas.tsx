@@ -14,7 +14,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
 import { drawMap, pressedThePin } from './draw.js';
-import { type Hit, pick } from './hit.js';
+import { type Hit, pick, selectableLayers } from './hit.js';
 import {
   MAX_SCALE,
   type Local,
@@ -237,9 +237,25 @@ export function MapCanvas({
         return;
       }
 
-      onSelect?.(pick(at(event), viewport, artefact.layers));
+      /*
+        Only what is drawn can be selected.
+
+        `pick` was given every layer the artefact carries, whatever the
+        switches said, so turning Pits off hid the markers and left them
+        selectable: a press on blank ground opened a card about a pit that was
+        not on the map. The rule belongs here rather than inside `pick`,
+        because this is the one place that knows what was painted -- the same
+        two flags go to the draw call a few lines above.
+      */
+      onSelect?.(
+        pick(
+          press,
+          viewport,
+          selectableLayers(artefact.layers, { pits: showPits, pipes: showPipes }),
+        ),
+      );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress],
+    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and

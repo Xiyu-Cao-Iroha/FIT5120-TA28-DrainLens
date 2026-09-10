@@ -37,6 +37,7 @@ import {
   type LayerKey,
   type LayerState,
   type MapMode,
+  NOTHING_ON,
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
@@ -64,13 +65,18 @@ import { PitDetail } from './PitDetail.js';
  * What the map opens with.
  *
  * A mode chosen on the homepage wins, because it is the most recent thing the
- * person said. The guided task is the next-best signal, and the unguided map
- * turns everything on including the hatching — somebody who asked for the whole
- * pilot area has asked to see where it is thin as well.
+ * person said. The guided task is the next-best signal — its layers are what
+ * its question needs.
+ *
+ * **The unguided map opens with nothing on but the ground**, which used to be
+ * everything on. The reasoning is in `modes.ts` beside `NOTHING_ON`; the short
+ * version is that "everything" is the densest thing this product draws and it
+ * was what a first visit met. Somebody who asked for the whole pilot area is
+ * choosing what to look at, and the chips are where that choice is made.
  */
 function openingState(mode: MapMode | null, guided: boolean): LayerState {
   if (mode !== null) return openingLayers(mode);
-  return guided ? GUIDED_ON : ALL_ON;
+  return guided ? GUIDED_ON : NOTHING_ON;
 }
 
 export interface MapViewProps {
@@ -86,6 +92,16 @@ export interface MapViewProps {
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
+  /**
+   * Let the address go again.
+   *
+   * Required alongside `onAddress` rather than optional beside it: a screen
+   * that can set an address from here and cannot take it back is the defect
+   * this pair exists to prevent, so the search box is not rendered without
+   * both. The gate is structural because a missing handler would otherwise be
+   * a button that does nothing, which is worse than no button.
+   */
+  readonly onClearAddress?: (() => void) | undefined;
 }
 
 export function MapView({
@@ -98,6 +114,7 @@ export function MapView({
   panel = true,
   index,
   onAddress,
+  onClearAddress,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
@@ -173,8 +190,31 @@ export function MapView({
     [trace, following],
   );
 
+  /*
+    Switching a layer off also lets go of anything selected on it.
+
+    The other half of the same defect as the hit test: with Pits off, the pit
+    card stayed open beside a map that no longer drew the pit it was about,
+    and pressing "Show connected pipe" traced a path through features nobody
+    could see. A card that outlives its layer is a claim about a map that is
+    no longer on screen.
+
+    Turning the layer back on does not bring the selection back, and that is
+    deliberate: restoring it would be guessing that the person still wanted
+    the pit they had before they went looking at something else.
+  */
   const toggle = (key: LayerKey) => {
     setLayers((current) => ({ ...current, [key]: !current[key] }));
+    if (key === 'pit' && layers.pit && hit?.kind === 'pit') {
+      setHit(null);
+      setFollowing(null);
+    }
+    if (key === 'pipe' && layers.pipe) {
+      // The trace is drawn as pipes, so it goes with them even when what is
+      // selected is the pit at the top of it.
+      setFollowing(null);
+      if (hit?.kind === 'pipe') setHit(null);
+    }
   };
 
   // The terrain chip cannot be pressed until its raster exists. Shown disabled
@@ -232,7 +272,14 @@ export function MapView({
           }}
         >
           <div style={{ pointerEvents: 'auto', display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
-            {index && onAddress && <MapSearch index={index} address={address} onPick={onAddress} />}
+            {index && onAddress && onClearAddress && (
+              <MapSearch
+                index={index}
+                address={address}
+                onPick={onAddress}
+                onClear={onClearAddress}
+              />
+            )}
             <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
           </div>
 
@@ -421,10 +468,12 @@ function MapSearch({
   index,
   address,
   onPick,
+  onClear,
 }: {
   readonly index: AddressIndex;
   readonly address: SupportedAddress | null;
   readonly onPick: (address: IndexedAddress) => void;
+  readonly onClear: () => void;
 }) {
   const [typed, setTyped] = useState('');
   const [focused, setFocused] = useState(false);
@@ -476,13 +525,27 @@ function MapSearch({
             color: ink.strong,
           }}
         />
-        {typed !== '' && (
+        {/*
+          Shown whenever there is something to clear, which includes a chosen
+          address and did not used to.
+
+          A chosen address is displayed as the field's *placeholder* -- the
+          typed text is cleared on picking one -- so gating this button on
+          `typed` made it disappear at the one moment it was most needed: the
+          address was on the map, named in the box, and there was no control
+          anywhere that took it back. The two cases are one button because
+          they are one intention, and the label says which is about to happen.
+        */}
+        {(typed !== '' || address !== null) && (
           <button
             type="button"
             onClick={() => {
               setTyped('');
+              // Only when there is one. Clearing a half-typed search should
+              // not throw away the address the map is centred on.
+              if (address !== null) onClear();
             }}
-            aria-label="Clear the search"
+            aria-label={address === null ? 'Clear the search' : 'Clear the address'}
             style={{ background: 'none', border: 'none', padding: 0, color: ink.subtle }}
           >
             <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden focusable="false">

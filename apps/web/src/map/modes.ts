@@ -57,7 +57,37 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
   return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
 }
 
-/** Everything on: the unguided way in, where nothing has been narrowed yet. */
+/**
+ * Nothing on but the ground: the unguided way in, from 10 September.
+ *
+ * **This reverses `ALL_ON` for that one entry, at the design owner's request,
+ * and `ALL_ON` is kept because the legend and the comparison map still mean
+ * "everything".** The argument for the reversal is that opening four layers at
+ * once over a square kilometre is the densest thing this product ever puts on
+ * screen, and it is what a first-time visitor meets: the chips read as
+ * decoration when they are all already on, and turning one *off* to see what
+ * it was is a harder first move than turning one on.
+ *
+ * **Terrain stays on, and that is not a half-measure.** It is the ground the
+ * map is drawn on rather than a layer over it -- without it the map opens onto
+ * a flat colour that quietly implies level ground, in a product whose whole
+ * argument is that it is not. What goes off is the four chips: pits, pipes,
+ * water flow, low areas.
+ *
+ * It does **not** touch `openingLayers`. AC 1.1.2 requires a homepage card to
+ * open the map showing the thing it named, and a card that opened a map with
+ * nothing on it would be a click that visibly did nothing.
+ */
+export const NOTHING_ON: LayerState = {
+  pit: false,
+  pipe: false,
+  terrain: true,
+  channel: false,
+  lowPoint: false,
+  unavailable: false,
+};
+
+/** Everything on. Still what the legend and the comparison map mean. */
 export const ALL_ON: LayerState = {
   pit: true,
   pipe: true,

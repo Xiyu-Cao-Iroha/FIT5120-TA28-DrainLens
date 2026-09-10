@@ -14,6 +14,7 @@ import {
   GUIDED_ON,
   type LayerKey,
   type MapMode,
+  NOTHING_ON,
   PANEL_KEYS,
   openingLayers,
   visibilityOf,
@@ -49,8 +50,31 @@ describe('where each control lives', () => {
 });
 
 describe('the presets', () => {
-  it('opens the unguided map with every layer on', () => {
+  it('has one preset with every layer on', () => {
+    // Still what the legend and the comparison map mean by "everything". It
+    // stopped being what the unguided map opens with on 10 September.
     expect(Object.values(ALL_ON).every(Boolean)).toBe(true);
+  });
+
+  it('opens the unguided map with nothing on but the ground', () => {
+    expect(NOTHING_ON).toEqual({
+      pit: false,
+      pipe: false,
+      channel: false,
+      lowPoint: false,
+      terrain: true,
+      unavailable: false,
+    });
+  });
+
+  it('leaves terrain on, because the alternative states something false', () => {
+    // Not a half-measure and not an oversight. Every chip goes off; the
+    // ground surface is what the map is drawn on, and turning it off opens
+    // onto a flat colour that implies level ground.
+    expect(NOTHING_ON.terrain).toBe(true);
+    for (const key of CHIP_KEYS) {
+      expect(NOTHING_ON[key]).toBe(false);
+    }
   });
 
   it('leaves low areas and the hatching out of the guided task, and nothing else', () => {
@@ -107,7 +131,9 @@ describe('openingLayers', () => {
 
   it('never opens the hatching from a card', () => {
     // It is a statement about the evidence and it belongs to the reader, not
-    // to the way they arrived. The full map turns it on; a card does not.
+    // to the way they arrived. No card turns it on, and since 10 September no
+    // preset does either — the unguided map opens empty, so it is reached
+    // from the Layers panel or not at all.
     for (const way of WAYS_IN) {
       expect(openingLayers(way).unavailable).toBe(false);
     }

@@ -598,6 +598,13 @@ function MapScreen({
       }
     >
       <MapView
+        /*
+          Remounted on every arrival, so the map cannot open carrying a pit
+          card, a traced path or a set of chips from the last visit. It was
+          already true by accident -- React unmounts this on the way out --
+          and this makes it true on purpose. See `mapOpenings` in session.ts.
+        */
+        key={session.mapOpenings}
         map={loaded.map}
         derived={loaded.derived}
         trace={loaded.trace}
@@ -616,6 +623,9 @@ function MapScreen({
             },
           })
         }
+        onClearAddress={() => {
+          dispatch({ type: 'address-cleared' });
+        }}
       />
       {touring && (
         <Tour

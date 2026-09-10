@@ -374,6 +374,117 @@ describe('searching from the map', () => {
   });
 });
 
+describe('arriving at the map', () => {
+  /*
+   * The map must start clean every time — no pit selected, no path traced, no
+   * chips left on from the last visit. That was true only because React
+   * unmounted the screen on the way out; nothing said so and nothing tested
+   * it. The map is keyed on this count now, so the guarantee is structural.
+   */
+  it('counts an arrival however the person got there', () => {
+    expect(play([{ type: 'map-opened' }]).mapOpenings).toBe(1);
+    expect(
+      play([
+        { type: 'address-accepted', address: GATEHOUSE },
+        { type: 'task-chosen', task: 'follow' },
+      ]).mapOpenings,
+    ).toBe(1);
+  });
+
+  it('counts leaving and coming back as a second arrival', () => {
+    const end = play([
+      { type: 'map-opened' },
+      { type: 'leave-map' },
+      { type: 'map-opened' },
+    ]);
+    expect(end.mapOpenings).toBe(2);
+  });
+
+  it('does not count anything done while already on the map', () => {
+    // Otherwise every search would throw away the layers the person had set,
+    // which is the opposite failure and just as bad.
+    const end = play([
+      { type: 'map-opened' },
+      { type: 'address-moved', address: NEALE },
+      { type: 'address-cleared' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: false },
+    ]);
+    expect(end.mapOpenings).toBe(1);
+    expect(end.screen).toBe('explore');
+  });
+
+  it('does not count screens that are not the map', () => {
+    expect(play([{ type: 'history-opened' }]).mapOpenings).toBe(0);
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }]).mapOpenings).toBe(0);
+  });
+});
+
+describe('letting the address go', () => {
+  /*
+   * There was no way to do this, and the shape of the gap is worth keeping.
+   * The map's search box shows a chosen address as its *placeholder* and
+   * clears what was typed, so the clear button — which appeared only when
+   * there was typed text — vanished at the exact moment there was something
+   * to clear. The mark stayed on the map with no control that removed it.
+   */
+  it('drops the address without moving off the map', () => {
+    const reading = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.address).toBeNull();
+    expect(end.screen).toBe(reading.screen);
+  });
+
+  it('drops a pit chosen near it, for the same reason a new address does', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: true },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.scenario.pitId).toBeNull();
+    expect(end.scenario.pitWasSuggested).toBe(false);
+    expect(end.outcome).toBeNull();
+  });
+
+  it('keeps the assumptions, which were never about the address', () => {
+    // Same rule as `address-moved`: the blockage setting and the rainfall are
+    // the person's, and re-asking for them would be the map forgetting
+    // something it was told.
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.scenario.blockage).toBe('fully-blocked');
+    expect(end.scenario.rainfallMm).toBe(60);
+  });
+
+  it('clears a rejected address too, so no stale complaint survives it', () => {
+    const end = play([
+      { type: 'address-rejected', typed: '12 Nowhere Street' },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.rejectedAddress).toBeNull();
+  });
+
+  it('is harmless when there is no address', () => {
+    expect(play([{ type: 'address-cleared' }]).address).toBeNull();
+  });
+});
+
 describe('an action the reducer does not know', () => {
   it('leaves the session untouched instead of erasing it', () => {
     // The compiler makes this unreachable, which is why the cast is needed to
