@@ -2,9 +2,46 @@
 
 Stormwater flood risk for residents of Greater Melbourne communities that flood repeatedly.
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, behind a password gate since 3 September 2026. **Serving Iteration 1, and holding there**: from 10 September 2026 this URL is the published iteration rather than the newest good code, and Iteration 2 goes to `drainlens-dev` until it is finished. [How the three URLs are kept apart](./deploy/README.md#preserving-each-iteration).
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, behind a password gate since 3 September 2026.
 
 **API:** https://drainlens-api-205559161217.australia-southeast1.run.app/health — a second Cloud Run service over Cloud SQL, live since 5 September 2026, serving the same artefacts rebuilt from rows. **The site reads four of its five artefacts from it**, falling back to the copies in its own container when it cannot answer, with the footer naming which source answered.
+
+### Which URL shows which iteration
+
+| | URL | Built from | Showing |
+|---|---|---|---|
+| **The live site** | https://drainlens-205559161217.australia-southeast1.run.app | `main` | the latest **completed** iteration — Iteration 1 today |
+| **Iteration 1, preserved** | https://drainlens-iteration1-205559161217.australia-southeast1.run.app | tag `iteration-1-frozen` (`138a002`) | Iteration 1, permanently — **not yet created** |
+| **Iteration 2, in build** | https://drainlens-dev-205559161217.australia-southeast1.run.app | `develop` | Iteration 2 as it is written — **not yet created** |
+
+**The live URL never changes and never goes away.** It is the one address to give
+anybody, and what it serves moves forward one iteration at a time: Iteration 1
+now, Iteration 2 the day Iteration 2 is finished. A Cloud Run hostname is the
+service name and the project number, so it is stable for as long as both exist —
+nothing about a redeployment rotates it, and no bookmark breaks.
+
+**Each finished iteration then keeps its own address as well**, which is the
+part that needs doing rather than waiting: the moment the live URL moves to
+Iteration 2, the preserved URL is the only place Iteration 1 still exists.
+
+All three sit behind the same password. An unlisted URL is not a gate, and a
+half-built iteration is exactly what should not be found by accident.
+
+> **Every one of these can also be run from nothing but this repository**, which
+> is the copy that outlives a cloud project, its credits and the semester:
+> `git checkout iteration-1-frozen`, `npm ci`, then `npm run dev --workspace
+> @drainlens/web`. The artefacts are committed, so it needs no network and no
+> API — the site falls back to the copies in its own tree and the footer says
+> so.
+>
+> **A local `npm run build` will not produce the deployed bundle**, and that is
+> not a discrepancy: `VITE_API_BASE` is inlined at build time, so a build
+> without it is a genuinely different program. Setting it to the API above
+> reproduces `index-DFGygy6v.js` byte for byte, which is how the tag was
+> checked against the running container. The trap is written out in
+> [deploy/README.md](./deploy/README.md#preserving-each-iteration), along with
+> how the three URLs are kept apart and what "preserved" does and does not
+> cover.
 
 Deployed from `main` and verified against it every time, because a deployment has already silently shipped something other than this repository once. **The bundle hash lives in [deploy/README.md](./deploy/README.md), beside the deployment that produced it, rather than here** — it changes with every build, and a hash written in an introduction is a line that is wrong more often than it is right. This paragraph went stale three times in three days before it was moved.
 
