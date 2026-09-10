@@ -122,6 +122,18 @@ export interface MapControlsProps {
   readonly canZoomOut: boolean;
   /** Absent when no address is selected — there is nowhere to return to. */
   readonly onRecentre?: (() => void) | undefined;
+  /**
+   * The view is held, so the buttons that would move it are not drawn.
+   *
+   * **The bar stays, because it is not one of them.** It is the only thing on
+   * this map that says how big anything is — there is no basemap and no
+   * familiar imagery — and the guide's sentences are distances: *about 20 m
+   * from your address*. A disabled zoom pair would have been the other option
+   * and is worse: greyed-out buttons read as broken rather than as absent, and
+   * they occupy the corner the guide needs, which is what made the pit it was
+   * pointing at unpressable in the first place.
+   */
+  readonly locked?: boolean;
   /** Pixels per metre, for the bar. */
   readonly scale: number;
 }
@@ -132,6 +144,7 @@ export function MapControls({
   canZoomIn,
   canZoomOut,
   onRecentre,
+  locked = false,
   scale,
 }: MapControlsProps) {
   const bar = scaleBar(scale);
@@ -176,7 +189,7 @@ export function MapControls({
         />
       </div>
 
-      {onRecentre && (
+      {!locked && onRecentre && (
         <div style={{ ...SURFACE, overflow: 'hidden' }}>
           <ControlButton
             label="Recentre on the selected address"
@@ -186,11 +199,13 @@ export function MapControls({
         </div>
       )}
 
-      <div style={{ ...SURFACE, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <ControlButton label="Zoom in" glyph={Plus} onPress={onZoomIn} disabled={!canZoomIn} />
-        <span aria-hidden style={{ height: 1, background: line.hair }} />
-        <ControlButton label="Zoom out" glyph={Minus} onPress={onZoomOut} disabled={!canZoomOut} />
-      </div>
+      {!locked && (
+        <div style={{ ...SURFACE, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <ControlButton label="Zoom in" glyph={Plus} onPress={onZoomIn} disabled={!canZoomIn} />
+          <span aria-hidden style={{ height: 1, background: line.hair }} />
+          <ControlButton label="Zoom out" glyph={Minus} onPress={onZoomOut} disabled={!canZoomOut} />
+        </div>
+      )}
     </div>
   );
 }

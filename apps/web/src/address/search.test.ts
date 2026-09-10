@@ -206,9 +206,30 @@ describe('the search is local', () => {
 });
 
 describe('unpacking the shipped index', () => {
+  /** Kensington's own corner, as `addresses.json` carries it. */
+  const KENSINGTON_FRAME = {
+    min_e: 316500,
+    min_n: 5814500,
+    width_m: 1000,
+    height_m: 1000,
+  } as const;
+
+  /**
+   * The council's, which contains it. Kensington's corner is this one's
+   * (1500, 6000) — the offset every address has to move by when the API is
+   * answering and the map underneath is the whole council.
+   */
+  const COUNCIL_FRAME = {
+    min_e: 315000,
+    min_n: 5808500,
+    width_m: 8500,
+    height_m: 9000,
+  } as const;
+
   const packed = {
     area: 'kensington',
     streets: ['Gatehouse Drive', 'Harper Street'],
+    extent: KENSINGTON_FRAME,
     on: ['Gatehouse Drive|Kensington', 'Neale Street|Kensington'],
     at: [
       [
@@ -220,11 +241,11 @@ describe('unpacking the shipped index', () => {
   } as const;
 
   it('rebuilds every address', () => {
-    expect(unpack(packed).addresses).toHaveLength(3);
+    expect(unpack(packed, KENSINGTON_FRAME).addresses).toHaveLength(3);
   });
 
   it('rebuilds the label the pipeline used to ship', () => {
-    const [first] = unpack(packed).addresses;
+    const [first] = unpack(packed, KENSINGTON_FRAME).addresses;
     expect(first?.label).toBe('46 Gatehouse Drive, Kensington');
     expect(first?.number).toBe('46');
     expect(first?.street).toBe('Gatehouse Drive');
@@ -234,41 +255,85 @@ describe('unpacking the shipped index', () => {
   it('rebuilds the id the session keys on', () => {
     // A different id here means a re-entered address reads as a new one, which
     // silently drops the pit chosen beside the old one.
-    expect(unpack(packed).addresses[0]?.id).toBe('kensington/46-gatehouse-drive-kensington');
-  });
-
-  it('keeps the coordinates untouched', () => {
-    const [first] = unpack(packed).addresses;
-    expect([first?.e, first?.n]).toEqual([320.5, 640.25]);
+    expect(unpack(packed, KENSINGTON_FRAME).addresses[0]?.id).toBe('kensington/46-gatehouse-drive-kensington');
   });
 
   it('carries the street list through, which is a different list', () => {
     // Wider than the streets with addresses on purpose: it is what tells
     // "outside the pilot area" from "no record of that street" (AC 1.1.8).
-    expect(unpack(packed).streets).toEqual(['Gatehouse Drive', 'Harper Street']);
-    expect(unpack(packed).addresses.map((a) => a.street)).not.toContain('Harper Street');
+    expect(unpack(packed, KENSINGTON_FRAME).streets).toEqual(['Gatehouse Drive', 'Harper Street']);
+    expect(unpack(packed, KENSINGTON_FRAME).addresses.map((a) => a.street)).not.toContain('Harper Street');
   });
 
   it('handles an address with no suburb', () => {
-    const noSuburb = { area: 'x', on: ['Some Lane|'], at: [[['1', 0, 0] as const]] };
-    expect(unpack(noSuburb).addresses[0]?.label).toBe('1 Some Lane');
+    const noSuburb = {
+      area: 'x',
+      extent: KENSINGTON_FRAME,
+      on: ['Some Lane|'],
+      at: [[['1', 0, 0] as const]],
+    };
+    expect(unpack(noSuburb, KENSINGTON_FRAME).addresses[0]?.label).toBe('1 Some Lane');
   });
 
   it('refuses an index whose groups do not line up', () => {
     // The failure this prevents is an address placed on another street --
     // plausible on screen and wrong in the only way that matters here.
-    expect(() => unpack({ ...packed, at: [packed.at[0]] })).toThrow(IndexError);
-    expect(() => unpack({ ...packed, at: [packed.at[0]] })).toThrow(/2 streets and 1 group/);
+    expect(() => unpack({ ...packed, at: [packed.at[0]] }, KENSINGTON_FRAME)).toThrow(IndexError);
+    expect(() => unpack({ ...packed, at: [packed.at[0]] }, KENSINGTON_FRAME)).toThrow(/2 streets and 1 group/);
   });
 
   it('refuses an index carrying no addresses at all', () => {
-    expect(() => unpack({ area: 'x' } as unknown as PackedIndex)).toThrow(IndexError);
+    expect(() => unpack({ area: 'x' } as unknown as PackedIndex, KENSINGTON_FRAME)).toThrow(
+      IndexError,
+    );
+  });
+
+  it('moves every address into the frame of the map it will be drawn on', () => {
+    /*
+     * The defect this exists for, and it was live.
+     *
+     * The index ships in Kensington's frame and is the one artefact that never
+     * comes from the API, so when the API answers with the council the map
+     * underneath has a different corner — Kensington's is the council's
+     * (1500, 6000). Unshifted, 46 Gatehouse Drive was drawn at (320.5, 640.25)
+     * of the council extent: **1.5 km west and 6 km south** of the house
+     * somebody typed, on a real street, inside the extent, looking entirely
+     * like a map. Nothing on screen could have said otherwise.
+     */
+    const [first] = unpack(packed, COUNCIL_FRAME).addresses;
+    expect([first?.e, first?.n]).toEqual([1820.5, 6640.25]);
+  });
+
+  it('leaves them alone when the map is the extent they were measured in', () => {
+    // The fallback, which is the normal state between demos. Same extent,
+    // zero shift -- and the arithmetic must not introduce a rounding of its own.
+    const [first] = unpack(packed, KENSINGTON_FRAME).addresses;
+    expect([first?.e, first?.n]).toEqual([320.5, 640.25]);
+  });
+
+  it('refuses a map the index does not fit inside, rather than drawing it anyway', () => {
+    // A map that does not contain the addressed area is not a map these
+    // addresses belong on. Shifting them into it would put houses outside the
+    // extent, and every "how far is this pit from your address" would go on
+    // answering.
+    const tooSmall = { min_e: 316500, min_n: 5814500, width_m: 500, height_m: 500 };
+    expect(() => unpack(packed, tooSmall)).toThrow(IndexError);
+    expect(() => unpack(packed, tooSmall)).toThrow(/does not fit inside/);
+  });
+
+  it('refuses an index that does not say which frame it is in', () => {
+    // Rather than assuming it is the map's own, which is true today and is the
+    // assumption that produced the defect above.
+    const { extent: _dropped, ...frameless } = packed;
+    expect(() => unpack(frameless as unknown as PackedIndex, COUNCIL_FRAME)).toThrow(
+      /which extent its coordinates are measured from/,
+    );
   });
 
   it('searches what it unpacked', () => {
     // The seam that matters: everything downstream still works on
     // `IndexedAddress`, so unpacking cannot change what a search finds.
-    const index = unpack(packed);
+    const index = unpack(packed, KENSINGTON_FRAME);
     expect(search(index, '46 gatehouse')[0]?.address.label).toBe(
       '46 Gatehouse Drive, Kensington',
     );

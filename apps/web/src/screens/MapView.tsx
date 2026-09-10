@@ -153,6 +153,23 @@ export interface MapViewProps {
   readonly addressCard?: boolean | undefined;
   /** How wide the opening view is, in metres. See `MapCanvas`. */
   readonly openAcrossM?: number | undefined;
+  /** Hold the view where it opened: no pan, no zoom. See `MapCanvas`. */
+  readonly locked?: boolean | undefined;
+  /**
+   * The map legend, off in the guide.
+   *
+   * It sits in the top right and is 260 pixels wide, which in the guide's
+   * frame is a third of the map — and the pit the guide rings is labelled with
+   * its asset number, drawn to the right of the marker, so a pit near the top
+   * of the view had its number running under the legend. Two things covering
+   * the thing being pointed at, and this is the second.
+   *
+   * It is also saying what the guide is in the middle of saying. The step
+   * beside the map reads *those are the structures the council has a record
+   * of*; a box repeating "Drainage pits — recorded by the council" is a second
+   * voice on the same sentence.
+   */
+  readonly legend?: boolean | undefined;
 }
 
 export function MapView({
@@ -173,6 +190,8 @@ export function MapView({
   onMapNow,
   addressCard = true,
   openAcrossM,
+  locked = false,
+  legend = true,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
@@ -328,6 +347,7 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
+        locked={locked}
         terrain={layers.terrain ? terrain : null}
         showPits={pitsDrawn}
         showPipes={layers.pipe}
@@ -397,7 +417,7 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          <MapLegend state={layers} />
+          {legend && <MapLegend state={layers} />}
         </div>
       )}
 

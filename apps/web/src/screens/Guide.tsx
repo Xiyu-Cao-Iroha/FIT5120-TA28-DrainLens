@@ -46,8 +46,26 @@ import {
 } from '../ui/theme.js';
 import { MapView } from './MapView.js';
 
-/** The two layers this section is about, and no more. */
-const DRAINAGE_CHIPS: readonly LayerKey[] = ['pit', 'pipe'];
+/**
+ * Which chips are on offer at each step, and no more.
+ *
+ * **The section already narrowed the map to two layers; this narrows it to the
+ * one being taught.** Step one says *press Pits* with Pipes sitting beside it,
+ * which is an invitation to press the wrong thing and then read an instruction
+ * about a map you have already gone past. Everything on screen during a step
+ * should be something the step is about.
+ *
+ * A layer that is *on* keeps its chip whatever the step says. Turning Pits off
+ * during the pipes step puts the guide back on step one, and a chip that
+ * vanished at the same moment would leave Pipes drawn with no way to turn it
+ * off — a map holding something the reader cannot take back.
+ */
+export function chipsFor(index: number, now: MapNow): readonly LayerKey[] {
+  const keys: LayerKey[] = ['pit'];
+  // 2 is `pipes-on`, the step that asks for it.
+  if (index >= 2 || now.pipes) keys.push('pipe');
+  return keys;
+}
 
 const NOTHING_ON_MAP: MapNow = {
   pits: false,
@@ -83,22 +101,31 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
   const teachingId = teaching === null ? null : String(teaching.pit.asset_number);
 
   /*
-    Known tightness, found by walking it: an address near the edge of the
-    extent puts its pit near the edge of the canvas.
+    An address near the edge of the extent puts its pit near the edge of the
+    canvas, and the bottom-right corner is where the map keeps its controls.
 
     32 Altona Street sits at (985.9, 25.7) of a 1000 m square -- fifteen metres
     from two boundaries -- and its teaching pit rendered at (1068, 751) of a
-    1080x775 canvas. The map clamps its view to the extent and cannot centre an
-    address that is already in the corner, which is recorded behaviour rather
-    than a bug; the consequence here is that the ringed pit is on screen with
-    about a dozen pixels to spare, so half of its 18-pixel tap target is
-    clipped.
+    1080x775 canvas, behind the zoom pair. The map clamps its view to the
+    extent and cannot centre an address that is already in the corner, which is
+    recorded behaviour rather than a bug. What was a bug was the guide asking
+    somebody to press a thing it had a button sitting on top of.
 
-    It is a real edge and it is not fixed: the pit is visible and pressable,
-    and the two fixes that would help -- opening on the midpoint of the address
-    and the pit, or zooming the guide out a step -- both change how the map
-    opens for the 99% of addresses that do not need it. Written down so the
-    next person meets it as a decision rather than as a surprise.
+    Three things moved, none of which is "open somewhere other than the
+    address":
+
+    - `locked` below takes the zoom and recentre buttons away, because the
+      guide never asks for either. The corner is the pit's again.
+    - The homepage's example address is 46 Gatehouse Drive, 307 m from the
+      nearest boundary, whose teaching pit is 24 m away with 22 pipes below it.
+      32 Altona Street was the worst address in the index for this and was the
+      one being demonstrated.
+    - When the API answers, the map is the whole council and Kensington is in
+      the middle of it, so the clamp never bites at all.
+
+    The edge itself stays: somebody may still type a corner address, and the
+    pit is then visible and pressable at the frame's edge rather than under
+    something.
   */
 
   // Stable, so `MapView`'s effect does not fire on every render of this one.
@@ -157,8 +184,24 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
           // Nothing on. The first instruction is "press Pits", and the guided
           // preset had already pressed it -- see `openWith` in MapView.
           openWith={NOTHING_ON}
-          chipKeys={DRAINAGE_CHIPS}
+          chipKeys={chipsFor(index0, now)}
           layersButton={false}
+          // 260 pixels of the top right, over the number badge on the very pit
+          // the guide is asking for -- and repeating the sentence the step
+          // beside the map is already saying.
+          legend={false}
+          /*
+            The view is held where it opened.
+
+            Every step says press *this* — a chip, the ringed pit, the button
+            on its card — and a reader who has dragged the map somewhere else
+            is being asked for something no longer on screen, with nothing
+            saying why. It also gives the corner back: the zoom and recentre
+            buttons stack in the bottom right, which is exactly where an
+            address near the edge of the extent puts its pit, and they were
+            covering the thing being pointed at.
+          */
+          locked
           // The compass card is bigger than this frame can carry; the pin stays.
           addressCard={false}
           /*

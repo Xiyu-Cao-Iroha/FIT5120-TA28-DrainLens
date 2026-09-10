@@ -55,6 +55,20 @@ export interface MapCanvasProps {
    * find the pit you are being asked to press.
    */
   readonly openAcrossM?: number;
+  /**
+   * Hold the opening view: no pan, no zoom, and no controls offering either.
+   *
+   * **For the guide, where moving the map is not one of the things being
+   * taught.** Every step says press *this* — a chip, a marked pit, a button on
+   * its card — and a reader who has dragged the map somewhere else is being
+   * asked to press something that is no longer on screen, with nothing telling
+   * them why. The lesson has one place in it.
+   *
+   * Selecting still works. This takes away *moving* the view, not using what
+   * is in it, and the difference is the whole point: a map you cannot press is
+   * a picture, and the guide's first claim is that this is the real map.
+   */
+  readonly locked?: boolean;
   readonly showPipes?: boolean;
   readonly showPits?: boolean;
   /**
@@ -106,6 +120,7 @@ export function MapCanvas({
   suggestedPit = null,
   terrain = null,
   openAcrossM,
+  locked = false,
   showPipes = true,
   showPits = true,
   address = null,
@@ -209,11 +224,11 @@ export function MapCanvas({
 
   const onWheel = useCallback(
     (event: React.WheelEvent) => {
-      if (viewport === null) return;
+      if (locked || viewport === null) return;
       const factor = Math.exp(-event.deltaY * 0.0015);
       setViewport(clamp(zoomAt(viewport, factor, at(event), bounds), bounds));
     },
-    [viewport, bounds, at],
+    [locked, viewport, bounds, at],
   );
 
   const onPointerDown = useCallback((event: React.PointerEvent) => {
@@ -225,6 +240,20 @@ export function MapCanvas({
     (event: React.PointerEvent) => {
       const drag = dragRef.current;
       if (!drag || viewport === null) return;
+      /*
+        Locked: the pointer still moves, and the view does not.
+
+        `drag.moved` keeps accumulating, which matters -- `onPointerUp` uses it
+        to tell a press from a drag, and a lock that stopped counting would
+        turn every swipe across the map into a selection of whatever happened
+        to be under the finger when it lifted.
+      */
+      if (locked) {
+        drag.moved += Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
+        drag.x = event.clientX;
+        drag.y = event.clientY;
+        return;
+      }
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
       drag.moved += Math.abs(dx) + Math.abs(dy);
@@ -232,7 +261,7 @@ export function MapCanvas({
       drag.y = event.clientY;
       setViewport(clamp(pan(viewport, dx, dy), bounds));
     },
-    [viewport, bounds],
+    [locked, viewport, bounds],
   );
 
   const onPointerUp = useCallback(
@@ -325,10 +354,17 @@ export function MapCanvas({
         onPointerCancel={() => {
           dragRef.current = null;
         }}
-        style={{ display: 'block', cursor: 'grab' }}
+        // `grab` promises the map moves. Locked, it does not, and a cursor
+        // that says otherwise is the interface making a claim it will not keep.
+        style={{ display: 'block', cursor: locked ? 'default' : 'grab' }}
       />
       {viewport && (
           <MapControls
+            // Locked, this is the scale bar and nothing else. The bar is not a
+            // control -- it is how "about 20 m from your address" is checked
+            // against the screen -- and this map has no basemap to judge size
+            // against without it.
+            locked={locked}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}
