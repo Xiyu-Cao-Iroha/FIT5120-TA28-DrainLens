@@ -20,16 +20,29 @@ import { decimetre, pitFeature } from './artefacts.js';
 
 export class NotFound extends Error {}
 
+/** Greater Melbourne, which the flood board covers and no pilot extent does. */
+export const FLOOD_EXTENT = 'greater-melbourne';
+
+/**
+ * The prose and provenance an artefact carries around its data.
+ *
+ * **Named by extent as well as by name, since migration 002.** It used to be
+ * keyed on the name alone, which was unambiguous while one extent existed and
+ * became a way for one extent's sentences to answer for another's rows the
+ * moment a second was loaded -- a wrong answer with the right shape, which is
+ * the failure mode this repository spends most of its comments on.
+ */
 async function envelope(
   client: pg.ClientBase,
   name: string,
+  extentId: string,
 ): Promise<Record<string, unknown>> {
   const result = await client.query<{ envelope: Record<string, unknown> }>(
-    `SELECT envelope FROM artefact_envelope WHERE name = $1`,
-    [name],
+    `SELECT envelope FROM artefact_envelope WHERE name = $1 AND extent_id = $2`,
+    [name, extentId],
   );
   const row = result.rows[0];
-  if (!row) throw new NotFound(`no ${name} artefact has been loaded`);
+  if (!row) throw new NotFound(`no ${name} artefact has been loaded for ${extentId}`);
   return row.envelope;
 }
 
@@ -45,7 +58,7 @@ export async function mapArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'map');
+  const base = await envelope(client, 'map', extent);
 
   const pits = await client.query<{
     asset_number: string;
@@ -69,7 +82,7 @@ export async function mapArtefact(
     path: [number, number][];
   }>(
     `SELECT ref, upstr_pit, dnstr_pit, diameter_mm, material, path
-     FROM pipe WHERE extent_id = $1 ORDER BY ref`,
+     FROM pipe WHERE extent_id = $1 ORDER BY id`,
     [extent],
   );
 
@@ -127,7 +140,7 @@ export async function derivedArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'derived');
+  const base = await envelope(client, 'derived', extent);
 
   const shapes = await client.query<{
     layer: string;
@@ -153,7 +166,7 @@ export async function traceArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'trace');
+  const base = await envelope(client, 'trace', extent);
 
   // Left join from `pit`, so a pit with nothing leaving it comes back as an
   // empty array rather than vanishing. `traceDownstream` documents the two as
@@ -213,7 +226,7 @@ export async function traceArtefact(
 export async function floodHistoryArtefact(
   client: pg.ClientBase,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'flood-history');
+  const base = await envelope(client, 'flood-history', FLOOD_EXTENT);
   const years =
     ((base.reportingPeriod as { years?: readonly string[] } | undefined)?.years) ?? [];
 
