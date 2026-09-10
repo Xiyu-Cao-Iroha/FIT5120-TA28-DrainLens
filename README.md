@@ -155,7 +155,9 @@ That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's
 
 **65 of those 71 seconds are `test_terrain.py`** — nineteen tests, each building a real grid. Everything else in the pipeline suite runs in six. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass — note that doing so would leave the rest at six seconds, which still misses the gate.
 
-The Node suite — the one the gate was written for — is **700 tests across 37 files**, and the runner's own step timing now puts it at **6 s**, which is over the gate. Locally it is 3.2–3.5 s over three runs.
+The Node suite — the one the gate was written for — is **804 tests across 42 files**, re-measured on 11 September, and the runner's own step timing put it at **6 s** on 5 September, which is over the gate. Locally it is 3.2–3.4 s over three runs on 11 September, unchanged from the 3.2–3.5 s of 5 September despite 104 more tests in 5 more files — the cost is start-up and transform, not the tests. **The runner figure has not been re-taken since the crossing**; it is dated rather than carried forward as if it were current.
+
+A further **52 tests run only against a real Postgres** (`npm run test:db`, four files) and are not in that count: they need a database and CI runs them as a separate job.
 
 > **This sentence said 588 across 30 for three days, twelve lines below a table saying 680 across 37.** The table was re-measured on 5 September and this line was not, because the same fact is written in two places and only one of them is a table anybody thinks to update. It is the reason the 8 September freeze re-ran every gate instead of reading them off this page — and the reason the count in `entry.test.ts` is now summed from its own rows rather than written beside them.
 

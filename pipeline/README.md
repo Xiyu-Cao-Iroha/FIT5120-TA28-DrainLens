@@ -25,7 +25,17 @@ py -m venv .venv                      # python3 -m venv .venv on macOS/Linux
 
 Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `stormwater-pits`, both CC BY, last modified 26 February 2023).
 
-**Full-size artefacts are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
+**Full-size intermediates are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
+
+**The council extent is committed too, and separately, under `apps/api/data/city-of-melbourne/`.** Not because it is small — 6.7 MB of map, 693 KB of trace, 210 KB of derived layers — but because it is the API image that reads it, `/data` is in `.dockerignore` as well as `.gitignore`, and an artefact that is not in the build context cannot be copied into the image. The migration job would then apply its schema changes and load Kensington into a database that was asked for a council. Rebuild it with:
+
+```bash
+python -m drainlens_pipeline.network --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/map.json
+python -m drainlens_pipeline.trace   --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/api/data/city-of-melbourne/trace.json
+python -m drainlens_pipeline.reframe --in ../apps/web/public/data/derived.json --from kensington --to city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json
+```
+
+No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 
 ## What the graph builder does, and what it refuses to do
 
