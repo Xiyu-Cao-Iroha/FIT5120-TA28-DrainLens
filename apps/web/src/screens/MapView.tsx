@@ -141,6 +141,17 @@ export interface MapViewProps {
    * its own instructions, which is a guide that teaches nothing.
    */
   readonly onMapNow?: ((now: MapNow) => void) | undefined;
+  /**
+   * The card that opens beside the address pin, naming what is near it.
+   *
+   * Off in the guide, and the reason is size rather than taste. The card
+   * carries a compass, two distances and a provenance tag; against a full
+   * screen it sits in a corner, and inside the guide's 560-pixel frame it
+   * covered most of the map it was annotating. The pin stays either way.
+   */
+  readonly addressCard?: boolean | undefined;
+  /** How wide the opening view is, in metres. See `MapCanvas`. */
+  readonly openAcrossM?: number | undefined;
 }
 
 export function MapView({
@@ -159,6 +170,8 @@ export function MapView({
   openWith,
   highlightPit = null,
   onMapNow,
+  addressCard = true,
+  openAcrossM,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
@@ -183,14 +196,14 @@ export function MapView({
   const [viewport, setViewport] = useState<Viewport | null>(null);
   // Dismissed by the person, not by the address changing: picking a new
   // address should say something about the new one.
-  const [addressCardOpen, setAddressCardOpen] = useState(true);
+  const [addressCardOpen, setAddressCardOpen] = useState(addressCard);
   useEffect(() => {
-    setAddressCardOpen(true);
+    setAddressCardOpen(addressCard);
     // A new address is a new question. Leaving the previous pit selected would
     // answer the old one beside the new mark.
     setHit(null);
     setFollowing(null);
-  }, [address]);
+  }, [address, addressCard]);
 
   // Painted once, then reused for every pan and zoom. A failure here leaves
   // the layer off rather than breaking the map: the terrain is context, and
@@ -296,6 +309,7 @@ export function MapView({
         // Only while the pits are drawn. A ring around a pit on a map with no
         // pits on it is a mark with nothing under it.
         suggestedPit={layers.pit ? highlightPit : null}
+        {...(openAcrossM === undefined ? {} : { openAcrossM })}
         terrain={layers.terrain ? terrain : null}
         showPits={layers.pit}
         showPipes={layers.pipe}
@@ -481,6 +495,7 @@ export function MapView({
         viewport !== null &&
         address !== null &&
         hit === null &&
+        addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
         <MapCallout

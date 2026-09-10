@@ -17,6 +17,7 @@ import { MapCanvas } from './map/MapCanvas.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
 import { Guide } from './screens/Guide.js';
+import { Choose } from './screens/Choose.js';
 import { Home } from './screens/Home.js';
 import { LockedMap } from './screens/LockedMap.js';
 import { SECTIONS, type SectionId } from './tutorial/sections.js';
@@ -234,7 +235,7 @@ export function App() {
           actions={
             <HomeNav
               onOpenMap={() => {
-                dispatch({ type: 'map-opened' });
+                dispatch({ type: 'get-started' });
               }}
               onOpenHistory={() => {
                 dispatch({ type: 'history-opened' });
@@ -244,30 +245,18 @@ export function App() {
         >
           <Home
             history={loaded.history}
-            learned={session.learned}
-            // The one list of sections that have a guide, named here and
-            // passed to both screens that need it, so the homepage and the
-            // notice cannot disagree about what can be started.
-            guided={GUIDED_SECTIONS}
             onOpenMap={(mode) => {
               /*
-                The drainage card starts the guide rather than opening the map,
-                once and for that card only.
+                Everything on the homepage now goes to the four cards.
 
-                The other three still open the map, and that asymmetry is
-                deliberate rather than half-finished: their sections are not
-                written yet, and a card that led to a guide with no steps in it
-                would be worse than one that leads where it always has. Each
-                joins as its section lands.
-
-                A section already finished goes straight to the map, because
-                the guide is a way in and not a toll.
+                A card here that started its section directly would be a second
+                front door with different manners -- one that skips the screen
+                showing what is done and what is left. The chooser is where
+                that choice is made, and the cards here describe rather than
+                dispatch.
               */
-              if (mode === 'drainage' && !session.learned.drainage) {
-                dispatch({ type: 'guide-chosen', section: 'drainage' });
-                return;
-              }
-              dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
+              void mode;
+              dispatch({ type: 'get-started' });
             }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
@@ -321,6 +310,25 @@ export function App() {
               })
             }
             onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
+          />
+        </Shell>
+      );
+
+    case 'choose':
+      return (
+        <Shell credits={credits} servedFrom={loaded.servedFrom} masthead={false}>
+          <Choose
+            learned={session.learned}
+            guided={GUIDED_SECTIONS}
+            onStart={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onSkip={() => {
+              dispatch({ type: 'map-opened', from: 'home' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
+            }}
           />
         </Shell>
       );
@@ -894,7 +902,7 @@ function HomeNav({
           borderRadius: radius.base,
         }}
       >
-        Explore map →
+        Get started →
       </button>
     </span>
   );

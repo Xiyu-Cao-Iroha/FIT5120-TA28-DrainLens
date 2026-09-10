@@ -77,6 +77,13 @@ export type Screen =
    * and being left to it. It reuses `address` as its way in, which is why that
    * screen is no longer unreachable and the note above it is no longer whole.
    */
+  /**
+   * "What do you want to explore first?" — the front door from 11 September.
+   *
+   * *Get started* lands here rather than on the map, which is the mentor's
+   * point made structural rather than written on a card.
+   */
+  | 'choose'
   | 'guide'
   /**
    * The whole map, asked for before the guide is finished.
@@ -265,6 +272,8 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  /** The homepage's front door: the four cards, not the map. */
+  | { readonly type: 'get-started' }
   /**
    * Start a section of the guide.
    *
@@ -300,8 +309,9 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   task: 'address',
   // Out of a section is back to the address it was built around, not out of
   // the guide altogether. The way out of the guide is the Home control.
+  choose: 'home',
   guide: 'address',
-  locked: 'home',
+  locked: 'choose',
   explore: 'task',
   scenario: 'task',
   result: 'scenario',
@@ -339,6 +349,9 @@ function step(session: Session, event: SessionEvent): Session {
           : {}),
       };
 
+    case 'get-started':
+      return { ...session, screen: 'choose' };
+
     case 'guide-chosen':
       return {
         ...session,
@@ -355,7 +368,9 @@ function step(session: Session, event: SessionEvent): Session {
       if (section === null) return session;
       return {
         ...session,
-        screen: 'home',
+        // Back to the four, which is the only screen that can show what has
+        // and has not been done. Carrying straight on would decide for them.
+        screen: 'choose',
         guideSection: null,
         learned: { ...session.learned, [section]: true },
       };

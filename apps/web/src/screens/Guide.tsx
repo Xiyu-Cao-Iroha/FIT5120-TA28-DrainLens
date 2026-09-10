@@ -111,8 +111,42 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
   const done = finished(DRAINAGE_STEPS, now, teachingId, acknowledged);
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', minHeight: 0 }}>
-      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+    /*
+      A framed map on the left and the question on the right, as the design
+      draws it.
+
+      The map is a box rather than the whole screen because this is a lesson
+      about it, not a session in it: a full-bleed map puts the instruction in a
+      corner of the thing it is describing, and the reader's eye has nowhere to
+      rest between reading and doing. It is still the *real* map, with its own
+      chips and its own pit card -- the frame changes its size, not what it is.
+    */
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        gap: space(8),
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: space(8),
+        flexWrap: 'wrap',
+        overflowY: 'auto',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: 'min(560px, 100%)',
+          height: 'min(480px, 70vh)',
+          flexShrink: 0,
+          border: `1px solid ${line.base}`,
+          borderRadius: radius.large,
+          boxShadow: shadow.lifted,
+          overflow: 'hidden',
+          background: surface.raised,
+        }}
+      >
         <MapView
           map={map}
           derived={derived}
@@ -125,6 +159,18 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
           openWith={NOTHING_ON}
           chipKeys={DRAINAGE_CHIPS}
           layersButton={false}
+          // The compass card is bigger than this frame can carry; the pin stays.
+          addressCard={false}
+          /*
+            300 m across, not the map's usual 3 px/m.
+
+            In a 560-pixel frame the default opens 187 metres wide, and for an
+            address in the corner of the extent -- where the view is clamped
+            and cannot centre -- that was one street and a pin, with the pit
+            being asked for off in a corner. This is the fix that was deferred
+            when the frame was full-screen and the tightness was cosmetic.
+          */
+          openAcrossM={300}
           highlightPit={teaching?.pit.asset_number ?? null}
           onMapNow={report}
         />
@@ -169,15 +215,10 @@ function Coach({
     <aside
       aria-label="Guide"
       style={{
-        width: 360,
-        flexShrink: 0,
-        borderLeft: `1px solid ${line.base}`,
-        background: surface.raised,
-        padding: space(6),
+        width: 'min(460px, 100%)',
         display: 'flex',
         flexDirection: 'column',
-        gap: space(4),
-        overflowY: 'auto',
+        gap: space(5),
       }}
     >
       <div>
@@ -203,7 +244,13 @@ function Coach({
       ) : (
         step !== undefined && (
           <>
-            <p style={{ margin: 0, font: type(text.lead, { leading: 1.4 }), color: ink.strong }}>
+            <p
+              style={{
+                margin: 0,
+                font: type(text.display, { weight: weight.semibold, leading: 1.25 }),
+                color: ink.strong,
+              }}
+            >
               {step.prompt}
             </p>
 
