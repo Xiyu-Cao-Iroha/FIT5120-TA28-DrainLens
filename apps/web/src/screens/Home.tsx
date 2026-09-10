@@ -38,6 +38,7 @@ import {
 import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
+import type { Learned } from '../tutorial/sections.js';
 import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from '../map/terrain.js';
 import { PilotBadge } from '../ui/Shell.js';
 import {
@@ -139,14 +140,26 @@ const WITHHOLDS: readonly string[] = [
   'Anywhere outside one square kilometre of Kensington',
 ];
 
+/**
+ * Whether a card's part of the guide has been done.
+ *
+ * `soon` is the three sections whose guide is not written yet. It is a third
+ * state rather than a synonym for `todo` because saying "not finished" about
+ * something nobody can start is a lie the reader could only find by pressing.
+ */
+export type GuideState = 'todo' | 'done' | 'soon';
+
 export interface HomeProps {
   readonly history: FloodHistoryArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  readonly learned: Learned;
+  /** The sections that have a guide written. The rest read as `soon`. */
+  readonly guided: readonly MapMode[];
 }
 
-export function Home({ history, onOpenMap, onOpenHistory }: HomeProps) {
+export function Home({ history, onOpenMap, onOpenHistory, learned, guided }: HomeProps) {
   return (
     <div>
       {/*
@@ -159,7 +172,13 @@ export function Home({ history, onOpenMap, onOpenHistory }: HomeProps) {
           onOpenMap();
         }}
       />
-      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} history={history} />
+      <Paths
+        onOpenMap={onOpenMap}
+        onOpenHistory={onOpenHistory}
+        history={history}
+        learned={learned}
+        guided={guided}
+      />
       <Flow />
       <Limits />
       <ClosingNote />
@@ -534,9 +553,11 @@ function PathThumb({ mode }: { readonly mode: MapMode }) {
  */
 function PathCard({
   path,
+  state,
   onOpen,
 }: {
   readonly path: (typeof PATHS)[number];
+  readonly state: GuideState;
   readonly onOpen: () => void;
 }) {
   const [raised, setRaised] = useState(false);
@@ -594,8 +615,59 @@ function PathCard({
         >
           {path.body}
         </span>
+        <GuideMark state={state} />
       </span>
     </button>
+  );
+}
+
+/**
+ * Whether this card's part of the guide has been done.
+ *
+ * **Not a lock, which is what the design drew.** The card is not locked — it
+ * is the way *in* to the guide, and pressing it is exactly what somebody who
+ * has not done it should do. What is locked is the whole map, and it is locked
+ * until all four are finished rather than card by card, so a padlock here
+ * would name the wrong thing and put it on the wrong control.
+ *
+ * `soon` is the honest state for the three sections whose guide is not written
+ * yet. Saying "not finished" about something nobody can start would be a lie
+ * the reader could only discover by pressing.
+ */
+function GuideMark({ state }: { readonly state: GuideState }) {
+  if (state === 'soon') return null;
+
+  const done = state === 'done';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: space(2),
+        marginTop: space(4),
+        font: type(text.small, { weight: weight.medium }),
+        color: done ? '#1a5d4d' : ink.subtle,
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden focusable="false">
+        {done ? (
+          <path
+            d="m3 8.5 3.2 3.2L13 5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : (
+          <>
+            <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M8 5v3.4l2.2 1.3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </>
+        )}
+      </svg>
+      {done ? 'Guide finished' : 'Two minutes, guided'}
+    </span>
   );
 }
 
@@ -724,11 +796,18 @@ function Paths({
   onOpenMap,
   onOpenHistory,
   history,
+  learned,
+  guided,
 }: {
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
   readonly history: FloodHistoryArtefact;
+  readonly learned: Learned;
+  readonly guided: readonly MapMode[];
 }) {
+  const guideState = (mode: MapMode): GuideState =>
+    !guided.includes(mode) ? 'soon' : learned[mode] ? 'done' : 'todo';
+
   return (
     <Band tone="raised" id={SECTIONS.paths}>
       <SectionHeading
@@ -747,6 +826,7 @@ function Paths({
           <PathCard
             key={path.title}
             path={path}
+            state={guideState(path.mode)}
             onOpen={() => {
               onOpenMap(path.mode);
             }}

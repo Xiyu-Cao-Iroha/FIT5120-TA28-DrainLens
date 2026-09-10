@@ -11,6 +11,7 @@ import {
   missingScenarioInput,
   reduce,
 } from './session.js';
+import { SECTION_ORDER, allLearned, countLearned } from './tutorial/sections.js';
 
 const GATEHOUSE: SupportedAddress = {
   id: 'kensington/46-gatehouse-drive',
@@ -381,8 +382,17 @@ describe('arriving at the map', () => {
    * unmounted the screen on the way out; nothing said so and nothing tested
    * it. The map is keyed on this count now, so the guarantee is structural.
    */
+  /*
+   * `map-opened` stopped landing on the map on 11 September: it lands on the
+   * notice, and `lock-passed` is what reaches the map. These tests were
+   * written against the one-step route and are edited rather than deleted,
+   * because the property is unchanged — an arrival is an arrival however many
+   * screens it took, and the rule still lives in one place in the reducer.
+   */
+  const OPEN_MAP: readonly SessionEvent[] = [{ type: 'map-opened' }, { type: 'lock-passed' }];
+
   it('counts an arrival however the person got there', () => {
-    expect(play([{ type: 'map-opened' }]).mapOpenings).toBe(1);
+    expect(play(OPEN_MAP).mapOpenings).toBe(1);
     expect(
       play([
         { type: 'address-accepted', address: GATEHOUSE },
@@ -391,12 +401,14 @@ describe('arriving at the map', () => {
     ).toBe(1);
   });
 
+  it('does not count the notice, which is not the map', () => {
+    // Reading a disclosure and then turning back has not started anything.
+    expect(play([{ type: 'map-opened' }]).mapOpenings).toBe(0);
+    expect(play([{ type: 'map-opened' }]).screen).toBe('locked');
+  });
+
   it('counts leaving and coming back as a second arrival', () => {
-    const end = play([
-      { type: 'map-opened' },
-      { type: 'leave-map' },
-      { type: 'map-opened' },
-    ]);
+    const end = play([...OPEN_MAP, { type: 'leave-map' }, ...OPEN_MAP]);
     expect(end.mapOpenings).toBe(2);
   });
 
@@ -404,7 +416,7 @@ describe('arriving at the map', () => {
     // Otherwise every search would throw away the layers the person had set,
     // which is the opposite failure and just as bad.
     const end = play([
-      { type: 'map-opened' },
+      ...OPEN_MAP,
       { type: 'address-moved', address: NEALE },
       { type: 'address-cleared' },
       { type: 'pit-selected', pitId: 'P-14', suggested: false },
@@ -416,6 +428,110 @@ describe('arriving at the map', () => {
   it('does not count screens that are not the map', () => {
     expect(play([{ type: 'history-opened' }]).mapOpenings).toBe(0);
     expect(play([{ type: 'address-accepted', address: GATEHOUSE }]).mapOpenings).toBe(0);
+  });
+});
+
+describe('the whole map, before the guide is finished', () => {
+  const ALL_FOUR: readonly SessionEvent[] = SECTION_ORDER.flatMap((section) => [
+    { type: 'guide-chosen', section },
+    { type: 'guide-finished' },
+  ]);
+
+  it('meets the notice on every route in, not just one', () => {
+    // The rule is in the reducer rather than at each route, because there are
+    // three ways to the map today and a lock written three times will be
+    // right at two of them.
+    expect(play([{ type: 'map-opened' }]).screen).toBe('locked');
+    expect(play([{ type: 'map-opened', mode: 'terrain' }]).screen).toBe('locked');
+    expect(play([{ type: 'map-opened', from: 'history' }]).screen).toBe('locked');
+  });
+
+  it('keeps the mode and the origin through the notice', () => {
+    // Otherwise reading four lines costs you the card you pressed and the page
+    // you came from, and Back stops obeying AC 1.1.10.
+    const end = play([
+      { type: 'map-opened', mode: 'low-areas', from: 'history' },
+      { type: 'lock-passed' },
+    ]);
+    expect(end.mapMode).toBe('low-areas');
+    expect(end.mapOrigin).toBe('history');
+  });
+
+  it('opens whether or not any of the guide was done', () => {
+    // Not a paywall. Five seconds buys a disclosure; it does not withhold the
+    // product from somebody who declines the lesson.
+    expect(play([{ type: 'map-opened' }, { type: 'lock-passed' }]).screen).toBe('explore');
+  });
+
+  it('stops appearing once all four sections are finished', () => {
+    const taught = play(ALL_FOUR);
+    expect(allLearned(taught.learned)).toBe(true);
+    expect(reduce(taught, { type: 'map-opened' }).screen).toBe('explore');
+  });
+
+  it('still appears when three of the four are finished', () => {
+    // All or nothing, which is the model the design owner chose. Three
+    // sections is not a partial unlock, it is three sections.
+    const three = play(ALL_FOUR.slice(0, 6));
+    expect(countLearned(three.learned)).toBe(3);
+    expect(reduce(three, { type: 'map-opened' }).screen).toBe('locked');
+  });
+
+  it('records nothing about having passed it', () => {
+    // A decision about one press, not a fact about the person. Passing the
+    // notice must not quietly count as having learned anything.
+    const passed = play([{ type: 'map-opened' }, { type: 'lock-passed' }]);
+    expect(countLearned(passed.learned)).toBe(0);
+  });
+
+  it('goes back where it came from rather than one screen up', () => {
+    expect(play([{ type: 'map-opened', from: 'history' }, { type: 'leave-map' }]).screen).toBe(
+      'history',
+    );
+  });
+});
+
+describe('starting and finishing a section of the guide', () => {
+  it('asks where you live before it can point at a pit near you', () => {
+    const end = play([{ type: 'guide-chosen', section: 'drainage' }]);
+    expect(end.screen).toBe('address');
+    expect(end.guideSection).toBe('drainage');
+  });
+
+  it('hands the address to the guide rather than to the task question', () => {
+    // The same screen answers two questions now, and which one it is
+    // answering is the whole of the difference.
+    const guided = play([
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(guided.screen).toBe('guide');
+
+    const unguided = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    expect(unguided.screen).toBe('task');
+  });
+
+  it('marks only the section that was running', () => {
+    const end = play([
+      { type: 'guide-chosen', section: 'water-flow' },
+      { type: 'guide-finished' },
+    ]);
+    expect(end.learned['water-flow']).toBe(true);
+    expect(countLearned(end.learned)).toBe(1);
+    expect(end.guideSection).toBeNull();
+  });
+
+  it('does nothing when no section is running', () => {
+    // `guide-finished` reaching the reducer from outside a section would
+    // otherwise mark whatever was last chosen, or crash on null.
+    const start = INITIAL_SESSION;
+    expect(reduce(start, { type: 'guide-finished' })).toBe(start);
+  });
+
+  it('carries the section through as the map mode', () => {
+    // So that finishing the guide and then opening the map shows the thing
+    // just taught rather than whatever was last looked at.
+    expect(play([{ type: 'guide-chosen', section: 'terrain' }]).mapMode).toBe('terrain');
   });
 });
 
@@ -501,9 +617,18 @@ describe('an action the reducer does not know', () => {
 });
 
 describe('opening the map from the homepage', () => {
-  it('goes straight there without asking for an address first', () => {
-    const end = reduce(INITIAL_SESSION, { type: 'map-opened' });
+  it('meets the notice first, and never asks for an address', () => {
+    /*
+     * This said "goes straight there" until 11 September, when the guide's
+     * lock landed. The half that changed is the destination; the half that
+     * matters is unchanged and is why the test is edited rather than deleted:
+     * no route to the map invents an address or demands one.
+     */
+    const notice = reduce(INITIAL_SESSION, { type: 'map-opened' });
+    expect(notice.screen).toBe('locked');
+    expect(notice.address).toBeNull();
 
+    const end = reduce(notice, { type: 'lock-passed' });
     expect(end.screen).toBe('explore');
     // No address is invented on the way. The map opens over the pilot area
     // with nothing selected, and the search along its top is how somebody

@@ -29,7 +29,12 @@ import type {
 } from '@drainlens/schema';
 
 import type { MapMode } from './map/modes.js';
-import { NOTHING_LEARNED, type Learned, type SectionId } from './tutorial/sections.js';
+import {
+  NOTHING_LEARNED,
+  type Learned,
+  type SectionId,
+  allLearned,
+} from './tutorial/sections.js';
 
 /**
  * Which screen the person is on.
@@ -73,6 +78,15 @@ export type Screen =
    * screen is no longer unreachable and the note above it is no longer whole.
    */
   | 'guide'
+  /**
+   * The whole map, asked for before the guide is finished.
+   *
+   * Not a refusal. It is the four things somebody is about to read without
+   * having been told what they are, and a five-second wait before the way in
+   * is offered — after which it opens whether or not any of the guide has been
+   * done. See `LOCK_NOTICE`.
+   */
+  | 'locked'
   /** Unreachable — the comparison is out of the Iteration 1 interface. */
   | 'scenario'
   /** Unreachable — as above. */
@@ -269,6 +283,8 @@ export type SessionEvent =
    * done. Carrying straight on to the next section would decide for them.
    */
   | { readonly type: 'guide-finished' }
+  /** The notice was read and the wait is over. */
+  | { readonly type: 'lock-passed' }
   /** Back out of the map, to whichever page opened it — AC 1.1.10. */
   | { readonly type: 'leave-map' }
   | { readonly type: 'go-home' }
@@ -285,6 +301,7 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   // Out of a section is back to the address it was built around, not out of
   // the guide altogether. The way out of the guide is the Home control.
   guide: 'address',
+  locked: 'home',
   explore: 'task',
   scenario: 'task',
   result: 'scenario',
@@ -411,11 +428,25 @@ function step(session: Session, event: SessionEvent): Session {
     case 'map-opened':
       return {
         ...session,
-        screen: 'explore',
+        /*
+          Every route to the whole map goes through one gate, and it is here
+          rather than at the routes.
+
+          There are three ways in today and the flood board may add a fourth;
+          a lock written at each of them is a lock that will be right at most
+          of them. The same argument as `mapOpenings` a few lines down, which
+          was written after a rule spread across three cases.
+        */
+        screen: allLearned(session.learned) ? 'explore' : 'locked',
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',
       };
+
+    case 'lock-passed':
+      // The five seconds are up and the notice was read. Nothing is recorded:
+      // this is a decision about one press, not a fact about the person.
+      return { ...session, screen: 'explore' };
 
     case 'leave-map':
       // AC 1.1.10. Not `back`, which walks a fixed chain: the map has two ways

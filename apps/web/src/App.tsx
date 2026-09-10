@@ -18,7 +18,8 @@ import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
 import { Guide } from './screens/Guide.js';
 import { Home } from './screens/Home.js';
-import { SECTIONS } from './tutorial/sections.js';
+import { LockedMap } from './screens/LockedMap.js';
+import { SECTIONS, type SectionId } from './tutorial/sections.js';
 import { progress } from './tutorial/progress.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
@@ -42,6 +43,14 @@ import { Tour } from './ui/Tour.js';
 import { API_BASE, EXTENT, type Origin, fetchArtefact, served } from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
+
+/**
+ * The sections of the guide that have steps written.
+ *
+ * One list, read by the homepage and by the notice. Two lists would drift, and
+ * the drift would show as a card offering a guide that opens an empty room.
+ */
+const GUIDED_SECTIONS: readonly SectionId[] = ['drainage'];
 
 interface Loaded {
   readonly map: MapArtefact;
@@ -235,6 +244,11 @@ export function App() {
         >
           <Home
             history={loaded.history}
+            learned={session.learned}
+            // The one list of sections that have a guide, named here and
+            // passed to both screens that need it, so the homepage and the
+            // notice cannot disagree about what can be started.
+            guided={GUIDED_SECTIONS}
             onOpenMap={(mode) => {
               /*
                 The drainage card starts the guide rather than opening the map,
@@ -307,6 +321,43 @@ export function App() {
               })
             }
             onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
+          />
+        </Shell>
+      );
+
+    case 'locked':
+      return (
+        <Shell
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          masthead={false}
+          back={{
+            label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+            onBack: () => {
+              dispatch({ type: 'leave-map' });
+            },
+          }}
+          crumbs={crumb('The whole map', undefined, true)}
+        >
+          <LockedMap
+            map={loaded.map}
+            learned={session.learned}
+            /*
+              Only the sections that have a guide written. Offering a card
+              whose guide has no steps in it would be a button that opens an
+              empty room, which is worse than not offering it. The others join
+              this list as they land.
+            */
+            available={GUIDED_SECTIONS}
+            onStartGuide={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onOpenAnyway={() => {
+              dispatch({ type: 'lock-passed' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'leave-map' });
+            }}
           />
         </Shell>
       );
