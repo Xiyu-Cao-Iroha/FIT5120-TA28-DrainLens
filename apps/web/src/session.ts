@@ -117,6 +117,22 @@ export interface Session {
   readonly mapMode: MapMode | null;
   /** The page the map was opened from — AC 1.1.10. */
   readonly mapOrigin: MapOrigin;
+  /**
+   * How many times the map has been arrived at. Only ever used as an identity.
+   *
+   * **The map is meant to start clean every time somebody enters it** — no pit
+   * selected, no trace drawn, no card left over from the last visit — and
+   * until now that was true only because React happened to unmount `MapView`
+   * on the way out. Nothing said so, nothing tested it, and the day somebody
+   * lifts the selection into this session the way `mapMode` was lifted, it
+   * silently stops being true.
+   *
+   * So the map is keyed on this and remounts by construction. Counting
+   * arrivals rather than naming them is deliberate: the rule is *entering the
+   * map*, and there are three ways to do it — the homepage, a task, and the
+   * way back from a result — which is three chances to forget one.
+   */
+  readonly mapOpenings: number;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -139,6 +155,7 @@ export const INITIAL_SESSION: Session = {
   task: null,
   mapMode: null,
   mapOrigin: 'home',
+  mapOpenings: 0,
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -156,6 +173,21 @@ export type SessionEvent =
    * that belongs to the old neighbourhood.
    */
   | { readonly type: 'address-moved'; readonly address: SupportedAddress }
+  /**
+   * The address let go of, from the map's search box.
+   *
+   * There was no way to do this. The box showed a chosen address as its
+   * *placeholder* and cleared what was typed, so the clear button — gated on
+   * there being typed text — vanished at exactly the moment there was
+   * something to clear, and the mark stayed on the map with no control that
+   * removed it. An address you cannot take back is a stronger commitment than
+   * this product asks for: nothing about it is stored, and it should be no
+   * harder to drop than it was to set.
+   *
+   * It drops the pit for the same reason `address-moved` does. A pit chosen
+   * near an address is an answer to a question about that address.
+   */
+  | { readonly type: 'address-cleared' }
   | { readonly type: 'address-rejected'; readonly typed: string }
   | { readonly type: 'task-chosen'; readonly task: Task }
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
@@ -208,7 +240,23 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   unsupported: 'address',
 };
 
+/**
+ * One rule about arriving at the map, applied to every route into it.
+ *
+ * Counting the arrival here rather than inside each case is the point: three
+ * different events can put somebody on the map, and a rule written three times
+ * is a rule that will be right twice. What the count is *for* is on
+ * `mapOpenings` — the short version is that the map remounts, so nothing is
+ * carried in from the last visit.
+ */
 export function reduce(session: Session, event: SessionEvent): Session {
+  const next = step(session, event);
+  return next.screen === 'explore' && session.screen !== 'explore'
+    ? { ...next, mapOpenings: next.mapOpenings + 1 }
+    : next;
+}
+
+function step(session: Session, event: SessionEvent): Session {
   switch (event.type) {
     case 'address-moved':
       return {
@@ -221,6 +269,15 @@ export function reduce(session: Session, event: SessionEvent): Session {
               outcome: null,
             }
           : {}),
+      };
+
+    case 'address-cleared':
+      return {
+        ...session,
+        address: null,
+        rejectedAddress: null,
+        scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+        outcome: null,
       };
 
     case 'address-accepted':
