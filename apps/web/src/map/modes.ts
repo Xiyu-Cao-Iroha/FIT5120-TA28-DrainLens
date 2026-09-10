@@ -13,9 +13,15 @@
  * papered over, because it is a real one and somebody will be asked about it.
  * The argument for it: pits and pipes are the recorded data this product is
  * built on and they are what a person switches most, while the ground surface
- * is background — on by default, drawn under everything, and not something
- * reached for while reading a particular street. A control's place should
- * follow how often it is used.
+ * is background — drawn under everything, and not something reached for while
+ * reading a particular street. A control's place should follow how often it is
+ * used.
+ *
+ * That argument said "on by default" until 11 September, when the unguided map
+ * stopped turning it on. The half that mattered survives: it is still the
+ * layer people change least, which is what put it behind the button. The half
+ * that did not survive is written out rather than quietly dropped, because an
+ * argument for a recorded deviation should be readable as it actually stands.
  *
  * Every layer still has its own switch, which is the substance both criteria
  * are protecting. What differs is which switch sits where.
@@ -42,8 +48,10 @@ export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoi
 /**
  * The switches behind the Layers button.
  *
- * Neither is a lesser layer. The ground surface is background: on by default,
- * drawn beneath everything else, and rarely the thing somebody is changing.
+ * Neither is a lesser layer. The ground surface is background: drawn beneath
+ * everything else, and rarely the thing somebody is changing. It was on by
+ * default until 11 September and is now on under every homepage card and off
+ * on the unguided way in -- see `NOTHING_ON`.
  * "Not enough ground measured" answers a question about the *evidence* rather
  * than about the ground, and it stays switchable in every view because it is
  * the one mark that says the map is guessing.
@@ -58,7 +66,7 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
 }
 
 /**
- * Nothing on but the ground: the unguided way in, from 10 September.
+ * Nothing on at all: the unguided way in, from 10 September.
  *
  * **This reverses `ALL_ON` for that one entry, at the design owner's request,
  * and `ALL_ON` is kept because the legend and the comparison map still mean
@@ -68,20 +76,32 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
  * decoration when they are all already on, and turning one *off* to see what
  * it was is a harder first move than turning one on.
  *
- * **Terrain stays on, and that is not a half-measure.** It is the ground the
- * map is drawn on rather than a layer over it -- without it the map opens onto
- * a flat colour that quietly implies level ground, in a product whose whole
- * argument is that it is not. What goes off is the four chips: pits, pipes,
- * water flow, low areas.
+ * **The ground surface went off too, on 11 September, and the argument for
+ * keeping it on is kept here rather than deleted.** It ran: the ground is what
+ * the map is drawn on rather than a layer over it, and without it the map
+ * opens onto a flat colour that quietly implies level ground, in a product
+ * whose whole argument is that it is not.
+ *
+ * What changed is the weighing, not the reasoning. Elevation shading over a
+ * square kilometre is not a quiet background — it is colour edge to edge, and
+ * it was the loudest thing left once the four chips went off. And the
+ * implication it was there to prevent is only made by a map that *says*
+ * nothing about the ground; this one says it in a control called **Ground
+ * surface**, one press away, sitting in the Layers panel where somebody who
+ * wants to know about the ground will look.
+ *
+ * The starting state is now the same claim as an empty page: it asserts
+ * nothing at all, and every layer is something the person turned on.
  *
  * It does **not** touch `openingLayers`. AC 1.1.2 requires a homepage card to
  * open the map showing the thing it named, and a card that opened a map with
- * nothing on it would be a click that visibly did nothing.
+ * nothing on it would be a click that visibly did nothing — so the ground is
+ * still on underneath every one of those.
  */
 export const NOTHING_ON: LayerState = {
   pit: false,
   pipe: false,
-  terrain: true,
+  terrain: false,
   channel: false,
   lowPoint: false,
   unavailable: false,
