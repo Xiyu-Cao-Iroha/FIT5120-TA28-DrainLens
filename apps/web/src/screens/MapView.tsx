@@ -68,11 +68,12 @@ import { PitDetail } from './PitDetail.js';
  * person said. The guided task is the next-best signal — its layers are what
  * its question needs.
  *
- * **The unguided map opens with nothing on but the ground**, which used to be
- * everything on. The reasoning is in `modes.ts` beside `NOTHING_ON`; the short
- * version is that "everything" is the densest thing this product draws and it
- * was what a first visit met. Somebody who asked for the whole pilot area is
- * choosing what to look at, and the chips are where that choice is made.
+ * **The unguided map opens with nothing on at all**, which used to be
+ * everything on, and was briefly everything but the ground. The reasoning is
+ * in `modes.ts` beside `NOTHING_ON`; the short version is that "everything" is
+ * the densest thing this product draws and it was what a first visit met.
+ * Somebody who asked for the whole pilot area is choosing what to look at, and
+ * the chips and the Layers panel are where that choice is made.
  */
 function openingState(mode: MapMode | null, guided: boolean): LayerState {
   if (mode !== null) return openingLayers(mode);

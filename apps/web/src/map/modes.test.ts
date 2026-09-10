@@ -56,24 +56,27 @@ describe('the presets', () => {
     expect(Object.values(ALL_ON).every(Boolean)).toBe(true);
   });
 
-  it('opens the unguided map with nothing on but the ground', () => {
-    expect(NOTHING_ON).toEqual({
-      pit: false,
-      pipe: false,
-      channel: false,
-      lowPoint: false,
-      terrain: true,
-      unavailable: false,
-    });
+  it('opens the unguided map with nothing on at all', () => {
+    expect(Object.values(NOTHING_ON).some(Boolean)).toBe(false);
   });
 
-  it('leaves terrain on, because the alternative states something false', () => {
-    // Not a half-measure and not an oversight. Every chip goes off; the
-    // ground surface is what the map is drawn on, and turning it off opens
-    // onto a flat colour that implies level ground.
-    expect(NOTHING_ON.terrain).toBe(true);
-    for (const key of CHIP_KEYS) {
+  it('covers every layer, so a new one cannot arrive switched on', () => {
+    // Written as a sweep rather than six booleans: the failure this catches is
+    // a layer added to `LayerState` and given a value everywhere except here,
+    // which would open the map with one thing on and no reason why.
+    for (const key of ALL_LAYERS) {
       expect(NOTHING_ON[key]).toBe(false);
+    }
+    expect(Object.keys(NOTHING_ON).sort()).toEqual([...ALL_LAYERS].sort());
+  });
+
+  it('still leaves the ground on under every homepage card', () => {
+    // The ground went off for the unguided entry on 11 September and stayed on
+    // for the cards, which is not an inconsistency: a card names a thing to
+    // look at, and AC 1.1.2 asks that pressing it show that thing.
+    expect(NOTHING_ON.terrain).toBe(false);
+    for (const way of ['drainage', 'water-flow', 'terrain', 'low-areas'] as const) {
+      expect(openingLayers(way).terrain).toBe(true);
     }
   });
 
