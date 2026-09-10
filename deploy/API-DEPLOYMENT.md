@@ -437,6 +437,17 @@ Latency, from a laptop over a home connection to Sydney — the same caveat as e
 The single 312 ms on `/health` is a cold start, as it was in September; `--min-instances=0` means the first request after an idle period pays for the container and the connector.
 
 > **Nothing here is compressed, and at council scale that is the finding.** There is no `Content-Encoding` on any response and no compression middleware in `server.ts` — the map goes out as **6,942,917 bytes on the wire**, where the same JSON gzips to about 1.2 MB. It was never worth noticing at 316 KB. It is now the largest single cost of entering the map for anybody the API is answering, and it is **the opposite way round from the fallback**: nginx compresses the copies in the site's own container, so the offline path is the fast one. Recorded rather than fixed in the same breath, because it is a change to the service and this section is a record of what was deployed.
+>
+> **Fixed the same day, in the revision after this one.** `hono/compress` on `/api/*`, measured through the middleware against a local database holding the council:
+>
+> | route | uncompressed | gzip | |
+> |---|---|---|---|
+> | `/api/map/city-of-melbourne` | 6,942,917 B | 1,220,733 B | 5.7× |
+> | `/api/trace/city-of-melbourne` | 709,800 B | 126,950 B | 5.6× |
+> | `/api/derived/city-of-melbourne` | 166,503 B | 41,781 B | 4.0× |
+> | `/api/flood-history` | 5,526 B | 1,770 B | 3.1× |
+>
+> **`/api/*` rather than `*`, and that is not tidiness.** The middleware skips bodies under 1 KB by reading `Content-Length`, and `c.json()` sets none — so the check is skipped rather than passed, and the 39-byte `/health` body came back gzipped into 59. The route that is polled and can never benefit was the one paying. There is a test for it.
 
 ### What changes on the site, and what does not
 

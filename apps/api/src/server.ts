@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
 import pg from 'pg';
 
@@ -79,6 +80,48 @@ export function createApp(pool: pg.Pool): Hono {
   const app = new Hono();
 
   app.use('*', cors({ origin: allowedOrigins() }));
+
+  /*
+    Compression, which stopped being optional when the extent became a council.
+
+    The map went out as **6,942,917 bytes with no `Content-Encoding` at all**:
+    p50 749.6 ms, p95 1556.5 ms, against 55 ms for the derived layers. At
+    Kensington's 316 KB nobody had to think about it. The same JSON gzips to
+    1.22 MB, and the site's own nginx has been compressing its bundled copies
+    all along -- so the *offline* fallback was the fast path and the API was
+    the slow one, which is the wrong way round for the source of truth.
+
+    Measured through this middleware, against a local database holding the
+    council extent — bytes on the wire, not `fetch`'s decoded length, which
+    reported 6,942,917 for a body that had travelled as 1.2 MB:
+
+    ==============================  ===========  ===========  =====
+    route                           uncompressed  gzip         ratio
+    ==============================  ===========  ===========  =====
+    /api/map/city-of-melbourne        6,942,917    1,220,733   5.7x
+    /api/trace/city-of-melbourne        709,800      126,950   5.6x
+    /api/derived/city-of-melbourne      166,503       41,781   4.0x
+    /api/flood-history                    5,526        1,770   3.1x
+    ==============================  ===========  ===========  =====
+
+    The level is the default, gzip 6. On this laptop level 1 gives 1.46 MB for
+    65 ms and level 9 gives 1.19 MB for 278 ms; 6 is 1.22 MB for 161 ms, and
+    the last 30 KB is not worth 117 ms of a one-CPU instance.
+
+    `Vary: Accept-Encoding` matters here and the middleware sets it: these
+    responses carry `Cache-Control: public`, and without the header a shared
+    cache is free to hand a gzipped body to a client that never asked for one.
+
+    **`/api/*` rather than `*`, because the middleware's own threshold does not
+    protect `/health`.** It skips compression below 1 KB by reading
+    `Content-Length` — and `c.json()` does not set one, so the check is
+    skipped rather than passed, and the 39-byte health body came back gzipped
+    into 59. Measured, after this comment had already claimed the opposite;
+    scoping the middleware is the fix that does not depend on a header nothing
+    here sends. `/health` is `no-store` and is polled, which is the one route
+    where a wrapper costs something every time and saves nothing ever.
+  */
+  app.use('/api/*', compress());
 
   /**
    * Answer, or say plainly what is missing.
