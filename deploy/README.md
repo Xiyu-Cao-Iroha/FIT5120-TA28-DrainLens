@@ -391,6 +391,66 @@ is the same constraint that ruled out serving it from a Cloud Storage
 sub-path. Reaching a subdirectory layout would mean an HTTPS load balancer,
 which needs a domain, which the team does not have.
 
+A *real* subdomain -- `iteration1.drainlens.example` -- is the shape the studio
+draws and it needs the same three things: a domain the team would have to buy,
+an HTTPS load balancer in front of Cloud Run, and a managed certificate. A
+Cloud Run service already gets its own hostname and its own certificate for
+nothing, so what is lost against the drawing is only that the name reads
+`drainlens-iteration1-…run.app` instead of `iteration1.…`. Every property the
+requirement is actually about -- a fixed URL, reachable, serving one iteration
+and not moving -- is there.
+
+### How to tell whether an iteration URL exists
+
+A service that does not exist and a service that is up both answer, and they
+answer differently:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://drainlens-iteration1-205559161217.australia-southeast1.run.app/
+```
+
+| Answer | What it is |
+|---|---|
+| **401** | the service is up and the gate is in front of it -- what a preserved iteration should return |
+| **404**, with no `server: nginx` and no `www-authenticate` | **no such service.** This is Google's front end, not ours |
+
+> **The two are easy to confuse and the confusion runs one way only**, which is
+> why it is worth a table: a 404 from a URL you expected to work reads as "the
+> site is broken", and it is not the site at all. `drainlens-api` answers 404
+> at `/` for the opposite reason -- it is running and has no route there, which
+> `/health` returning 200 is what distinguishes.
+
+### What "preserved" does and does not cover
+
+**The code is preserved. What the page reads is not, and the two are different
+claims.** The Dockerfile's `VITE_API_BASE` defaults to the shared API, so
+`drainlens-iteration1` will point at the same `drainlens-api` that Iteration 2
+goes on developing. The archive is frozen in its own image; it is not sealed
+off from everything outside it.
+
+What that costs, in the three cases that can actually happen:
+
+| If Iteration 2… | The archive shows |
+|---|---|
+| leaves the API alone, or adds to it | Iteration 1, unchanged |
+| stops the API -- **the normal state between demos** | Iteration 1 from the artefacts baked into its own image, with the footer saying so |
+| **changes the shape of a response** | whatever the frozen client's guards make of it -- and the database suite found **four** shape changes those guards accept that a reader would not survive |
+
+**So the rule has a trigger rather than a default.** If Iteration 2 changes the
+shape of anything the API returns, that change is additive or the archive is
+rebuilt against no API at all. It is written as a trigger because sealing it
+is not one flag: `gcloud run deploy --source` has no `--build-arg` -- checked,
+not assumed -- so an image built with `VITE_API_BASE=` empty needs the
+`cloudbuild.yaml` route the API already uses, and standing that up for a
+service deployed once is machinery that has to be worth something.
+
+> **The argument for leaving it pointed at the API is that reading from the
+> database is part of what Iteration 1 *was*** -- it landed on 5 September and
+> is in that iteration's record. An archive that provably never calls the API
+> would document the feature out of existence. The fallback is designed,
+> visible in the footer, and already what a visitor sees on any day the
+> database is stopped.
+
 No iteration *branch* is needed. The studio says to create one only when the
 hosting platform requires a branch to deploy from; `gcloud run deploy --source`
 takes whatever is checked out, so a tag is enough.
