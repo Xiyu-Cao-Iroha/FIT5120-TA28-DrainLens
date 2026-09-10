@@ -105,6 +105,25 @@ That builds the council-wide graph. The artefacts the browser actually loads are
 
 Order matters for two of them: `derived` and `trace` both read what earlier stages wrote.
 
+### Which extent
+
+`network`, `addresses` and `derived` take `--extent`, and it names a **published** extent rather than four numbers:
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.network --extent city-of-melbourne
+```
+
+| Name | Size | What it is |
+|---|---|---|
+| `kensington` | 1 × 1 km | The Iteration 1 demonstration extent. The default, and what everything ships from today |
+| `city-of-melbourne` | 8.5 × 9 km | Everywhere the council publishes a drainage record |
+
+Both live in `geo.py`'s `EXTENTS`, and `resolve_extent` is shared so four builders cannot come to spell the same extent differently. **An unknown name exits rather than falling back** — a build that quietly produced Kensington when it was asked for the council is a build whose output nobody can tell apart from the right one. `network` also keeps `--bounds MIN_E MIN_N MAX_E MAX_N` for a one-off that is not published under a name; that used to be spelled `--extent`.
+
+> **`city-of-melbourne` was measured, not drawn around the LGA boundary** — the same method that chose Kensington, and for the same reason: the extent that matters is where the *data* is. All 21,113 pits in the council-wide graph carry a position and span 7,971 × 8,237 m; the extent is that rounded outward onto the point cloud's 500 m tile grid.
+>
+> **It is a 76.5 km² box holding 65.7 km² of data.** Only 56 of its 72 square kilometres contain a pit at all — the Yarra, the parks, and land the council does not drain — and it touches **306** tiles where the archive holds 215. A terrain build over it will not find a tile for every square, and that is a fact about the city rather than a missing download. Density is not uniform either: the median occupied square kilometre holds 225 pits and the densest holds **1,905**, against Kensington's 895. Anything that draws every pit at once needs to know that before it is asked to draw the CBD.
+
 `flood_history` is the exception to the pattern: it fetches its own two sources rather than reading what an earlier stage left on disk, because neither is a local export. Give it `--incidents` and `--geography` to build from files you already have — both or neither, so a published file is never silently mixed with a local one. See [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) for what the sources are and what they do and do not support.
 
 See [pipeline/README.md](../pipeline/README.md) for what each stage does and the data findings behind them.

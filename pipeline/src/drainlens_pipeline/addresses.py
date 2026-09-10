@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
     from pathlib import Path
 
-    from .geo import DEMONSTRATION_EXTENT
+    from .geo import EXTENTS, resolve_extent
 
     parser = argparse.ArgumentParser(
         prog="python -m drainlens_pipeline.addresses",
@@ -260,12 +260,17 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("../apps/web/public/data/map.json"),
         help="map artefact, read for street names that carry no address",
     )
+    parser.add_argument(
+        "--extent",
+        choices=sorted(EXTENTS),
+        help="a published extent; defaults to the Iteration 1 demonstration extent",
+    )
     args = parser.parse_args(argv)
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)
 
-    extent = DEMONSTRATION_EXTENT
+    extent = resolve_extent(args.extent)
     log(f"Fetching addresses for {extent.name}")
     addresses = fetch(extent)
 
