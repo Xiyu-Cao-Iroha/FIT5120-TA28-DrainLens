@@ -42,6 +42,7 @@ import {
   visibilityOf,
 } from '../map/modes.js';
 import type { MapNow } from '../tutorial/drainage.js';
+import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
@@ -280,6 +281,23 @@ export function MapView({
   const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
 
   /*
+    Too many pits on screen to be pits.
+
+    The pilot extent never reached this: 895 drains over a square kilometre are
+    legible at any zoom the product offers. The council extent is 21,113 over
+    76.5 km2, and the full view puts 18,840 of them on one screen -- a texture
+    that happens to be made of drains. `legibility` counts what is in view
+    rather than reading the zoom, because density is not uniform and any scale
+    strict enough for the CBD hides Kensington.
+  */
+  const pitPoints = useMemo(
+    () => (map.layers.pit ?? []).map((pit) => pit.c),
+    [map.layers.pit],
+  );
+  const legible = useMemo(() => legibility(pitPoints, viewport), [pitPoints, viewport]);
+  const pitsDrawn = layers.pit && legible.drawPits;
+
+  /*
     Reported on every change, and only on a change.
 
     The dependency list is the four facts rather than the objects holding them,
@@ -308,10 +326,10 @@ export function MapView({
         selectedPit={selected}
         // Only while the pits are drawn. A ring around a pit on a map with no
         // pits on it is a mark with nothing under it.
-        suggestedPit={layers.pit ? highlightPit : null}
+        suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         terrain={layers.terrain ? terrain : null}
-        showPits={layers.pit}
+        showPits={pitsDrawn}
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
@@ -380,6 +398,44 @@ export function MapView({
             chips instead of under them.
           */}
           <MapLegend state={layers} />
+        </div>
+      )}
+
+      {/*
+        Said, not silently done.
+
+        The switch is on and the marks are not there, which reads as a broken
+        map unless something accounts for it — the same mistake as a control
+        that vanishes, which this map already refuses to make with the terrain
+        chip. The count is in the sentence because "there are eighteen thousand
+        of them here" and "something is wrong" are different things to be told,
+        and only one of them is true.
+      */}
+      {panel && layers.pit && !legible.drawPits && (
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: space(6),
+            zIndex: 5,
+            maxWidth: 420,
+            padding: `${String(space(3))}px ${String(space(4))}px`,
+            background: surface.raised,
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            boxShadow: shadow.floating,
+            font: type(text.label, { leading: 1.45 }),
+            color: ink.base,
+            textAlign: 'center',
+          }}
+        >
+          <strong style={{ color: ink.strong }}>
+            {legible.inView.toLocaleString('en-AU')} drainage pits are in view.
+          </strong>{' '}
+          Zoom in to see them individually — at this scale they are closer together than
+          they can be drawn or pressed.
         </div>
       )}
 
