@@ -15,6 +15,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -319,6 +320,72 @@ describe('how long an answer may be reused', () => {
     const response = await app.request('/api/map/not-an-extent');
     expect(response.status).toBe(404);
     expect(response.headers.get('cache-control')).not.toBe('public, max-age=300');
+  });
+});
+
+describe('what travels over the wire', () => {
+  const asked = { headers: { 'accept-encoding': 'gzip' } };
+
+  it('compresses an artefact, and says so', async () => {
+    // The council map is 6,942,917 bytes of JSON and 1,220,733 gzipped. It
+    // went out uncompressed for one deployment, at p50 749.6 ms against 55 ms
+    // for the derived layers, while the site's own nginx had been compressing
+    // its bundled copies all along -- the fallback faster than the source.
+    const response = await app.request('/api/map/kensington', asked);
+    expect(response.headers.get('content-encoding')).toBe('gzip');
+  });
+
+  it('says the answer varies by what was asked for', async () => {
+    // These carry `Cache-Control: public`. Without this header a shared cache
+    // may hand the gzipped body to a client that never asked for one.
+    const response = await app.request('/api/map/kensington', asked);
+    expect(response.headers.get('vary')).toMatch(/accept-encoding/i);
+  });
+
+  it('leaves it alone for a client that did not ask', async () => {
+    const response = await app.request('/api/map/kensington', {
+      headers: { 'accept-encoding': 'identity' },
+    });
+    expect(response.headers.get('content-encoding')).toBeNull();
+  });
+
+  it('does not compress the health check', async () => {
+    /*
+     * **The middleware's own 1 KB threshold does not do this, which is why
+     * the middleware is scoped to `/api/*`.** It decides by reading
+     * `Content-Length`, and `c.json()` sets none — so the check is skipped
+     * rather than passed, and 39 bytes of health came back gzipped into 59.
+     * This is the route that is polled, is `no-store`, and can never benefit.
+     */
+    const response = await app.request('/health', asked);
+    expect(response.headers.get('content-encoding')).toBeNull();
+  });
+
+  it('gzips to exactly the artefact, and to a fraction of its size', async () => {
+    /*
+     * Smaller is only good if it is the same thing.
+     *
+     * **`app.request` hands back the compressed bytes; it does not decode.**
+     * A browser's `fetch` does, which is why nothing downstream had to change
+     * — and it is why every other test in this file still reads JSON: `get`
+     * sends no `Accept-Encoding`, so those responses are never compressed at
+     * all. Written down because the first version of this test called
+     * `.json()` on the gzip and failed with `Unexpected token`, which reads
+     * like a broken response rather than an undecoded one.
+     */
+    const [gzipped, plain] = await Promise.all([
+      app.request('/api/map/kensington', asked),
+      app.request('/api/map/kensington'),
+    ]);
+    const wire = Buffer.from(await gzipped.arrayBuffer());
+    const decoded = gunzipSync(wire).toString('utf8');
+
+    expect(decoded).toBe(await plain.text());
+    expect((JSON.parse(decoded) as { layers: { pit: unknown[] } }).layers.pit).toHaveLength(895);
+    // Kensington's map is 316 KB; the council's is 6.9 MB and gzips 5.7x. A
+    // ratio this side of 2 would mean the middleware had stopped working and
+    // left the header behind.
+    expect(wire.length * 2).toBeLessThan(Buffer.byteLength(decoded));
   });
 });
 
