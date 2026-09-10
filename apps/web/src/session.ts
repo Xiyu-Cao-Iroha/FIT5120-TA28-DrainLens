@@ -297,6 +297,17 @@ export type SessionEvent =
   /** Back out of the map, to whichever page opened it — AC 1.1.10. */
   | { readonly type: 'leave-map' }
   | { readonly type: 'go-home' }
+  /**
+   * Left the address screen without giving one.
+   *
+   * Where that goes depends on why the screen was open, which is why it is a
+   * reducer decision and not two buttons wired to two actions in the view: a
+   * guide section is pending exactly when the chooser sent somebody here, and
+   * otherwise this screen was reached from the homepage. The view would have
+   * to read `guideSection` to work that out, and then two places would know
+   * the rule.
+   */
+  | { readonly type: 'address-abandoned' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
@@ -473,6 +484,12 @@ function step(session: Session, event: SessionEvent): Session {
 
     case 'go-home':
       return { ...session, screen: 'home' };
+
+    case 'address-abandoned':
+      // Back to whoever asked. The pending section is left alone: pressing
+      // Back does not un-choose the part of the guide, it just stops short of
+      // giving an address, and the chooser it lands on will set it again.
+      return { ...session, screen: session.guideSection === null ? 'home' : 'choose' };
 
     case 'change-address':
       return { ...session, screen: 'address' };
