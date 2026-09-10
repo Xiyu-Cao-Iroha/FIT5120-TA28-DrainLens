@@ -21,6 +21,7 @@
  * from. Neither copy ever needs the other's extent.
  */
 
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,9 +46,32 @@ const COUNCIL = {
   extent: 'city-of-melbourne',
 };
 
+/**
+ * Whether the council artefacts have been built on this machine.
+ *
+ * **This file said "these tests skip when it is not there" before anything
+ * skipped**, and CI found that out on the first run: `ENOENT`, and a red
+ * database job on a pull request that changed nothing about the database.
+ * A comment describing behaviour nobody wrote is worse than no comment,
+ * because it is read as a reason not to check.
+ *
+ * They are not committed and should not be: 6.7 MB of map and 693 KB of trace
+ * against a repository whose committed artefacts exist so the frontend runs
+ * from a clone. Rebuild them with
+ *
+ *   python -m drainlens_pipeline.network  --extent city-of-melbourne --out ../data/map/council/map.json
+ *   python -m drainlens_pipeline.trace    --map ../data/map/council/map.json --out ../data/map/council/trace.json
+ *   python -m drainlens_pipeline.reframe  --in ../apps/web/public/data/derived.json \
+ *       --from kensington --to city-of-melbourne --out ../data/map/council/derived.json
+ *
+ * and copy `flood-history.json` in beside them.
+ */
+const built = existsSync(path.join(COUNCIL.dir, 'map.json'));
+
 let client: pg.Client;
 
 beforeAll(async () => {
+  if (!built) return;
   client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
@@ -58,13 +82,13 @@ beforeAll(async () => {
 }, 300_000);
 
 afterAll(async () => {
-  await client.end();
+  await client?.end();
 });
 
 const one = async (sql: string, args: unknown[] = []): Promise<string> =>
   (await client.query<{ v: string }>(sql, args)).rows[0]?.v ?? '0';
 
-describe('the council extent in the database', () => {
+describe.skipIf(!built)('the council extent in the database', () => {
   it('holds every pit and pipe the council publishes', async () => {
     expect(Number(await one('SELECT count(*)::text AS v FROM pit'))).toBe(21113);
     expect(Number(await one('SELECT count(*)::text AS v FROM pipe'))).toBe(17242);
