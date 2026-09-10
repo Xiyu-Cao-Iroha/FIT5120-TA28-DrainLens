@@ -29,20 +29,33 @@ import type {
 } from '@drainlens/schema';
 
 import type { MapMode } from './map/modes.js';
+import {
+  NOTHING_LEARNED,
+  type Learned,
+  type SectionId,
+  allLearned,
+} from './tutorial/sections.js';
 
 /**
  * Which screen the person is on.
  *
- * **Four of these are unreachable, and deliberately so.**
+ * **Three of these are unreachable, and deliberately so.** It was four until
+ * 11 September.
  *
- * `address` and `task` were the two steps between the homepage and the map.
- * Since 3 September the homepage opens the map directly and an address is
- * named in the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
- * it. `scenario` and `result` are the drain-blockage comparison, which AC
- * 1.1.1 requires to be absent from the Iteration 1 interface.
+ * `task` was one of two steps between the homepage and the map. Since
+ * 3 September the homepage opens the map directly and an address is named in
+ * the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put it.
+ * `scenario` and `result` are the drain-blockage comparison, which AC 1.1.1
+ * requires to be absent from the Iteration 1 interface.
  *
- * All four are kept rather than deleted: their screens and tests are intact,
- * and Iteration 2 decides whether to restore them or remove them. Nothing
+ * **`address` stopped being one of them on 11 September.** The guide asks
+ * where you live before it can point at a pit near you, and this is the screen
+ * that asks — built in August, unreachable since 3 September, and reached
+ * again without being rewritten. Kept code that turns out to be needed is the
+ * argument for keeping it, and it is worth saying once that the argument paid.
+ *
+ * They are kept rather than deleted: their screens and tests are intact, and
+ * Iteration 2 decides whether to restore them or remove them. Nothing
  * dispatches an event that reaches any of them, which is what makes them
  * hidden rather than merely unvisited.
  */
@@ -51,11 +64,36 @@ export type Screen =
   | 'home'
   /** The recorded flood incidents, which are about the past and not this address. */
   | 'history'
-  /** Unreachable — the map's search bar took this over. */
+  /** The guide's way in, and reachable again since 11 September. */
   | 'address'
   /** Unreachable — the homepage's cards took this over. */
   | 'task'
   | 'explore'
+  /**
+   * The guide: the real map with a coach beside it, one section at a time.
+   *
+   * Added 11 September, after the mentor's point that the user journey was
+   * somebody arriving at a square kilometre with four layers and no basemap
+   * and being left to it. It reuses `address` as its way in, which is why that
+   * screen is no longer unreachable and the note above it is no longer whole.
+   */
+  /**
+   * "What do you want to explore first?" — the front door from 11 September.
+   *
+   * *Get started* lands here rather than on the map, which is the mentor's
+   * point made structural rather than written on a card.
+   */
+  | 'choose'
+  | 'guide'
+  /**
+   * The whole map, asked for before the guide is finished.
+   *
+   * Not a refusal. It is the four things somebody is about to read without
+   * having been told what they are, and a five-second wait before the way in
+   * is offered — after which it opens whether or not any of the guide has been
+   * done. See `LOCK_NOTICE`.
+   */
+  | 'locked'
   /** Unreachable — the comparison is out of the Iteration 1 interface. */
   | 'scenario'
   /** Unreachable — as above. */
@@ -133,6 +171,17 @@ export interface Session {
    * way back from a result — which is three chances to forget one.
    */
   readonly mapOpenings: number;
+  /**
+   * Which sections of the guide are finished.
+   *
+   * Held here because the session is what the screens read, and mirrored onto
+   * the device by `tutorial/progress.ts` so it survives a reload. **This is
+   * the authoritative copy**: a device that will not store anything still
+   * finishes the guide, it just starts again next time.
+   */
+  readonly learned: Learned;
+  /** The section being taught, or null outside the guide. */
+  readonly guideSection: SectionId | null;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -156,6 +205,8 @@ export const INITIAL_SESSION: Session = {
   mapMode: null,
   mapOrigin: 'home',
   mapOpenings: 0,
+  learned: NOTHING_LEARNED,
+  guideSection: null,
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -221,6 +272,28 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  /** The homepage's front door: the four cards, not the map. */
+  | { readonly type: 'get-started' }
+  /**
+   * Start a section of the guide.
+   *
+   * It goes to the address screen rather than to the map, because the guide
+   * cannot point at a pit near you until it knows where you are — and because
+   * "press the pit near your address" is the sentence the whole section is
+   * built around. The address is the first thing it needs, not a detail it
+   * collects later.
+   */
+  | { readonly type: 'guide-chosen'; readonly section: SectionId }
+  /**
+   * A section finished.
+   *
+   * Marks it learned and goes back to the four, which is what the design draws
+   * and the only screen that can show the person what they have and have not
+   * done. Carrying straight on to the next section would decide for them.
+   */
+  | { readonly type: 'guide-finished' }
+  /** The notice was read and the wait is over. */
+  | { readonly type: 'lock-passed' }
   /** Back out of the map, to whichever page opened it — AC 1.1.10. */
   | { readonly type: 'leave-map' }
   | { readonly type: 'go-home' }
@@ -234,6 +307,11 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   history: 'home',
   address: 'home',
   task: 'address',
+  // Out of a section is back to the address it was built around, not out of
+  // the guide altogether. The way out of the guide is the Home control.
+  choose: 'home',
+  guide: 'address',
+  locked: 'choose',
   explore: 'task',
   scenario: 'task',
   result: 'scenario',
@@ -271,6 +349,33 @@ function step(session: Session, event: SessionEvent): Session {
           : {}),
       };
 
+    case 'get-started':
+      return { ...session, screen: 'choose' };
+
+    case 'guide-chosen':
+      return {
+        ...session,
+        screen: 'address',
+        guideSection: event.section,
+        // The map's mode follows the section, so finishing the guide and
+        // opening the map shows the thing that was just taught rather than
+        // whatever was last looked at.
+        mapMode: event.section,
+      };
+
+    case 'guide-finished': {
+      const section = session.guideSection;
+      if (section === null) return session;
+      return {
+        ...session,
+        // Back to the four, which is the only screen that can show what has
+        // and has not been done. Carrying straight on would decide for them.
+        screen: 'choose',
+        guideSection: null,
+        learned: { ...session.learned, [section]: true },
+      };
+    }
+
     case 'address-cleared':
       return {
         ...session,
@@ -283,7 +388,11 @@ function step(session: Session, event: SessionEvent): Session {
     case 'address-accepted':
       return {
         ...session,
-        screen: 'task',
+        // The same screen answers two questions now. It asks for an address
+        // and hands it to whoever was waiting: the guide, when a section is
+        // running, and the task question otherwise -- which is where this
+        // always went and is currently unreachable.
+        screen: session.guideSection === null ? 'task' : 'guide',
         address: event.address,
         rejectedAddress: null,
         // A different address invalidates the pit, which belongs to the old
@@ -334,11 +443,25 @@ function step(session: Session, event: SessionEvent): Session {
     case 'map-opened':
       return {
         ...session,
-        screen: 'explore',
+        /*
+          Every route to the whole map goes through one gate, and it is here
+          rather than at the routes.
+
+          There are three ways in today and the flood board may add a fourth;
+          a lock written at each of them is a lock that will be right at most
+          of them. The same argument as `mapOpenings` a few lines down, which
+          was written after a rule spread across three cases.
+        */
+        screen: allLearned(session.learned) ? 'explore' : 'locked',
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',
       };
+
+    case 'lock-passed':
+      // The five seconds are up and the notice was read. Nothing is recorded:
+      // this is a decision about one press, not a fact about the person.
+      return { ...session, screen: 'explore' };
 
     case 'leave-map':
       // AC 1.1.10. Not `back`, which walks a fixed chain: the map has two ways

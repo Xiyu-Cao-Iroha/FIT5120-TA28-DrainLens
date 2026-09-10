@@ -409,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
     from pathlib import Path
 
-    from .geo import DEMONSTRATION_EXTENT
+    from .geo import EXTENTS, resolve_extent
     from .hydrology import condition
 
     parser = argparse.ArgumentParser(
@@ -418,12 +418,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--terrain", type=Path, default=Path("../data/terrain"))
     parser.add_argument("--out", type=Path, default=Path("../data/map/derived.json"))
+    parser.add_argument(
+        "--extent",
+        choices=sorted(EXTENTS),
+        help="a published extent; defaults to the Iteration 1 demonstration extent",
+    )
     args = parser.parse_args(argv)
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)
 
-    extent = DEMONSTRATION_EXTENT
+    extent = resolve_extent(args.extent)
     surface = np.load(args.terrain / "ground-surface.npy").astype(np.float64)
     log(f"Deriving layers for {extent.name}")
 

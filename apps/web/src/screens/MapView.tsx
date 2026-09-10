@@ -41,6 +41,8 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
+import type { MapNow } from '../tutorial/drainage.js';
+import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
@@ -103,6 +105,54 @@ export interface MapViewProps {
    * a button that does nothing, which is worse than no button.
    */
   readonly onClearAddress?: (() => void) | undefined;
+  /**
+   * Which chips to offer, and whether the Layers button is there.
+   *
+   * The guide narrows both. Its first instruction is *press Pits*, and a row
+   * of four chips turns that into a search.
+   */
+  readonly chipKeys?: readonly LayerKey[] | undefined;
+  readonly layersButton?: boolean | undefined;
+  /**
+   * What is on when the map opens, overriding the mode and the task.
+   *
+   * **The guide needs this and found out the hard way.** It opened with
+   * `task="follow"`, which is the guided preset — pits, pipes, water flow and
+   * the ground all on — so its first two instructions were already satisfied
+   * and it began at step 3 of 6, beside a map drawing a layer whose chip it
+   * had deliberately hidden. A guide whose first words are *press Pits* has to
+   * open on a map with no pits on it, and that is a fact about the guide
+   * rather than about any task, so it is said here rather than inferred.
+   */
+  readonly openWith?: LayerState | undefined;
+  /**
+   * A pit to ring without selecting — the guide's *press this one*.
+   *
+   * `MapCanvas` already draws this as `suggestedPit`, "offered but not
+   * confirmed, drawn as a ring rather than a fill", which is exactly what the
+   * guide is doing: pointing, not choosing on the reader's behalf.
+   */
+  readonly highlightPit?: number | null | undefined;
+  /**
+   * What the map is showing, whenever it changes.
+   *
+   * **Reported, not lifted**, for the same reason the viewport is: the map
+   * owns its layers and its selection, and the guide reads them to work out
+   * which step it is on. A guide that *set* them could walk itself through
+   * its own instructions, which is a guide that teaches nothing.
+   */
+  readonly onMapNow?: ((now: MapNow) => void) | undefined;
+  /**
+   * The card that opens beside the address pin, naming what is near it.
+   *
+   * Off in the guide, and the reason is size rather than taste. The card
+   * carries a compass, two distances and a provenance tag; against a full
+   * screen it sits in a corner, and inside the guide's 560-pixel frame it
+   * covered most of the map it was annotating. The pin stays either way.
+   */
+  readonly addressCard?: boolean | undefined;
+  /** How wide the opening view is, in metres. See `MapCanvas`. */
+  readonly openAcrossM?: number | undefined;
 }
 
 export function MapView({
@@ -116,12 +166,19 @@ export function MapView({
   index,
   onAddress,
   onClearAddress,
+  chipKeys,
+  layersButton = true,
+  openWith,
+  highlightPit = null,
+  onMapNow,
+  addressCard = true,
+  openAcrossM,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
   // not an instruction, and nobody asked to be walked through anything.
   const guided = task !== 'full-map';
-  const [layers, setLayers] = useState<LayerState>(() => openingState(mode, guided));
+  const [layers, setLayers] = useState<LayerState>(() => openWith ?? openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
   /**
    * The pit's card is folded away, and the pit is still selected.
@@ -140,14 +197,14 @@ export function MapView({
   const [viewport, setViewport] = useState<Viewport | null>(null);
   // Dismissed by the person, not by the address changing: picking a new
   // address should say something about the new one.
-  const [addressCardOpen, setAddressCardOpen] = useState(true);
+  const [addressCardOpen, setAddressCardOpen] = useState(addressCard);
   useEffect(() => {
-    setAddressCardOpen(true);
+    setAddressCardOpen(addressCard);
     // A new address is a new question. Leaving the previous pit selected would
     // answer the old one beside the new mark.
     setHit(null);
     setFollowing(null);
-  }, [address]);
+  }, [address, addressCard]);
 
   // Painted once, then reused for every pan and zoom. A failure here leaves
   // the layer off rather than breaking the map: the terrain is context, and
@@ -223,6 +280,43 @@ export function MapView({
   // never there, and this one is named by AC 1.1.4.
   const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
 
+  /*
+    Too many pits on screen to be pits.
+
+    The pilot extent never reached this: 895 drains over a square kilometre are
+    legible at any zoom the product offers. The council extent is 21,113 over
+    76.5 km2, and the full view puts 18,840 of them on one screen -- a texture
+    that happens to be made of drains. `legibility` counts what is in view
+    rather than reading the zoom, because density is not uniform and any scale
+    strict enough for the CBD hides Kensington.
+  */
+  const pitPoints = useMemo(
+    () => (map.layers.pit ?? []).map((pit) => pit.c),
+    [map.layers.pit],
+  );
+  const legible = useMemo(() => legibility(pitPoints, viewport), [pitPoints, viewport]);
+  const pitsDrawn = layers.pit && legible.drawPits;
+
+  /*
+    Reported on every change, and only on a change.
+
+    The dependency list is the four facts rather than the objects holding them,
+    so a pan does not tell the guide anything: `hit` is a new object every
+    press and `layers` a new object every toggle, and reporting on either would
+    re-run the guide's step arithmetic on movements that cannot affect it.
+  */
+  const pitsOn = layers.pit;
+  const pipesOn = layers.pipe;
+  const selectedId = selected === null ? null : String(selected);
+  useEffect(() => {
+    onMapNow?.({
+      pits: pitsOn,
+      pipes: pipesOn,
+      selectedPit: selectedId,
+      followingPit: following,
+    });
+  }, [pitsOn, pipesOn, selectedId, following, onMapNow]);
+
   return (
     <>
       <MapCanvas
@@ -230,8 +324,12 @@ export function MapView({
         derived={derived}
         show={visibilityOf(layers)}
         selectedPit={selected}
+        // Only while the pits are drawn. A ring around a pit on a map with no
+        // pits on it is a mark with nothing under it.
+        suggestedPit={pitsDrawn ? highlightPit : null}
+        {...(openAcrossM === undefined ? {} : { openAcrossM })}
         terrain={layers.terrain ? terrain : null}
-        showPits={layers.pit}
+        showPits={pitsDrawn}
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
@@ -281,7 +379,13 @@ export function MapView({
                 onClear={onClearAddress}
               />
             )}
-            <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
+            <LayerChips
+              state={layers}
+              onToggle={toggle}
+              unavailableKeys={notYet}
+              layersButton={layersButton}
+              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
+            />
           </div>
 
           {/*
@@ -294,6 +398,44 @@ export function MapView({
             chips instead of under them.
           */}
           <MapLegend state={layers} />
+        </div>
+      )}
+
+      {/*
+        Said, not silently done.
+
+        The switch is on and the marks are not there, which reads as a broken
+        map unless something accounts for it — the same mistake as a control
+        that vanishes, which this map already refuses to make with the terrain
+        chip. The count is in the sentence because "there are eighteen thousand
+        of them here" and "something is wrong" are different things to be told,
+        and only one of them is true.
+      */}
+      {panel && layers.pit && !legible.drawPits && (
+        <div
+          role="status"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: space(6),
+            zIndex: 5,
+            maxWidth: 420,
+            padding: `${String(space(3))}px ${String(space(4))}px`,
+            background: surface.raised,
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            boxShadow: shadow.floating,
+            font: type(text.label, { leading: 1.45 }),
+            color: ink.base,
+            textAlign: 'center',
+          }}
+        >
+          <strong style={{ color: ink.strong }}>
+            {legible.inView.toLocaleString('en-AU')} drainage pits are in view.
+          </strong>{' '}
+          Zoom in to see them individually — at this scale they are closer together than
+          they can be drawn or pressed.
         </div>
       )}
 
@@ -409,6 +551,7 @@ export function MapView({
         viewport !== null &&
         address !== null &&
         hit === null &&
+        addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
         <MapCallout

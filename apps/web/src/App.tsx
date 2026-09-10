@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useReducer, useState } from 'react';
 
-import type { AddressIndex } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
@@ -16,7 +16,12 @@ import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
+import { Guide } from './screens/Guide.js';
+import { Choose } from './screens/Choose.js';
 import { Home } from './screens/Home.js';
+import { LockedMap } from './screens/LockedMap.js';
+import { SECTIONS, type SectionId } from './tutorial/sections.js';
+import { progress } from './tutorial/progress.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
@@ -36,9 +41,25 @@ import {
 import { Shell } from './ui/Shell.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
-import { API_BASE, EXTENT, type Origin, fetchArtefact, served } from './data/source.js';
+import {
+  API_BASE,
+  API_EXTENT,
+  BUNDLED_EXTENT,
+  type Origin,
+  fetchArtefact,
+  fetchTogether,
+  served,
+} from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
+
+/**
+ * The sections of the guide that have steps written.
+ *
+ * One list, read by the homepage and by the notice. Two lists would drift, and
+ * the drift would show as a card offering a guide that opens an empty room.
+ */
+const GUIDED_SECTIONS: readonly SectionId[] = ['drainage'];
 
 interface Loaded {
   readonly map: MapArtefact;
@@ -47,8 +68,10 @@ interface Loaded {
   readonly index: AddressIndex;
   readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
-  /** Where the four database-backed artefacts actually came from. */
+  /** Where the three artefacts describing this place came from -- all of them. */
   readonly servedFrom: Origin | 'mixed';
+  /** `city-of-melbourne` or `kensington`, depending on which answered. */
+  readonly extentName: string;
 }
 
 async function load(): Promise<Loaded> {
@@ -68,25 +91,37 @@ async function load(): Promise<Loaded> {
     console.warn(`DrainLens: ${url} did not answer (${reason}); using the bundled copy`);
   };
 
-  const [map, derived, trace, history, addresses] = await Promise.all([
-    fetchArtefact<MapArtefact>({
-      api: at(`/api/map/${EXTENT}`),
+  /*
+    The three that describe one place, fetched as a set.
+
+    The API's extent is the whole council and the container's is the pilot
+    square kilometre, so these three have to come from the same side or the
+    derived layers land a kilometre and a half from the streets they belong
+    to. `fetchTogether` makes that structural rather than hoped for.
+  */
+  const place = await fetchTogether<[MapArtefact, DerivedArtefact, TraceArtefact]>([
+    {
+      api: at(`/api/map/${API_EXTENT}`),
       bundled: '/data/map.json',
       guard: assertUsable,
       onFallback: note,
-    }),
-    fetchArtefact<DerivedArtefact>({
-      api: at(`/api/derived/${EXTENT}`),
+    },
+    {
+      api: at(`/api/derived/${API_EXTENT}`),
       bundled: '/data/derived.json',
       guard: assertDerived,
       onFallback: note,
-    }),
-    fetchArtefact<TraceArtefact>({
-      api: at(`/api/trace/${EXTENT}`),
+    },
+    {
+      api: at(`/api/trace/${API_EXTENT}`),
       bundled: '/data/trace.json',
       guard: assertTrace,
       onFallback: note,
-    }),
+    },
+  ]);
+  const [map, derived, trace] = place.values;
+
+  const [history, addresses] = await Promise.all([
     fetchArtefact<FloodHistoryArtefact>({
       api: at('/api/flood-history'),
       bundled: '/data/flood-history.json',
@@ -102,24 +137,44 @@ async function load(): Promise<Loaded> {
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
-  const index = addresses as AddressIndex & { fixture?: string };
-  if (!Array.isArray(index.addresses)) {
-    throw new Error('the address index carries no addresses');
-  }
+  // Unpacked once, here, rather than on every keystroke. The shipped shape
+  // groups addresses by street and leaves out what it can rebuild; `unpack`
+  // refuses an index whose groups do not line up rather than repairing it.
+  const packed = addresses as PackedIndex & { fixture?: string };
+  const index = unpack(packed);
 
   return {
-    map: map.value,
-    derived: derived.value,
-    trace: trace.value,
+    map,
+    derived,
+    trace,
     history: history.value,
     index,
-    fixtureNote: index.fixture,
-    servedFrom: served([map.from, derived.from, trace.from, history.from]),
+    fixtureNote: packed.fixture,
+    servedFrom: served([place.from, history.from]),
+    // Which extent is actually on screen, so the interface can say so rather
+    // than leaving somebody to notice the map got smaller.
+    extentName: place.from === 'api' ? API_EXTENT : BUNDLED_EXTENT,
   };
 }
 
 export function App() {
-  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
+  /*
+    Seeded from the device, then mirrored back to it.
+
+    The session is the authoritative copy and `progress` is a mirror, which is
+    the only arrangement where a browser that refuses to store anything still
+    lets somebody finish the guide -- they just start again next time. Reading
+    it here rather than inside the reducer keeps `session.ts`'s rule intact:
+    nothing in that file touches storage of any kind, and a test enforces it by
+    running a whole session against traps rather than by reading the source.
+  */
+  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION, (initial) => ({
+    ...initial,
+    learned: progress.read(),
+  }));
+  useEffect(() => {
+    progress.write(session.learned);
+  }, [session.learned]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Only the two comparison screens use it, and neither is reachable in the
@@ -203,10 +258,11 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           actions={
             <HomeNav
               onOpenMap={() => {
-                dispatch({ type: 'map-opened' });
+                dispatch({ type: 'get-started' });
               }}
               onOpenHistory={() => {
                 dispatch({ type: 'history-opened' });
@@ -217,7 +273,17 @@ export function App() {
           <Home
             history={loaded.history}
             onOpenMap={(mode) => {
-              dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
+              /*
+                Everything on the homepage now goes to the four cards.
+
+                A card here that started its section directly would be a second
+                front door with different manners -- one that skips the screen
+                showing what is done and what is left. The chooser is where
+                that choice is made, and the cards here describe rather than
+                dispatch.
+              */
+              void mode;
+              dispatch({ type: 'get-started' });
             }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
@@ -231,6 +297,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           back={{
             label: 'Home',
             onBack: () => {
@@ -255,7 +322,8 @@ export function App() {
     case 'unsupported':
       return (
         <Shell credits={credits}
-          servedFrom={loaded.servedFrom}>
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}>
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -275,11 +343,123 @@ export function App() {
         </Shell>
       );
 
+    case 'choose':
+      return (
+        <Shell credits={credits} servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName} masthead={false}>
+          <Choose
+            learned={session.learned}
+            guided={GUIDED_SECTIONS}
+            onStart={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onSkip={() => {
+              dispatch({ type: 'map-opened', from: 'home' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'locked':
+      return (
+        <Shell
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          masthead={false}
+          back={{
+            label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+            onBack: () => {
+              dispatch({ type: 'leave-map' });
+            },
+          }}
+          crumbs={crumb('The whole map', undefined, true)}
+        >
+          <LockedMap
+            map={loaded.map}
+            learned={session.learned}
+            extentName={loaded.extentName}
+            /*
+              Only the sections that have a guide written. Offering a card
+              whose guide has no steps in it would be a button that opens an
+              empty room, which is worse than not offering it. The others join
+              this list as they land.
+            */
+            available={GUIDED_SECTIONS}
+            onStartGuide={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onOpenAnyway={() => {
+              dispatch({ type: 'lock-passed' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'leave-map' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'guide':
+      return (
+        <Shell
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          masthead={false}
+          back={{
+            label: 'Address',
+            onBack: () => {
+              dispatch({ type: 'back' });
+            },
+          }}
+          crumbs={crumb(SECTIONS[session.guideSection ?? 'drainage'].label, undefined, true)}
+          trailing={
+            // The way out of the guide, which is a different thing from the
+            // way back one step. Asked for by name: somebody three steps in
+            // who wants out should not have to press Back three times.
+            <button
+              type="button"
+              onClick={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              style={{
+                border: `1px solid ${line.base}`,
+                borderRadius: radius.base,
+                background: surface.raised,
+                color: ink.base,
+                padding: `${String(space(2))}px ${String(space(3))}px`,
+                font: type(text.label, { weight: weight.medium }),
+                cursor: 'pointer',
+              }}
+            >
+              Home
+            </button>
+          }
+        >
+          {session.address === null ? null : (
+            <Guide
+              map={loaded.map}
+              derived={loaded.derived}
+              trace={loaded.trace}
+              index={loaded.index}
+              address={session.address}
+              onFinish={() => {
+                dispatch({ type: 'guide-finished' });
+              }}
+            />
+          )}
+        </Shell>
+      );
+
     case 'task':
       return (
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -349,6 +529,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -564,6 +745,7 @@ function MapScreen({
     <Shell
       credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
       // Inside the map, the name at the top tells somebody something they
       // worked out by arriving. The row below carries the way back out.
       masthead={false}
@@ -756,7 +938,7 @@ function HomeNav({
           borderRadius: radius.base,
         }}
       >
-        Explore map →
+        Get started →
       </button>
     </span>
   );

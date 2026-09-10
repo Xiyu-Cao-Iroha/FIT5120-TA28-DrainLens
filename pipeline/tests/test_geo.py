@@ -12,13 +12,16 @@ import pytest
 
 from drainlens_pipeline.geo import (
     DEMONSTRATION_ADDRESS,
+    CITY_OF_MELBOURNE,
     DEMONSTRATION_EXTENT,
+    EXTENTS,
     RESERVE_ADDRESS,
     TILE_SIZE_M,
     Extent,
     tile_bounds,
     tile_name,
     tile_of,
+    resolve_extent,
     from_mga55,
     to_mga55,
 )
@@ -147,3 +150,88 @@ class TestExtent:
         assert "Gatehouse" in DEMONSTRATION_ADDRESS
         assert "Kensington" in DEMONSTRATION_ADDRESS
         assert "Kensington" in RESERVE_ADDRESS
+
+
+class TestTheCouncilWideExtent:
+    """Everywhere the City of Melbourne publishes a drainage record.
+
+    The figures are asserted rather than described because they were measured
+    from ``data/graph/drainage-graph.json`` -- 21,113 pits, all of them with a
+    position -- and that file is a build product nobody reruns by accident. A
+    number in a comment drifts; a number in a test fails.
+    """
+
+    def test_it_covers_every_pit_the_council_publishes(self):
+        # The measured span is 7,971 m east-west and 8,237 m north-south, from
+        # 315,193 / 5,808,872 to 323,164 / 5,817,109. The extent has to hold
+        # that with room, and this is the assertion that says so.
+        assert CITY_OF_MELBOURNE.contains(315_193, 5_808_872)
+        assert CITY_OF_MELBOURNE.contains(323_164, 5_817_109)
+
+    def test_it_sits_on_the_point_clouds_own_tile_grid(self):
+        # Rounded outward to 500 m because a future terrain build has to line
+        # up with those tiles; an extent that straddles them makes every tile
+        # a partial one.
+        for value in (
+            CITY_OF_MELBOURNE.min_e,
+            CITY_OF_MELBOURNE.min_n,
+            CITY_OF_MELBOURNE.max_e,
+            CITY_OF_MELBOURNE.max_n,
+        ):
+            assert value % TILE_SIZE_M == 0
+
+    def test_it_is_eight_and_a_half_by_nine_kilometres(self):
+        assert (CITY_OF_MELBOURNE.width_m, CITY_OF_MELBOURNE.height_m) == (8500.0, 9000.0)
+        assert CITY_OF_MELBOURNE.width_m * CITY_OF_MELBOURNE.height_m / 1e6 == 76.5
+
+    def test_it_swallows_the_demonstration_extent_whole(self):
+        # Kensington has to stay addressable inside it, because the terrain and
+        # everything derived from it are staying at that extent for now.
+        assert CITY_OF_MELBOURNE.contains(DEMONSTRATION_EXTENT.min_e, DEMONSTRATION_EXTENT.min_n)
+        assert CITY_OF_MELBOURNE.contains(
+            DEMONSTRATION_EXTENT.max_e - 1, DEMONSTRATION_EXTENT.max_n - 1
+        )
+
+    def test_it_touches_more_tiles_than_the_archive_holds(self):
+        # 306 against the archive's 215. The box is bigger than the data: only
+        # 56 of its 72 square kilometres contain a pit at all -- the Yarra, the
+        # parks, and land the council does not drain. A terrain build over this
+        # extent will not find a tile for every square it covers, and that is a
+        # fact about the city rather than a missing download.
+        assert len(CITY_OF_MELBOURNE.tile_names()) == 306
+
+
+class TestResolvingAnExtentByName:
+    def test_it_finds_each_published_extent(self):
+        assert resolve_extent("kensington") is DEMONSTRATION_EXTENT
+        assert resolve_extent("city-of-melbourne") is CITY_OF_MELBOURNE
+
+    def test_it_defaults_to_the_demonstration_extent(self):
+        assert resolve_extent(None) is DEMONSTRATION_EXTENT
+
+    def test_a_name_beats_raw_bounds(self):
+        # A published name is a claim the artefacts have to agree on; four
+        # numbers on a command line are a one-off.
+        assert resolve_extent("kensington", [0, 0, 10, 10]) is DEMONSTRATION_EXTENT
+
+    def test_it_takes_raw_bounds_for_a_one_off(self):
+        extent = resolve_extent(None, [1000, 2000, 1500, 2500])
+        assert (extent.name, extent.width_m, extent.height_m) == ("custom", 500, 500)
+
+    def test_it_refuses_an_unknown_name_rather_than_falling_back(self):
+        # A build that quietly produced Kensington when it was asked for the
+        # council is a build whose output nobody can tell apart from the right
+        # one.
+        with pytest.raises(SystemExit, match="unknown extent"):
+            resolve_extent("nowhere")
+
+    def test_it_refuses_bounds_that_are_not_four_numbers(self):
+        with pytest.raises(SystemExit, match="four numbers"):
+            resolve_extent(None, [1, 2, 3])
+
+    def test_every_registered_extent_is_keyed_by_its_own_name(self):
+        # The failure this catches: an extent added to the registry under a
+        # different key from its `name`, so the API serves `/api/map/foo` and
+        # the artefact inside says it is `bar`.
+        for key, extent in EXTENTS.items():
+            assert key == extent.name

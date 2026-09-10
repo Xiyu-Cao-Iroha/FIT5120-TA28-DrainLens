@@ -196,3 +196,32 @@ The gates table has four rows with a dash where a status belongs, and these are 
 **One thing worth a conversation rather than a decision:** whether the demonstration leads with *where water collects* or with the comparison. The comparison now explains itself when it finds nothing, so either order is defensible.
 
 **Five are done** and are recorded above with reasoning. Reopen any of them — particularly §3 if the KPI table reads badly, and §6 if the deck was meant to be versioned.
+
+---
+
+## 8 · Where the measured ground stops, on a map that no longer stops there — **OPEN, deferred to 13 September**
+
+The recorded network now covers the City of Melbourne. The terrain does not, and cannot be made to for free: the ground surface is 6.6 million points over **one square kilometre of Kensington**, and the derived layers — surface-water paths, low points, the data-quality hatching — are calculated from it.
+
+So on the council map, **Water flow and Low areas have marks in 1 km² of 76.5 km² and nothing anywhere else.**
+
+### What is already honest, and what is not
+
+The data does not lie. `pipeline/reframe.py` writes a `covers` sentence into the artefact, the lock notice says *"that ground was measured for one square kilometre of Kensington — everywhere else on this map, nothing is claimed about where water goes"*, and `sections.test.ts` fails if that sentence goes missing.
+
+**The map itself says nothing.** Somebody who turns on Water flow over Docklands sees empty ground, and empty ground is exactly what this product spends its whole vocabulary distinguishing:
+
+| What they see | What it could mean |
+|---|---|
+| No water paths | The calculated surface says water does not run here |
+| No water paths | **Nobody measured this ground** |
+
+Those are different statements and the map currently makes them look identical. The `unavailable` layer — *Not enough ground measured* — exists for precisely this distinction and is itself derived from the Kensington scene, so outside that square there is not even a hatch to draw.
+
+### The options
+
+1. **Draw the measured square as an outline on the council map**, labelled, whenever a derived layer is on. Cheapest, and it names the boundary rather than implying one.
+2. **Extend the hatching to everything outside the measured square.** Most consistent with the existing vocabulary — the hatch already means "not enough ground measured" — but 75.5 km² of hatch is a lot of texture, and it would dominate a map whose subject is the drainage.
+3. **Grey the derived chips outside the square**, so they cannot be turned on where there is nothing to show. Prevents the confusion by removing the control, which this repository has argued against before: a control that vanishes reads as a control that was never there.
+
+**Deferred by the design owner on 11 September to 13 September.** It is recorded here rather than left in a conversation because the map shipping without it is the one thing in this expansion that can mislead somebody, and a deferral that nobody wrote down is indistinguishable from an oversight.

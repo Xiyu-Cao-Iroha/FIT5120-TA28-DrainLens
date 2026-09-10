@@ -45,6 +45,16 @@ export interface MapCanvasProps {
   readonly suggestedPit?: number | null;
   /** The painted terrain raster, or null when it is off or not loaded. */
   readonly terrain?: HTMLCanvasElement | null;
+  /**
+   * How many metres wide the view is when it opens, instead of `LOCAL_SCALE`.
+   *
+   * Expressed in metres rather than in pixels per metre so that it means the
+   * same thing in a frame of any size — which is the whole reason it exists.
+   * `LOCAL_SCALE` is 3 px/m, and in the guide's 560-pixel frame that is 187
+   * metres of a square kilometre: enough to see one street and not enough to
+   * find the pit you are being asked to press.
+   */
+  readonly openAcrossM?: number;
   readonly showPipes?: boolean;
   readonly showPits?: boolean;
   /**
@@ -95,6 +105,7 @@ export function MapCanvas({
   selectedPit = null,
   suggestedPit = null,
   terrain = null,
+  openAcrossM,
   showPipes = true,
   showPits = true,
   address = null,
@@ -131,7 +142,13 @@ export function MapCanvas({
         current === null
           ? openingRef.current === null
             ? fit(width, height, bounds)
-            : focus(width, height, bounds, openingRef.current)
+            : focus(
+                width,
+                height,
+                bounds,
+                openingRef.current,
+                openAcrossM === undefined ? undefined : width / openAcrossM,
+              )
           : clamp({ ...current, widthPx: width, heightPx: height }, bounds),
       );
     };
@@ -140,7 +157,7 @@ export function MapCanvas({
     const observer = new ResizeObserver(resize);
     observer.observe(frame);
     return () => observer.disconnect();
-  }, [bounds.widthM, bounds.heightM]);
+  }, [bounds.widthM, bounds.heightM, openAcrossM]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

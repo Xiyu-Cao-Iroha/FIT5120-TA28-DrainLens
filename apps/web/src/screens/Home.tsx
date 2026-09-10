@@ -79,7 +79,12 @@ export const SECTIONS = {
  * *DrainLens does not provide* further down this page still says, in full, that
  * there are no forecasts and no depths. A caveat nobody reads is not a caveat.
  */
-const PATHS: readonly {
+/**
+ * Exported so the chooser draws the same four cards from the same definition.
+ * Two copies would drift, and the drift would be a card whose picture on one
+ * screen is not the layer it opens on the other.
+ */
+export const PATHS: readonly {
   readonly mode: MapMode;
   readonly title: string;
   readonly body: string;
@@ -337,7 +342,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
             for one thing.
           */}
           <div style={{ display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
-            <PrimaryButton label="Explore the map →" onPress={onOpenMap} />
+            <PrimaryButton label="Get started →" onPress={onOpenMap} />
           </div>
 
           <div
@@ -382,7 +387,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
  * No external images, and none fetched: this product loads nothing from a
  * third party, and four thumbnails are not the place to start.
  */
-function PathThumb({ mode }: { readonly mode: MapMode }) {
+export function PathThumb({ mode }: { readonly mode: MapMode }) {
   const frame = { width: '100%', height: 104, display: 'block' } as const;
   const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
 
@@ -598,6 +603,7 @@ function PathCard({
     </button>
   );
 }
+
 
 /**
  * The top of the flood board, on the homepage.

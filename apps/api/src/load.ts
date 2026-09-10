@@ -32,10 +32,28 @@ import path from 'node:path';
 import pg from 'pg';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DATA = path.resolve(HERE, '../../web/public/data');
 
-/** The extent every row in these artefacts belongs to. */
-const EXTENT = 'kensington';
+/** Where the shipped artefacts live, and the extent they belong to. */
+export interface Source {
+  readonly dir: string;
+  readonly extent: string;
+}
+
+/**
+ * The container's own copy: Kensington, the extent that ships.
+ *
+ * A second extent is a second `load` against a different directory, not a
+ * second database -- which is what the schema means by "one row per published
+ * extent". `city-of-melbourne` is built into the pipeline's own working
+ * directory and loaded from there; it is far too large to commit.
+ */
+export const BUNDLED: Source = {
+  dir: path.resolve(HERE, '../../web/public/data'),
+  extent: 'kensington',
+};
+
+/** Greater Melbourne, which the flood board covers and no pilot extent does. */
+export const FLOOD_EXTENT = 'greater-melbourne';
 
 export class LoadError extends Error {}
 
@@ -69,10 +87,14 @@ interface Artefact {
   readonly [key: string]: unknown;
 }
 
-const read = async (name: string): Promise<Artefact> =>
-  JSON.parse(await readFile(path.join(DATA, name), 'utf8')) as Artefact;
+export async function load(
+  client: pg.ClientBase,
+  from: Source = BUNDLED,
+): Promise<Record<string, number>> {
+  const EXTENT = from.extent;
+  const read = async (name: string): Promise<Artefact> =>
+    JSON.parse(await readFile(path.join(from.dir, name), 'utf8')) as Artefact;
 
-export async function load(client: pg.ClientBase): Promise<Record<string, number>> {
   const map = await read('map.json');
   const derived = await read('derived.json');
   const trace = await read('trace.json');
@@ -83,14 +105,27 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
     counted[table] = n;
   };
 
-  // Order matters: everything references `source`, and `extent` is referenced
-  // by every layer. Deleting runs the other way for the same reason.
+  /*
+    This extent's rows go; every other extent's stay.
+
+    It used to TRUNCATE the whole schema, which was right while there was one
+    extent and becomes wrong the moment there are two: loading the council
+    would silently empty Kensington, and the first anyone would know is the
+    container's fallback and the API disagreeing about what exists.
+
+    `extent` cascades to every layer that references it, so one DELETE clears
+    the pits, pipes, roads, labels, derived shapes and trace rows belonging to
+    this extent and nothing else. The tables that are not extent-scoped --
+    `source`, and the Greater Melbourne flood history -- are rewritten below
+    rather than deleted here, because they are shared and the last loader to
+    run should leave them correct rather than absent.
+  */
+  await client.query('DELETE FROM extent WHERE id = $1', [EXTENT]);
   await client.query(`
     TRUNCATE flood_area_coverage, flood_area, flood_incident, sa1_region,
-             trace_reason, trace_link, derived_shape, street_label,
-             road, pipe, pit, artefact_envelope, extent, population,
-             source RESTART IDENTITY;
+             population RESTART IDENTITY;
   `);
+  await client.query('DELETE FROM artefact_envelope WHERE extent_id = $1', [FLOOD_EXTENT]);
 
   // --- Provenance -----------------------------------------------------------
 
@@ -133,8 +168,23 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
 
   for (const row of sources.values()) {
     await client.query(
+      /*
+        Upserted, because `source` is shared across extents.
+
+        Two extents cite the same four datasets -- they are the same council
+        publishing the same exports -- so the second loader to run meets rows
+        the first one wrote. It used to be a plain INSERT after a TRUNCATE of
+        the whole schema; with the truncate gone that is a duplicate-key error
+        on the second extent, which is a load that fails loudly rather than one
+        that corrupts anything, but a failed load is still a load nobody got.
+      */
       `INSERT INTO source (dataset_id, title, publisher, licence, last_modified)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (dataset_id) DO UPDATE SET
+         title = EXCLUDED.title,
+         publisher = EXCLUDED.publisher,
+         licence = EXCLUDED.licence,
+         last_modified = EXCLUDED.last_modified`,
       row,
     );
   }
@@ -160,6 +210,29 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
   );
   count('extent', 1);
 
+  /*
+    Greater Melbourne, which the flood board covers and no pilot extent does.
+
+    **The loader inserts what the loader references.** Migration 002 creates
+    this row too, because it has to exist before the envelope's `extent_id` can
+    be made NOT NULL on a database that already has data in it. But a migration
+    inserting a row the loader depends on is a dependency nobody can see from
+    here, and it broke exactly that way: `api.test.ts` drops the schema and
+    re-migrates, and any path that reaches `load` without 002's INSERT surviving
+    fails on a foreign key three hundred lines later.
+
+    Its bounds are the published ASGS extremes of the Greater Melbourne GCCSA
+    in degrees, not local metres, and the CRS column says which -- the flood
+    board never asks for a position, so nothing reads them; they are here so
+    the row is not four zeroes pretending to be an extent.
+  */
+  await client.query(
+    `INSERT INTO extent (id, min_e, min_n, width_m, height_m, crs)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id) DO NOTHING`,
+    [FLOOD_EXTENT, 144.5938, -38.5033, 1.1097, 1.103, 'EPSG:4326'],
+  );
+
   // --- The envelope each artefact carries around its data --------------------
 
   // Everything but the bulk arrays. The guards in the frontend check these
@@ -179,8 +252,10 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
       `INSERT INTO artefact_envelope (name, extent_id, version, envelope) VALUES ($1, $2, $3, $4)`,
       [
         name,
-        // The flood history is Greater Melbourne, not the pilot extent.
-        name === 'flood-history' ? null : EXTENT,
+        // The flood history is Greater Melbourne, which is an extent row of
+        // its own since migration 002 -- it was NULL here, which is honest and
+        // cannot be part of a primary key.
+        name === 'flood-history' ? FLOOD_EXTENT : EXTENT,
         need(artefact.version as number | undefined, `a version on ${name}`),
         JSON.stringify(envelope),
       ],
@@ -228,7 +303,15 @@ export async function load(client: pg.ClientBase): Promise<Record<string, number
       `INSERT INTO pipe (ref, extent_id, upstr_pit, dnstr_pit, diameter_mm, material, path, dataset_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        need(pipe.ref as number | undefined, 'a ref on a pipe'),
+        /*
+          Nullable since migration 003, and not because the guard was
+          inconvenient. 85 of the council's 17,242 pipes carry no reference
+          number, no upstream pit and no downstream pit -- geometry the council
+          recorded and identified with nothing. `need` was right to refuse
+          them against a schema that made `ref` the primary key; the schema was
+          what had to change.
+        */
+        (pipe.ref as number | undefined) ?? null,
         EXTENT,
         pipe.upstr_pit ?? null,
         pipe.dnstr_pit ?? null,

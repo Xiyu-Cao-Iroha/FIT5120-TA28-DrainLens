@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
     from pathlib import Path
 
-    from .geo import DEMONSTRATION_EXTENT
+    from .geo import EXTENTS, resolve_extent
 
     parser = argparse.ArgumentParser(
         prog="python -m drainlens_pipeline.network",
@@ -292,13 +292,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("../data/map/map.json"))
     parser.add_argument(
         "--extent",
+        choices=sorted(EXTENTS),
+        help="a published extent; defaults to the Iteration 1 demonstration extent",
+    )
+    parser.add_argument(
+        "--bounds",
         nargs=4,
         type=float,
         metavar=("MIN_E", "MIN_N", "MAX_E", "MAX_N"),
-        help="MGA55 bounds; defaults to the Iteration 1 demonstration extent",
+        help="raw MGA55 bounds, for a one-off that is not published under a name",
     )
     args = parser.parse_args(argv)
-    extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
+    extent = resolve_extent(args.extent, args.bounds)
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)

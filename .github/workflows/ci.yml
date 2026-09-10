@@ -46,6 +46,19 @@ jobs:
       - name: Check the documentation and the source encoding
         run: node tools/docs/check.mjs
 
+      # The guide tells every visitor to press a drainage pit and follow the
+      # water from it, which only works where the council's record carries an
+      # inlet with a path onward. Whether one exists near a given address is a
+      # fact about the *artefact*, and a new release of map.json or trace.json
+      # can take it away without a single test failing.
+      #
+      # It is a script rather than a test for the same reason the check above
+      # is: it is a claim about published data. It is also four and a half
+      # seconds over 4,089 addresses in a suite the runner already times at six
+      # against a five-second gate, and it runs here in a sixth of a second.
+      - name: Check the guide against the published artefacts
+        run: node tools/data/check-guide.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage

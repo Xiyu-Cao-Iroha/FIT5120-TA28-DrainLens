@@ -22,6 +22,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { load } from '../src/load.js';
+import { migrate } from '../src/migrate.js';
 import { createApp } from '../src/server.js';
 
 import { assertUsable } from '../../web/src/map/artefact.js';
@@ -53,7 +54,15 @@ beforeAll(async () => {
   const client = await pool.connect();
   try {
     await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await client.query(await readFile(path.join(ROOT, 'db/migrations/001_init.sql'), 'utf8'));
+    /*
+      Through the runner, not by reading one file.
+
+      This used to apply `001_init.sql` directly, which was the same thing
+      while there was one migration and stopped being it the moment there were
+      three: every assertion below would have run against a schema two
+      migrations behind the one that ships, and passed.
+    */
+    await migrate(client);
     await client.query('BEGIN');
     await load(client);
     await client.query('COMMIT');
