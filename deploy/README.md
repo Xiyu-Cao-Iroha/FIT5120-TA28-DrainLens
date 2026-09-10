@@ -153,6 +153,24 @@ does not appear below** — that is the point of the day.
 > serving the archive's build would look exactly like a working dev URL on any
 > screen nobody had changed yet.
 
+### 11 September, later: dev carries the guide and the whole council
+
+The same service, redeployed — this is the "as often as the work needs it" the section above promised, and the first time it has been taken up.
+
+| | `drainlens-dev` |
+|---|---|
+| Revision | `drainlens-dev-00002-fb4`, replacing `-00001-dch` |
+| Built from | `develop` at `8cd079b`, `--source=.` |
+| Expected bundle | `index-BxUcrnih.js` at 361.02 KB, from a local build of `8cd079b` with `VITE_API_BASE` set — against `index-DPyTUEqn.js` at 342.23 KB on the previous revision |
+| Gate | **401**, realm `DrainLens - FIT5120 TA28 prototype` |
+| Carries | The guided tutorial, and a map that is the whole City of Melbourne rather than the Kensington square |
+| API behind it | `drainlens-api-00003-g7k`, holding `city-of-melbourne`: 21,113 pits against the 895 this URL served an hour earlier |
+| Root URL | **not redeployed.** `drainlens` still answers 401 and still serves `iteration-1-frozen` |
+
+> **No environment variables were passed, and that is the check rather than a shortcut.** `gcloud run deploy` inherits what it is not given, but only from a service that already exists — and this image *refuses to start* without `BASIC_AUTH_USER` and `BASIC_AUTH_HASH`. A revision that is serving 401 has therefore proved the inheritance worked; there was no need to handle the hash again, and handling it again is how it got mangled the first time.
+>
+> **19 KB of bundle between the two revisions**, which is the guide, the four cards, the lock notice and the legibility limit. The API's own numbers are the other half of the evidence: the two services were deployed forty minutes apart and the map behind this one went from 895 pits to 21,113 in between.
+
 | Still true of every deployment | |
 |---|---|
 | Bundle | Changes with every build. Compare it, do not assume it. |
