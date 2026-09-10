@@ -36,6 +36,7 @@ import {
   resolve,
   search,
 } from '../address/search.js';
+import { demonstrationAddress } from '../address/demonstration.js';
 import { FixtureNotice, PilotBadge } from '../ui/Shell.js';
 import {
   advisory,
@@ -128,7 +129,7 @@ export function Landing({ index, fixtureNote, onFound, onUnsupported }: LandingP
     [index, typed],
   );
 
-  const demonstration = index.addresses[0];
+  const demonstration = demonstrationAddress(index);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -441,7 +442,7 @@ function UnsupportedNotice({
   readonly problem: NonNullable<Problem>;
   readonly index: AddressIndex;
 }) {
-  const demonstration = index.addresses[0];
+  const demonstration = demonstrationAddress(index);
   return (
     <div
       role="alert"

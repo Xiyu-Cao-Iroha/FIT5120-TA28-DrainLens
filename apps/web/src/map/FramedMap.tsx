@@ -75,7 +75,7 @@ export function FramedMap() {
           <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
         </svg>
         <span style={{ font: type(text.small), color: ink.subtle }}>
-          32 Altona Street, Kensington
+          46 Gatehouse Drive, Kensington
         </span>
         <span
           style={{
