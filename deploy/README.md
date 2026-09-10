@@ -126,6 +126,33 @@ Eight changes, all in `apps/web`: the six items on the team's own review list, t
 
 > **The revision id for the earlier deployment on this day was not captured**, which is why that row has none. `gcloud run revisions list --service=drainlens --region=australia-southeast1` still holds it; it is recorded here as missing rather than filled in from a guess about the numbering.
 
+### 11 September: two more services, and the root untouched
+
+The three-URL scheme stopped being a plan. **`drainlens` was not redeployed and
+does not appear below** — that is the point of the day.
+
+| | `drainlens-iteration1` | `drainlens-dev` |
+|---|---|---|
+| Revision | `drainlens-iteration1-00001-r8w` | `drainlens-dev-00001-dch` |
+| Built from | **image digest `sha256:93c4277b…`** — the one `drainlens-00015-lxc` runs | `develop` at `e5e0f01`, `--source=.` |
+| Build line | none, and that is correct: it did not build | `Building using Dockerfile` |
+| Expected bundle | `index-DFGygy6v.js` — guaranteed, not checked: same digest | `index-DPyTUEqn.js`, from a local build of `e5e0f01` with `VITE_API_BASE` set |
+| Gate | **401**, realm `DrainLens - FIT5120 TA28 prototype` | **401**, same realm |
+| Holds | Iteration 1, permanently | Iteration 2, redeployed as the work needs it |
+
+> **Before: a bare 404 with no `server: nginx` and no `www-authenticate`.
+> After: 401 on both.** That is the whole verification and it is worth naming,
+> because "the service exists" was the one thing this scheme had been asserting
+> without evidence for three days. Neither service existed when the tables that
+> described them were written.
+>
+> **The dev bundle differs from the archive's by 0.68 KB**, which is the three
+> map fixes and nothing else: `index-DFGygy6v.js` at 341.55 KB against
+> `index-DPyTUEqn.js` at 342.23 KB. Two different hashes is the evidence the
+> dev service built the new code rather than the same code twice — a dev URL
+> serving the archive's build would look exactly like a working dev URL on any
+> screen nobody had changed yet.
+
 | Still true of every deployment | |
 |---|---|
 | Bundle | Changes with every build. Compare it, do not assume it. |
@@ -452,29 +479,54 @@ service deployed once is machinery that has to be worth something.
 > database is stopped.
 
 No iteration *branch* is needed. The studio says to create one only when the
-hosting platform requires a branch to deploy from; `gcloud run deploy --source`
-takes whatever is checked out, so a tag is enough.
+hosting platform requires a branch to deploy from, and nothing here does.
 
-```bash
-git checkout iteration-1-frozen
-gcloud run deploy drainlens-iteration1 --project=fit5120-504507 --source=. \
-  --region=australia-southeast1 --allow-unauthenticated --port=8080 \
-  --memory=512Mi --max-instances=1 \
+**Deploy the archive from the image the root is already running, not from
+source.** This is a change from what this file said before it was done, and the
+reason is that it removes the check it used to prescribe rather than passing
+it. A rebuild is a second build that *should* produce the same thing; the
+digest **is** the thing.
+
+```powershell
+gcloud run deploy drainlens-iteration1 --project=fit5120-504507 `
+  --image=australia-southeast1-docker.pkg.dev/fit5120-504507/cloud-run-source-deploy/drainlens@sha256:93c4277b1ffd69cd5985d0663be079c3cd7c8c7ebfb509a6d478587c15e0e1c2 `
+  --region=australia-southeast1 --allow-unauthenticated --port=8080 `
+  --memory=512Mi --max-instances=1 `
   --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
-git checkout main
 ```
 
-> **Two things to read from the build output, in this order.** The first line
-> must say `Building using Dockerfile` -- `--source=.` falls back to Buildpacks
-> without erroring, and this repository has already shipped that failure once.
-> Then check the served bundle is `index-DFGygy6v.js`: the frozen service is
-> only frozen if it built the tag's code, and a container that quietly built
-> something else looks identical from the outside.
+| | Rebuild from the tag | Point at the digest |
+|---|---|---|
+| What you get | a build that should match | **byte for byte what is running** |
+| Depends on | a clean working tree, the branch not moving mid-upload, Cloud Build not falling back to Buildpacks | nothing |
+| Takes | minutes | seconds |
+| Needs a checkout | yes | **no** |
+
+> **The warning this replaces was "a container that quietly built something
+> else looks identical from the outside".** That is true, and the answer turned
+> out not to be a better check -- it was not building. The digest comes from
+> `gcloud run services describe drainlens`, under the running container's
+> `image:`, and it is the image revision `drainlens-00015-lxc` serves.
 >
-> Single quotes around `--set-env-vars` are not optional on PowerShell. A comma
-> makes an array there, which is rejoined with spaces, so the variables arrive
-> as a value nobody typed. That is recorded in full in
-> [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md); it bit a `--database-flags` first.
+> The tag `iteration-1-frozen` is not made redundant by this. It preserves the
+> *source*; the digest preserves the *artefact*, and the two are checked
+> against each other by building the tag with `VITE_API_BASE` set and comparing
+> the bundle hash -- which is how `index-DFGygy6v.js` was confirmed on
+> 8 September. Source without an artefact is a build you hope reproduces;
+> an artefact without source is a binary nobody can read.
+
+> **Single quotes around `--set-env-vars` are not optional on PowerShell**, for
+> two separate reasons and both have bitten. A comma makes an array, which is
+> rejoined with spaces -- recorded in [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md),
+> where it hit `--database-flags` first. And an apr1 hash is full of `$`, so
+> double quotes expand `$apr1`, `$uJ7o8kGu` and the rest into nothing: the
+> value arrives short, wrong, and *not empty*, so the fail-closed guard passes
+> it and the site is locked against everybody who has the password.
+>
+> The trailing `/` many apr1 hashes end with is part of the hash. A first
+> attempt at the command above lost the closing quote and PowerShell sat
+> waiting at `>>` for the rest of a string -- which is the harmless failure of
+> the two, because it does not run.
 
 > `--allow-unauthenticated` stays on all of them. It governs Cloud Run's own
 > IAM, which is a different gate from the one in nginx: leaving it off would
