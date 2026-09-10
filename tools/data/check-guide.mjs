@@ -144,10 +144,140 @@ if (unreachable > 0) {
   );
 }
 
+/*
+ * The address the product offers when somebody has not got one of their own.
+ *
+ * It used to be `index.addresses[0]` — whichever sorted first, which was 32
+ * Altona Street, fifteen metres from two boundaries of a one-kilometre square.
+ * The map cannot centre an address already in the corner, so the guide's
+ * teaching pit landed under the zoom buttons and the step *press the pit
+ * marked on the map* pointed at something with a control on top of it.
+ *
+ * `apps/web/src/address/demonstration.ts` names one instead, and falls back to
+ * the first if it is gone. **This is what stops the fallback being silent**:
+ * a rebuilt index that drops this address, or moves it, fails here rather
+ * than quietly going back to offering whatever sorts first.
+ */
+const DEMONSTRATION = '46 Gatehouse Drive, Kensington';
+
+/**
+ * How far the offered address must sit from the nearest boundary.
+ *
+ * The guide opens 300 m across, so half of that is what it takes for the view
+ * to centre rather than clamp. 46 Gatehouse Drive has 307 m.
+ */
+const DEMONSTRATION_MARGIN_M = 150;
+
+/*
+ * Compared on the label the *browser* rebuilds, not the one this script
+ * flattens to. `addresses` above joins the group key straight on, so its
+ * labels read "46 Gatehouse Drive|Kensington" — and comparing those against
+ * the product's "46 Gatehouse Drive, Kensington" matches nothing, which this
+ * check reported as the address being missing from the index. A check that
+ * fails for its own reasons is worse than no check: the message named a real
+ * failure that was not happening.
+ */
+const asProductLabel = (label) => label.replace('|', ', ').toLowerCase();
+const offered = addresses.find((a) => asProductLabel(a.label) === DEMONSTRATION.toLowerCase());
+if (offered === undefined) {
+  note(
+    `${DEMONSTRATION} is not in the published index, so the address the product offers ` +
+      `has silently gone back to whichever one sorts first. Pick another and name it in ` +
+      `apps/web/src/address/demonstration.ts.`,
+  );
+} else {
+  const margin = Math.min(
+    offered.e,
+    offered.n,
+    index.extent.width_m - offered.e,
+    index.extent.height_m - offered.n,
+  );
+  if (margin < DEMONSTRATION_MARGIN_M) {
+    note(
+      `${DEMONSTRATION} is ${margin.toFixed(1)} m from the edge of the extent, under the ` +
+        `${String(DEMONSTRATION_MARGIN_M)} m the guide needs to centre on it. Its teaching pit ` +
+        `will be drawn against the frame, where the map keeps its controls.`,
+    );
+  }
+  let nearest = Infinity;
+  for (const pit of candidates) {
+    const d = Math.hypot(offered.e - pit.c[0], offered.n - pit.c[1]);
+    if (d < nearest) nearest = d;
+  }
+  if (nearest > RADIUS_M) {
+    note(`${DEMONSTRATION} has no teachable pit within ${String(RADIUS_M)} m`);
+  }
+}
+
+/*
+ * And the same promise on the map the API serves, which is a different map.
+ *
+ * **The address index is the one artefact that never comes from the API**, so
+ * it always arrives in the pilot extent's frame while the map underneath may
+ * be the council's — whose corner is 1.5 km west and 6 km south of
+ * Kensington's. It went out that way: every pin 1.5 km and 6 km from the house
+ * somebody typed, on a real street, inside the extent, looking like a map.
+ * `unpack` now shifts the index into whichever map was served, and this is the
+ * check that the shift lands the addresses where the guide can still work.
+ *
+ * Restated arithmetic again, and deliberately: this script exists to ask
+ * questions of the artefacts that the application's own code cannot be trusted
+ * to ask about itself.
+ */
+const council = JSON.parse(
+  await readFile(path.resolve(HERE, '../../apps/api/data/city-of-melbourne/map.json'), 'utf8'),
+);
+
+const east = index.extent.min_e - council.extent.min_e;
+const north = index.extent.min_n - council.extent.min_n;
+if (
+  east < 0 ||
+  north < 0 ||
+  east + index.extent.width_m > council.extent.width_m ||
+  north + index.extent.height_m > council.extent.height_m
+) {
+  note(
+    `the address index does not sit inside ${String(council.extent.name)}: ` +
+      `${String(index.extent.width_m)}x${String(index.extent.height_m)} m at ` +
+      `(${String(east)}, ${String(north)}). Every address would be drawn outside the map.`,
+  );
+}
+
+const councilCandidates = (council.layers?.pit ?? []).filter(
+  (pit) =>
+    pit.asset_number !== undefined &&
+    INLET.test(String(pit.object_type_lupvalue ?? '').toLowerCase()),
+);
+
+let councilFurthest = 0;
+let councilFurthestLabel = '';
+for (const address of addresses) {
+  const e = address.e + east;
+  const n = address.n + north;
+  let nearest = Infinity;
+  for (const pit of councilCandidates) {
+    const d = Math.hypot(e - pit.c[0], n - pit.c[1]);
+    if (d < nearest) nearest = d;
+  }
+  if (nearest > councilFurthest) {
+    councilFurthest = nearest;
+    councilFurthestLabel = address.label;
+  }
+}
+
+if (councilFurthest > RADIUS_M) {
+  note(
+    `shifted into ${String(council.extent.name)}, ${councilFurthestLabel} is ` +
+      `${councilFurthest.toFixed(1)} m from the nearest inlet, past the ${String(RADIUS_M)} m the ` +
+      `guide allows. If this is a few hundred metres out, the shift is wrong rather than the data.`,
+  );
+}
+
 const summary =
   `${String(addresses.length)} addresses, ${String(pits.length)} pits, ` +
   `${String(candidates.length)} of them a recorded inlet that leads somewhere. ` +
-  `Furthest any address sits from one: ${furthest.toFixed(1)} m of ${String(RADIUS_M)} m allowed.`;
+  `Furthest any address sits from one: ${furthest.toFixed(1)} m of ${String(RADIUS_M)} m allowed. ` +
+  `Shifted into the council frame, furthest is ${councilFurthest.toFixed(1)} m.`;
 
 if (problems.length > 0) {
   console.error(summary);

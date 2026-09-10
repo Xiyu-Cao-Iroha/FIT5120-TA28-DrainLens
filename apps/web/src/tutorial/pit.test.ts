@@ -114,12 +114,17 @@ describe('against the published artefacts', () => {
       readFileSync(path.resolve(__dirname, '../../public/data', name), 'utf8'),
     ) as unknown;
 
-  const map = read('map.json') as { layers: { pit: readonly Pit[] } };
+  const map = read('map.json') as {
+    extent: { min_e: number; min_n: number; width_m: number; height_m: number };
+    layers: { pit: readonly Pit[] };
+  };
   const trace = read('trace.json') as TraceArtefact;
-  // Unpacked the way the browser unpacks it. The index ships grouped by
-  // street with the label left out, and a test reading the raw file would be
-  // testing a shape nothing else in the product sees.
-  const index = unpack(read('addresses.json') as PackedIndex);
+  // Unpacked the way the browser unpacks it: grouped by street with the label
+  // left out, and into the frame of the map it is about to be compared
+  // against. A test reading the raw file would be testing a shape nothing else
+  // in the product sees -- and passing a frame other than this map's is the
+  // defect `search.test.ts` pins, so here it is `map.extent` by construction.
+  const index = unpack(read('addresses.json') as PackedIndex, map.extent);
 
   /*
     A smoke test, not the invariant. The claim that *every* one of the 4,089

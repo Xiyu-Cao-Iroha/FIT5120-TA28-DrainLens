@@ -140,8 +140,15 @@ async function load(): Promise<Loaded> {
   // Unpacked once, here, rather than on every keystroke. The shipped shape
   // groups addresses by street and leaves out what it can rebuild; `unpack`
   // refuses an index whose groups do not line up rather than repairing it.
+  //
+  // **Into the frame of the map that was actually served.** The index is the
+  // one artefact that never comes from the API, so it always arrives in the
+  // pilot extent's frame -- and when the API answers, the map under it is the
+  // council's, whose corner is 1.5 km west and 6 km south of Kensington's.
+  // Every pin was landing there: on a real street, inside the extent, looking
+  // like a map. `unpack` refuses if the index does not fit inside the map.
   const packed = addresses as PackedIndex & { fixture?: string };
-  const index = unpack(packed);
+  const index = unpack(packed, map.extent);
 
   return {
     map,
