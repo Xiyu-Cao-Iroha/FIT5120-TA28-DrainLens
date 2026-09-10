@@ -91,6 +91,8 @@ The fix for filters is not more quoting. It is **filters with no spaces and no q
 
 This is the same family as *Quote the hash with single quotes* in [`deploy/README.md`](README.md), where double quotes reduced an apr1 hash to a single character and nginx accepted it. In all three cases the shell edited the value and nothing downstream could tell.
 
+**It happened a fourth time on 11 September, to this page's own rule.** The council migration's `--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace` went out unquoted on the reasoning that a token with no spaces is safe. It is not; the comma is enough on its own. gcloud stored one argument and the container went looking for a module named `migrate.js --extent city-of-melbourne --replace`. **The job deployed successfully** — that is what makes this one worth writing down twice: a mangled `--args` is not a deployment error, it is a container that starts, fails, and reports exit code 1 with nothing about quoting anywhere in the message.
+
 ---
 
 ## The order, and why it is this order
@@ -326,10 +328,34 @@ Build the image at the commit being deployed — on `develop` for Iteration 2, n
 gcloud builds submit --config=deploy/api/cloudbuild.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
 ```
 
-Point the job at the council. `--args` is comma-delimited and the whole flag is one token with no spaces, which is what keeps PowerShell out of it:
+Point the job at the council. **`--args` is comma-delimited, so the whole flag goes in single quotes** — this is *Wrap any argument containing a comma in single quotes* from the PowerShell section above, and skipping it is the third time this project has shipped that mistake:
 
 ```bash
-gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node --args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=1Gi --task-timeout=30m --max-retries=0
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=1Gi --task-timeout=30m --max-retries=0
+```
+
+> **This paragraph said the opposite for one deployment**, and the deployment failed on it: *"`--args` is comma-delimited and the whole flag is one token with no spaces, which is what keeps PowerShell out of it."* Having no spaces is not what keeps PowerShell out — the comma is enough. It split the value into four elements and rejoined them with spaces, gcloud stored **one** argument, and the container went looking for a module called `migrate.js --extent city-of-melbourne --replace`:
+>
+> ```
+> Error: Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'
+> ```
+>
+> The rule was already written twenty lines up this page, next to `--database-flags=a=off,b=off,c=none`, which is the same shape and failed the same way on 5 September. It was reasoned past rather than applied.
+
+**Check the arguments before executing**, because the job deploys successfully either way — a mangled `--args` is not a deploy error, it is a container that starts and exits 1:
+
+```bash
+gcloud run jobs describe drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --format=yaml
+```
+
+Four elements under `args:`, not one:
+
+```yaml
+          - args:
+            - apps/api/dist/migrate.js
+            - --extent
+            - city-of-melbourne
+            - --replace
 ```
 
 **`--memory=1Gi` and `--task-timeout=30m`, both raised.** The council map is 6.7 MB of JSON parsed into memory, and the load is 46,000 single-row inserts in one transaction; locally it takes just under a minute against a database on the same machine, and the 10-minute timeout that was ample for 895 pits is not a margin worth relying on over a socket.
@@ -371,7 +397,7 @@ gcloud run deploy drainlens-api --image=australia-southeast1-docker.pkg.dev/fit5
 The same command with the extent swapped. It needs `--replace` in that direction too, for the same reason:
 
 ```bash
-gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node --args=apps/api/dist/migrate.js,--extent,kensington,--replace --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,kensington,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
 ```
 
 ### Verifying it
@@ -409,6 +435,7 @@ Nothing about the frontend deployment. The site asks the API for `city-of-melbou
 |---|---|
 | `permission denied for schema public` in the job log | Postgres 15 removed the implicit `CREATE` grant on `public`. Connect as the `postgres` user and `GRANT ALL ON SCHEMA public TO drainlens;`, then re-run the job |
 | The job succeeds, `/health` answers 404 | The service is on a revision that started before the job ran, or against a different database. `/health` refuses to report ok on an empty database on purpose — a 200 over no rows is a service that looks healthy and serves an empty map |
+| `Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'` | PowerShell split `--args` on its commas and rejoined them with spaces, so gcloud stored one argument instead of four. Single-quote the whole `--args=` flag and re-deploy the job; the image is fine and does not need rebuilding |
 | `LoadError: the database holds kensington, which overlaps city-of-melbourne` | The instance already holds the other extent. Re-run the job with `--replace` — the migrations it applied first are recorded, so the second run picks up at the load |
 | `duplicate key value violates unique constraint "pit_pkey"` | An image built before `--replace` existed. Rebuild at a commit that has it rather than deleting rows by hand |
 | `ENOENT ... /app/apps/api/data/city-of-melbourne/map.json` | The image predates the committed council artefacts, or was built from a context that excluded them. `/data` is dockerignored and `apps/api/data` deliberately is not |
