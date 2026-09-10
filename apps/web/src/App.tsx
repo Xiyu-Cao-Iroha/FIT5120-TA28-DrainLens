@@ -16,7 +16,10 @@ import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
+import { Guide } from './screens/Guide.js';
 import { Home } from './screens/Home.js';
+import { SECTIONS } from './tutorial/sections.js';
+import { progress } from './tutorial/progress.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
@@ -119,7 +122,23 @@ async function load(): Promise<Loaded> {
 }
 
 export function App() {
-  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
+  /*
+    Seeded from the device, then mirrored back to it.
+
+    The session is the authoritative copy and `progress` is a mirror, which is
+    the only arrangement where a browser that refuses to store anything still
+    lets somebody finish the guide -- they just start again next time. Reading
+    it here rather than inside the reducer keeps `session.ts`'s rule intact:
+    nothing in that file touches storage of any kind, and a test enforces it by
+    running a whole session against traps rather than by reading the source.
+  */
+  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION, (initial) => ({
+    ...initial,
+    learned: progress.read(),
+  }));
+  useEffect(() => {
+    progress.write(session.learned);
+  }, [session.learned]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Only the two comparison screens use it, and neither is reachable in the
@@ -217,6 +236,23 @@ export function App() {
           <Home
             history={loaded.history}
             onOpenMap={(mode) => {
+              /*
+                The drainage card starts the guide rather than opening the map,
+                once and for that card only.
+
+                The other three still open the map, and that asymmetry is
+                deliberate rather than half-finished: their sections are not
+                written yet, and a card that led to a guide with no steps in it
+                would be worse than one that leads where it always has. Each
+                joins as its section lands.
+
+                A section already finished goes straight to the map, because
+                the guide is a way in and not a toll.
+              */
+              if (mode === 'drainage' && !session.learned.drainage) {
+                dispatch({ type: 'guide-chosen', section: 'drainage' });
+                return;
+              }
               dispatch({ type: 'map-opened', from: 'home', ...(mode ? { mode } : {}) });
             }}
             onOpenHistory={() => {
@@ -272,6 +308,57 @@ export function App() {
             }
             onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
           />
+        </Shell>
+      );
+
+    case 'guide':
+      return (
+        <Shell
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          masthead={false}
+          back={{
+            label: 'Address',
+            onBack: () => {
+              dispatch({ type: 'back' });
+            },
+          }}
+          crumbs={crumb(SECTIONS[session.guideSection ?? 'drainage'].label, undefined, true)}
+          trailing={
+            // The way out of the guide, which is a different thing from the
+            // way back one step. Asked for by name: somebody three steps in
+            // who wants out should not have to press Back three times.
+            <button
+              type="button"
+              onClick={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              style={{
+                border: `1px solid ${line.base}`,
+                borderRadius: radius.base,
+                background: surface.raised,
+                color: ink.base,
+                padding: `${String(space(2))}px ${String(space(3))}px`,
+                font: type(text.label, { weight: weight.medium }),
+                cursor: 'pointer',
+              }}
+            >
+              Home
+            </button>
+          }
+        >
+          {session.address === null ? null : (
+            <Guide
+              map={loaded.map}
+              derived={loaded.derived}
+              trace={loaded.trace}
+              index={loaded.index}
+              address={session.address}
+              onFinish={() => {
+                dispatch({ type: 'guide-finished' });
+              }}
+            />
+          )}
         </Shell>
       );
 

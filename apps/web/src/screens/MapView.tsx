@@ -41,6 +41,7 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
+import type { MapNow } from '../tutorial/drainage.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
 import { loadTerrain, rasterise } from '../map/terrain.js';
@@ -103,6 +104,43 @@ export interface MapViewProps {
    * a button that does nothing, which is worse than no button.
    */
   readonly onClearAddress?: (() => void) | undefined;
+  /**
+   * Which chips to offer, and whether the Layers button is there.
+   *
+   * The guide narrows both. Its first instruction is *press Pits*, and a row
+   * of four chips turns that into a search.
+   */
+  readonly chipKeys?: readonly LayerKey[] | undefined;
+  readonly layersButton?: boolean | undefined;
+  /**
+   * What is on when the map opens, overriding the mode and the task.
+   *
+   * **The guide needs this and found out the hard way.** It opened with
+   * `task="follow"`, which is the guided preset — pits, pipes, water flow and
+   * the ground all on — so its first two instructions were already satisfied
+   * and it began at step 3 of 6, beside a map drawing a layer whose chip it
+   * had deliberately hidden. A guide whose first words are *press Pits* has to
+   * open on a map with no pits on it, and that is a fact about the guide
+   * rather than about any task, so it is said here rather than inferred.
+   */
+  readonly openWith?: LayerState | undefined;
+  /**
+   * A pit to ring without selecting — the guide's *press this one*.
+   *
+   * `MapCanvas` already draws this as `suggestedPit`, "offered but not
+   * confirmed, drawn as a ring rather than a fill", which is exactly what the
+   * guide is doing: pointing, not choosing on the reader's behalf.
+   */
+  readonly highlightPit?: number | null | undefined;
+  /**
+   * What the map is showing, whenever it changes.
+   *
+   * **Reported, not lifted**, for the same reason the viewport is: the map
+   * owns its layers and its selection, and the guide reads them to work out
+   * which step it is on. A guide that *set* them could walk itself through
+   * its own instructions, which is a guide that teaches nothing.
+   */
+  readonly onMapNow?: ((now: MapNow) => void) | undefined;
 }
 
 export function MapView({
@@ -116,12 +154,17 @@ export function MapView({
   index,
   onAddress,
   onClearAddress,
+  chipKeys,
+  layersButton = true,
+  openWith,
+  highlightPit = null,
+  onMapNow,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
   // not an instruction, and nobody asked to be walked through anything.
   const guided = task !== 'full-map';
-  const [layers, setLayers] = useState<LayerState>(() => openingState(mode, guided));
+  const [layers, setLayers] = useState<LayerState>(() => openWith ?? openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
   /**
    * The pit's card is folded away, and the pit is still selected.
@@ -223,6 +266,26 @@ export function MapView({
   // never there, and this one is named by AC 1.1.4.
   const notYet: LayerKey[] = terrain === null ? ['terrain'] : [];
 
+  /*
+    Reported on every change, and only on a change.
+
+    The dependency list is the four facts rather than the objects holding them,
+    so a pan does not tell the guide anything: `hit` is a new object every
+    press and `layers` a new object every toggle, and reporting on either would
+    re-run the guide's step arithmetic on movements that cannot affect it.
+  */
+  const pitsOn = layers.pit;
+  const pipesOn = layers.pipe;
+  const selectedId = selected === null ? null : String(selected);
+  useEffect(() => {
+    onMapNow?.({
+      pits: pitsOn,
+      pipes: pipesOn,
+      selectedPit: selectedId,
+      followingPit: following,
+    });
+  }, [pitsOn, pipesOn, selectedId, following, onMapNow]);
+
   return (
     <>
       <MapCanvas
@@ -230,6 +293,9 @@ export function MapView({
         derived={derived}
         show={visibilityOf(layers)}
         selectedPit={selected}
+        // Only while the pits are drawn. A ring around a pit on a map with no
+        // pits on it is a mark with nothing under it.
+        suggestedPit={layers.pit ? highlightPit : null}
         terrain={layers.terrain ? terrain : null}
         showPits={layers.pit}
         showPipes={layers.pipe}
@@ -281,7 +347,13 @@ export function MapView({
                 onClear={onClearAddress}
               />
             )}
-            <LayerChips state={layers} onToggle={toggle} unavailableKeys={notYet} />
+            <LayerChips
+              state={layers}
+              onToggle={toggle}
+              unavailableKeys={notYet}
+              layersButton={layersButton}
+              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
+            />
           </div>
 
           {/*

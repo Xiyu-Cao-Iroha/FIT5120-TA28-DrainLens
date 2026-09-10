@@ -204,6 +204,18 @@ export interface LayerChipsProps {
   readonly onToggle: (key: LayerKey) => void;
   /** Keys that cannot be turned on yet — the terrain raster is still loading. */
   readonly unavailableKeys?: readonly LayerKey[];
+  /**
+   * Which chips to draw. All four unless the guide says otherwise.
+   *
+   * The guide shows the two the section is about and no more. That is not
+   * tidiness: its first instruction is *press Pits*, and a row of four chips
+   * makes that a search rather than a press. The layers left out are not
+   * disabled — a disabled control is still a control somebody reads and
+   * wonders about — they are the ones this section has not reached yet.
+   */
+  readonly keys?: readonly LayerKey[];
+  /** The Layers button. Off inside the guide, which has nothing behind it yet. */
+  readonly layersButton?: boolean;
 }
 
 /**
@@ -213,7 +225,13 @@ export interface LayerChipsProps {
  * panel are one decision seen at two depths, and a person looking for a layer
  * that is not a chip should find the place it lives without hunting.
  */
-export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChipsProps) {
+export function LayerChips({
+  state,
+  onToggle,
+  unavailableKeys = [],
+  keys = CHIP_KEYS,
+  layersButton = true,
+}: LayerChipsProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -223,7 +241,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
       data-tour="chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
-      {CHIP_KEYS.map((key) => {
+      {keys.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
         return (
@@ -242,6 +260,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
         );
       })}
 
+      {layersButton && (
       <div style={{ position: 'relative' }}>
         <button
           type="button"
@@ -336,6 +355,7 @@ export function LayerChips({ state, onToggle, unavailableKeys = [] }: LayerChips
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
