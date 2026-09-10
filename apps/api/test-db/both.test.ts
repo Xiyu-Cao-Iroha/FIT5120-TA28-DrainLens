@@ -21,57 +21,32 @@
  * from. Neither copy ever needs the other's extent.
  */
 
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { migrate } from '../src/migrate.js';
-import { BUNDLED, load } from '../src/load.js';
+import { BUNDLED, COUNCIL, load } from '../src/load.js';
 import { derivedArtefact, mapArtefact, traceArtefact } from '../src/queries.js';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * The council extent, built into the pipeline's working directory.
+/*
+ * **These tests used to skip, and no longer can.**
  *
- * Not committed: 6.7 MB of map and 693 KB of trace against a repository that
- * commits its artefacts so the frontend runs from a clone. `data/` is ignored
- * for exactly this, and these tests skip when it is not there.
+ * The council artefacts were built into `/data`, which is git-ignored, so this
+ * file guarded itself with `describe.skipIf(!built)` -- after a first version
+ * that only *said* it skipped and turned the database job red on a pull
+ * request that changed nothing about the database.
+ *
+ * They are committed now, under `apps/api/data/city-of-melbourne`, because
+ * `/data` is dockerignored as well and the migration job cannot load a file
+ * that is not in the image. That removes the reason for the guard: the
+ * artefacts are in every clone, so a missing one is a broken checkout and
+ * should fail here loudly rather than take seven assertions about the council
+ * quietly out of the run.
  */
-const COUNCIL = {
-  dir: path.resolve(HERE, '../../../data/map/council'),
-  extent: 'city-of-melbourne',
-};
-
-/**
- * Whether the council artefacts have been built on this machine.
- *
- * **This file said "these tests skip when it is not there" before anything
- * skipped**, and CI found that out on the first run: `ENOENT`, and a red
- * database job on a pull request that changed nothing about the database.
- * A comment describing behaviour nobody wrote is worse than no comment,
- * because it is read as a reason not to check.
- *
- * They are not committed and should not be: 6.7 MB of map and 693 KB of trace
- * against a repository whose committed artefacts exist so the frontend runs
- * from a clone. Rebuild them with
- *
- *   python -m drainlens_pipeline.network  --extent city-of-melbourne --out ../data/map/council/map.json
- *   python -m drainlens_pipeline.trace    --map ../data/map/council/map.json --out ../data/map/council/trace.json
- *   python -m drainlens_pipeline.reframe  --in ../apps/web/public/data/derived.json \
- *       --from kensington --to city-of-melbourne --out ../data/map/council/derived.json
- *
- * and copy `flood-history.json` in beside them.
- */
-const built = existsSync(path.join(COUNCIL.dir, 'map.json'));
 
 let client: pg.Client;
 
 beforeAll(async () => {
-  if (!built) return;
   client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
@@ -88,7 +63,7 @@ afterAll(async () => {
 const one = async (sql: string, args: unknown[] = []): Promise<string> =>
   (await client.query<{ v: string }>(sql, args)).rows[0]?.v ?? '0';
 
-describe.skipIf(!built)('the council extent in the database', () => {
+describe('the council extent in the database', () => {
   it('holds every pit and pipe the council publishes', async () => {
     expect(Number(await one('SELECT count(*)::text AS v FROM pit'))).toBe(21113);
     expect(Number(await one('SELECT count(*)::text AS v FROM pipe'))).toBe(17242);
@@ -101,6 +76,30 @@ describe.skipIf(!built)('the council extent in the database', () => {
     expect(artefact.layers.pit.length).toBe(21113);
     expect(artefact.extent.width_m).toBe(8500);
     expect(artefact.extent.height_m).toBe(9000);
+  });
+
+  it('leaves a pipe the council identified with nothing without a ref, not with ref 0', async () => {
+    /*
+     * 85 of the council's 17,242 pipes carry no reference number -- geometry
+     * the council recorded and identified with nothing. Migration 003 made
+     * `ref` nullable for them; the API kept mapping it as `Number(r.ref)`, and
+     * `Number(null)` is 0. So the 85 came back carrying **reference number
+     * zero**: not missing, not flagged, indistinguishable from an asset id.
+     *
+     * Every shape check passed. It was found by `verify-api.mjs` comparing the
+     * whole response against the artefact, which is the only reason that
+     * comparison is deep.
+     *
+     * **The council records two pipes whose reference number really is 0**,
+     * which is what made the invented value dangerous rather than merely
+     * wrong: it is a value this dataset uses, so 85 fabrications would have
+     * sat indistinguishably beside 2 records. That is why the assertion is a
+     * count and not `none of them is zero` -- the bug returning reads as 87.
+     */
+    const artefact = await mapArtefact(client, 'city-of-melbourne');
+    const pipes = artefact.layers.pipe as { ref?: number }[];
+    expect(pipes.filter((p) => p.ref === undefined).length).toBe(85);
+    expect(pipes.filter((p) => p.ref === 0).length).toBe(2);
   });
 
   it('has an envelope of its own, keyed by extent', async () => {
@@ -167,11 +166,44 @@ describe.skipIf(!built)('the council extent in the database', () => {
     ).toBe(1);
   });
 
-  it('refuses to hold the pilot extent as well', async () => {
-    // Loudly, on a primary key, rather than by silently storing a second copy
-    // of every shared pit at different coordinates.
+  it('refuses to hold the pilot extent as well, and names it', async () => {
+    /*
+     * It used to refuse on `pit_pkey`, which is the primary key being right
+     * and is an awful thing to read: `duplicate key value violates unique
+     * constraint "pit_pkey"`, at insert 896 of 21,113, three minutes into a
+     * Cloud Run job that had already applied two schema changes. The
+     * constraint still stands behind this; the loader just gets there first
+     * and says which extent is in the way and what the flag is called.
+     */
     await client.query('BEGIN');
-    await expect(load(client, BUNDLED)).rejects.toThrow(/pit_pkey|duplicate key/);
+    await expect(load(client, BUNDLED)).rejects.toThrow(/holds city-of-melbourne/);
+    await expect(load(client, BUNDLED)).rejects.toThrow(/--replace/);
+    await client.query('ROLLBACK');
+  });
+
+  it('swaps one extent for the other when it is asked to, in either direction', async () => {
+    /*
+     * The deployment path, which is not the same as the fresh-database path.
+     * A running instance already holds an extent, so changing which one it
+     * serves is always this operation -- and it failed in *both* directions
+     * before `--replace` existed, because the load deletes the extent it is
+     * loading and leaves the one that is in the way.
+     */
+    await client.query('BEGIN');
+    const toPilot = await load(client, BUNDLED, { replace: true });
+    expect(toPilot['replaced city-of-melbourne']).toBe(1);
+    expect(Number(await one('SELECT count(*)::text AS v FROM pit'))).toBe(895);
+
+    const back = await load(client, COUNCIL, { replace: true });
+    expect(back['replaced kensington']).toBe(1);
+    expect(Number(await one('SELECT count(*)::text AS v FROM pit'))).toBe(21113);
+
+    // Greater Melbourne is not a pilot extent and is never the one replaced:
+    // the flood board is the same board whichever city map is loaded.
+    expect(back['replaced greater-melbourne']).toBeUndefined();
+    expect(
+      await one("SELECT extent_id AS v FROM artefact_envelope WHERE name = 'flood-history'"),
+    ).toBe('greater-melbourne');
     await client.query('ROLLBACK');
   });
 });

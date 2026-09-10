@@ -283,6 +283,113 @@ The instance name is not in the filter because there is one instance in this pro
 
 ---
 
+## Iteration 2: serving the City of Melbourne instead of Kensington
+
+Two extents are published. **The database holds exactly one**, and changing which one is a different operation from the first deployment above — the instance already has rows in it.
+
+### The artefacts are committed, which nothing else in `/data` is
+
+`load.ts` reads files, so the files have to be in the image, and the image is built from this repository. `/data` — where `pipeline/` writes the council build — is in `.dockerignore` as well as `.gitignore`, so an artefact built there is not in the build context at all and cannot be copied out of it. The council's three files are therefore committed under **`apps/api/data/city-of-melbourne/`**, which the Dockerfile copies whole:
+
+| | |
+|---|---|
+| `map.json` | 6.7 MB — 21,113 pits, 17,242 pipes, 4,177 roads, 2,775 labels |
+| `trace.json` | 693 KB |
+| `derived.json` | 210 KB, reframed to the council's origin by `pipeline/reframe.py` |
+| *no `flood-history.json`* | That board is Greater Melbourne's, not any pilot extent's. It is read from the bundled copy whichever extent is being loaded — a second, byte-identical copy in the council directory would be two files that must stay equal with nothing to notice when they stop |
+
+1.3 MB as git objects, paid once per rebuild of the council extent. Everything else under `/data` — including the 4 GB point cloud — stays ignored.
+
+### `--replace`, and why it is not the default
+
+The two extents **overlap**: Kensington is a square kilometre inside the council, and its 895 pits are 895 of the council's 21,113 under the same `asset_number`, which is a global primary key. Loading either one into a database holding the other fails on `pit_pkey` — **in both directions**. The load deletes the extent it is *loading*, so it leaves the one that is in the way; that was measured, not reasoned about, after the reasoning got the direction wrong.
+
+So the loader asks first and refuses in a sentence that names what is in the way:
+
+```
+LoadError: the database holds kensington, which overlaps city-of-melbourne: the same
+assets would be stored twice in two coordinate frames, and the insert would fail on
+pit_pkey. Load with --replace to remove kensington first.
+```
+
+`--replace` is not the default because it deletes rows nobody named, and because the schema was written for a second *pilot area* — two extents that do not overlap should both be able to live here. This one is a containing extent, which is a different relationship. `--replace` is for a deployment that is deliberately changing which extent it serves.
+
+Failing this way is safe: migrations 002 and 003 have already been applied and recorded by the time the load refuses, so re-running with the flag prints `schema already current` and carries on.
+
+### The sequence
+
+Migrations **002** and **003** are new since the first deployment and are applied by the same job. 003 is the one that matters for the council: `pipe.ref` was a primary key because the sample had no duplicates, and council-wide **85 of 17,242 pipes carry no `ref` at all and one `ref` is used twice**.
+
+Build the image at the commit being deployed — on `develop` for Iteration 2, not `main`, which is frozen:
+
+```bash
+gcloud builds submit --config=deploy/api/cloudbuild.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
+```
+
+Point the job at the council. `--args` is comma-delimited and the whole flag is one token with no spaces, which is what keeps PowerShell out of it:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node --args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=1Gi --task-timeout=30m --max-retries=0
+```
+
+**`--memory=1Gi` and `--task-timeout=30m`, both raised.** The council map is 6.7 MB of JSON parsed into memory, and the load is 46,000 single-row inserts in one transaction; locally it takes just under a minute against a database on the same machine, and the 10-minute timeout that was ample for 895 pits is not a margin worth relying on over a socket.
+
+```bash
+gcloud run jobs execute drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --wait
+```
+
+The log to expect, copied from the rehearsal against the local database rather than composed:
+
+```
+  schema                 already current
+  extent                 city-of-melbourne
+  replaced kensington         1
+  source                      8
+  extent                      1
+  artefact_envelope           4
+  pit                     21113
+  pipe                    17242
+  road                     4177
+  street_label             2775
+  derived_shape             394
+  trace_link              12798
+  trace_reason                4
+  flood_area                180
+  flood_area_coverage        30
+```
+
+`replaced kensington` appears only when there was something to replace; a second execution omits it and prints the same table counts.
+
+Then redeploy the service on the same image, so the server and the migration that filled its database were built from one commit:
+
+```bash
+gcloud run deploy drainlens-api --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --port=8080 --memory=512Mi --max-instances=2 --min-instances=0 --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --allow-unauthenticated
+```
+
+### Going back to Kensington
+
+The same command with the extent swapped. It needs `--replace` in that direction too, for the same reason:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node --args=apps/api/dist/migrate.js,--extent,kensington,--replace --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
+```
+
+### Verifying it
+
+`verify-api.mjs` takes the extent as a second argument, because the instance holds one of two and comparing against the wrong one is worse than not comparing at all:
+
+```bash
+node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-southeast1.run.app city-of-melbourne
+```
+
+It compares every response against `apps/api/data/city-of-melbourne` deeply, and the flood board against the bundled copy. **This is the check that found the one real defect in the council load**: `ref` stopped being the pipe primary key in migration 003, `queries.ts` still mapped it as `Number(r.ref)`, and `Number(null)` is `0` — so the 85 council pipes the council identified with nothing came back carrying *reference number zero*. Not missing, not flagged, indistinguishable from an asset id. Every shape-based check passed.
+
+### What changes on the site, and what does not
+
+Nothing about the frontend deployment. The site asks the API for `city-of-melbourne` and falls back to its own bundled `kensington` when the API is unreachable — which is the normal state between demos — and `fetchTogether` takes all three place-artefacts from one side or the other, so the two coordinate frames can never be mixed on one screen.
+
+---
+
 ## What must still be true afterwards
 
 | | |
@@ -302,6 +409,9 @@ The instance name is not in the filter because there is one instance in this pro
 |---|---|
 | `permission denied for schema public` in the job log | Postgres 15 removed the implicit `CREATE` grant on `public`. Connect as the `postgres` user and `GRANT ALL ON SCHEMA public TO drainlens;`, then re-run the job |
 | The job succeeds, `/health` answers 404 | The service is on a revision that started before the job ran, or against a different database. `/health` refuses to report ok on an empty database on purpose — a 200 over no rows is a service that looks healthy and serves an empty map |
+| `LoadError: the database holds kensington, which overlaps city-of-melbourne` | The instance already holds the other extent. Re-run the job with `--replace` — the migrations it applied first are recorded, so the second run picks up at the load |
+| `duplicate key value violates unique constraint "pit_pkey"` | An image built before `--replace` existed. Rebuild at a commit that has it rather than deleting rows by hand |
+| `ENOENT ... /app/apps/api/data/city-of-melbourne/map.json` | The image predates the committed council artefacts, or was built from a context that excluded them. `/data` is dockerignored and `apps/api/data` deliberately is not |
 | `ENOENT ... /app/apps/web/public/data/map.json` | The image was flattened. `load.ts` resolves the artefacts relative to its own file and `migrate.ts` resolves the migrations the same way; the layout under `/app` in `deploy/api/Dockerfile` is load-bearing, and it breaks at run time rather than at build time |
 | The build says `Building using Buildpacks` | Wrong command. This one is `gcloud builds submit --config=deploy/api/cloudbuild.yaml`; `--source=.` cannot see this Dockerfile |
 | Cloud Build cannot push, or cannot write logs | Newer projects build as the compute service account, which may need `roles/artifactregistry.writer` and `roles/logging.logWriter`. The error names the missing permission; grant that one rather than a wider role |

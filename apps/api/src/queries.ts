@@ -74,7 +74,9 @@ export async function mapArtefact(
   if (pits.rowCount === 0) throw new NotFound(`no extent called ${extent}`);
 
   const pipes = await client.query<{
-    ref: string;
+    // Nullable since migration 003. It was `string` here while it was the
+    // primary key, and the type said what the schema said.
+    ref: string | null;
     upstr_pit: string | null;
     dnstr_pit: string | null;
     diameter_mm: number | null;
@@ -116,9 +118,17 @@ export async function mapArtefact(
       pipe: pipes.rows.map((r) => ({
         g: 'line',
         c: r.path,
-        ref: Number(r.ref),
         // Omitted rather than nulled, exactly as the file does it: the
         // frontend reads an absent key as "the council record has none".
+        //
+        // `ref` joined the others on 11 September, and the way it was found is
+        // the argument for the deep comparison in `tools/deploy/verify-api.mjs`.
+        // It stopped being the primary key in migration 003 and this line was
+        // not revisited, so `Number(null)` made **reference number 0** for the
+        // 85 council pipes the council identified with nothing -- a value that
+        // is not missing, is not flagged, and looks exactly like an asset id.
+        // Every check that compares shapes passed.
+        ...(r.ref === null ? {} : { ref: Number(r.ref) }),
         ...(r.upstr_pit === null ? {} : { upstr_pit: Number(r.upstr_pit) }),
         ...(r.dnstr_pit === null ? {} : { dnstr_pit: Number(r.dnstr_pit) }),
         ...(r.diameter_mm === null ? {} : { diameter: r.diameter_mm }),
