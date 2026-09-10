@@ -24,6 +24,7 @@ import type { Pit } from '../map/artefact.js';
 import type { Local } from '../map/viewport.js';
 import { type Link, type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import { surfaceEntryOf } from '../crosssection/section.js';
+import { type PackedIndex, unpack } from '../address/search.js';
 
 const pit = (asset_number: number, c: Local, type = 'Grated Side Entry'): Pit =>
   ({ g: 'point', c, asset_number, object_type_lupvalue: type }) as unknown as Pit;
@@ -115,9 +116,10 @@ describe('against the published artefacts', () => {
 
   const map = read('map.json') as { layers: { pit: readonly Pit[] } };
   const trace = read('trace.json') as TraceArtefact;
-  const index = read('addresses.json') as {
-    addresses: readonly { label: string; e: number; n: number }[];
-  };
+  // Unpacked the way the browser unpacks it. The index ships grouped by
+  // street with the label left out, and a test reading the raw file would be
+  // testing a shape nothing else in the product sees.
+  const index = unpack(read('addresses.json') as PackedIndex);
 
   /*
     A smoke test, not the invariant. The claim that *every* one of the 4,089

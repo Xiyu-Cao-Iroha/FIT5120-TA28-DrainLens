@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type AddressIndex,
+  IndexError,
   type IndexedAddress,
+  type PackedIndex,
   MAX_SUGGESTIONS,
   normalise,
   resolve,
   search,
+  unpack,
 } from './search.js';
 
 const at = (id: string, number: string, street: string, e = 500, n = 500): IndexedAddress => ({
@@ -199,5 +202,75 @@ describe('the search is local', () => {
       globalThis.fetch = original;
     }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('unpacking the shipped index', () => {
+  const packed = {
+    area: 'kensington',
+    streets: ['Gatehouse Drive', 'Harper Street'],
+    on: ['Gatehouse Drive|Kensington', 'Neale Street|Kensington'],
+    at: [
+      [
+        ['46', 320.5, 640.25],
+        ['48', 330, 645],
+      ],
+      [['13', 140, 480]],
+    ],
+  } as const;
+
+  it('rebuilds every address', () => {
+    expect(unpack(packed).addresses).toHaveLength(3);
+  });
+
+  it('rebuilds the label the pipeline used to ship', () => {
+    const [first] = unpack(packed).addresses;
+    expect(first?.label).toBe('46 Gatehouse Drive, Kensington');
+    expect(first?.number).toBe('46');
+    expect(first?.street).toBe('Gatehouse Drive');
+    expect(first?.suburb).toBe('Kensington');
+  });
+
+  it('rebuilds the id the session keys on', () => {
+    // A different id here means a re-entered address reads as a new one, which
+    // silently drops the pit chosen beside the old one.
+    expect(unpack(packed).addresses[0]?.id).toBe('kensington/46-gatehouse-drive-kensington');
+  });
+
+  it('keeps the coordinates untouched', () => {
+    const [first] = unpack(packed).addresses;
+    expect([first?.e, first?.n]).toEqual([320.5, 640.25]);
+  });
+
+  it('carries the street list through, which is a different list', () => {
+    // Wider than the streets with addresses on purpose: it is what tells
+    // "outside the pilot area" from "no record of that street" (AC 1.1.8).
+    expect(unpack(packed).streets).toEqual(['Gatehouse Drive', 'Harper Street']);
+    expect(unpack(packed).addresses.map((a) => a.street)).not.toContain('Harper Street');
+  });
+
+  it('handles an address with no suburb', () => {
+    const noSuburb = { area: 'x', on: ['Some Lane|'], at: [[['1', 0, 0] as const]] };
+    expect(unpack(noSuburb).addresses[0]?.label).toBe('1 Some Lane');
+  });
+
+  it('refuses an index whose groups do not line up', () => {
+    // The failure this prevents is an address placed on another street --
+    // plausible on screen and wrong in the only way that matters here.
+    expect(() => unpack({ ...packed, at: [packed.at[0]] })).toThrow(IndexError);
+    expect(() => unpack({ ...packed, at: [packed.at[0]] })).toThrow(/2 streets and 1 group/);
+  });
+
+  it('refuses an index carrying no addresses at all', () => {
+    expect(() => unpack({ area: 'x' } as unknown as PackedIndex)).toThrow(IndexError);
+  });
+
+  it('searches what it unpacked', () => {
+    // The seam that matters: everything downstream still works on
+    // `IndexedAddress`, so unpacking cannot change what a search finds.
+    const index = unpack(packed);
+    expect(search(index, '46 gatehouse')[0]?.address.label).toBe(
+      '46 Gatehouse Drive, Kensington',
+    );
   });
 });

@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useReducer, useState } from 'react';
 
-import type { AddressIndex } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
@@ -115,10 +115,11 @@ async function load(): Promise<Loaded> {
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
-  const index = addresses as AddressIndex & { fixture?: string };
-  if (!Array.isArray(index.addresses)) {
-    throw new Error('the address index carries no addresses');
-  }
+  // Unpacked once, here, rather than on every keystroke. The shipped shape
+  // groups addresses by street and leaves out what it can rebuild; `unpack`
+  // refuses an index whose groups do not line up rather than repairing it.
+  const packed = addresses as PackedIndex & { fixture?: string };
+  const index = unpack(packed);
 
   return {
     map: map.value,
@@ -126,7 +127,7 @@ async function load(): Promise<Loaded> {
     trace: trace.value,
     history: history.value,
     index,
-    fixtureNote: index.fixture,
+    fixtureNote: packed.fixture,
     servedFrom: served([map.from, derived.from, trace.from, history.from]),
   };
 }

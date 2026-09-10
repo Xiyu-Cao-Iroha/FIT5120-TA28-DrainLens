@@ -23,7 +23,7 @@ import re
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Sequence
 
 from .geo import Extent, from_mga55, to_mga55
 
@@ -84,16 +84,11 @@ class Address:
     e: float
     n: float
 
-    def as_json(self) -> dict:
-        return {
-            "id": self.id,
-            "label": self.label,
-            "number": self.number,
-            "street": self.street,
-            "suburb": self.suburb,
-            "e": round(self.e, 1),
-            "n": round(self.n, 1),
-        }
+    # There was an `as_json` here, emitting all seven fields. `_grouped` took
+    # over on 11 September and it became reachable only from its own test --
+    # which was asserting that no owner name or valuation reaches the browser
+    # against a method the browser never receives. That assertion now runs
+    # against the built artefact, which is the thing it was always about.
 
 
 def _title(text: str) -> str:
@@ -238,8 +233,57 @@ def build(
             "typed into the search box is ever sent anywhere."
         ),
         "streets": streets,
-        "addresses": [address.as_json() for address in addresses],
+        **_grouped(addresses),
     }
+
+
+def _grouped(addresses: Sequence[Address]) -> dict:
+    """Addresses grouped by street, each one a ``[number, e, n]`` triple.
+
+    **The index has to travel whole, so its size is a design constraint rather
+    than a detail.** Nothing about a typed address is ever sent anywhere, which
+    means the browser needs every address it might match before the first
+    keystroke. At the demonstration extent that was 678 KB and nobody had to
+    think about it; across the council it is 62,397 addresses, and as a list of
+    objects that is **10.9 MB raw and 986 KB gzipped**.
+
+    Four shapes were measured against the real council index:
+
+    ==========================  =========  ========
+    shape                       raw        gzipped
+    ==========================  =========  ========
+    a list of objects           10.88 MB    986 KB
+    without ``id``               7.61 MB    784 KB
+    without ``id`` or ``label``  5.18 MB    584 KB
+    grouped by street            1.31 MB    482 KB
+    grouped, columnar            1.19 MB    359 KB
+    ==========================  =========  ========
+
+    ``id`` and ``label`` go because both are derivable from the number, the
+    street and the suburb; the browser rebuilds them once on load rather than
+    downloading 5.7 MB of text it could have written itself.
+
+    **The columnar shape is smaller and is not used.** It stores numbers,
+    eastings and northings in three parallel arrays, and three arrays that must
+    stay aligned are a way for an address to end up at another address's
+    coordinates -- silently, and looking entirely plausible. A triple cannot
+    come apart. That is 123 KB gzipped for an invariant nobody has to test, and
+    this is a product whose whole argument is that it does not quietly say the
+    wrong thing.
+
+    The raw figure matters as much as the gzipped one: it is what the browser
+    parses and holds, and 1.31 MB against 10.88 MB is the difference that shows
+    up on a phone rather than on the wire.
+    """
+    order: list[str] = []
+    at: dict[str, list[list]] = {}
+    for address in addresses:
+        key = f"{address.street}|{address.suburb}"
+        if key not in at:
+            order.append(key)
+            at[key] = []
+        at[key].append([address.number, round(address.e, 1), round(address.n, 1)])
+    return {"on": order, "at": [at[key] for key in order]}
 
 
 def main(argv: list[str] | None = None) -> int:

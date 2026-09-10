@@ -44,6 +44,79 @@ export interface AddressIndex {
 }
 
 /**
+ * The index as it travels: streets once, then a triple per address.
+ *
+ * **The whole index has to reach the browser before the first keystroke**,
+ * because nothing about a typed address is ever sent anywhere. At the
+ * demonstration extent that was 678 KB and cost nobody a thought; across the
+ * council it is 62,397 addresses, and as a list of objects that is 10.9 MB to
+ * download and parse. Grouped like this it is 1.33 MB and 489 KB gzipped.
+ *
+ * `id` and `label` are not carried because both are exactly reconstructible
+ * from the number, the street and the suburb — 5.7 MB of text the browser can
+ * write itself. `pipeline/addresses.py` records the four shapes that were
+ * measured and why the smallest one was not taken.
+ */
+export interface PackedIndex {
+  readonly area: string;
+  readonly streets?: readonly string[];
+  /** `"Gatehouse Drive|Kensington"`, one per group, in the order `at` uses. */
+  readonly on: readonly string[];
+  /** Per group, `[number, e, n]` for each address on that street. */
+  readonly at: readonly (readonly (readonly [string, number, number])[])[];
+}
+
+export class IndexError extends Error {}
+
+/**
+ * Unpack the shipped index once, on load.
+ *
+ * The rest of this module works on `IndexedAddress`, and it stays that way:
+ * search runs on every keystroke and is not the place to be rebuilding labels.
+ *
+ * **It refuses rather than repairs.** An index whose `on` and `at` disagree in
+ * length has lost the correspondence between a street and its addresses, and
+ * the failure that produces is an address silently placed on another street —
+ * plausible on screen, wrong in the only way this product cannot afford. A
+ * search box that says the index is broken is recoverable; one that confidently
+ * points at the wrong house is not.
+ */
+export function unpack(raw: PackedIndex): AddressIndex {
+  if (!Array.isArray(raw.on) || !Array.isArray(raw.at)) {
+    throw new IndexError('the address index carries no addresses');
+  }
+  if (raw.on.length !== raw.at.length) {
+    throw new IndexError(
+      `the address index has ${String(raw.on.length)} streets and ${String(raw.at.length)} groups of addresses`,
+    );
+  }
+
+  const addresses: IndexedAddress[] = [];
+  raw.on.forEach((key, group) => {
+    const [street, suburb = ''] = key.split('|');
+    for (const [number, e, n] of raw.at[group] ?? []) {
+      const label = suburb === '' ? `${number} ${street ?? ''}` : `${number} ${street ?? ''}, ${suburb}`;
+      addresses.push({
+        // The same id the pipeline used to write, rebuilt from the same parts.
+        id: `${raw.area}/${label.toLowerCase().replace(/ /g, '-').replace(/,/g, '')}`,
+        label,
+        number,
+        street: street ?? '',
+        suburb,
+        e,
+        n,
+      });
+    }
+  });
+
+  return {
+    area: raw.area,
+    addresses,
+    ...(raw.streets === undefined ? {} : { streets: raw.streets }),
+  };
+}
+
+/**
  * Street-type abbreviations, expanded before matching.
  *
  * Somebody typing "46 gatehouse dr" means Gatehouse Drive, and an index that

@@ -65,7 +65,25 @@ const index = await read('addresses.json');
 
 const pits = map.layers?.pit ?? [];
 const links = trace.links ?? {};
-const addresses = index.addresses ?? [];
+/*
+ * The index ships grouped by street: `on` holds "Street|Suburb" and `at` holds
+ * a `[number, e, n]` triple per address. Only the positions matter here, so
+ * this flattens rather than rebuilding the labels the browser rebuilds.
+ *
+ * **This script caught the shape change on the first run after it landed**,
+ * reporting "0 addresses" and exiting 1 rather than passing over an empty
+ * list. That is the whole reason it is a check and not a comment: a script
+ * that read the new shape leniently would have reported success about nothing.
+ */
+const addresses = (index.on ?? []).flatMap((key, group) =>
+  (index.at?.[group] ?? []).map(([number, e, n]) => ({ label: `${number} ${key}`, e, n })),
+);
+if ((index.on ?? []).length !== (index.at ?? []).length) {
+  note(
+    `addresses.json has ${String((index.on ?? []).length)} streets and ` +
+      `${String((index.at ?? []).length)} groups of addresses; they must correspond`,
+  );
+}
 
 if (pits.length === 0) note('map.json carries no pits at all');
 if (addresses.length === 0) note('addresses.json carries no addresses at all');
