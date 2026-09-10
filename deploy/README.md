@@ -1,6 +1,6 @@
 # Deploying DrainLens
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — **Iteration 1, and holding there.** From 10 September 2026 this URL is the *published iteration* rather than the newest good code: it serves `iteration-1-frozen`, and Iteration 2 goes to `drainlens-dev` until it is finished. See [Preserving each iteration](#preserving-each-iteration).
 
 **This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four of its five artefacts from it**, falling back to the copies in this container when it cannot answer — so a change to the API does not need the site redeployed, and the API being stopped does not take the site down.
 
@@ -8,7 +8,7 @@ Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twe
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. Everything below was run, not planned, and every command was run by the team on their own machine.
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. **That last one is the last.** Iteration 1 was frozen on 8 September and Iteration 2 began on 10 September, so this service is not redeployed again until Iteration 2 is complete. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -334,29 +334,56 @@ freeze.
 **The URL.** Cloud Run gives every *service* its own hostname, so a service per
 role is the closest thing available to the subdomain pattern the studio draws:
 
-| Role | The studio's shape | Here |
-|---|---|---|
-| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev`, **not yet created** |
-| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` |
-| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration, preserved | `drainlens-iteration1`, then one per iteration |
+| Role | The studio's shape | Service | Built from | Holds |
+|---|---|---|---|---|
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | Iteration 2, as it is built |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 1**, and not moving |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1` | tag `iteration-1-frozen` | deployed once, then left alone |
 
-> **`drainlens` has been filling two of those roles at once, and the freeze is
-> the moment that stops being safe.** It has been redeployed eight times as
-> work continued, which is the *dev* behaviour -- correct while there was no
+> **`drainlens` filled two of those roles at once until 10 September, and the
+> freeze is what stopped that being safe.** It had been redeployed eight times
+> as work continued, which is the *dev* behaviour -- correct while there was no
 > completed iteration to protect, and that is the studio's own first case: at
 > the start there is no previous version, so the root can carry the work.
 >
-> From the first Iteration 2 deployment it is wrong. The root must keep showing
-> Iteration 1 while Iteration 2 is built, so **Iteration 2 work deploys to
-> `drainlens-dev` and never to `drainlens`**, and `drainlens` moves only when
-> Iteration 2 is complete -- deployed from its tag to the root and to
-> `drainlens-iteration2` in the same pass.
->
-> **Today the rule is already satisfied without touching the root.** The studio
-> asks that after Iteration 1 the same stable build be reachable from both the
-> root and the Iteration 1 URL, and `drainlens` is already serving
-> `index-DFGygy6v.js`, which is what `iteration-1-frozen` builds. So the freeze
-> is **one deployment** -- `drainlens-iteration1` -- and nothing else moves.
+> **Iteration 2 began on 10 September**, and from that moment the root must
+> keep showing Iteration 1 while Iteration 2 is built.
+
+### What changed for the branches on 10 September
+
+**`develop` no longer flows to `main` at the end of a change.** Every pull
+request until now ended with a second one merging `develop` into `main`,
+because `main` was the thing that got deployed. `main` is now the *published
+iteration* rather than the newest good code, so it holds at
+`iteration-1-frozen` until Iteration 2 is finished.
+
+| | Until 8 September | From 10 September |
+|---|---|---|
+| Branch off | `develop` | `develop`, unchanged |
+| Feature PR into | `develop` | `develop`, unchanged |
+| Then | a second PR, `develop` into `main` | **nothing** -- work stops on `develop` |
+| Deployed to | `drainlens`, the root | `drainlens-dev` |
+| `main` moves | every release | **once**, when Iteration 2 is complete |
+
+> **The one that will be got wrong is the third row**, because two pull
+> requests in a row is the habit this repository has had since 26 August and a
+> `develop` into `main` merge is one click away at any time. The check is the
+> same one the empty-diff incident produced: after merging, read where the
+> commit landed rather than trusting the routine. `git rev-parse origin/main`
+> must still be `138a002` for the whole of Iteration 2.
+
+**Completing Iteration 2** is then one pass, and it is the same shape as the
+Iteration 1 freeze: merge `develop` into `main`, re-run every gate rather than
+citing the last recorded numbers, tag `iteration-2-frozen`, deploy that tag to
+**both** `drainlens` and a new `drainlens-iteration2`, and check the served
+bundle hash against a local build on each. `drainlens-iteration1` is not
+touched, then or ever.
+
+> **The dev service is the one place a deployment is allowed to be routine.**
+> It exists so that Iteration 2 can be shown to the team on a real URL without
+> that showing anything to a marker reading the root. It carries the same
+> access gate: an unlisted URL is not a gate, and a half-built iteration is
+> exactly what should not be found by accident.
 
 A subdirectory (`/iteration1`) is **not** an option here and the reason is
 already recorded above: every path this app fetches is absolute from `/`, which
@@ -389,11 +416,40 @@ git checkout main
 > as a value nobody typed. That is recorded in full in
 > [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md); it bit a `--database-flags` first.
 
-> `--allow-unauthenticated` stays on both. It governs Cloud Run's own IAM,
-> which is a different gate from the one in nginx: leaving it off would demand
-> a Google identity and a signed request, which is not something a mentor can
-> do from a browser. The password prompt is the gate; IAM is not being used as
-> one.
+> `--allow-unauthenticated` stays on all of them. It governs Cloud Run's own
+> IAM, which is a different gate from the one in nginx: leaving it off would
+> demand a Google identity and a signed request, which is not something a
+> mentor can do from a browser. The password prompt is the gate; IAM is not
+> being used as one.
+
+**The dev service**, created when Iteration 2 began and redeployed as often as
+the work needs it. Same image, same gate, same flags -- the only differences
+are the service name and that it is built from `develop` rather than a tag.
+
+```bash
+git checkout develop
+gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. \
+  --region=australia-southeast1 --allow-unauthenticated --port=8080 \
+  --memory=512Mi --max-instances=1 \
+  --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
+```
+
+> **`--max-instances=1` is what makes four services cost about what one does.**
+> Cloud Run scales each of them to zero when nobody is asking, so an idle
+> archive is free and the dev service costs only while it is being looked at.
+> The instance cap also means a runaway loop cannot quietly scale out; the
+> always-on cost in this project is the Cloud SQL instance, and that is stopped
+> between demos.
+>
+> **The environment variables have to be given the first time.** `gcloud run
+> deploy` inherits variables you do not name, but only from a service that
+> already exists -- and the container refuses to start without them, which is
+> the fail-closed behaviour verified above. Read them off the running root
+> rather than retyping the hash: `gcloud run services describe drainlens
+> --region=australia-southeast1 --project=fit5120-504507 --format=yaml`. Keep
+> `--format=yaml` as one unquoted token; `gcloud.cmd` strips inner double
+> quotes, which is what broke the logging filters in
+> [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md).
 
 ---
 
