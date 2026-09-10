@@ -102,12 +102,38 @@ export function nextSection(learned: Learned): SectionId | null {
  *   by nobody, which is also what the footer's CC BY notice has to say;
  * - and the fourth is the sentence this product has refused to stop saying.
  */
-export const LOCK_NOTICE: readonly string[] = [
-  'This is one square kilometre of Kensington, not all of Melbourne.',
-  'The drainage is the council’s record. Where it stops, the map stops — that is not a loading failure.',
-  'The water paths and low areas are calculated here from measured ground. Nobody publishes them.',
-  'It is not a flood warning and not a forecast.',
-];
+export function lockNotice(extentName: string): readonly string[] {
+  /*
+    The first line depends on which extent is on screen, and it has to.
+
+    It read "This is one square kilometre of Kensington" for as long as that
+    was the only extent there was. The database now holds the whole council, so
+    on the day the API answered, a screen whose entire purpose is to disclose
+    what the reader is about to look at opened by telling them it was
+    seventy-five times smaller than it is.
+
+    Getting that wrong is worse here than anywhere else on the site. Every
+    other sentence in this product is hedged; these four are the ones that say
+    plainly what the thing is, and a plain sentence that is false is not a
+    smaller error than a hedged one.
+  */
+  const where =
+    extentName === 'city-of-melbourne'
+      ? 'This is the City of Melbourne — about 76 square kilometres, and not the rest of Greater Melbourne.'
+      : 'This is one square kilometre of Kensington, not all of Melbourne.';
+
+  const ground =
+    extentName === 'city-of-melbourne'
+      ? 'The water paths and low areas are calculated here from measured ground, and that ground was measured for one square kilometre of Kensington. Everywhere else on this map, nothing is claimed about where water goes.'
+      : 'The water paths and low areas are calculated here from measured ground. Nobody publishes them.';
+
+  return [
+    where,
+    'The drainage is the council’s record. Where it stops, the map stops — that is not a loading failure.',
+    ground,
+    'It is not a flood warning and not a forecast.',
+  ];
+}
 
 /** How long the notice stands before the way in is offered. */
 export const LOCK_NOTICE_SECONDS = 5;

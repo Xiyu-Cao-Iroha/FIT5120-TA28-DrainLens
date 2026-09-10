@@ -23,8 +23,45 @@
  * through a server.
  */
 
-/** The extent this pilot covers. One, and the API takes it as a path segment. */
-export const EXTENT = 'kensington';
+/**
+ * The extent in the container, and the extent in the database.
+ *
+ * **They are different, and that is the whole of the expansion.** The database
+ * holds `city-of-melbourne` — 21,113 pits over 76.5 km² — and the container
+ * ships `kensington`, the square kilometre it has shipped since August. When
+ * the API answers, the map is the council; when the Cloud SQL instance is
+ * stopped, which is the normal state between demonstrations, the map is the
+ * square kilometre and the footer says where it came from.
+ *
+ * They cannot both be in the database. Kensington is *inside* the council, so
+ * its 895 pits are 895 of the same assets with the same `asset_number`, and
+ * that is a global primary key: one asset is not two rows in two coordinate
+ * frames. Nothing needs them both — see `apps/api/test-db/both.test.ts`.
+ */
+export const BUNDLED_EXTENT = 'kensington';
+export const API_EXTENT = 'city-of-melbourne';
+
+/**
+ * The derived layers cover one square kilometre of whichever map is showing.
+ *
+ * Surface-water paths, low points and the data-quality hatching are calculated
+ * from a measured ground surface, and that surface exists for Kensington and
+ * nowhere else: 6.6 million points over one square kilometre. Expanding the
+ * recorded network did not expand the terrain, and inventing paths across the
+ * other 75.5 km² would be exactly the fabrication this product refuses.
+ *
+ * **They arrive already in the frame of the map they are drawn over**, because
+ * `pipeline/reframe.py` moves them at build time. Every artefact's
+ * coordinates are metres from its own extent's corner, so Kensington's origin
+ * is the council's (1500, 6000) — and Kensington-frame shapes over a
+ * council-frame map would land a kilometre and a half west and six kilometres
+ * south, silently, looking like a map. Doing it once at build time is why
+ * nothing here has to know that two frames exist.
+ *
+ * What the browser does have to know is that they *cover* less than the map
+ * does. The artefact carries a `covers` sentence saying so.
+ */
+export const DERIVED_COVERS = 'covers';
 
 /**
  * The API's origin, or an empty string for "do not ask a server at all".
@@ -112,6 +149,59 @@ export async function fetchArtefact<T>(request: ArtefactRequest<T>): Promise<Fet
 
   const value = await attempt(request.bundled, request.guard, fetchImpl, timeoutMs);
   return { value: value as T, from: 'bundled' };
+}
+
+/**
+ * Fetch a set of artefacts that must agree, and fall back as a set.
+ *
+ * **`mixed` was harmless until the two extents had different sizes.** The map,
+ * the derived layers and the trace describe one place in one coordinate frame:
+ * metres from that extent's south-west corner. While both copies were
+ * Kensington, an API map beside a bundled derived layer was the same square
+ * kilometre either way and nobody could tell. Now the API's map is the council
+ * and the container's is the square kilometre, and mixing them draws the water
+ * paths a kilometre and a half from the streets they run down — on screen,
+ * silently, looking like a map.
+ *
+ * So the choice is made once for all of them: **every one from the API, or
+ * every one from the container.** One artefact refusing is the whole set
+ * refusing, which costs a visitor the larger map in a case where they were
+ * going to get a wrong one.
+ *
+ * The flood board is deliberately not in here. It is Greater Melbourne over
+ * six financial years, it carries no coordinates, and it cannot disagree with
+ * a map about where anything is.
+ */
+export async function fetchTogether<T extends readonly unknown[]>(
+  requests: { readonly [K in keyof T]: ArtefactRequest<T[K]> },
+): Promise<{ readonly values: T; readonly from: Origin }> {
+  const list = requests as readonly ArtefactRequest<unknown>[];
+
+  if (list.every((r) => r.api !== null && r.api !== '')) {
+    try {
+      const values = await Promise.all(
+        list.map((r) =>
+          attempt(
+            r.api as string,
+            r.guard,
+            r.fetchImpl ?? fetch,
+            r.timeoutMs ?? API_TIMEOUT_MS,
+          ),
+        ),
+      );
+      return { values: values as unknown as T, from: 'api' };
+    } catch (error) {
+      // Reported once for the set rather than once per artefact: they failed
+      // as a set, and three lines in a console would suggest three faults.
+      const why = error instanceof Error ? error.message : String(error);
+      list[0]?.onFallback?.('the API', why);
+    }
+  }
+
+  const values = await Promise.all(
+    list.map((r) => attempt(r.bundled, r.guard, r.fetchImpl ?? fetch, r.timeoutMs ?? API_TIMEOUT_MS)),
+  );
+  return { values: values as unknown as T, from: 'bundled' };
 }
 
 /**

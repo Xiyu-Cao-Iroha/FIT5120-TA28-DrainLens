@@ -41,7 +41,15 @@ import {
 import { Shell } from './ui/Shell.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
-import { API_BASE, EXTENT, type Origin, fetchArtefact, served } from './data/source.js';
+import {
+  API_BASE,
+  API_EXTENT,
+  BUNDLED_EXTENT,
+  type Origin,
+  fetchArtefact,
+  fetchTogether,
+  served,
+} from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
 
@@ -60,8 +68,10 @@ interface Loaded {
   readonly index: AddressIndex;
   readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
-  /** Where the four database-backed artefacts actually came from. */
+  /** Where the three artefacts describing this place came from -- all of them. */
   readonly servedFrom: Origin | 'mixed';
+  /** `city-of-melbourne` or `kensington`, depending on which answered. */
+  readonly extentName: string;
 }
 
 async function load(): Promise<Loaded> {
@@ -81,25 +91,37 @@ async function load(): Promise<Loaded> {
     console.warn(`DrainLens: ${url} did not answer (${reason}); using the bundled copy`);
   };
 
-  const [map, derived, trace, history, addresses] = await Promise.all([
-    fetchArtefact<MapArtefact>({
-      api: at(`/api/map/${EXTENT}`),
+  /*
+    The three that describe one place, fetched as a set.
+
+    The API's extent is the whole council and the container's is the pilot
+    square kilometre, so these three have to come from the same side or the
+    derived layers land a kilometre and a half from the streets they belong
+    to. `fetchTogether` makes that structural rather than hoped for.
+  */
+  const place = await fetchTogether<[MapArtefact, DerivedArtefact, TraceArtefact]>([
+    {
+      api: at(`/api/map/${API_EXTENT}`),
       bundled: '/data/map.json',
       guard: assertUsable,
       onFallback: note,
-    }),
-    fetchArtefact<DerivedArtefact>({
-      api: at(`/api/derived/${EXTENT}`),
+    },
+    {
+      api: at(`/api/derived/${API_EXTENT}`),
       bundled: '/data/derived.json',
       guard: assertDerived,
       onFallback: note,
-    }),
-    fetchArtefact<TraceArtefact>({
-      api: at(`/api/trace/${EXTENT}`),
+    },
+    {
+      api: at(`/api/trace/${API_EXTENT}`),
       bundled: '/data/trace.json',
       guard: assertTrace,
       onFallback: note,
-    }),
+    },
+  ]);
+  const [map, derived, trace] = place.values;
+
+  const [history, addresses] = await Promise.all([
     fetchArtefact<FloodHistoryArtefact>({
       api: at('/api/flood-history'),
       bundled: '/data/flood-history.json',
@@ -122,13 +144,16 @@ async function load(): Promise<Loaded> {
   const index = unpack(packed);
 
   return {
-    map: map.value,
-    derived: derived.value,
-    trace: trace.value,
+    map,
+    derived,
+    trace,
     history: history.value,
     index,
     fixtureNote: packed.fixture,
-    servedFrom: served([map.from, derived.from, trace.from, history.from]),
+    servedFrom: served([place.from, history.from]),
+    // Which extent is actually on screen, so the interface can say so rather
+    // than leaving somebody to notice the map got smaller.
+    extentName: place.from === 'api' ? API_EXTENT : BUNDLED_EXTENT,
   };
 }
 
@@ -233,6 +258,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           actions={
             <HomeNav
               onOpenMap={() => {
@@ -271,6 +297,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           back={{
             label: 'Home',
             onBack: () => {
@@ -295,7 +322,8 @@ export function App() {
     case 'unsupported':
       return (
         <Shell credits={credits}
-          servedFrom={loaded.servedFrom}>
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}>
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -317,7 +345,8 @@ export function App() {
 
     case 'choose':
       return (
-        <Shell credits={credits} servedFrom={loaded.servedFrom} masthead={false}>
+        <Shell credits={credits} servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName} masthead={false}>
           <Choose
             learned={session.learned}
             guided={GUIDED_SECTIONS}
@@ -339,6 +368,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           masthead={false}
           back={{
             label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
@@ -351,6 +381,7 @@ export function App() {
           <LockedMap
             map={loaded.map}
             learned={session.learned}
+            extentName={loaded.extentName}
             /*
               Only the sections that have a guide written. Offering a card
               whose guide has no steps in it would be a button that opens an
@@ -376,6 +407,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           masthead={false}
           back={{
             label: 'Address',
@@ -427,6 +459,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -496,6 +529,7 @@ export function App() {
         <Shell
           credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -711,6 +745,7 @@ function MapScreen({
     <Shell
       credits={credits}
           servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
       // Inside the map, the name at the top tells somebody something they
       // worked out by arriving. The row below carries the way back out.
       masthead={false}

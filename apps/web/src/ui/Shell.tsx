@@ -117,6 +117,8 @@ export interface ShellProps {
    * claim, and a claim this product makes visible rather than asserts.
    */
   readonly servedFrom?: 'api' | 'bundled' | 'mixed';
+  /** Which extent is on screen, so the footer can say how much ground it is. */
+  readonly extentName?: string;
 }
 
 export function Shell({
@@ -128,6 +130,7 @@ export function Shell({
   masthead = true,
   credits,
   servedFrom,
+  extentName,
 }: ShellProps) {
   return (
     <div
@@ -259,7 +262,7 @@ export function Shell({
       </main>
 
       {credits !== undefined && credits.length > 0 && (
-        <Attribution credits={credits} servedFrom={servedFrom} />
+        <Attribution credits={credits} servedFrom={servedFrom} extentName={extentName} />
       )}
     </div>
   );
@@ -273,6 +276,21 @@ export function Shell({
  * as the indicative banner above it. It is small and quiet, which the licence
  * permits; it is not absent, which the licence does not.
  */
+/**
+ * How much ground is on screen, which changed with where it came from.
+ *
+ * The database holds the whole City of Melbourne and the container holds the
+ * pilot square kilometre, so when the instance is stopped the map does not
+ * merely come from somewhere else -- **it gets smaller**. A footer that said
+ * only where the data came from would leave somebody to notice that on their
+ * own, by finding a street missing.
+ */
+const AREA: Record<string, string> = {
+  'city-of-melbourne': 'Showing the whole City of Melbourne.',
+  kensington:
+    'Showing the Kensington pilot square kilometre — the wider council map needs the database, which is not answering.',
+};
+
 const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
   api: 'Served from the DrainLens database.',
   bundled: 'Served from the copy bundled with this site.',
@@ -282,11 +300,13 @@ const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
 function Attribution({
   credits,
   servedFrom,
+  extentName,
 }: {
   readonly credits: readonly Credit[];
   // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
   // treats those as different, and the caller always passes the key.
   readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
+  readonly extentName: string | undefined;
 }) {
   return (
     <footer
@@ -315,6 +335,9 @@ function Attribution({
       ))}
       <span>{CHANGES_NOTICE}</span>
       {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
+      {extentName !== undefined && AREA[extentName] !== undefined && (
+        <span> {AREA[extentName]}</span>
+      )}
     </footer>
   );
 }

@@ -26,11 +26,11 @@ import { useEffect, useState } from 'react';
 import type { MapArtefact } from '../map/artefact.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import {
-  LOCK_NOTICE,
   LOCK_NOTICE_SECONDS,
   type Learned,
   SECTIONS,
   countLearned,
+  lockNotice,
   nextSection,
   SECTION_ORDER,
 } from '../tutorial/sections.js';
@@ -50,6 +50,8 @@ import {
 export interface LockedMapProps {
   readonly map: MapArtefact;
   readonly learned: Learned;
+  /** Which extent is on screen. The disclosure is different for each. */
+  readonly extentName: string;
   /** Sections that have a guide written. The rest cannot be offered yet. */
   readonly available: readonly SectionId[];
   readonly onStartGuide: (section: SectionId) => void;
@@ -60,6 +62,7 @@ export interface LockedMapProps {
 export function LockedMap({
   map,
   learned,
+  extentName,
   available,
   onStartGuide,
   onOpenAnyway,
@@ -137,7 +140,7 @@ export function LockedMap({
               color: ink.base,
             }}
           >
-            {LOCK_NOTICE.map((sentence) => (
+            {lockNotice(extentName).map((sentence) => (
               <li key={sentence}>{sentence}</li>
             ))}
           </ul>

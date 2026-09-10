@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { migrate } from '../src/migrate.js';
 import { BUNDLED, load } from '../src/load.js';
-import { mapArtefact, traceArtefact } from '../src/queries.js';
+import { derivedArtefact, mapArtefact, traceArtefact } from '../src/queries.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -106,6 +106,25 @@ describe('the council extent in the database', () => {
     const trace = await traceArtefact(client, 'city-of-melbourne');
     expect(Object.keys(trace.links).length).toBe(21113);
     expect(trace.counts['leaves-mapped-area'] ?? 0).toBe(0);
+  });
+
+  it('holds the derived layers in the council frame, not the pilot one', async () => {
+    /*
+     * Coordinates are metres from the extent's own south-west corner, so the
+     * same ground has two coordinates depending on which extent you asked
+     * for. Kensington's origin is the council's (1500, 6000).
+     *
+     * The shapes are reframed at build time -- `pipeline/reframe.py` -- so
+     * this artefact is internally consistent and the browser never learns
+     * that two frames exist. If this fails, every water path on the council
+     * map is 1.5 km west and 6 km south of where it belongs, drawn silently
+     * and looking like a map.
+     */
+    const derived = await derivedArtefact(client, 'city-of-melbourne');
+    const first = derived.layers.channel?.[0]?.c[0];
+    expect(first?.[0]).toBeGreaterThan(1500);
+    expect(first?.[1]).toBeGreaterThan(6000);
+    expect(derived.extent.width_m).toBe(8500);
   });
 
   it('contains the pilot extent, which is why only one of them is loaded', async () => {
