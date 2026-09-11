@@ -111,21 +111,27 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: Node coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound, and Python's slipped 0.57 points when `reframe.py` arrived — that module's uncovered lines are its `main()` argument parsing, not its arithmetic, which is checked.
+Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure, and again after the coverage pass that followed it.
 
 **This table is the only place the test counts are written.** Every prose restatement of them has gone stale, three times, and the third was hours old — see the note under *Suite runtime*.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **93.33%** Node · **91.22%** Python |
+| Coverage, overall | ≥ 88% | **95.27%** Node · **91.89%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **851** Node unit across 43 files · **57** database across 4 · **408** Python across 18 — **1,316** |
+| Tests | — | **913** Node unit across 50 files · **57** database across 4 · **412** Python across 18 — **1,382** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
 | CI green rate | ≥ 95% | tracked on the Actions tab |
 | Legibility | 4.5:1 for normal text, nothing under 10 px | **met on the homepage, the map and the flood board**, measured 7 September — see below |
+
+> **Two figures in that table are lower than the code deserves, and one is lower than it looks.**
+>
+> `apps/api/src/migrate.ts` reads 49.58%, and its `migrate()` is exercised thoroughly — by `npm run test:db`, which runs under a different config and is not in this number. The coverage run covers the unit suite only, so anything that needs a real Postgres is counted as uncovered.
+>
+> `useScenario.ts` and the body of `scenario/worker.ts` need a React renderer and a `Worker`, and this repository has neither by choice. The pure logic inside both was **pulled out** rather than left untested — `positionsFor`, `resultOf` and `handle` are exported and covered — and what remains uncovered is genuinely the plumbing: `new Worker(...)`, `postMessage`, and the effect that tears it down.
 
 > **The runtime gate cannot be failed or passed, because it never said which number it means.** Three consecutive runs of `npm test` on 5 September: Vitest reported **3.74 s, 3.69 s and 5.12 s**, and the wall clock for the same three commands was **6.42 s, 6.42 s and 8.10 s**. Vitest's figure excludes the transform and collect phases it prints beside it; the wall clock includes npm's own start-up. One is under the gate twice out of three and the other is never under it, and both are honest measurements of different things.
 >

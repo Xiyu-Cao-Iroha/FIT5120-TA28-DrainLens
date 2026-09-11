@@ -9,10 +9,12 @@ came out wrong -- with the interface blaming the council's data for it.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from drainlens_pipeline.geo import CITY_OF_MELBOURNE, DEMONSTRATION_EXTENT, Extent
-from drainlens_pipeline.reframe import ReframeError, reframe, shift_coordinates
+from drainlens_pipeline.reframe import ReframeError, main, reframe, shift_coordinates
 
 
 def artefact(**layers) -> dict:
@@ -135,3 +137,103 @@ class TestReframe:
         ]
         assert offsets[::2] == [1500.0] * 5
         assert offsets[1::2] == [6000.0] * 5
+
+
+class TestTheCommandThatBuiltTheCouncilArtefacts:
+    """The CLI wrapper, which is how `derived.json` was moved into the council frame.
+
+    It was the whole of this module's uncovered 31%, and it is not an
+    incidental wrapper: `pipeline/README.md` gives this exact command as the
+    way to rebuild the committed council artefacts, and the file it writes is
+    the one the API image copies. A command documented and never run is a
+    command that can stop working without anybody finding out until a
+    deployment.
+    """
+
+    def _artefact(self, tmp_path):
+        source = tmp_path / "derived.json"
+        source.write_text(
+            json.dumps(
+                {
+                    "artefact": "derived-layers",
+                    "basis": "derived",
+                    "extent": {"name": "kensington", "width_m": 1000, "height_m": 1000},
+                    "layers": {"channel": [{"g": "line", "c": [[10, 20], [30, 40]]}]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return source
+
+    def test_it_writes_the_moved_artefact_where_it_was_asked_to(self, tmp_path, capsys):
+        source = self._artefact(tmp_path)
+        out = tmp_path / "council" / "derived.json"
+
+        assert (
+            main(
+                [
+                    "--in",
+                    str(source),
+                    "--out",
+                    str(out),
+                    "--from",
+                    "kensington",
+                    "--to",
+                    "city-of-melbourne",
+                ]
+            )
+            == 0
+        )
+
+        # The directory did not exist: the command makes it rather than failing
+        # on a path the person typed from the README.
+        moved = json.loads(out.read_text(encoding="utf-8"))
+        assert moved["extent"]["name"] == "city-of-melbourne"
+        # Kensington's corner is the council's (1500, 6000).
+        assert moved["layers"]["channel"][0]["c"] == [[1510.0, 6020.0], [1530.0, 6040.0]]
+
+    def test_it_says_what_it_moved_and_where(self, tmp_path, capsys):
+        source = self._artefact(tmp_path)
+        out = tmp_path / "out.json"
+        main(["--in", str(source), "--out", str(out), "--from", "kensington", "--to", "city-of-melbourne"])
+
+        said = capsys.readouterr().err
+        assert "1 shapes moved" in said
+        assert "kensington" in said and "city-of-melbourne" in said
+
+    def test_it_refuses_an_extent_it_does_not_publish(self, tmp_path):
+        # argparse, not a fallback: an unknown name is a typo, and reframing
+        # into a guessed extent is the failure this module exists to prevent.
+        source = self._artefact(tmp_path)
+        with pytest.raises(SystemExit):
+            main(
+                [
+                    "--in",
+                    str(source),
+                    "--out",
+                    str(tmp_path / "out.json"),
+                    "--from",
+                    "kensington",
+                    "--to",
+                    "greater-melbourne",
+                ]
+            )
+
+    def test_it_refuses_to_move_an_artefact_out_of_its_own_frame(self, tmp_path):
+        # The artefact says it is Kensington's; asking to move it *from* the
+        # council would shift it by the wrong offset and produce a file that
+        # looks right.
+        source = self._artefact(tmp_path)
+        with pytest.raises(ReframeError):
+            main(
+                [
+                    "--in",
+                    str(source),
+                    "--out",
+                    str(tmp_path / "out.json"),
+                    "--from",
+                    "city-of-melbourne",
+                    "--to",
+                    "city-of-melbourne",
+                ]
+            )
