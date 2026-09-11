@@ -366,7 +366,17 @@ function step(session: Session, event: SessionEvent): Session {
     case 'guide-chosen':
       return {
         ...session,
-        screen: 'address',
+        /*
+          The address is asked for once, not once per section.
+
+          This said `'address'` unconditionally, which was right while there
+          was one lesson and became a toll gate the moment there were three:
+          finish drainage, come back to the four, pick water flow, and be asked
+          for the address you gave ninety seconds ago. It is still reachable
+          from the map's own Address control, which is where somebody who
+          wants a different street goes.
+        */
+        screen: session.address === null ? 'address' : 'guide',
         guideSection: event.section,
         // The map's mode follows the section, so finishing the guide and
         // opening the map shows the thing that was just taught rather than

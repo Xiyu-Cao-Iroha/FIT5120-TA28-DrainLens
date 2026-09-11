@@ -41,7 +41,7 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
-import type { MapNow } from '../tutorial/drainage.js';
+import type { MapNow } from '../tutorial/lesson.js';
 import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
@@ -326,15 +326,30 @@ export function MapView({
   */
   const pitsOn = layers.pit;
   const pipesOn = layers.pipe;
+  const channelOn = layers.channel;
+  const lowPointsOn = layers.lowPoint;
+  const unmeasuredOn = layers.unavailable;
   const selectedId = selected === null ? null : String(selected);
   useEffect(() => {
     onMapNow?.({
       pits: pitsOn,
       pipes: pipesOn,
+      channel: channelOn,
+      lowPoints: lowPointsOn,
+      unmeasured: unmeasuredOn,
       selectedPit: selectedId,
       followingPit: following,
     });
-  }, [pitsOn, pipesOn, selectedId, following, onMapNow]);
+  }, [
+    pitsOn,
+    pipesOn,
+    channelOn,
+    lowPointsOn,
+    unmeasuredOn,
+    selectedId,
+    following,
+    onMapNow,
+  ]);
 
   return (
     <>

@@ -10,24 +10,19 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { DRAINAGE_STEPS } from './drainage.js';
 import {
-  DRAINAGE_STEPS,
   type MapNow,
+  NOTHING_ON_MAP,
   type Requirement,
   finished,
   satisfied,
   stepIndex,
-} from './drainage.js';
+} from './lesson.js';
 
 const PIT = '1144882';
 
-const now = (over: Partial<MapNow> = {}): MapNow => ({
-  pits: false,
-  pipes: false,
-  selectedPit: null,
-  followingPit: null,
-  ...over,
-});
+const now = (over: Partial<MapNow> = {}): MapNow => ({ ...NOTHING_ON_MAP, ...over });
 
 /** Everything done, which is the state the last step leaves behind. */
 const ALL_DONE = now({

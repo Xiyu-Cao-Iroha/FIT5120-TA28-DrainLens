@@ -225,6 +225,28 @@ describe('going back', () => {
     expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
   });
 
+  it('asks for the address once, not once per section', () => {
+    /*
+     * It asked every time, which was invisible while there was one lesson and
+     * became a toll gate the moment there were three: finish drainage, come
+     * back to the four, pick water flow, and be asked for the address you gave
+     * ninety seconds ago. Found by walking the second lesson, not by a test.
+     */
+    const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(first.screen).toBe('address');
+
+    const withAddress = reduce(first, { type: 'address-accepted', address: GATEHOUSE });
+    expect(withAddress.screen).toBe('guide');
+
+    const second = reduce(
+      reduce(withAddress, { type: 'guide-finished' }),
+      { type: 'guide-chosen', section: 'water-flow' },
+    );
+    expect(second.screen).toBe('guide');
+    expect(second.guideSection).toBe('water-flow');
+    expect(second.address).toEqual(GATEHOUSE);
+  });
+
   it('keeps the chosen section, because Back is not un-choosing it', () => {
     const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
