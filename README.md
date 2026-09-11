@@ -111,14 +111,16 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **7 September 2026**, on this laptop, in a quality pass that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound.
+Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure. These are the current numbers, not the best ones the project has had: Node coverage fell from its early highs as the interface grew, which is what the 88% floor exists to bound, and Python's slipped 0.57 points when `reframe.py` arrived — that module's uncovered lines are its `main()` argument parsing, not its arithmetic, which is checked.
+
+**This table is the only place the test counts are written.** Every prose restatement of them has gone stale, three times, and the third was hours old — see the note under *Suite runtime*.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **92.63%** Node · **91.79%** Python |
+| Coverage, overall | ≥ 88% | **93.33%** Node · **91.22%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **700** Node unit across 37 files · **42** database · **377** Python across 17 — **1,119** |
+| Tests | — | **851** Node unit across 43 files · **57** database across 4 · **408** Python across 18 — **1,316** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
@@ -155,11 +157,13 @@ That test builds a zigzag and runs Douglas–Peucker over it — the algorithm's
 
 **65 of those 71 seconds are `test_terrain.py`** — nineteen tests, each building a real grid. Everything else in the pipeline suite runs in six. That is inherent to what they check, and splitting them into a separate script is a decision the team should take deliberately rather than one to slip into a documentation pass — note that doing so would leave the rest at six seconds, which still misses the gate.
 
-The Node suite — the one the gate was written for — is **804 tests across 42 files**, re-measured on 11 September, and the runner's own step timing put it at **6 s** on 5 September, which is over the gate. Locally it is 3.2–3.4 s over three runs on 11 September, unchanged from the 3.2–3.5 s of 5 September despite 104 more tests in 5 more files — the cost is start-up and transform, not the tests. **The runner figure has not been re-taken since the crossing**; it is dated rather than carried forward as if it were current.
+The Node suite — the one the gate was written for — runs in **3.9–4.0 s** locally, over three runs on 11 September, against **6 s** on the runner on 5 September, which is over the gate. **The runner figure has not been re-taken since the crossing**; it is dated rather than carried forward as if it were current. How many tests that is, is in the table above and nowhere else.
 
-A further **52 tests run only against a real Postgres** (`npm run test:db`, four files) and are not in that count: they need a database and CI runs them as a separate job.
-
-> **This sentence said 588 across 30 for three days, twelve lines below a table saying 680 across 37.** The table was re-measured on 5 September and this line was not, because the same fact is written in two places and only one of them is a table anybody thinks to update. It is the reason the 8 September freeze re-ran every gate instead of reading them off this page — and the reason the count in `entry.test.ts` is now summed from its own rows rather than written beside them.
+> **This sentence carried its own copy of the test count until 11 September, and the copy was wrong twice in one day.**
+>
+> It said 588 across 30 for three days, twelve lines below a table saying 680 across 37. That was written up here as a lesson — *the same fact is written in two places and only one of them is a table anybody thinks to update* — and then the line was re-typed with a fresh number rather than emptied, which fixed the instance and kept the defect. It went stale twice more the same afternoon, once at 804 and once at 818, each time within hours of being measured.
+>
+> A count is a thing a suite produces, not a thing prose knows. The sentence is about **runtime** now and the count lives in one table, which is the fix the two earlier corrections both described and neither made.
 
 > **It crossed on 5 September, and the note that stood here two days earlier was wrong.** That note said the older warning — *"a dozen more test files would put it over"* — had been shown to be pessimistic, because five files and ninety-three tests had not moved the runner off 5 s. **Two files and twenty-three tests later it is 6 s.** The warning was not pessimistic; it was early, and the measurement that was supposed to correct it was taken at the last moment it still held.
 >

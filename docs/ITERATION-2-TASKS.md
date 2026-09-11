@@ -190,7 +190,7 @@ Carried from Iteration 1, with the two that were breached still breached.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | **Node 6 s on the runner ✗** as of 5 September, not re-measured since. **Python 68 s ✗**. Locally 3.2–3.4 s over three runs on 11 September, at 818 tests across 43 files |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | **Node 6 s on the runner ✗** as of 5 September, not re-measured since. **Python 68 s ✗**. Locally 3.9–4.0 s over three runs on 11 September. Counts and coverage are in the README's gate table and are not restated here — three copies of that number have gone stale, one of them within hours |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main`; `origin/main` stays at `138a002` | Continuous | enforced and checked after every push |

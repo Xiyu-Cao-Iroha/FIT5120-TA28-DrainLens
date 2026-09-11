@@ -6,7 +6,8 @@
  * reader would learn a control that does not exist, and AC 1.1.2's *open the
  * local map* would stop being met the moment a card led here instead. What
  * they press is `MapView`, with its own chips, its own canvas and its own pit
- * card — narrowed to the two layers this section is about.
+ * card — narrowed to the layers the section is about, and then to the one the
+ * step is about. Which layers those are belongs to the lesson, not here.
  *
  * **The guide reads the map; it never drives it.** `onMapNow` reports what is
  * on and what is selected, and the step is derived from that. Nothing here
