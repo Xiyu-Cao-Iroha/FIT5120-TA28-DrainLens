@@ -21,17 +21,21 @@ import { useCallback, useMemo, useState } from 'react';
 import type { AddressIndex } from '../address/search.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
-import { type LayerKey, NOTHING_ON } from '../map/modes.js';
+import { NOTHING_ON } from '../map/modes.js';
 import type { SupportedAddress } from '../session.js';
 import type { TraceArtefact } from '../trace/graph.js';
 import { chooseTeachingPit } from '../tutorial/pit.js';
 import {
-  DRAINAGE_DONE,
-  DRAINAGE_STEPS,
+  type Finished,
+  type Lesson,
   type MapNow,
+  NOTHING_ON_MAP,
+  type Step,
   finished,
   stepIndex,
-} from '../tutorial/drainage.js';
+} from '../tutorial/lesson.js';
+import { lessonFor } from '../tutorial/lessons.js';
+import { SECTIONS, type SectionId } from '../tutorial/sections.js';
 import {
   ink,
   line,
@@ -46,34 +50,6 @@ import {
 } from '../ui/theme.js';
 import { MapView } from './MapView.js';
 
-/**
- * Which chips are on offer at each step, and no more.
- *
- * **The section already narrowed the map to two layers; this narrows it to the
- * one being taught.** Step one says *press Pits* with Pipes sitting beside it,
- * which is an invitation to press the wrong thing and then read an instruction
- * about a map you have already gone past. Everything on screen during a step
- * should be something the step is about.
- *
- * A layer that is *on* keeps its chip whatever the step says. Turning Pits off
- * during the pipes step puts the guide back on step one, and a chip that
- * vanished at the same moment would leave Pipes drawn with no way to turn it
- * off — a map holding something the reader cannot take back.
- */
-export function chipsFor(index: number, now: MapNow): readonly LayerKey[] {
-  const keys: LayerKey[] = ['pit'];
-  // 2 is `pipes-on`, the step that asks for it.
-  if (index >= 2 || now.pipes) keys.push('pipe');
-  return keys;
-}
-
-const NOTHING_ON_MAP: MapNow = {
-  pits: false,
-  pipes: false,
-  selectedPit: null,
-  followingPit: null,
-};
-
 export interface GuideProps {
   readonly map: MapArtefact;
   readonly derived: DerivedArtefact;
@@ -81,22 +57,31 @@ export interface GuideProps {
   readonly index: AddressIndex;
   /** Chosen before the guide starts. The guide has nothing to point at without one. */
   readonly address: SupportedAddress;
+  /** Which section is being taught. Its lesson decides everything below. */
+  readonly section: SectionId;
   readonly onFinish: () => void;
 }
 
-export function Guide({ map, derived, trace, index, address, onFinish }: GuideProps) {
+export function Guide({ map, derived, trace, index, address, section, onFinish }: GuideProps) {
   const [now, setNow] = useState<MapNow>(NOTHING_ON_MAP);
   /** How many `read` steps have been pressed past. See `stepIndex`. */
   const [acknowledged, setAcknowledged] = useState(0);
 
+  const lesson = lessonFor(section);
+
   /*
-    Recomputed only when the address moves. The choice walks every inlet in the
-    extent and traces each one, which is a few hundred graph walks -- cheap
-    once, and not something to do on every pan.
+    Recomputed only when the address moves, and only for a lesson that needs
+    it. The choice walks every inlet in the extent and traces each one, which
+    is a few hundred graph walks -- cheap once, and pointless for a lesson that
+    asks for a layer rather than for a feature.
   */
+  const wantsPit = lesson?.teachingPit ?? false;
   const teaching = useMemo(
-    () => chooseTeachingPit([address.eastingM, address.northingM], map.layers.pit ?? [], trace),
-    [address.eastingM, address.northingM, map.layers.pit, trace],
+    () =>
+      wantsPit
+        ? chooseTeachingPit([address.eastingM, address.northingM], map.layers.pit ?? [], trace)
+        : null,
+    [wantsPit, address.eastingM, address.northingM, map.layers.pit, trace],
   );
   const teachingId = teaching === null ? null : String(teaching.pit.asset_number);
 
@@ -133,9 +118,20 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
     setNow(next);
   }, []);
 
-  const index0 = stepIndex(DRAINAGE_STEPS, now, teachingId, acknowledged);
-  const step = DRAINAGE_STEPS[index0];
-  const done = finished(DRAINAGE_STEPS, now, teachingId, acknowledged);
+  /*
+    A section with no lesson written cannot be started, and the chooser will
+    not offer it -- `GUIDED_SECTIONS` is derived from the lessons that exist.
+    This is the guard for the path that does not go through the chooser, and
+    it says what is missing rather than rendering a guide with no steps in it.
+  */
+  if (lesson === undefined) {
+    return <NotWritten section={section} onFinish={onFinish} />;
+  }
+
+  const steps = lesson.steps;
+  const index0 = stepIndex(steps, now, teachingId, acknowledged);
+  const step = steps[index0];
+  const done = finished(steps, now, teachingId, acknowledged);
 
   return (
     /*
@@ -181,10 +177,11 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
           index={index}
           address={address}
           task="follow"
-          // Nothing on. The first instruction is "press Pits", and the guided
-          // preset had already pressed it -- see `openWith` in MapView.
+          // Nothing on. Every lesson opens with an empty map and the first
+          // instruction turns something on -- and the guided preset had
+          // already pressed it. See `openWith` in MapView.
           openWith={NOTHING_ON}
-          chipKeys={chipsFor(index0, now)}
+          chipKeys={lesson.chips(index0, now)}
           layersButton={false}
           // 260 pixels of the top right, over the number badge on the very pit
           // the guide is asking for -- and repeating the sentence the step
@@ -221,9 +218,10 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
 
       <Coach
         address={address}
+        finishedCopy={lesson.finished}
         step={step}
         stepNumber={index0}
-        total={DRAINAGE_STEPS.length}
+        total={steps.length}
         done={done}
         teaching={teaching === null ? null : { id: teachingId ?? '', metres: teaching.distanceM }}
         onNext={() => {
@@ -237,6 +235,7 @@ export function Guide({ map, derived, trace, index, address, onFinish }: GuidePr
 
 function Coach({
   address,
+  finishedCopy,
   step,
   stepNumber,
   total,
@@ -246,7 +245,8 @@ function Coach({
   onFinish,
 }: {
   readonly address: SupportedAddress;
-  readonly step: (typeof DRAINAGE_STEPS)[number] | undefined;
+  readonly finishedCopy: Finished;
+  readonly step: Step | undefined;
   readonly stepNumber: number;
   readonly total: number;
   readonly done: boolean;
@@ -283,7 +283,7 @@ function Coach({
       <Progress done={done ? total : stepNumber} total={total} />
 
       {done ? (
-        <Finished onFinish={onFinish} />
+        <Done copy={finishedCopy} onFinish={onFinish} />
       ) : (
         step !== undefined && (
           <>
@@ -358,14 +358,14 @@ function Progress({ done, total }: { readonly done: number; readonly total: numb
   );
 }
 
-function Finished({ onFinish }: { readonly onFinish: () => void }) {
+function Done({ copy, onFinish }: { readonly copy: Finished; readonly onFinish: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(4) }}>
       <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
-        {DRAINAGE_DONE.headline}
+        {copy.headline}
       </h2>
       <p style={{ margin: 0, font: type(text.body, { leading: 1.5 }), color: ink.base }}>
-        {DRAINAGE_DONE.body}
+        {copy.body}
       </p>
       <div
         style={{
@@ -378,7 +378,7 @@ function Finished({ onFinish }: { readonly onFinish: () => void }) {
           boxShadow: shadow.floating,
         }}
       >
-        {DRAINAGE_DONE.unlocked}
+        {copy.unlocked}
       </div>
       <button type="button" onClick={onFinish} style={primary}>
         Back to the four →
@@ -397,3 +397,35 @@ const primary = {
   font: type(text.label, { weight: weight.medium }),
   cursor: 'pointer',
 } as const;
+
+/**
+ * A section whose lesson has not been written.
+ *
+ * Not reachable from the chooser, which offers `GUIDED_SECTIONS` and derives
+ * that from the lessons that exist. It is here because `session.guideSection`
+ * is a `SectionId` and the type admits all four — and a screen that rendered a
+ * guide with no steps would show "1 of 0" and wait forever for an instruction
+ * nobody had written.
+ */
+function NotWritten({
+  section,
+  onFinish,
+}: {
+  readonly section: SectionId;
+  readonly onFinish: () => void;
+}) {
+  return (
+    <div style={{ maxWidth: 520, margin: '0 auto', padding: space(10) }}>
+      <h2 style={{ margin: `0 0 ${String(space(3))}px`, font: type(text.title), color: ink.strong }}>
+        {SECTIONS[section].label}
+      </h2>
+      <p style={{ margin: `0 0 ${String(space(5))}px`, font: type(text.body, { leading: 1.5 }), color: ink.muted }}>
+        This part of the guide is not written yet. Nothing has been unlocked, and nothing about the
+        map has changed.
+      </p>
+      <button type="button" onClick={onFinish} style={primary}>
+        Back to the four →
+      </button>
+    </div>
+  );
+}

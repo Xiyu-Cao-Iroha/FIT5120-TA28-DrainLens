@@ -22,6 +22,7 @@ import { Home } from './screens/Home.js';
 import { LockedMap } from './screens/LockedMap.js';
 import { SECTIONS, type SectionId } from './tutorial/sections.js';
 import { progress } from './tutorial/progress.js';
+import { GUIDED_SECTIONS } from './tutorial/lessons.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
@@ -53,13 +54,13 @@ import {
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
 
-/**
- * The sections of the guide that have steps written.
- *
- * One list, read by the homepage and by the notice. Two lists would drift, and
- * the drift would show as a card offering a guide that opens an empty room.
- */
-const GUIDED_SECTIONS: readonly SectionId[] = ['drainage'];
+/*
+  The sections of the guide that have steps written used to be a hand-kept
+  array here. It is `GUIDED_SECTIONS` in `tutorial/lessons.ts` now, derived
+  from the lessons that exist — one place to add a section rather than two, and
+  the drift it removes would have shown as a card offering a guide that opens
+  an empty room.
+*/
 
 interface Loaded {
   readonly map: MapArtefact;
@@ -454,13 +455,14 @@ export function App() {
             </button>
           }
         >
-          {session.address === null ? null : (
+          {session.address === null || session.guideSection === null ? null : (
             <Guide
               map={loaded.map}
               derived={loaded.derived}
               trace={loaded.trace}
               index={loaded.index}
               address={session.address}
+              section={session.guideSection}
               onFinish={() => {
                 dispatch({ type: 'guide-finished' });
               }}
