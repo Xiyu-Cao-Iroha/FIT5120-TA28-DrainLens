@@ -63,6 +63,52 @@ export interface ScenarioRunner {
  */
 export const POSITIONS_MM: readonly number[] = [20, 40, 60];
 
+/**
+ * The rainfall amounts one run solves, given the one that was asked for.
+ *
+ * The published three, plus the requested amount when it is not one of them,
+ * **strictly ascending** — the engine refuses an unordered or duplicated list,
+ * and it is right to: a position list that is not sorted produces a
+ * monotonicity check comparing the wrong pair.
+ *
+ * Pulled out of the hook so it can be tested. It was four lines inside a
+ * `useCallback` inside a `useEffect`-bearing hook, which meant the only way to
+ * exercise the engine's own precondition was to render React.
+ */
+export function positionsFor(rainfallMm: number): number[] {
+  return [...new Set([...POSITIONS_MM, rainfallMm])].sort((a, b) => a - b);
+}
+
+/**
+ * A worker reply as the screen reads it.
+ *
+ * Everything that is not a successful result becomes an insufficiency with a
+ * named reason, including the two shapes that should not arrive at all: a
+ * `failed` message, and a `loaded` reply carrying a run's id — which would
+ * mean the worker answered a different question from the one asked. Reading
+ * fields off that would be reading `undefined` as an answer.
+ *
+ * Pulled out of the hook for the same reason as `positionsFor`, and it is the
+ * more valuable of the two: this is the mapping the result screen depends on.
+ */
+export function resultOf(reply: WorkerReply): ScenarioResult {
+  if (reply.type !== 'result') {
+    return { status: 'insufficient-information', reason: 'scenario_calculation_failed' };
+  }
+  if (reply.status !== 'successful') {
+    return {
+      status: 'insufficient-information',
+      reason: reply.reason as InsufficiencyReason,
+    };
+  }
+  return {
+    status: 'successful',
+    band: reply.band,
+    positions: reply.positions,
+    cellSizeM: reply.cellSizeM,
+  };
+}
+
 export function useScenario(base: string, enabled = true): ScenarioRunner {
   const workerRef = useRef<Worker | null>(null);
   const nextId = useRef(1);
@@ -112,40 +158,16 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
           return;
         }
 
-        // The requested amount is solved even when it is not one of the three
-        // published ones, and the list stays strictly ascending because the
-        // engine requires it.
-        const positions = [...new Set([...POSITIONS_MM, rainfallMm])].sort((a, b) => a - b);
+        const positions = positionsFor(rainfallMm);
         const id = nextId.current++;
 
         setRunning(true);
         pending.current.set(id, (reply) => {
           setRunning(false);
-          if (reply.type === 'failed') {
-            setFailure(reply.message);
-            resolve({ status: 'insufficient-information', reason: 'scenario_calculation_failed' });
-            return;
-          }
-          if (reply.type !== 'result') {
-            // A `loaded` reply carrying a run's id would mean the worker
-            // answered the wrong question; treat it as a failed calculation
-            // rather than reading fields that are not there.
-            resolve({ status: 'insufficient-information', reason: 'scenario_calculation_failed' });
-            return;
-          }
-          resolve(
-            reply.status === 'successful'
-              ? {
-                  status: 'successful',
-                  band: reply.band,
-                  positions: reply.positions,
-                  cellSizeM: reply.cellSizeM,
-                }
-              : {
-                  status: 'insufficient-information',
-                  reason: reply.reason as InsufficiencyReason,
-                },
-          );
+          // The message goes on the screen, so it is kept here rather than in
+          // `resultOf` — which says what the run produced, not what to show.
+          if (reply.type === 'failed') setFailure(reply.message);
+          resolve(resultOf(reply));
         });
 
         worker.postMessage({
