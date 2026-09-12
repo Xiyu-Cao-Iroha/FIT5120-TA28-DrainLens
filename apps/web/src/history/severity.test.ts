@@ -133,6 +133,7 @@ const area = (over: Partial<MapArea> = {}): MapArea => ({
   suppressedRegions: 0,
   persons: 24000,
   rate: 1,
+  regions: 46,
   personsByYear: [23000, 24000],
   e: 0,
   n: 0,
@@ -360,5 +361,25 @@ describe('every field these guards refuse to do without', () => {
     expect(() => {
       assertPoints(change(points(1)) as unknown);
     }).toThrow(AreaDataError);
+  });
+});
+
+describe('the numbers on the panel are the artefact’s, not arithmetic', () => {
+  it('carries the region count rather than reconstructing it', () => {
+    /*
+      **The panel said "1 of its 2 regions" about an area with 46.** The
+      sentence needed a denominator, `MapArea` did not carry one, and what went
+      on screen was `suppressedRegions + 1` — an invented number, on a page
+      whose subject is withheld counts, in a product whose argument is that it
+      does not invent numbers.
+    */
+    const s = scope({});
+    const withReal = {
+      ...s,
+      areas: [{ ...s.areas[0]!, regions: 46, suppressedRegions: 1, complete: false }],
+    };
+    const [joinedArea] = joinAreas(withReal, population([1000, 1000]), points(1));
+    expect(joinedArea.regions).toBe(46);
+    expect(joinedArea.suppressedRegions).toBe(1);
   });
 });

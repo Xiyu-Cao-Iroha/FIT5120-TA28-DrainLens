@@ -168,6 +168,15 @@ export interface MapArea {
   readonly byYear: readonly number[];
   readonly complete: boolean;
   readonly suppressedRegions: number;
+  /**
+   * How many SA1 regions roll up into this area.
+   *
+   * Carried because the panel says *n of its m regions were withheld*, and the
+   * first version of that sentence did not have m — it printed
+   * `suppressedRegions + 1`, which said "1 of its 2" about an area with 46.
+   * An invented denominator on a page about withheld counts.
+   */
+  readonly regions: number;
   /** Residents at the denominator date, or null where the area has none. */
   readonly persons: number | null;
   /**
@@ -215,6 +224,7 @@ export function joinAreas(
       byYear: area.byYear,
       complete: area.complete,
       suppressedRegions: area.suppressedRegions,
+      regions: area.regions,
       persons: enough ? denominator : null,
       rate: enough ? (area.total / denominator) * 1000 : null,
       personsByYear: series,

@@ -49,11 +49,13 @@ import {
 export interface FloodHistoryProps {
   readonly artefact: FloodHistoryArtefact;
   readonly onOpenMap: () => void;
+  /** The same records drawn rather than ranked — every area, not the top thirty. */
+  readonly onOpenAreas: () => void;
   /** AC 2.1.2: back to the homepage, without the browser's own control. */
   readonly onBack: () => void;
 }
 
-export function FloodHistory({ artefact, onOpenMap, onBack }: FloodHistoryProps) {
+export function FloodHistory({ artefact, onOpenMap, onOpenAreas, onBack }: FloodHistoryProps) {
   const [expanded, setExpanded] = useState(false);
   const listRef = useRef<HTMLOListElement | null>(null);
   const shown = expanded ? artefact.areas : artefact.areas.slice(0, artefact.defaultAreas);
@@ -146,6 +148,59 @@ export function FloodHistory({ artefact, onOpenMap, onBack }: FloodHistoryProps)
             ` ${alsoTied.map((a) => a.name).join(' and ')} recorded the same count as the last of them, and ${alsoTied.length === 1 ? 'appears' : 'appear'} under Show more locations.`}
         </span>
       </div>
+
+      {/*
+        The map of every area, offered where the ranking ends.
+
+        **This list is thirty of {areasInScope}, and the sentence above says
+        so.** A reader who has just been told that 275 areas recorded an
+        incident and that they are looking at thirty of them has exactly the
+        question this answers.
+      */}
+      <section
+        style={{
+          marginTop: space(6),
+          padding: space(5),
+          background: brand.wash,
+          border: `1px solid ${brand.tint}`,
+          borderRadius: radius.large,
+          display: 'flex',
+          gap: space(5),
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ flex: '1 1 320px' }}>
+          <h3
+            style={{
+              margin: `0 0 ${String(space(2))}px`,
+              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+              color: ink.strong,
+            }}
+          >
+            See all {String(artefact.counts.areasInScope)} areas on a map
+          </h3>
+          <span style={{ color: ink.muted, font: type(text.label, { leading: 1.55 }) }}>
+            This list is the highest {String(artefact.areas.length)}. The map draws every area in{' '}
+            {artefact.geography.scope}, including the ones with nothing recorded, and can show the
+            counts relative to how many people live there.
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={onOpenAreas}
+          style={{
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            border: 'none',
+            borderRadius: radius.base,
+            background: brand.base,
+            color: ink.inverse,
+            font: type(text.label, { weight: weight.semibold }),
+          }}
+        >
+          Open the area map →
+        </button>
+      </section>
 
       <Explanation artefact={artefact} />
       <ToTheMap artefact={artefact} onOpenMap={onOpenMap} />

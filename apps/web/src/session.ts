@@ -64,6 +64,15 @@ export type Screen =
   | 'home'
   /** The recorded flood incidents, which are about the past and not this address. */
   | 'history'
+  /**
+   * The same incidents as a map of all 281 areas, in two modes.
+   *
+   * A separate screen from the board rather than a tab on it, because the
+   * board is a ranking of thirty and the map is every area in scope. AC
+   * 2.2.1.b caps the board at thirty and nothing here changes that: the map
+   * reads its own artefact.
+   */
+  | 'flood-map'
   /** The guide's way in, and reachable again since 11 September. */
   | 'address'
   /** Unreachable — the homepage's cards took this over. */
@@ -299,6 +308,8 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  /** The board's map, which is the same records drawn rather than ranked. */
+  | { readonly type: 'flood-map-opened' }
   /** The homepage's front door: the four cards, not the map. */
   | { readonly type: 'get-started' }
   /**
@@ -353,6 +364,10 @@ const screenForTask = (task: Task): Screen => (task === 'compare' ? 'scenario' :
 const BACK: Readonly<Record<Screen, Screen>> = {
   home: 'home',
   history: 'home',
+  // Back from the map is the board it was opened from, not the homepage. The
+  // board is where the ranking and the six sentences about what a count means
+  // live, and they are what somebody leaving the map most likely wants.
+  'flood-map': 'history',
   address: 'home',
   task: 'address',
   // Out of a section is back to the address it was built around, not out of
@@ -544,6 +559,9 @@ function step(session: Session, event: SessionEvent): Session {
 
     case 'history-opened':
       return { ...session, screen: 'history' };
+
+    case 'flood-map-opened':
+      return { ...session, screen: 'flood-map' };
 
     case 'go-home':
       return { ...session, screen: 'home', pendingTask: null };
