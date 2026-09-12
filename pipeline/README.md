@@ -303,6 +303,15 @@ refuses a list where one name carries two codes for exactly that reason.
 ./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   --areas ../data/sa2-areas.json
 ```
 
+**The list has been used once, and it matched.** ABS 3218.0's SA2 population
+estimates cover all 281 areas — by the code and by the name, agreeing on every
+one, with nothing left over on either side. What that settles, what year the
+denominator is, and why over a quarter of the areas have a total that is a
+floor rather than an exact value is in
+[POPULATION-DATA.md](../docs/POPULATION-DATA.md). **No stage here reads that
+workbook yet**; the match was measured before a stage was written, which is the
+order this repository takes sources in.
+
 `fetch` checks that each download is an archive holding the file it should,
 because **data.vic's own catalogue link for this dataset is dead** and serves a
 404 HTML page that `curl` saves as 119 KB of "spreadsheet" without complaint.
@@ -314,7 +323,7 @@ alone, why Greater Melbourne, and the four limitations the page has to carry
 
 ## Built since this file was first written
 
-Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), and an address index (`addresses`) with a fixture standing in for it.
+Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), an address index (`addresses`) with a fixture standing in for it, the recorded flood incidents (`flood_history`), and `reframe` — which moves an artefact from one extent's coordinate frame into another's, and is how the Kensington derived layers were placed on the council map.
 
 **The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
 
