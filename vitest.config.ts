@@ -24,18 +24,23 @@ export default defineConfig({
         '**/*.d.ts',
         // Covered by `npm run test:db`, not by this run, and excluded here so
         // that the percentage stays a statement about the unit suite rather
-        // than a number nobody can act on. It is not untested: twelve tests in
-        // `apps/api/test-db/load.test.ts` load it against a real Postgres and
-        // reconcile every table against the published artefacts. Excluding it
+        // than a number nobody can act on. It is not untested:
+        // `apps/api/test-db/load.test.ts` loads it against a real Postgres and
+        // reconciles every table against the published artefacts. Excluding it
         // *before* those existed would have been hiding untested code behind a
         // gate, which is a different thing entirely.
         //
         // The same applies to the loader, the queries and the server: all
-        // three are exercised by `npm run test:db` against a real Postgres --
-        // twenty-four tests, four of which run the frontend's own guards over
-        // the API's responses. Excluding any of them *before* those tests
-        // existed would have been hiding untested code behind a gate; the
-        // exclusion came second, and each file was red first.
+        // three are exercised by `npm run test:db` against a real Postgres,
+        // some of it running the frontend's own guards over the API's
+        // responses. Excluding any of them *before* those tests existed would
+        // have been hiding untested code behind a gate; the exclusion came
+        // second, and each file was red first.
+        //
+        // **Both sentences above carried a test count, and both had gone
+        // stale** -- twelve against sixteen, twenty-four against thirty. The
+        // README's gate table is the one place a count is written down, for
+        // exactly this reason, and a comment is not that place.
         'apps/api/src/load.ts',
         'apps/api/src/queries.ts',
         'apps/api/src/server.ts',

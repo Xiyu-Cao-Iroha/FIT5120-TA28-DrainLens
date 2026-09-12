@@ -89,12 +89,81 @@ describe('what the loader put in', () => {
     expect(await count('flood_area_coverage')).toBe(30);
   });
 
-  it('leaves the two tables that have no verified source empty', async () => {
-    // Not an oversight. The SA1 grain needs the pipeline to emit it, and the
-    // population dataset has not been reconciled against its own
-    // documentation. An empty table is honest; invented rows would not be.
+  it('holds the population, one row per area per year', async () => {
+    /*
+      **This test used to assert that `population` is empty**, with a comment
+      saying the dataset had not been reconciled against its own documentation.
+      It has been now — 281 of 281 areas, by two joins that agree — so the
+      invariant is superseded rather than wrong, and the assertion moves rather
+      than disappearing. See `docs/POPULATION-DATA.md`.
+
+      281 areas across the seven 30 Junes the reporting period touches.
+    */
+    expect(await count('population')).toBe(1967);
+    expect(Number(await one(`SELECT count(DISTINCT area_code)::text AS v FROM population`))).toBe(281);
+    expect(Number(await one(`SELECT count(DISTINCT as_at)::text AS v FROM population`))).toBe(7);
+    expect(await one(`SELECT min(as_at)::text AS v FROM population`)).toBe('2009-06-30');
+    expect(await one(`SELECT max(as_at)::text AS v FROM population`)).toBe('2015-06-30');
+  });
+
+  it('keeps the areas nobody lives in, because a population is still a fact', async () => {
+    // Seven areas are under the 1,000 residents the Severity Score needs —
+    // two airports, a racecourse, industrial land. They are not dropped: the
+    // rule about what may be divided belongs to whoever divides, and a row
+    // missing here would be indistinguishable from a join that failed.
+    expect(
+      Number(
+        await one(
+          `SELECT count(*)::text AS v FROM population
+           WHERE as_at = '2012-06-30' AND persons < 1000`,
+        ),
+      ),
+    ).toBe(7);
+    expect(
+      Number(
+        await one(
+          `SELECT count(*)::text AS v FROM population
+           WHERE as_at = '2012-06-30' AND persons = 0`,
+        ),
+      ),
+    ).toBe(3);
+  });
+
+  it('points every population row at a source that exists', async () => {
+    // The foreign key already guarantees it; this says which one, because a
+    // denominator whose publisher and licence cannot be named is a number the
+    // page cannot show under AC 4.3.2.d.
+    expect(
+      await one(`SELECT DISTINCT dataset_id AS v FROM population`),
+    ).toBe('3218.0');
+    expect(
+      await one(`SELECT publisher AS v FROM source WHERE dataset_id = '3218.0'`),
+    ).toBe('Australian Bureau of Statistics');
+  });
+
+  it('leaves the SA1 grain empty, which is still the honest state', async () => {
+    // `flood_incident` needs the pipeline to emit 13,339 regions it currently
+    // discards at build time. The score is computed at SA2 from the published
+    // rollups, so this stays empty and the comment in the migration stays true.
     expect(await count('flood_incident')).toBe(0);
-    expect(await count('population')).toBe(0);
+  });
+
+  it('cannot yet join the counts to the denominator, and says so', async () => {
+    /*
+      **Recorded as a test because it is a gap, not a bug, and gaps are the
+      thing that gets forgotten.**
+
+      `population` holds all 281 areas by ASGS code. `flood_area` holds the
+      published thirty by name. There is no column joining them and there are
+      not the same number of them, so the Severity Score cannot be computed in
+      this database as it stands — the flood artefact would have to publish
+      every in-scope area and carry the code beside the name.
+
+      That is a change to an artefact the board already reads, so it is its own
+      piece of work rather than a line snuck into this one.
+    */
+    expect(Number(await one(`SELECT count(DISTINCT area_name)::text AS v FROM flood_area`))).toBe(30);
+    expect(Number(await one(`SELECT count(DISTINCT area_code)::text AS v FROM population`))).toBe(281);
   });
 });
 
