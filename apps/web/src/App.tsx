@@ -29,7 +29,7 @@ import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
-import type { DifferenceArea } from './map/difference.js';
+import { type DifferenceArea, intoMapFrame } from './map/difference.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
@@ -570,6 +570,46 @@ export function App() {
 
     case 'scenario':
     case 'result': {
+      const startComparison = (): void => {
+        // The scene's own cell for this asset. Never recomputed
+        // from the map geometry: the pipeline snaps drains onto
+        // the flow field, so a cell worked out here disagrees with
+        // the scene for every drain in the extent.
+        const drain = scenario.drains.find(
+          (d) => d.assetNumber === session.scenario.pitId,
+        );
+        const cell = drain?.isInlet === true ? drain.cell : null;
+        if (cell === null || session.scenario.blockage === null) {
+          // A pit the scene does not place cannot carry a
+          // scenario, and that is an inlet problem rather than a
+          // crash.
+          dispatch({ type: 'comparison-started' });
+          dispatch({
+            type: 'comparison-finished',
+            outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
+          });
+          return;
+        }
+
+        dispatch({ type: 'comparison-started' });
+        void scenario
+          .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
+          .then((result) => {
+            // Cleared on failure: leaving the previous run's
+            // positions attached would let the control offer
+            // answers to a question nobody asked.
+            setPositions(result.status === 'successful' ? result.positions : []);
+            if (result.status === 'successful') setCellSizeM(result.cellSizeM);
+            dispatch({
+              type: 'comparison-finished',
+              outcome:
+                result.status === 'successful'
+                  ? { kind: 'comparison', band: result.band }
+                  : { kind: 'insufficient', reason: result.reason },
+            });
+          });
+      };
+
       const onAction = (action: Action) => {
         switch (action) {
           case 'change-scenario':
@@ -582,8 +622,10 @@ export function App() {
             dispatch({ type: 'change-scenario' });
             return;
           case 'try-again':
-            dispatch({ type: 'comparison-started' });
-            dispatch({ type: 'comparison-finished', outcome: { kind: 'insufficient', reason: 'scenario_calculation_failed' } });
+            // Runs the same comparison again. It used to dispatch a failure
+            // without calling the engine at all, so the button could only
+            // ever reproduce the screen it was pressed on.
+            startComparison();
             return;
           case 'change-address':
             dispatch({ type: 'change-address' });
@@ -605,9 +647,12 @@ export function App() {
       const differenceShown: DifferenceArea | null =
         session.screen === 'result' && outcome?.kind === 'comparison'
           ? {
-              cells:
+              cells: intoMapFrame(
                 positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)
                   ?.higherAreasM ?? [],
+                scenario.origin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
+                loaded.map.extent,
+              ),
               cellSizeM,
             }
           : null;
@@ -677,45 +722,7 @@ export function App() {
                   onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
                   onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
                   onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
-                  onRun={() => {
-                    // The scene's own cell for this asset. Never recomputed
-                    // from the map geometry: the pipeline snaps drains onto
-                    // the flow field, so a cell worked out here disagrees with
-                    // the scene for every drain in the extent.
-                    const drain = scenario.drains.find(
-                      (d) => d.assetNumber === session.scenario.pitId,
-                    );
-                    const cell = drain?.isInlet === true ? drain.cell : null;
-                    if (cell === null || session.scenario.blockage === null) {
-                      // A pit the scene does not place cannot carry a
-                      // scenario, and that is an inlet problem rather than a
-                      // crash.
-                      dispatch({ type: 'comparison-started' });
-                      dispatch({
-                        type: 'comparison-finished',
-                        outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
-                      });
-                      return;
-                    }
-
-                    dispatch({ type: 'comparison-started' });
-                    void scenario
-                      .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
-                      .then((result) => {
-                        // Cleared on failure: leaving the previous run's
-                        // positions attached would let the control offer
-                        // answers to a question nobody asked.
-                        setPositions(result.status === 'successful' ? result.positions : []);
-                        if (result.status === 'successful') setCellSizeM(result.cellSizeM);
-                        dispatch({
-                          type: 'comparison-finished',
-                          outcome:
-                            result.status === 'successful'
-                              ? { kind: 'comparison', band: result.band }
-                              : { kind: 'insufficient', reason: result.reason },
-                        });
-                      });
-                  }}
+                  onRun={startComparison}
                   onReset={() => dispatch({ type: 'reset-choices' })}
                 />
               )}

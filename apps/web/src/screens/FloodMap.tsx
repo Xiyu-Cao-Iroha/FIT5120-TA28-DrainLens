@@ -34,6 +34,7 @@ import {
   type PopulationArtefact,
   type ScopeAreas,
   completenessOf,
+  completenessText,
   scoreLabel,
   totalLabel,
 } from '../history/severity.js';
@@ -330,6 +331,7 @@ function Detail({
   readonly scope: ScopeAreas;
 }) {
   const state = completenessOf(area, mode);
+  const completeness = completenessText(area, state, scope.incidentType);
   const widest = Math.max(1, ...area.byYear);
 
   return (
@@ -420,30 +422,7 @@ function Detail({
 
       <Section title="How complete this is">
         <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
-          {state === 'minimum' ? (
-            <>
-              <strong style={{ color: ink.strong }}>Minimum value.</strong> A count inside this
-              area was withheld for privacy — {String(area.suppressedRegions)} of its{' '}
-              {String(area.regions)} smaller regions — so the total is a lower bound rather than a
-              number.
-            </>
-          ) : state === 'none' ? (
-            <>
-              <strong style={{ color: ink.strong }}>No recorded activity.</strong> The SES recorded
-              no {scope.incidentType.toLowerCase()} dispatch here across the whole period. That is
-              different from a small number.
-            </>
-          ) : state === 'unavailable' ? (
-            <>
-              <strong style={{ color: ink.strong }}>Not available.</strong> The counts are exact;
-              the score is not published because there is no usable population to divide by.
-            </>
-          ) : (
-            <>
-              <strong style={{ color: ink.strong }}>Exact.</strong> No count inside this area was
-              withheld.
-            </>
-          )}
+          <strong style={{ color: ink.strong }}>{completeness.label}</strong> {completeness.body}
         </p>
       </Section>
 

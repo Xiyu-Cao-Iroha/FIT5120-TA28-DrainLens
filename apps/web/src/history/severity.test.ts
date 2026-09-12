@@ -30,6 +30,7 @@ import {
   bandOf,
   breaksFor,
   completenessOf,
+  completenessText,
   joinAreas,
   scoreLabel,
   totalLabel,
@@ -169,6 +170,28 @@ describe('what an area is worth saying', () => {
     const unscored = area({ total: 0, rate: null, persons: null });
     expect(completenessOf(unscored, 'activity')).toBe('none');
     expect(completenessOf(unscored, 'severity')).toBe('unavailable');
+  });
+
+  it('never calls a withheld count exact just because there is no score', () => {
+    // Port Melbourne Industrial and Braeside: a withheld region, and too few
+    // residents to score. The panel said "The counts are exact" about both.
+    const both = area({ complete: false, suppressedRegions: 1, regions: 3, rate: null, persons: 400 });
+    const state = completenessOf(both, 'severity');
+    expect(state).toBe('unavailable');
+    const said = completenessText(both, state, 'Flood');
+    expect(said.label).toBe('Not available.');
+    expect(said.body).not.toContain('exact');
+    expect(said.body).toContain('1 of its 3 smaller regions');
+    expect(said.body).toContain('minimum');
+
+    const exactButUnscored = area({ rate: null, persons: 400 });
+    expect(completenessText(exactButUnscored, 'unavailable', 'Flood').body).toContain('The counts are exact');
+  });
+
+  it('says each completeness state in its own words', () => {
+    expect(completenessText(area(), 'exact', 'Flood').label).toBe('Exact.');
+    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').body).toContain('2 of its 46');
+    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood dispatch');
   });
 
   it('reads the mode’s own number off the area', () => {
