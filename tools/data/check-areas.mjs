@@ -175,6 +175,51 @@ for (const p of points.areas) {
   }
 }
 
+// --- every legend entry describes something -------------------------------
+
+/*
+  The bins the map's legend names, restated from `history/severity.ts`.
+
+  Restating them is a real cost — the two can drift — and it is the same
+  trade-off `check-guide.mjs` takes with the inlet expression, for the same
+  reason: that module is TypeScript in a browser bundle and this is a plain
+  node script. **The tie is that the counts below are exact**, so a change in
+  either place has to be looked at rather than absorbed.
+
+  What this catches is a legend entry describing nothing. A rebuilt artefact
+  can empty a bin without a line of code changing, and an empty bin is a
+  colour in the key that appears nowhere on the map.
+*/
+const BINS = {
+  activity: [
+    ['1–10', (a) => a.total >= 1 && a.total <= 10, 27],
+    ['11–25', (a) => a.total >= 11 && a.total <= 25, 102],
+    ['26–50', (a) => a.total >= 26 && a.total <= 50, 91],
+    ['51 and above', (a) => a.total >= 51, 55],
+    ['no recorded activity', (a) => a.total === 0, 6],
+  ],
+};
+
+for (const [label, holds, expected] of BINS.activity) {
+  const found = scope.areas.filter(holds).length;
+  if (found === 0) fail(`the activity legend's "${label}" describes no area`);
+  else if (found !== expected) {
+    fail(`"${label}" holds ${String(found)} areas; severity.ts's comment says ${String(expected)}`);
+  }
+}
+
+const denominator = population.asAt.indexOf(population.denominator);
+const rates = population.areas
+  .filter((p) => p.persons[denominator] >= population.minimumResidents)
+  .map((p) => (byCode.get(p.code).total / p.persons[denominator]) * 1000);
+for (const [label, holds] of [
+  ['Lower', (r) => r < 1.3],
+  ['Moderate', (r) => r >= 1.3 && r <= 3],
+  ['Higher', (r) => r > 3],
+]) {
+  if (!rates.some(holds)) fail(`the severity legend's "${label}" describes no area`);
+}
+
 // --- say what was checked -------------------------------------------------
 
 const summary =
