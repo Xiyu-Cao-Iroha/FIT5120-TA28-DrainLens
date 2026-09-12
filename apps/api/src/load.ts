@@ -164,6 +164,12 @@ export async function load(
     await readFile(path.join(BUNDLED.dir, 'population.json'), 'utf8'),
   ) as Artefact;
 
+  // Every area in the scope, which is what the flood tables now hold. The
+  // board is thirty rows of it; see the loop that fills `board_rank`.
+  const scopeAreas = JSON.parse(
+    await readFile(path.join(BUNDLED.dir, 'sa2-areas.json'), 'utf8'),
+  ) as Artefact;
+
   const counted: Record<string, number> = {};
   const count = (table: string, n: number) => {
     counted[table] = n;
@@ -533,8 +539,21 @@ export async function load(
   }
   count('trace_reason', Object.keys(reasons).length);
 
-  // --- Flood history, at the grain the artefact publishes --------------------
+  // --- Flood history, at the full scope rather than the board's thirty -------
 
+  /*
+    **Two artefacts, one set of rows.** The scope list carries all 281 areas
+    with their ASGS codes; the board carries the highest thirty, ranked, and
+    AC 2.2.1.b caps it there. Loading both into two sets of tables would put
+    thirty areas' counts in the database twice with nothing to notice when the
+    copies stop agreeing -- which is the failure that produced
+    `tools/data/check-areas.mjs`, and repeating it one layer down would be
+    learning nothing.
+
+    So the rows are the scope and `board_rank` is the board. Exactly thirty
+    rows carry a rank; the API asks for the ranked ones. The cap stays a
+    property of the data, which is how Iteration 1 recorded it as met.
+  */
   const scope = need(
     (flood.geography as { scope?: string } | undefined)?.scope,
     'a geographic scope on the flood history',
@@ -544,9 +563,13 @@ export async function load(
     'a reporting period on the flood history',
   );
   const incidentType = need(flood.incidentType as string | undefined, 'an incident type');
-  const areas = need(
+  const board = need(
     flood.areas as readonly Record<string, unknown>[] | undefined,
     'areas on the flood history',
+  );
+  const areas = need(
+    scopeAreas.areas as readonly Record<string, unknown>[] | undefined,
+    'areas on the scope list',
   );
 
   let areaYears = 0;
@@ -569,11 +592,13 @@ export async function load(
     }
 
     await client.query(
-      `INSERT INTO flood_area_coverage (extent_scope, area_name, regions, suppressed_regions, complete)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO flood_area_coverage
+         (extent_scope, area_name, sa2_code, regions, suppressed_regions, complete)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         scope,
         name,
+        need(area.code as string | undefined, `an ASGS code for ${name}`),
         need(area.regions as number | undefined, `a region count for ${name}`),
         need(area.suppressedRegions as number | undefined, `a suppressed count for ${name}`),
         need(area.complete as boolean | undefined, `a completeness flag for ${name}`),
@@ -582,6 +607,31 @@ export async function load(
   }
   count('flood_area', areaYears);
   count('flood_area_coverage', areas.length);
+
+  /*
+    The board, as a rank on rows that already exist.
+
+    An area on the board that the scope list does not hold would mean the two
+    artefacts were built from different runs, which `check-areas.mjs` refuses
+    before either is committed -- but the loader is what a Cloud Run job
+    executes against a database, and a silent zero-row update there is a board
+    that renders empty for everybody.
+  */
+  for (const [index, area] of board.entries()) {
+    const name = need(area.name as string | undefined, 'a name on a board area');
+    const updated = await client.query(
+      `UPDATE flood_area_coverage SET board_rank = $1
+       WHERE extent_scope = $2 AND area_name = $3`,
+      [index + 1, scope, name],
+    );
+    if (updated.rowCount !== 1) {
+      throw new LoadError(
+        `the board ranks ${name} at ${String(index + 1)}, and the scope list does not hold it: ` +
+          `the two artefacts were not built from the same run`,
+      );
+    }
+  }
+  count('flood_area_coverage board_rank', board.length);
 
   // --- The Severity Score's denominator -------------------------------------
 

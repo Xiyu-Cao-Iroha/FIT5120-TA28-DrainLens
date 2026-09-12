@@ -145,6 +145,7 @@ console.log(`  taken    ${new Date().toISOString()}\n`);
 
 const mapFile = await published('map.json');
 const floodFile = await shared('flood-history.json');
+const scopeFile = await shared('sa2-areas.json');
 
 // Health first. Everything below it is meaningless against an empty database,
 // and an empty database is what a service that started before its migration
@@ -164,6 +165,17 @@ await report('health reports the data is in, not merely that the process is up',
   assert.equal(it.status, 'ok');
   assert.equal(it.pits, mapFile.layers.pit.length, `serving ${String(it.pits)} pits`);
   assert.equal(it.areas, floodFile.areas.length, `serving ${String(it.areas)} areas`);
+  /*
+    The tables hold every area in the scope and the board is thirty of them,
+    so there are two numbers to be wrong about. A job that loaded the board
+    and not the scope would keep `areas` right and leave the map with nothing
+    to draw — which is the deployment failure this whole script exists for.
+  */
+  assert.equal(
+    it.scopeAreas,
+    scopeFile.areas.length,
+    `holding ${String(it.scopeAreas)} areas in scope`,
+  );
 });
 
 await report('map: every recorded feature, in every layer', async () => {
