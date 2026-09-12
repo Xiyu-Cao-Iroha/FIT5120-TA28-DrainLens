@@ -27,6 +27,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../src/migrate.js';
 import { BUNDLED, COUNCIL, load } from '../src/load.js';
 import { derivedArtefact, mapArtefact, traceArtefact } from '../src/queries.js';
+import { DATABASE_URL } from './url.js';
 
 /*
  * **These tests used to skip, and no longer can.**
@@ -47,7 +48,7 @@ import { derivedArtefact, mapArtefact, traceArtefact } from '../src/queries.js';
 let client: pg.Client;
 
 beforeAll(async () => {
-  client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  client = new pg.Client({ connectionString: DATABASE_URL });
   await client.connect();
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await migrate(client);

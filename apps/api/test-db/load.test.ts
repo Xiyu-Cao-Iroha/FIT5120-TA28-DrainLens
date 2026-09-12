@@ -27,13 +27,11 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { load } from '../src/load.js';
+import { DATABASE_URL } from './url.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
 
-const URL =
-  process.env.DATABASE_URL ??
-  'postgres://drainlens:drainlens-local-only@localhost:5433/drainlens';
 
 let client: pg.Client;
 
@@ -46,7 +44,7 @@ const count = async (table: string): Promise<number> =>
   Number(await one(`SELECT count(*)::text AS v FROM ${table}`));
 
 beforeAll(async () => {
-  client = new pg.Client({ connectionString: URL });
+  client = new pg.Client({ connectionString: DATABASE_URL });
   await client.connect();
 
   // From scratch every run. A test that passes only against a database
