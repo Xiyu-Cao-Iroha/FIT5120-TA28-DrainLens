@@ -785,3 +785,105 @@ describe('opening the map from the homepage', () => {
     expect(viaTask.mapMode).toBeNull();
   });
 });
+
+describe('a task chosen before there is an address', () => {
+  /*
+    AC 3.1.1 needs the comparison offered from the homepage, and the homepage
+    has no address. The route is: name the task, be asked for an address, then
+    arrive at the task — and the reducer is the only thing that remembers what
+    the address was collected for.
+
+    **The screen that used to carry this choice had no way in.** `screen:
+    'task'` is set by `address-accepted` with no guide section running, and
+    after the homepage was rebuilt around the guide, every route to the address
+    screen set one. That is why the tests below check both destinations: where
+    a pending task goes, and that an address given with nothing pending still
+    lands on the task question.
+  */
+
+  it('collects an address first, then opens what was asked for', () => {
+    const asked = play([{ type: 'task-wanted', task: 'compare' }]);
+    expect(asked.screen).toBe('address');
+    expect(asked.task).toBeNull();
+
+    const arrived = play([{ type: 'address-accepted', address: GATEHOUSE }], asked);
+    expect(arrived.screen).toBe('scenario');
+    expect(arrived.task).toBe('compare');
+  });
+
+  it('goes straight there when an address is already in hand', () => {
+    // The homepage is not the only place this can be dispatched from, and
+    // somebody who has already named their street should not be asked twice.
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-wanted', task: 'compare' },
+    ]);
+    expect(end.screen).toBe('scenario');
+  });
+
+  it('still sends an address given for no particular task to the task question', () => {
+    // The other destination, and the one that restores a screen nothing could
+    // reach: changing an address from inside the comparison and re-entering it
+    // lands on `Choose a task`, which is what the breadcrumb already claims.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'change-address' },
+      { type: 'address-accepted', address: NEALE },
+    ]);
+    expect(end.screen).toBe('task');
+  });
+
+  it('drops a pending task when the address screen is backed out of', () => {
+    /*
+      The failure this prevents: press the comparison card, change your mind,
+      go and read the flood board, then give an address somewhere else for an
+      unrelated reason and be dropped into a comparison you abandoned. The
+      pending guide section is deliberately *not* dropped the same way — the
+      chooser sets it again every time it is used, and the homepage does not.
+    */
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-abandoned' },
+    ]);
+    expect(end.screen).toBe('home');
+    expect(end.pendingTask).toBeNull();
+
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }], end).screen).toBe('task');
+  });
+
+  it('does not let a pending task outlive a trip home', () => {
+    const end = play([{ type: 'task-wanted', task: 'compare' }, { type: 'go-home' }]);
+    expect(end.pendingTask).toBeNull();
+  });
+
+  it('leaves the guide in charge when both are waiting', () => {
+    // A section is chosen from the chooser, which is reached from the map,
+    // which can be reached after a pending task is set. The section is the
+    // more recent answer and it is the one being taught.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(end.screen).toBe('guide');
+  });
+});
+
+describe('the breadcrumb back to the task question', () => {
+  it('goes to the task question rather than the screen it was pressed on', () => {
+    // It dispatched `task-chosen` with the task already chosen, so the crumb
+    // labelled `Choose a task` returned to the comparison. A mislabelled
+    // control, unnoticed for as long as its destination was unreachable.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-reconsidered' },
+    ]);
+    expect(end.screen).toBe('task');
+  });
+
+  it('stays put with no address, because the task question shows one', () => {
+    expect(play([{ type: 'task-reconsidered' }]).screen).toBe('home');
+  });
+})

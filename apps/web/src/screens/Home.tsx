@@ -12,12 +12,19 @@
  * card names one and carries it through. A card that opened the same default
  * map as every other card would be four labels over one door.
  *
- * **What is deliberately not on it.**
+ * **The drain-blockage comparison is back, and it is not a mode.** AC 1.1.1
+ * required it absent from the Iteration 1 interface, and absent meant not
+ * described here either — a card explaining a feature is that feature
+ * appearing in the interface. AC 3.1.1 requires it offered again, and this is
+ * the only place it can be offered from: the screen that used to carry it is
+ * reached by giving an address, and since this page replaced the address
+ * field as the way in, nothing reaches it.
  *
- * No drain-blockage comparison. AC 1.1.1 requires it to be absent from the
- * Iteration 1 interface, and absent means not described here either — a card
- * explaining a feature is that feature appearing in the interface. The screens
- * and their tests are untouched in the repository, waiting for Iteration 2.
+ * It sits below the four rather than among them because it is a task and they
+ * are layers. The four open a map; this one asks three questions first and
+ * then opens a map that answers them. It also needs an address, which is why
+ * pressing it goes to the address screen rather than straight there — the
+ * session carries what it was for.
  *
  * Flood history arrived on 3 September and is the fifth card, set apart from
  * the four modes because it is the one way in that does not open the map. It
@@ -149,9 +156,11 @@ export interface HomeProps {
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  /** Asks for an address, then opens the comparison — AC 3.1.1. */
+  readonly onCompare: () => void;
 }
 
-export function Home({ history, onOpenMap, onOpenHistory }: HomeProps) {
+export function Home({ history, onOpenMap, onOpenHistory, onCompare }: HomeProps) {
   return (
     <div>
       {/*
@@ -164,7 +173,12 @@ export function Home({ history, onOpenMap, onOpenHistory }: HomeProps) {
           onOpenMap();
         }}
       />
-      <Paths onOpenMap={onOpenMap} onOpenHistory={onOpenHistory} history={history} />
+      <Paths
+        onOpenMap={onOpenMap}
+        onOpenHistory={onOpenHistory}
+        onCompare={onCompare}
+        history={history}
+      />
       <Flow />
       <Limits />
       <ClosingNote />
@@ -729,10 +743,12 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
 function Paths({
   onOpenMap,
   onOpenHistory,
+  onCompare,
   history,
 }: {
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  readonly onCompare: () => void;
   readonly history: FloodHistoryArtefact;
 }) {
   return (
@@ -819,6 +835,65 @@ function Paths({
         </div>
 
         <FloodPreview artefact={history} />
+      </article>
+
+      {/*
+        The comparison, offered again after one iteration off. Quieter than the
+        flood band above it: that one is a finished thing to read, and this one
+        is a calculation somebody has to set up and whose most likely honest
+        answer is that blocking one drain changed nothing anybody would notice.
+
+        The words below say what it compares against and what it is not, in
+        that order, because the second is the part a person will otherwise
+        supply for themselves. AC 3.1.2.d and 3.1.2.e put the same distinction
+        on the controls; this is the version that has to survive being read
+        once, quickly, by somebody deciding whether to press it.
+      */}
+      <article
+        style={{
+          marginTop: space(6),
+          padding: space(5),
+          background: surface.raised,
+          border: `1px solid ${line.base}`,
+          borderRadius: radius.large,
+          display: 'flex',
+          gap: space(5),
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ flex: '1 1 320px' }}>
+          <h3
+            style={{
+              margin: `0 0 ${String(space(2))}px`,
+              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+              letterSpacing: tracking.title,
+              color: ink.strong,
+            }}
+          >
+            Compare a drain-blockage scenario
+          </h3>
+          <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
+            Choose a recorded drainage pit near an address, assume it is partly or fully blocked,
+            and compare the calculated result against the same rainfall with every drain clear.
+            Both sides are assumptions you set, not observations of the drain or a forecast of
+            rain, and the answer is often that there is no clear difference.
+          </p>
+        </span>
+        <button
+          type="button"
+          onClick={onCompare}
+          style={{
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            border: `1px solid ${line.strong}`,
+            borderRadius: radius.base,
+            background: surface.raised,
+            color: brand.ink,
+            font: type(text.label, { weight: weight.semibold }),
+          }}
+        >
+          Set up a comparison →
+        </button>
       </article>
 
       {/*

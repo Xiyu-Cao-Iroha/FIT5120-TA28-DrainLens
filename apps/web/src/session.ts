@@ -182,6 +182,20 @@ export interface Session {
   readonly learned: Learned;
   /** The section being taught, or null outside the guide. */
   readonly guideSection: SectionId | null;
+  /**
+   * A task chosen before an address was given, waiting for one.
+   *
+   * The same shape of problem `guideSection` solves, for the other question
+   * the address screen is asked on behalf of. A homepage card naming a task
+   * cannot go straight to it — every task screen is about somewhere — so it
+   * asks for an address first and this remembers what it was for.
+   *
+   * **Null is not "no task", it is "nobody is waiting".** With nothing
+   * pending, an accepted address lands on the task question, which is what it
+   * did before any of this and is still right for somebody who arrived by
+   * changing their address rather than by choosing a task.
+   */
+  readonly pendingTask: Task | null;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -207,6 +221,7 @@ export const INITIAL_SESSION: Session = {
   mapOpenings: 0,
   learned: NOTHING_LEARNED,
   guideSection: null,
+  pendingTask: null,
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -241,6 +256,18 @@ export type SessionEvent =
   | { readonly type: 'address-cleared' }
   | { readonly type: 'address-rejected'; readonly typed: string }
   | { readonly type: 'task-chosen'; readonly task: Task }
+  /**
+   * A task chosen somewhere that has no address yet.
+   *
+   * `task-chosen` assumes one: it is dispatched from the task question, which
+   * is only reached by giving an address. The homepage has no address and is
+   * where AC 3.1.1 needs the comparison to be offered from, so this is the
+   * same choice made one screen earlier — it collects the address first and
+   * then does exactly what `task-chosen` does.
+   */
+  | { readonly type: 'task-wanted'; readonly task: Task }
+  /** Back to the task question from a task -- the comparison's breadcrumb. */
+  | { readonly type: 'task-reconsidered' }
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
   | { readonly type: 'blockage-selected'; readonly blockage: BlockageSetting }
   | { readonly type: 'rainfall-selected'; readonly rainfallMm: number }
@@ -313,6 +340,16 @@ export type SessionEvent =
   | { readonly type: 'reset-choices' };
 
 /** Where `back` goes from each screen. */
+/**
+ * Where a task opens.
+ *
+ * One line, in one place, because two screens now send somebody to a task:
+ * the task question, which has an address, and the homepage, which does not.
+ * A second copy of this would be a homepage card that opens a different
+ * screen from the card with the same name one step further in.
+ */
+const screenForTask = (task: Task): Screen => (task === 'compare' ? 'scenario' : 'explore');
+
 const BACK: Readonly<Record<Screen, Screen>> = {
   home: 'home',
   history: 'home',
@@ -413,7 +450,14 @@ function step(session: Session, event: SessionEvent): Session {
         // and hands it to whoever was waiting: the guide, when a section is
         // running, and the task question otherwise -- which is where this
         // always went and is currently unreachable.
-        screen: session.guideSection === null ? 'task' : 'guide',
+        screen:
+          session.guideSection !== null
+            ? 'guide'
+            : session.pendingTask === null
+              ? 'task'
+              : screenForTask(session.pendingTask),
+        ...(session.pendingTask === null ? {} : { task: session.pendingTask }),
+        pendingTask: null,
         address: event.address,
         rejectedAddress: null,
         // A different address invalidates the pit, which belongs to the old
@@ -430,11 +474,20 @@ function step(session: Session, event: SessionEvent): Session {
     case 'address-rejected':
       return { ...session, screen: 'unsupported', rejectedAddress: event.typed };
 
+    case 'task-wanted':
+      // With an address already in hand this is `task-chosen`, and saying so
+      // by falling through would be cheaper than the recursion. It would also
+      // be two cases that have to be kept the same by hand.
+      return session.address === null
+        ? { ...session, screen: 'address', pendingTask: event.task }
+        : reduce(session, { type: 'task-chosen', task: event.task });
+
     case 'task-chosen':
       return {
         ...session,
-        screen: event.task === 'compare' ? 'scenario' : 'explore',
+        screen: screenForTask(event.task),
         task: event.task,
+        pendingTask: null,
         // The other way into the map. A mode left over from an earlier trip
         // through the homepage would quietly override the task's own defaults.
         mapMode: null,
@@ -493,13 +546,34 @@ function step(session: Session, event: SessionEvent): Session {
       return { ...session, screen: 'history' };
 
     case 'go-home':
-      return { ...session, screen: 'home' };
+      return { ...session, screen: 'home', pendingTask: null };
 
     case 'address-abandoned':
       // Back to whoever asked. The pending section is left alone: pressing
       // Back does not un-choose the part of the guide, it just stops short of
       // giving an address, and the chooser it lands on will set it again.
-      return { ...session, screen: session.guideSection === null ? 'home' : 'choose' };
+      //
+      // **A pending task is dropped, and that asymmetry is deliberate.** The
+      // chooser re-sets the section every time it is used; the homepage does
+      // not, so a task kept here would sit through a visit to the map and
+      // then divert the next address somebody gives for an unrelated reason.
+      return {
+        ...session,
+        screen: session.guideSection === null ? 'home' : 'choose',
+        pendingTask: null,
+      };
+
+    case 'task-reconsidered':
+      /*
+        Back to the task question, which the comparison's own breadcrumb has
+        claimed to do since it was written and did not: it dispatched
+        `task-chosen` with the task already chosen, so 'Choose a task' led
+        back to the screen it was pressed on. Nobody noticed because the
+        screen it names had no way in at all.
+
+        Guarded on the address because the task screen puts one on itself.
+      */
+      return session.address === null ? session : { ...session, screen: 'task' };
 
     case 'change-address':
       return { ...session, screen: 'address' };
