@@ -152,6 +152,35 @@ button:disabled {
  * its container, and a width measured in an effect is one frame late — which
  * here means the map is painted at the wrong size and then jumps.
  */
+/*
+ * The photograph behind the first screen, and the scrim that keeps it readable.
+ *
+ * **In CSS rather than inline because the answer depends on the layout.** Wide,
+ * the text sits in the left column and the scrim can ease off to the right so
+ * the wet kerb is not washed out. Narrow, the column is the whole width and the
+ * text runs into that easing — measured, the right end of the gradient is about
+ * 0.34 and white text there is under 4:1, which fails the gate this project set
+ * itself.
+ *
+ * So the narrow rule is a flat 0.78. Against the brightest pixel under the text
+ * — rgb(212, 218, 219), a reflection off the wet road — that leaves
+ * rgb(56, 64, 70), on which white measures 10.55, the lead 8.63, the quiet line
+ * 7.24 and the eyebrow's mint 6.48. Every one of those was computed rather than
+ * chosen, because a photograph's contrast changes with every pixel and the only
+ * number worth checking is the worst one.
+ */
+.home__hero-photo {
+  background-color: #0c141c;
+  background-image:
+    linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%),
+    url('/hero-street.webp');
+  background-size: cover;
+  /* Low and right: that is where the grate and the running water are, and
+     `cover` crops whichever axis is long. */
+  background-position: 70% 65%;
+  background-repeat: no-repeat;
+}
+
 .home__hero {
   display: grid;
   grid-template-columns: 1fr;
@@ -174,6 +203,21 @@ button:disabled {
 }
 
 @media (min-width: 900px) {
+  /* Wide enough for the text to keep to its own column, so the scrim can ease
+     off over the half of the picture no text is placed on. At 52% — past the
+     text column — it is still 0.72, where the same worst pixel becomes
+     rgb(68, 75, 81) and the four colours measure 8.86, 7.24, 6.08 and 5.44. */
+  .home__hero-photo {
+    background-image:
+      linear-gradient(
+        100deg,
+        rgba(12, 20, 28, 0.84) 0%,
+        rgba(12, 20, 28, 0.72) 52%,
+        rgba(12, 20, 28, 0.34) 100%
+      ),
+      url('/hero-street.webp');
+  }
+
   .home__hero {
     grid-template-columns: minmax(360px, 46%) 1fr;
     gap: 56px;
