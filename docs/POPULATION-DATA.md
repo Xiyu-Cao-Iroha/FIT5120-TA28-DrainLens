@@ -82,18 +82,31 @@ AC 4.1.6 asks for three states. The match settles how many of them this data can
 | **Exact** | a complete count, and a population | **197** |
 | **Minimum value** | a count inside the area was withheld for privacy, so the total is a floor | **80** |
 | **No recorded activity** | a complete count that is zero | **4** |
-| **Not available** | no population for the area | **0** |
+| **Not available** | no usable population for the area | **7** — see the correction below |
 
 **Over a quarter of the map is a floor.** 80 areas of 281 contain at least one withheld SA1 region — 106 regions in scope, of the 144 the publisher withholds across Victoria. That is not the impression the published thirty give, where the flag is the exception. A legend that treats *Minimum value* as an edge case is describing a different dataset, and a colour ramp that paints a floor the same as an exact value is claiming precision for 28.5% of the areas that do not have it.
 
 **Two of those 80 have a published total of zero**, which is the sharpest case in the data: every region the SES recorded for them was withheld, so the honest reading is *0 or more, unknown*, not *none*. They are counted above as floors rather than as no recorded activity, because that is what they are.
 
-**Nothing in this data produces a *Not available* score.** Every area in scope has a denominator. The state still has to exist — a guard nobody takes is cheaper than a number with nothing behind it — but the interface should not be built around a case with no instance, and the prototype's `N/A` areas cannot arise for this reason.
+> **This section said *Not available* has no instance, and that was wrong.** It was measured by asking whether a population **row** existed, and one exists for all 281. Three of them say **zero**: Essendon Airport, Moorabbin Airport and **West Melbourne, which has two recorded dispatches and no residents**. Four more are between 15 and 158 residents. Seven areas therefore get no score, the state has instances, and the prototype's `N/A` areas are real after all. Checking for the presence of a field is not checking the value in it, and the distinction is the entire subject of this file.
+>
+> The threshold and the seven areas are in [SEVERITY-SCORE.md](./SEVERITY-SCORE.md).
+
+**The states differ between the two map modes, and the difference is not cosmetic.** The activity map draws all 281; the severity map draws the 274 with a usable denominator.
+
+| | Activity map | Severity map |
+| --- | ---: | ---: |
+| Exact | 197 | 196 |
+| Minimum value — a floor | 80 | 78 |
+| No recorded activity | 4 | **0** |
+| Not available | — | **7** |
+
+**Every area with no recorded activity is an area with no score.** All six — two airports, a racecourse, two industrial areas and Melbourne Airport — have under 200 residents, so the severity map never shows a *no recorded activity* area at all, while the activity map shows six. A legend shared between the two modes would offer, in each mode, a state that mode cannot produce.
 
 ---
 
 ## Open
 
-- **The Severity Score's definition** — numerator, denominator, rounding, and what it is called on screen — is still to be written, and AC 4.3.2.c requires it to be explainable in two sentences. This file supplies the denominator and nothing else. Nothing here decides what is divided by it.
+- **The Severity Score's definition** is written, in [SEVERITY-SCORE.md](./SEVERITY-SCORE.md), and it is where the 1,000-resident threshold and the seven excluded areas come from. This file supplies the denominator and decides nothing about what is divided by it.
 - **The SA1 grain question** is settled by this: the score is computed at SA2 from the published rollups, so `flood_incident` stays empty and the comment in `db/migrations/001_init.sql` explaining why stays true.
 - **`population.area_code`** takes the nine-digit code and `area_level` takes `'SA2'`. The loader for it does not exist yet.

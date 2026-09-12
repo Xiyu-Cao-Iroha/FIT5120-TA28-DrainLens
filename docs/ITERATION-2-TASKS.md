@@ -40,11 +40,13 @@ Three options, and the answer decides a week of work:
 
 **Recommended: project at build time.** It is the option consistent with everything already built, and the pipeline already has the machinery.
 
-**D2 — What the Severity Score is.** *(AC 4.1.3, 4.3.2)*
+**D2 — What the Severity Score is.** *(AC 4.1.3, 4.3.2)* — **taken, 12 September.**
 
-Write the definition before writing the code, in [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) or beside it: numerator, denominator, years, population vintage, what happens when the numerator is a floor, and what the number is called on screen. AC 4.3.2.c requires the method to be explainable in two sentences, which is a useful test of the definition itself.
+[SEVERITY-SCORE.md](./SEVERITY-SCORE.md). **Recorded flood-related SES dispatches per 1,000 residents, 2009-10 to 2014-15, over the population at 30 June 2012.** A rate with its unit on screen rather than a 0-10 index; a floor stays a floor; and **seven areas get no score at all** because a per-resident rate needs residents — one dispatch in an industrial estate of fifteen people would outscore everywhere in Greater Melbourne by four times.
 
-**Neither decision is blocked by anything.** Take both by the end of day two.
+Writing it first paid for itself twice. It found that *Not available* has instances after all, which the population reconciliation had said it did not, and it found that the two map modes produce different completeness states — so a legend shared between them offers each mode a state that mode cannot produce.
+
+**D1 was not taken so much as dissolved:** with the map drawn as marks at area centroids rather than as boundary polygons, no reprojected SA2 boundary artefact is needed. What is still needed is a position per area, which is two orders of magnitude smaller than a polygon set.
 
 ---
 
@@ -74,11 +76,11 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 ### Population
 
-- [ ] **Obtain the population dataset** with a stated vintage → *4.1.3.a, 4.3.2.d*
-- [ ] **Reconcile it against its own documentation**, the same discipline every other source went through → *4.3.3.a*
-- [ ] **Match to ASGS 2011 and report the match rate** → *4.1.6.a, 4.1.6.e*. **How many areas fail to match is a deliverable, not an error to hide.** Every unmatched area is a *Not available* on the map, and that count belongs in the documentation
+- [x] **Obtain the population dataset** with a stated vintage → *4.1.3.a, 4.3.2.d*. ABS 3218.0, SA2 estimates 2005–2015, released 30 March 2016
+- [x] **Reconcile it against its own documentation**, the same discipline every other source went through → *4.3.3.a*. Its Explanatory Notes state the 2011 ASGS edition, and that 2012 is revised rather than final
+- [x] **Matched, and the rate reported** → *4.1.6.a, 4.1.6.e*. **281 of 281**, by code and by name, the two joins agreeing on every one. But *Not available* is not empty for the reason this line assumed: **seven areas match and still get no score**, because their population is zero or near it. An unmatched area was never the only way to reach that state
 - [ ] **Load it** — the `population` table is declared and empty, and its comment asks whoever fills it to choose the grain deliberately rather than inventing one → *4.1.3.a*
-- [ ] **Decide the SA1 grain question.** `flood_incident` is declared and nothing loads it: the pipeline computes 13,339 regions and discards them at build time. If the Severity Score is computed at SA2 from published rollups, this stays empty and the comment stays true. If it is computed at SA1, the pipeline has to emit that grain and re-fetch the sources. **Pick one and write down which**
+- [x] **Decided: SA2.** `flood_incident` is declared and nothing loads it: the pipeline computes 13,339 regions and discards them at build time. If the Severity Score is computed at SA2 from published rollups, this stays empty and the comment stays true. If it is computed at SA1, the pipeline has to emit that grain and re-fetch the sources. **Pick one and write down which**
 
 ### Events
 
