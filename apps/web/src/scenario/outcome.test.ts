@@ -17,8 +17,12 @@ import {
   BASIS_COLOURS,
   BASIS_LABELS,
   HOW_IT_WAS_PRODUCED,
+  HOW_STRONGLY_TO_READ_IT,
   INSUFFICIENT,
+  LIMITATIONS,
+  NO_CLEAR_CHANGE_MEANS,
   RAINFALL_CONTROL_NOTE,
+  RAINFALL_EXPLAINED,
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
@@ -52,14 +56,14 @@ describe('every outcome the engine can return has words', () => {
 
 describe('a band and a missing answer are different kinds of thing', () => {
   it('uses a different heading for each', () => {
-    // "No clear difference" is an answer. "Comparison unavailable" is the
+    // "No clear change" is an answer. "Insufficient information" is the
     // absence of one. A resident acting on the first is reasonable; acting on
     // the second, believing it was the first, is not.
     for (const band of COMPARISON_BANDS) {
       expect(BANDS[band].title).toBe('Difference from the all-clear baseline');
     }
     for (const reason of INSUFFICIENCY_REASONS) {
-      expect(INSUFFICIENT[reason].title).toBe('Comparison unavailable');
+      expect(INSUFFICIENT[reason].title).toBe('Insufficient information');
     }
   });
 
@@ -263,5 +267,62 @@ describe('why no clear difference', () => {
   it('does not put a millimetre figure on screen as a finding', () => {
     const all = WHY_NO_CLEAR_CHANGE.map((i) => i.body).join(' ');
     expect(all).not.toMatch(/\d+(\.\d+)?\s?mm/);
+  });
+});
+
+describe('the Iteration 2 wording', () => {
+  it('names the two bands in the criteria\'s own words', () => {
+    // AC 3.1.3.e: Higher than baseline, No clear change.
+    expect(BANDS['higher-than-baseline'].comparison).toBe('Higher than baseline');
+    expect(BANDS['no-clear-change'].comparison).toBe('No clear change');
+    expect(Object.values(BANDS).map((b) => b.band).join(' ')).not.toMatch(/DIFFERENCE/);
+  });
+
+  it('says what No clear change does not mean', () => {
+    // AC 3.3.2.h and 3.1.3.f. Found missing from the screen on 13 September.
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/did not identify a clear difference from the all-clear baseline/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/does not mean the selected drain has no blockage or flood concern/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/no effect in a real flood/);
+  });
+
+  it('lists all nine limitations, a to i, in order', () => {
+    expect(LIMITATIONS).toHaveLength(9);
+    const [a, b, c, d, e, f, g, h, i] = LIMITATIONS;
+    expect(a).toMatch(/blockage condition is an assumption/i);
+    expect(b).toMatch(/not a weather observation or forecast/i);
+    expect(c).toMatch(/rainfall amount at which a drain would fail/i);
+    expect(d).toMatch(/pipe hydraulic capacity is not modelled/i);
+    expect(e).toMatch(/does not show a validated flood depth or water depth/i);
+    expect(f).toMatch(/when floodwater would arrive/i);
+    expect(g).toMatch(/flood probability or a risk score/i);
+    expect(h).toBe(NO_CLEAR_CHANGE_MEANS);
+    expect(i).toMatch(/only shows differences from the all-clear baseline/i);
+  });
+
+  it('explains accumulated rainfall as a simplified total, without intensity, duration or forecast', () => {
+    // AC 3.2.3.c, d and e.
+    expect(RAINFALL_EXPLAINED).toMatch(/simplified total/);
+    expect(RAINFALL_EXPLAINED).toMatch(/does not model how intense the rain is or how long it lasts/);
+    expect(RAINFALL_EXPLAINED).toMatch(/not a weather forecast or a prediction of a future storm/);
+  });
+
+  it('does not let the rainfall control imply a steady climb', () => {
+    // AC 3.2.2.d.
+    expect(RAINFALL_CONTROL_NOTE).toMatch(/need not grow steadily with rainfall/);
+  });
+
+  it('states the simplified assumptions with their numbers, and how strongly to read the result', () => {
+    const step = HOW_IT_WAS_PRODUCED.find((s) => s.title === 'Simplified assumptions');
+    expect(step?.body).toContain('60%');
+    expect(step?.body).toContain('0.05 m³');
+    expect(step?.body).toMatch(/evenly/);
+    expect(HOW_STRONGLY_TO_READ_IT).toMatch(/not how much/);
+    expect(HOW_STRONGLY_TO_READ_IT).toMatch(/not that the drain does not matter/);
+  });
+
+  it('calls the ground surface photogrammetric', () => {
+    const item = WHAT_IS_UNCERTAIN.find((i) => /ground surface/i.test(i.title));
+    expect(item?.body).toMatch(/photogrammetric/);
+    expect([...LIMITATIONS, RAINFALL_EXPLAINED, HOW_STRONGLY_TO_READ_IT].join(' ').toLowerCase()).not.toContain('lidar');
   });
 });

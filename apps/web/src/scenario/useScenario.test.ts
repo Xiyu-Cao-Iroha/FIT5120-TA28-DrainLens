@@ -31,34 +31,22 @@ describe('which rainfall amounts a run solves', () => {
     expect(positionsFor(40)).toEqual([...POSITIONS_MM]);
   });
 
-  it('adds the requested amount when it is not one of them', () => {
-    expect(positionsFor(35)).toEqual([20, 35, 40, 60]);
-    expect(positionsFor(5)).toEqual([5, 20, 40, 60]);
-    expect(positionsFor(90)).toEqual([20, 40, 60, 90]);
-  });
-
-  it('never repeats an amount', () => {
-    // A duplicate is not merely untidy: the engine refuses a list that is not
-    // strictly ascending, and the refusal reaches a resident as a failed
-    // calculation.
-    for (const mm of POSITIONS_MM) {
-      expect(positionsFor(mm)).toHaveLength(POSITIONS_MM.length);
+  it('refuses an amount that is not a validated level, instead of solving it', () => {
+    // It used to append whatever was asked for, so a typed 500 mm reached the
+    // engine. AC 3.2.3.b: only the validated levels.
+    for (const mm of [0, 5, 35, 50, 90, 120, 500]) {
+      expect(() => positionsFor(mm)).toThrow(/not a validated rainfall level/);
     }
   });
 
-  it('is strictly ascending for every amount, which is the engine precondition', () => {
-    for (const mm of [0, 1, 19, 20, 21, 40, 59, 60, 61, 120, 200]) {
+  it('is the same strictly ascending list whichever level was asked for', () => {
+    for (const mm of POSITIONS_MM) {
       const positions = positionsFor(mm);
+      expect(positions).toEqual([20, 40, 60]);
       for (let i = 1; i < positions.length; i += 1) {
         expect(positions[i]!).toBeGreaterThan(positions[i - 1]!);
       }
-      expect(positions).toContain(mm);
     }
-  });
-
-  it('sorts numerically, not as text', () => {
-    // The classic: a default sort puts 100 before 20.
-    expect(positionsFor(100)).toEqual([20, 40, 60, 100]);
   });
 });
 

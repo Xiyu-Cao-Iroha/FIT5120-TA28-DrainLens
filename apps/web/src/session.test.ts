@@ -887,3 +887,14 @@ describe('the breadcrumb back to the task question', () => {
     expect(play([{ type: 'task-reconsidered' }]).screen).toBe('home');
   });
 })
+
+describe('rainfall is one of the validated levels', () => {
+  it('ignores an amount the explorer does not offer', () => {
+    // AC 3.2.3.b. A stored 35 mm would be shown in the summary as a choice.
+    const start = reduce(INITIAL_SESSION, { type: 'rainfall-selected', rainfallMm: 60 });
+    expect(start.scenario.rainfallMm).toBe(60);
+    for (const mm of [35, 0, 120, 500]) {
+      expect(reduce(start, { type: 'rainfall-selected', rainfallMm: mm }).scenario.rainfallMm).toBe(60);
+    }
+  });
+});

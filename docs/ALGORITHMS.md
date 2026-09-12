@@ -263,6 +263,53 @@ disappeared into an average while the arithmetic stayed correct.
 > matching figures should not be quoted as independent measurements until
 > somebody can reproduce them.
 
+### The site ran with Failure 3 until 13 September
+
+The engine has taken `rimDepthM` since 29 August, and the scene has carried
+`rim-depth.bin` since the same day. **The browser loaded neither**:
+`scene.ts` never fetched the file and the worker never passed it, so every
+comparison anybody ran on the site spread a hollow's water evenly — the exact
+failure above, in production, with every test green because the engine's own
+tests supplied the shape directly.
+
+It was fixed in PR #128. What it changed, measured on the Kensington scene,
+every inlet at 20, 40 and 60 mm, rim depth against even spreading, cells
+reported higher than baseline:
+
+| Inlet | Blockage | With rim depth | Evenly spread |
+|---|---|---|---|
+| 1730246 | fully | 40 · 72 · 121 | 0 · 0 · 144 |
+| 1363588 | fully | 154 · 210 · 360 | 0 · 0 · 652 |
+| 1363588 | partly | 0 · 208 · 358 | 0 · 0 · 0 |
+| 1363621 | fully | 175 · 357 · 479 | 652 · 652 · 652 |
+| 1363621 | partly | 154 · 333 · 412 | 0 · 652 · 652 |
+
+**Three inlets, and for them the band on the site was wrong at seven of
+fifteen positions.** Every other inlet reads *no clear change* either way. The
+PR description said no band changed; that was measured on 60 of the 475 inlets,
+none of which was one of these three, and it was wrong.
+
+## The validated rainfall levels
+
+AC 3.2.3.b asks for "only rainfall levels supported and validated by the
+current scenario model". The explorer offers **20, 40 and 60 mm** and nothing
+else (`VALIDATED_RAINFALL_LEVELS_MM` in `packages/schema`). A number box that
+accepted any amount was removed; it let 500 mm reach the engine.
+
+Validated means this, run on 13 September against the Kensington scene with rim
+depth, the engine's mass-balance and monotonicity checks in force:
+
+| | Runs | Result |
+|---|---:|---|
+| Every inlet (475) × fully and partly blocked × 20/40/60 mm | 950 | **946 successful**, 4 *invalid inlet* (two inlets the record does not describe well enough) |
+| Checks refused a comparison | — | **none** — no *comparison not comparable*, no *calculation failed* |
+| Runs with any position higher than baseline | — | 5 runs, 3 inlets, 14 positions (the table above) |
+
+Why these three amounts: all inside `RAINFALL_RANGE_MM` (0–120 mm), 20 and 60 mm
+are where the blockage sensitivity in DECISIONS-PENDING.md §1 was measured, and
+40 mm is the default with a step either side. A fourth level is a new
+validation run, not a new button.
+
 ---
 
 ## Cost

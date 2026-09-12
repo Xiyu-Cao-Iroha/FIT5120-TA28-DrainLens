@@ -19,7 +19,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { BlockageSetting, InsufficiencyReason } from '@drainlens/schema';
+import {
+  type BlockageSetting,
+  type InsufficiencyReason,
+  VALIDATED_RAINFALL_LEVELS_MM,
+  isValidatedRainfall,
+} from '@drainlens/schema';
 
 import type { SceneDrain, SolvedPosition, WorkerReply, WorkerRequest } from './worker.js';
 
@@ -63,22 +68,28 @@ export interface ScenarioRunner {
  * three published amounts together costs one pass and means a person changing
  * amounts is reading a cache rather than waiting again.
  */
-export const POSITIONS_MM: readonly number[] = [20, 40, 60];
+export const POSITIONS_MM: readonly number[] = VALIDATED_RAINFALL_LEVELS_MM;
 
 /**
  * The rainfall amounts one run solves, given the one that was asked for.
  *
- * The published three, plus the requested amount when it is not one of them,
- * **strictly ascending** — the engine refuses an unordered or duplicated list,
- * and it is right to: a position list that is not sorted produces a
- * monotonicity check comparing the wrong pair.
+ * The validated three, **strictly ascending** — the engine refuses an
+ * unordered or duplicated list, and it is right to: a position list that is
+ * not sorted produces a monotonicity check comparing the wrong pair.
+ *
+ * It used to append whatever amount was asked for, which is how a typed 500
+ * mm reached the engine. An amount outside the validated set is now refused
+ * here, and the setup screen no longer offers a way to type one.
  *
  * Pulled out of the hook so it can be tested. It was four lines inside a
  * `useCallback` inside a `useEffect`-bearing hook, which meant the only way to
  * exercise the engine's own precondition was to render React.
  */
 export function positionsFor(rainfallMm: number): number[] {
-  return [...new Set([...POSITIONS_MM, rainfallMm])].sort((a, b) => a - b);
+  if (!isValidatedRainfall(rainfallMm)) {
+    throw new Error(`${String(rainfallMm)} mm is not a validated rainfall level`);
+  }
+  return [...POSITIONS_MM].sort((a, b) => a - b);
 }
 
 /**
@@ -162,6 +173,12 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
           return;
         }
 
+        // Refused before the worker is asked. A throw inside this executor
+        // would reject a promise nobody catches.
+        if (!isValidatedRainfall(rainfallMm)) {
+          resolve({ status: 'insufficient-information', reason: 'scenario_calculation_failed' });
+          return;
+        }
         const positions = positionsFor(rainfallMm);
         const id = nextId.current++;
 
