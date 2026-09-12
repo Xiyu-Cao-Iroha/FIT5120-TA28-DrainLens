@@ -129,7 +129,7 @@ Re-measured on **11 September 2026**, on this laptop, in a self-check that ran e
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
 | CI green rate | ≥ 95% | tracked on the Actions tab |
-| Legibility | 4.5:1 for normal text, nothing under 10 px | **met on the homepage, the map and the flood board**, measured 7 September; the hero photograph re-measured 12 September — see below |
+| Legibility | 4.5:1 for normal text, nothing under 10 px | **met on the homepage, the map and the flood board**, measured 7 September; the homepage re-measured 12 September, when it went onto a photograph — see below |
 
 > **Two figures in that table are lower than the code deserves, and one is lower than it looks.**
 >
