@@ -59,6 +59,15 @@ jobs:
       - name: Check the guide against the published artefacts
         run: node tools/data/check-guide.mjs
 
+      # Three artefacts now describe the same 281 areas, and they are three
+      # because AC 2.2.1.b caps the board at thirty "where the data is, not
+      # where it is drawn". Two files that must stay equal with nothing to
+      # notice when they stop is a failure this repository has had once
+      # already; the answer there was to delete one, and it cannot be taken
+      # here because these answer different questions.
+      - name: Check the area artefacts against each other
+        run: node tools/data/check-areas.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage
