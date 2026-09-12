@@ -318,3 +318,64 @@ class TestD8:
         surface[4, 5] = 9.9  # east, 0.1 m down over 1 m  -> slope 0.100
         surface[5, 5] = 9.5  # south-east, 0.5 m down over 1.414 m -> slope 0.354
         assert d8(surface)[4, 4] == 1
+
+
+class TestGroundThatWasNeverMeasured:
+    """Cells in a point-cloud tile the archive does not have.
+
+    The council extent is a rectangle and the archive covers the municipality,
+    so 95 of its 306 tiles are absent. Those cells are an edge of the
+    calculation -- water reaching them leaves -- not a wall and not ground.
+    """
+
+    def test_a_hollow_opening_onto_missing_ground_does_not_fill(self):
+        # Inside the grid, but it touches the missing tile, so it is a valley
+        # draining off the measured area rather than a basin.
+        surface = np.full((9, 9), 10.0)
+        surface[4, 3:6] = 9.0
+        valid = np.ones((9, 9), dtype=bool)
+        valid[:, 6:] = False
+        assert np.allclose(fill(surface, valid=valid)[4, 3:6], 9.0)
+        assert find_depressions(surface, CELL, valid=valid) == []
+
+    def test_the_same_hollow_fills_when_the_ground_around_it_exists(self):
+        surface = np.full((9, 9), 10.0)
+        surface[4, 3:6] = 9.0
+        assert np.allclose(fill(surface)[4, 3:6], 10.0)
+        assert len(find_depressions(surface, CELL)) == 1
+
+    def test_missing_cells_are_left_as_they_were(self):
+        surface = np.full((9, 9), 10.0)
+        surface[0:3, 0:3] = -50.0
+        valid = np.ones((9, 9), dtype=bool)
+        valid[0:3, 0:3] = False
+        filled = fill(surface, valid=valid)
+        assert (filled[0:3, 0:3] == -50.0).all()
+
+    def test_nothing_flows_into_missing_ground_and_it_flows_nowhere(self):
+        # Missing ground lower than everything must not become the sink the
+        # whole map drains into.
+        surface = plane(9, 9, fall=0.05)
+        valid = np.ones((9, 9), dtype=bool)
+        valid[:, -2:] = False
+        directions = d8(condition(surface, valid=valid), valid=valid)
+        assert (directions[:, -2:] == LEAVES_WINDOW).all()
+        assert (directions[:, -3] == LEAVES_WINDOW).all(), "the last measured column leaves"
+        assert (directions[1:-1, 1:-3] == 0).all(), "and everything else still runs east"
+
+    def test_a_mask_of_every_cell_changes_nothing(self):
+        surface = bowl(depth=1.0) + np.random.default_rng(7).normal(0, 0.01, (9, 9))
+        everything = np.ones((9, 9), dtype=bool)
+        assert np.array_equal(fill(surface, valid=everything), fill(surface))
+        assert np.array_equal(d8(surface, valid=everything), d8(surface))
+
+    def test_refuses_a_mask_of_the_wrong_shape(self):
+        with pytest.raises(HydrologyError, match="validity mask"):
+            fill(np.zeros((9, 9)), valid=np.ones((8, 8), dtype=bool))
+        with pytest.raises(HydrologyError, match="validity mask"):
+            d8(np.zeros((9, 9)), valid=np.ones((8, 8), dtype=bool))
+
+    def test_labels_can_be_wider_than_the_engine_reads(self):
+        wide = Depression(id=40_000, cells=np.array([3]), capacity_m3=1.0, spill_elevation_m=1.0, spill_cell=4)
+        labels = cell_labels([wide], 5, 5, np.int32)
+        assert labels.dtype == np.int32 and labels.ravel()[3] == 40_000

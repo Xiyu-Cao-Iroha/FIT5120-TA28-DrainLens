@@ -380,3 +380,64 @@ class TestBuild:
         artefact = self.artefact()
         assert "south-west corner" in artefact["coordinates"]
         assert artefact["extent"]["width_m"] == 40.0
+
+
+class TestGroundOutsideTheArchive:
+    def test_a_block_in_a_missing_tile_is_not_a_gap(self):
+        # Nothing was measured there because there was nothing to measure
+        # from. Hatching it "not enough ground measured" would claim the
+        # opposite of what happened.
+        observed = np.zeros((100, 100), dtype=bool)
+        valid = np.ones((100, 100), dtype=bool)
+        valid[:, 50:] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0, valid=valid)
+        assert sum(dv.ring_area_m2(ring) for ring in gaps) == 5000.0
+
+    def test_the_channel_share_is_of_ground_that_exists(self):
+        # Half the grid missing, each missing cell accumulating 1, would halve
+        # the bar a channel has to clear.
+        surface = valley(20, 40)
+        valid = np.ones(surface.shape, dtype=bool)
+        valid[:, 20:] = False
+        direction = d8(condition(surface, valid=valid), valid=valid)
+        accumulated = dv.flow_accumulation(direction, surface)
+        bar = np.percentile(accumulated[valid], 90.0)
+        assert bar > np.percentile(accumulated, 90.0), "the missing half would lower the bar"
+
+        traced = dv.trace_channels(direction, accumulated, percentile=90.0, min_length=1, valid=valid)
+        cells = [(r, c) for path in traced for r, c in path]
+        assert cells, "something is still a channel"
+        assert all(c < 20 for _, c in cells), "none of it is off the measured ground"
+        # A path may end by stepping onto the trunk it meets; every cell before
+        # that has to clear the bar set by measured ground alone.
+        heads = [path[:-1] if len(path) > 1 else path for path in traced]
+        assert all(accumulated[r, c] >= bar for path in heads for r, c in path)
+
+    def test_no_bar_is_low_enough_to_draw_on_missing_ground(self):
+        # A missing cell accumulates exactly 1 -- itself -- so any bar at or
+        # below 1 would admit every one of them without the mask.
+        surface = valley(20, 40)
+        valid = np.ones(surface.shape, dtype=bool)
+        valid[:, 20:] = False
+        direction = d8(condition(surface, valid=valid), valid=valid)
+        accumulated = dv.flow_accumulation(direction, surface)
+        traced = dv.trace_channels(direction, accumulated, percentile=0.0, min_length=1, valid=valid)
+        assert traced
+        assert all(c < 20 for path in traced for _, c in path)
+
+
+class TestSayingWhatWasNotMeasured:
+    def test_it_lists_the_missing_tiles_and_says_nothing_is_claimed_there(self):
+        from drainlens_pipeline.geo import CITY_OF_MELBOURNE
+
+        said = dv.covering(CITY_OF_MELBOURNE, ["Tile_+004_+003", "Tile_+005_+003"])
+        assert said["missing_tiles"] == ["Tile_+004_+003", "Tile_+005_+003"]
+        assert "304 of the 306" in said["covers"]
+        assert "has not been measured" in said["covers"]
+        assert "nothing is claimed" in said["covers"]
+
+    def test_it_refuses_a_tile_that_is_not_part_of_the_extent(self):
+        from drainlens_pipeline.geo import DEMONSTRATION_EXTENT
+
+        with pytest.raises(dv.DerivedError, match=r"Tile_\+020_\+020"):
+            dv.covering(DEMONSTRATION_EXTENT, ["Tile_+020_+020"])

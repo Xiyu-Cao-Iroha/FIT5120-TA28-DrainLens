@@ -68,11 +68,10 @@ jobs:
       - name: Check the area artefacts against each other
         run: node tools/data/check-areas.mjs
 
-      # The derived layers ship twice: Kensington for the bundled fallback,
-      # and Kensington plus the central city, moved into the council frame,
-      # for the database. On 13 September the thresholds changed, only the
-      # first was rebuilt, and the deployed map kept the old hatching with
-      # every test green.
+      # The derived layers ship twice: Kensington's own build for the bundled
+      # fallback, and a council-wide build for the database. On 13 September
+      # the thresholds changed, only the first was rebuilt, and the deployed
+      # map kept the old hatching with every test green.
       - name: Check the council derived layers against the bundled copy
         run: node tools/data/check-derived.mjs
 

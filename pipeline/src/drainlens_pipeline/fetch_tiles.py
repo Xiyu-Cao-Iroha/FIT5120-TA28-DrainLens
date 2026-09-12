@@ -29,7 +29,7 @@ from .archive import (
     read_member,
     select,
 )
-from .geo import DEMONSTRATION_ADDRESS, DEMONSTRATION_EXTENT, Extent
+from .geo import DEMONSTRATION_ADDRESS, DEMONSTRATION_EXTENT, EXTENTS, Extent
 
 #: Melbourne sits between roughly -20 m and 400 m AHD. Anything outside this is
 #: not an elevation, and saying so early is what stops a misread header being
@@ -69,9 +69,16 @@ def fetch_extent(
     out: Path,
     *,
     force: bool = False,
+    allow_missing: bool = False,
     log: TextIO | None = None,
 ) -> dict[str, object]:
-    """Write every tile the extent needs into `out`, skipping what is already there."""
+    """Write every tile the extent needs into `out`, skipping what is already there.
+
+    With `allow_missing`, tiles the archive does not have are reported and
+    skipped instead of refused. The council extent needs it: the archive covers
+    the municipality and the extent is the rectangle around it, so 95 of its
+    306 tiles were never published. A pilot extent should never need it.
+    """
     say = (lambda m: print(m, file=log)) if log is not None else (lambda m: None)
 
     names = extent.tile_names()
@@ -86,6 +93,13 @@ def fetch_extent(
     members = read_directory(read, total)
     say(f"          {len(members)} members\n")
 
+    missing: list[str] = []
+    if allow_missing:
+        have = {m.stem for m in members}
+        missing = [n for n in names if n not in have]
+        if missing:
+            say(f"          {len(missing)} of {len(names)} tiles are not in the archive, skipping them\n")
+        names = [n for n in names if n in have]
     wanted = select(members, names)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -114,7 +128,13 @@ def fetch_extent(
             f"\nfetched {fetched_bytes / 1e6:.1f} MB of a {total / 1e9:.2f} GB archive "
             f"— {(total - fetched_bytes) / total:.1%} of it never left the server"
         )
-    return {"written": written, "skipped": skipped, "bytes": fetched_bytes, "points": points}
+    return {
+        "written": written,
+        "skipped": skipped,
+        "missing": missing,
+        "bytes": fetched_bytes,
+        "points": points,
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -128,10 +148,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar=("MIN_E", "MIN_N", "MAX_E", "MAX_N"),
         help="MGA55 bounds; defaults to the demonstration extent",
     )
+    parser.add_argument("--name", choices=sorted(EXTENTS), help="a published extent; wins over --extent")
     parser.add_argument("--force", action="store_true", help="re-fetch tiles already on disk")
+    parser.add_argument(
+        "--allow-missing-tiles",
+        action="store_true",
+        help="skip tiles the archive does not have instead of refusing",
+    )
     args = parser.parse_args(argv)
 
-    extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
+    if args.name:
+        extent = EXTENTS[args.name]
+    else:
+        extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
     if extent is DEMONSTRATION_EXTENT:
         print(f"address   {DEMONSTRATION_ADDRESS}", file=sys.stderr)
 
@@ -141,6 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         extent,
         args.out,
         force=args.force,
+        allow_missing=args.allow_missing_tiles,
         log=sys.stderr,
     )
     return 0

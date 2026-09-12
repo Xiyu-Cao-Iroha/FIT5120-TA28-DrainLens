@@ -1,33 +1,32 @@
 #!/usr/bin/env node
 /**
- * Is the council's copy of the derived layers still the pilot copies, moved?
+ * Do the two copies of the derived layers still describe what they claim to?
  *
- * The derived layers exist in more than one place. `apps/web/public/data/derived.json`
- * is Kensington, in Kensington's frame, and is what the site draws when the
- * database is not answering. `apps/api/data/city-of-melbourne/derived.json` is
- * what the migration job loads — so it is what the site draws when the
- * database *is* answering — and it is built by `pipeline/reframe.py` from
- * every measured area: Kensington, and since 13 September the central city.
+ * The derived layers exist twice, built separately:
  *
- * **They drifted on 13 September.** The coverage-gap thresholds changed, the
- * Kensington copy was rebuilt, and the council copy was not: every test
+ * - `apps/web/public/data/derived.json` is Kensington, in Kensington's frame,
+ *   and is what the site draws when the database is not answering.
+ * - `apps/api/data/city-of-melbourne/derived.json` is the whole City of
+ *   Melbourne, built from one terrain run over every point-cloud tile the
+ *   archive has, and is what the migration job loads.
+ *
+ * **They drifted once.** On 13 September the coverage-gap thresholds changed,
+ * the Kensington copy was rebuilt, and the council copy was not: every test
  * passed, the database loaded without complaint, and the deployed map kept
- * hatching 46 gaps at the old 0.35 threshold while the bundled fallback drew
- * 14. Nothing looked at both files, because nothing had to.
+ * hatching at the old threshold while the fallback drew the new one. Nothing
+ * looked at both files, because nothing had to. This does:
  *
- * This does, three ways:
+ * - both were built with the same settings, so one legend entry means one
+ *   thing whichever copy is on screen;
+ * - the council copy names the tiles it is missing, those are tiles of its
+ *   extent, and no shape has a point inside one — where nothing was measured,
+ *   nothing may be drawn;
+ * - every point lies inside the extent, and the council copy still says in
+ *   words that nothing is claimed where the ground was not measured.
  *
- * - the council copy names exactly the measured areas below, where geo.py
- *   puts them;
- * - its Kensington shapes are the bundled shapes moved by (1500, 6000), point
- *   by point, and come first in every layer — `combine` writes them in the
- *   order it was given;
- * - every other shape lies inside the central city's box, and the settings
- *   match the bundled copy's, so one legend entry means one thing.
- *
- * The central city has no bundled copy to compare against — it is served only
- * from the database — so for it this checks placement and settings, not
- * shape.
+ * The two copies are not compared shape for shape. A catchment that runs past
+ * Kensington's edge is cut off in the pilot build and whole in the council
+ * one, so the water paths legitimately differ at the edges.
  *
  * It is a script rather than a unit test for the same reason as
  * `check-areas.mjs`: it is a claim about published artefacts, which a pipeline
@@ -47,20 +46,13 @@ const bundled = await read('apps/web/public/data/derived.json');
 const council = await read('apps/api/data/city-of-melbourne/derived.json');
 
 /**
- * Each measured area in the council's frame: its south-west corner and size.
- *
- * Kensington is 316,500 / 5,814,500 and the central city 319,000 / 5,811,500,
- * less the council's 315,000 / 5,808,500 — the extents in
+ * The council extent and the point-cloud tile grid, from
  * `pipeline/src/drainlens_pipeline/geo.py`. Written here rather than read from
- * the file, because reading them from the file would accept any placement the
- * file happened to claim.
+ * the file, so a file that moved its own extent cannot vouch for itself.
  */
-const AREAS = [
-  { name: 'kensington', e: 1500, n: 6000, width_m: 1000, height_m: 1000 },
-  { name: 'melbourne-cbd', e: 4000, n: 3000, width_m: 3000, height_m: 2500 },
-];
-const [KENSINGTON, CBD] = AREAS;
-const OFFSET = [KENSINGTON.e, KENSINGTON.n];
+const EXTENT = { minE: 315000, minN: 5808500, width: 8500, height: 9000 };
+const TILE = { originE: 313000, originN: 5807000, size: 500 };
+const MISSING_EXPECTED = 95;
 
 const problems = [];
 
@@ -70,65 +62,76 @@ if (bundled.extent?.name !== 'kensington') {
 if (council.extent?.name !== 'city-of-melbourne') {
   problems.push(`the council copy says it is ${JSON.stringify(council.extent?.name)}, not city-of-melbourne`);
 }
+if (council.extent?.width_m !== EXTENT.width || council.extent?.height_m !== EXTENT.height) {
+  problems.push(`the council copy is ${String(council.extent?.width_m)} x ${String(council.extent?.height_m)} m, not ${String(EXTENT.width)} x ${String(EXTENT.height)}`);
+}
 
-// The thresholds are what drifted; say so by name before comparing shapes.
+// The thresholds are what drifted; say so by name before anything else.
 if (JSON.stringify(bundled.settings) !== JSON.stringify(council.settings)) {
   problems.push(
     `the settings differ — bundled ${JSON.stringify(bundled.settings)}, council ${JSON.stringify(council.settings)}. ` +
-      'Rebuild the council copy with pipeline/reframe.py (the command is in pipeline/README.md).',
+      'Rebuild whichever is older (the commands are in pipeline/README.md).',
   );
 }
 
-if (JSON.stringify(council.areas) !== JSON.stringify(AREAS)) {
-  problems.push(`the council copy's areas are ${JSON.stringify(council.areas)}, not ${JSON.stringify(AREAS)}`);
+// Every tile of the extent, by the name the archive uses.
+const tileName = (tx, ty) =>
+  `Tile_${tx < 0 ? '-' : '+'}${String(Math.abs(tx)).padStart(3, '0')}_${ty < 0 ? '-' : '+'}${String(Math.abs(ty)).padStart(3, '0')}`;
+const tx0 = Math.floor((EXTENT.minE - TILE.originE) / TILE.size);
+const ty0 = Math.floor((EXTENT.minN - TILE.originN) / TILE.size);
+const across = EXTENT.width / TILE.size;
+const up = EXTENT.height / TILE.size;
+const tiles = new Set();
+for (let ty = ty0; ty < ty0 + up; ty += 1) for (let tx = tx0; tx < tx0 + across; tx += 1) tiles.add(tileName(tx, ty));
+
+const missing = council.missing_tiles;
+if (!Array.isArray(missing)) {
+  problems.push('the council copy does not list the tiles it is missing');
+} else {
+  const strangers = missing.filter((name) => !tiles.has(name));
+  if (strangers.length > 0) problems.push(`the council copy lists tiles outside its extent: ${strangers.join(', ')}`);
+  if (missing.length !== MISSING_EXPECTED) {
+    problems.push(`the council copy is missing ${String(missing.length)} tiles; the archive lacks ${String(MISSING_EXPECTED)} of this extent's ${String(tiles.size)}`);
+  }
 }
 
-const inside = (area, [e, n]) =>
-  e >= area.e - 0.051 && e <= area.e + area.width_m + 0.051 && n >= area.n - 0.051 && n <= area.n + area.height_m + 0.051;
+if (typeof council.covers !== 'string' || !council.covers.includes('nothing is claimed')) {
+  problems.push('the council copy no longer says that nothing is claimed where the ground was not measured');
+}
 
-const layers = new Set([...Object.keys(bundled.layers ?? {}), ...Object.keys(council.layers ?? {})]);
-for (const layer of layers) {
-  const from = bundled.layers?.[layer] ?? [];
-  const to = council.layers?.[layer] ?? [];
-  if (to.length < from.length) {
-    problems.push(`${layer}: ${String(from.length)} Kensington shapes in the bundled copy, only ${String(to.length)} shapes in the council copy`);
-    continue;
-  }
+// Local metres -> tile name, for points strictly inside a tile. A point on a
+// tile edge belongs to both neighbours, and an outline traced along the edge of
+// the measured area sits exactly there.
+const EDGE = 0.051;
+const missingSet = new Set(Array.isArray(missing) ? missing : []);
+const insideMissing = ([e, n]) => {
+  const fx = (EXTENT.minE + e - TILE.originE) / TILE.size;
+  const fy = (EXTENT.minN + n - TILE.originN) / TILE.size;
+  const tx = Math.floor(fx);
+  const ty = Math.floor(fy);
+  const offE = (fx - tx) * TILE.size;
+  const offN = (fy - ty) * TILE.size;
+  if (offE < EDGE || offE > TILE.size - EDGE || offN < EDGE || offN > TILE.size - EDGE) return false;
+  return missingSet.has(tileName(tx, ty));
+};
+const outsideExtent = ([e, n]) => e < -EDGE || n < -EDGE || e > EXTENT.width + EDGE || n > EXTENT.height + EDGE;
 
-  let moved = 0;
-  let wrong = 0;
-  const walk = (a, b) => {
-    if (typeof a[0] === 'number') {
-      moved += 1;
-      // reframe rounds to a decimetre after adding the offset.
-      if (Math.abs(a[0] + OFFSET[0] - b[0]) > 0.051 || Math.abs(a[1] + OFFSET[1] - b[1]) > 0.051) wrong += 1;
-      return;
-    }
-    if (a.length !== b.length) {
-      wrong += 1;
-      return;
-    }
-    a.forEach((item, index) => walk(item, b[index]));
-  };
-  from.forEach((shape, index) => walk(shape.c, to[index].c));
-  if (wrong > 0) problems.push(`${layer}: ${String(wrong)} of ${String(moved)} Kensington points are not the bundled point moved by (1500, 6000)`);
-
+for (const [layer, shapes] of Object.entries(council.layers ?? {})) {
   let points = 0;
-  let astray = 0;
-  const each = (value) => {
+  let onMissing = 0;
+  let outside = 0;
+  const walk = (value) => {
     if (typeof value[0] === 'number') {
       points += 1;
-      if (!inside(CBD, value)) astray += 1;
+      if (outsideExtent(value)) outside += 1;
+      else if (insideMissing(value)) onMissing += 1;
       return;
     }
-    value.forEach(each);
+    value.forEach(walk);
   };
-  to.slice(from.length).forEach((shape) => each(shape.c));
-  if (astray > 0) problems.push(`${layer}: ${String(astray)} of ${String(points)} points after the Kensington shapes lie outside the central city`);
-}
-
-if (typeof council.covers !== 'string' || council.covers.length === 0) {
-  problems.push('the council copy has lost its `covers` sentence');
+  shapes.forEach((shape) => walk(shape.c));
+  if (outside > 0) problems.push(`${layer}: ${String(outside)} of ${String(points)} points lie outside the council extent`);
+  if (onMissing > 0) problems.push(`${layer}: ${String(onMissing)} of ${String(points)} points lie inside a tile the archive does not have`);
 }
 
 if (problems.length > 0) {
@@ -140,4 +143,6 @@ if (problems.length > 0) {
 const counts = Object.entries(council.layers)
   .map(([name, shapes]) => `${String(shapes.length)} ${name}`)
   .join(', ');
-console.log(`derived layers: Kensington moved by (1500, 6000), the rest inside the central city — ${counts}`);
+console.log(
+  `derived layers: same settings in both copies; the council copy covers ${String(tiles.size - missing.length)} of ${String(tiles.size)} tiles and draws nothing on the other ${String(missing.length)} — ${counts}`,
+);

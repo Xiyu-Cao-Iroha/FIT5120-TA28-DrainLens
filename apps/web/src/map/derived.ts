@@ -225,14 +225,21 @@ interface Extremes {
   maxN: number;
 }
 
-const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
-  for (const point of path) {
-    if (point[0] >= seen.minE && point[0] <= seen.maxE && point[1] >= seen.minN && point[1] <= seen.maxN) {
-      return true;
-    }
-  }
-  // A shape can span the view without a vertex inside it, so fall back to its
-  // own bounds. Cheaper to do second: most shapes fail or pass on a vertex.
+/**
+ * Each shape's bounds, worked out once.
+ *
+ * Recomputed on every frame they were free at a square kilometre and 800
+ * shapes. The council-wide artefact carries about 16,000, and walking every
+ * vertex of every one of them on each frame of a drag was a large part of
+ * what made the zoomed-out map stutter. The artefact is immutable once
+ * loaded, so a path's bounds never change and can be kept against the path
+ * itself.
+ */
+const extremes = new WeakMap<readonly Local[], Extremes>();
+
+function extremesOf(path: readonly Local[]): Extremes {
+  const known = extremes.get(path);
+  if (known) return known;
   let minE = Infinity;
   let minN = Infinity;
   let maxE = -Infinity;
@@ -243,40 +250,95 @@ const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
     if (point[1] < minN) minN = point[1];
     if (point[1] > maxN) maxN = point[1];
   }
-  return minE <= seen.maxE && maxE >= seen.minE && minN <= seen.maxN && maxN >= seen.minN;
+  const found = { minE, minN, maxE, maxN };
+  extremes.set(path, found);
+  return found;
+}
+
+/**
+ * Whether any part of a shape's bounds is on screen.
+ *
+ * Bounds rather than vertices: a shape can span the view without a vertex
+ * inside it, and a vertex inside the view is always inside the bounds too, so
+ * the one test answers both.
+ */
+const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
+  const box = extremesOf(path);
+  return box.minE <= seen.maxE && box.maxE >= seen.minE && box.minN <= seen.maxN && box.maxN >= seen.minN;
+};
+
+/**
+ * The smallest low point drawn, as its longer side on screen, in pixels.
+ *
+ * **A display filter that changes with zoom, not a claim about the ground.**
+ * Below a pixel a hollow cannot be seen, only paid for: zoomed out over the
+ * whole council, most of the 15,000 are specks under a pixel wide, each one
+ * a fill and a stroke. Zoom in and every one of them is drawn again.
+ */
+export const LOW_POINT_MIN_PX = 1;
+
+/** Rings per path when drawing low points. See the note in `drawDerived`. */
+export const LOW_POINTS_PER_PATH = 10;
+
+const bigEnough = (path: readonly Local[], scale: number): boolean => {
+  const box = extremesOf(path);
+  return Math.max(box.maxE - box.minE, box.maxN - box.minN) * scale >= LOW_POINT_MIN_PX;
 };
 
 /**
  * Add one ring to the current path. **Does not begin one.**
  *
- * Split out of `trace` because `hatch` composes a clip region from several
- * rings at once, and `trace`'s `beginPath` threw away every ring but the
- * last — so only one unavailable area was ever hatched, and *which* one
- * changed as the view moved. On screen that was areas flickering and
- * disappearing while the map was dragged.
+ * It was split out of a `trace` that began a path per ring, because `hatch`
+ * composes a clip region from several rings at once and that `beginPath`
+ * threw away every ring but the last — so only one unavailable area was ever
+ * hatched, and *which* one changed as the view moved. On screen that was
+ * areas flickering and disappearing while the map was dragged. The low points
+ * now build one path the same way, and `trace` had no callers left.
  */
 function addRing(
   context: CanvasRenderingContext2D,
   viewport: Viewport,
   path: readonly Local[],
 ): void {
+  const screen = onScreen(viewport, path);
+  for (let index = 0; index < screen.length; index += 1) {
+    const point = screen[index];
+    if (!point) continue;
+    if (index === 0) context.moveTo(point[0], point[1]);
+    else context.lineTo(point[0], point[1]);
+  }
+}
+
+/**
+ * A path's vertices on screen, leaving out any within `MIN_STEP_PX` of the
+ * last one kept.
+ *
+ * Zoomed out over the whole council the low points alone are 400,000 vertices,
+ * most of them a fraction of a pixel from their neighbour. Leaving those out
+ * took that layer from 191 ms a frame to about 50 ms in Chrome, and changes
+ * nothing zoomed in: the pipeline already simplified to a metre, so at street
+ * zoom no two vertices are this close. The first and last are always kept, so
+ * a ring still closes where it started and a channel still ends where it ends.
+ */
+export const MIN_STEP_PX = 2;
+
+function onScreen(viewport: Viewport, path: readonly Local[]): (readonly [number, number])[] {
+  const kept: (readonly [number, number])[] = [];
+  let lastX = 0;
+  let lastY = 0;
   for (let index = 0; index < path.length; index += 1) {
     const point = path[index];
     if (!point) continue;
     const [x, y] = toScreen(viewport, point);
-    if (index === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
+    const first = kept.length === 0;
+    const last = index === path.length - 1;
+    if (first || last || Math.abs(x - lastX) + Math.abs(y - lastY) >= MIN_STEP_PX) {
+      kept.push([x, y]);
+      lastX = x;
+      lastY = y;
+    }
   }
-}
-
-/** One ring as a path of its own, for drawing it by itself. */
-function trace(
-  context: CanvasRenderingContext2D,
-  viewport: Viewport,
-  path: readonly Local[],
-): void {
-  context.beginPath();
-  addRing(context, viewport, path);
+  return kept;
 }
 
 /**
@@ -377,19 +439,39 @@ export function drawDerived(
   }
 
   if (show.lowPoint) {
+    /*
+      **A few rings to a path**, not one each and not all at once.
+
+      One fill and one dashed stroke per ring was 30,000 draw calls a frame
+      over the whole council and most of a 236 ms frame. One path holding
+      every ring is worse: Chrome's cost for filling and dashing a path grows
+      faster than its length, and 15,000 rings in one path hung the tab.
+      Measured on 2,000 real rings -- one per path 51 ms, 10 per path 12 ms,
+      50 19 ms, 200 24 ms. The rings are separate hollows and never overlap,
+      so batching paints the same pixels, and every edge keeps its dash.
+    */
     context.fillStyle = palette.lowPoint;
     context.strokeStyle = palette.lowPointEdge;
     context.lineWidth = 1;
     context.setLineDash([...LOW_POINT_DASH]);
+    let inPath = 0;
+    const flush = (): void => {
+      if (inPath === 0) return;
+      context.fill();
+      context.stroke();
+      inPath = 0;
+    };
     for (const shape of artefact.layers['low-point'] ?? []) {
       for (const ring of shape.c) {
-        if (!pathVisible(ring, seen)) continue;
-        trace(context, viewport, ring);
+        if (!pathVisible(ring, seen) || !bigEnough(ring, viewport.scale)) continue;
+        if (inPath === 0) context.beginPath();
+        addRing(context, viewport, ring);
         context.closePath();
-        context.fill();
-        context.stroke();
+        inPath += 1;
+        if (inPath === LOW_POINTS_PER_PATH) flush();
       }
     }
+    flush();
     context.setLineDash([]);
   }
 
@@ -403,7 +485,7 @@ export function drawDerived(
     context.setLineDash([...CHANNEL_DASH]);
     for (const line of artefact.layers.channel ?? []) {
       if (!pathVisible(line.c, seen)) continue;
-      const screen = line.c.map((point) => toScreen(viewport, point));
+      const screen = onScreen(viewport, line.c);
       drawn.push(screen);
       context.beginPath();
       for (let i = 0; i < screen.length; i += 1) {

@@ -253,3 +253,45 @@ class TestMain:
                 "--extent", *(str(v) for v in (EXTENT.min_e, EXTENT.min_n, EXTENT.max_e, EXTENT.max_n)),
             ]
         )
+
+
+class TestRasterisingATileAtATime:
+    def test_the_running_minimum_is_the_minimum_of_every_point(self, tile_dir):
+        points, _ = terrain.load_tiles(tile_dir, EXTENT)
+        from drainlens_pipeline.ground import minimum_surface
+
+        expected, seen = minimum_surface(points, EXTENT.min_e, EXTENT.min_n, EXTENT.max_e, EXTENT.max_n, 1.0)
+        surface, observed, valid, present, missing, count = terrain.rasterise_tiles(tile_dir, EXTENT, 1.0)
+        assert np.array_equal(surface, expected) and np.array_equal(observed, seen)
+        assert valid is None and present == [TILE] and missing == [] and count == 250_000
+
+    def test_refuses_a_missing_tile_unless_asked(self, tile_dir):
+        wider = Extent("wider", 316_500.0, 5_814_500.0, 317_500.0, 5_815_000.0)
+        with pytest.raises(FileNotFoundError, match=r"Tile_\+008_\+015"):
+            terrain.rasterise_tiles(tile_dir, wider, 1.0)
+
+    def test_marks_the_missing_tile_as_no_ground(self, tile_dir):
+        wider = Extent("wider", 316_500.0, 5_814_500.0, 317_500.0, 5_815_000.0)
+        surface, observed, valid, present, missing, _ = terrain.rasterise_tiles(
+            tile_dir, wider, 1.0, allow_missing=True
+        )
+        assert missing == ["Tile_+008_+015"] and present == [TILE]
+        assert valid.shape == (500, 1000)
+        assert valid[:, :500].all() and not valid[:, 500:].any()
+        assert not observed[:, 500:].any()
+
+    def test_refuses_an_extent_with_no_tile_at_all(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="none of the tiles"):
+            terrain.rasterise_tiles(tmp_path, EXTENT, 1.0, allow_missing=True)
+
+    def test_a_build_over_a_missing_tile_records_it_and_writes_the_mask(self, tile_dir, tmp_path):
+        wider = Extent("wider", 316_500.0, 5_814_500.0, 317_500.0, 5_815_000.0)
+        result = terrain.build(tile_dir, wider, allow_missing_tiles=True)
+        assert result.missing_tiles == ("Tile_+008_+015",)
+        assert (result.direction[:, 500:] == -1).all()
+        out = tmp_path / "terrain"
+        terrain.write(result, out)
+        assert np.load(out / "ground-valid.npy")[:, :500].all()
+        manifest = json.loads((out / "terrain.json").read_text(encoding="utf-8"))
+        assert manifest["missing_tiles"] == ["Tile_+008_+015"]
+        assert manifest["coverage"]["in_archive_fraction"] == 0.5

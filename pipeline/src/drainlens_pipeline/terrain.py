@@ -24,13 +24,13 @@ import numpy as np
 from .footprints import SOURCE as FOOTPRINT_SOURCE
 from .footprints import barrier_mask
 from .footprints import fetch as fetch_footprints
-from .geo import DEMONSTRATION_EXTENT, Extent
+from .geo import DEMONSTRATION_EXTENT, EXTENTS, Extent, tile_bounds, tile_of
 from .ground import (
     DEFAULT_MAX_WINDOW_M,
     DEFAULT_SLOPE_THRESHOLD,
     GroundSurface,
-    build_ground_surface,
     fill_holes,
+    ground_from_minimum,
 )
 from .hydrology import (
     CONDITIONING_EPSILON_M,
@@ -85,6 +85,11 @@ class TerrainBuild:
     barriers: np.ndarray | None = None
     """Building footprints. `None` means the routing let water cross buildings."""
 
+    valid: np.ndarray | None = None
+    """Cells inside a tile the archive has. `None` means every tile was there."""
+
+    missing_tiles: tuple[str, ...] = ()
+
     @property
     def storage_m3(self) -> float:
         return sum(d.capacity_m3 for d in self.depressions)
@@ -105,6 +110,7 @@ class TerrainBuild:
             "grid": {"rows": rows, "cols": cols, "cell_size_m": CELL_SIZE_M, "origin": "north-west"},
             "source": SOURCE,
             "tiles": self.tiles,
+            "missing_tiles": list(self.missing_tiles),
             "points_read": self.point_count,
             "filter": {
                 "method": "simple morphological filter (Pingel, Clarke and McBride, 2013)",
@@ -115,6 +121,14 @@ class TerrainBuild:
             "coverage": {
                 "measured_fraction": round(1.0 - self.surface.filled_fraction, 4),
                 "interpolated_fraction": round(self.surface.filled_fraction, 4),
+                "in_archive_fraction": (
+                    1.0 if self.valid is None else round(float(self.valid.mean()), 4)
+                ),
+                "note": (
+                    "Fractions are of the whole grid. Cells in a missing tile hold no "
+                    "ground at all: they are never measured, routing treats them as the "
+                    "edge of the calculation, and no derived layer is drawn over them."
+                ),
             },
             "elevation_m": {
                 "min": round(float(elevation.min()), 3),
@@ -168,28 +182,105 @@ def load_tiles(
     return np.concatenate(chunks), names
 
 
+def rasterise_tiles(
+    tile_dir: Path,
+    extent: Extent,
+    cell_size_m: float,
+    *,
+    allow_missing: bool = False,
+    log: Callable[[str], None] = lambda _: None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, list[str], list[str], int]:
+    """The lowest point per cell, one tile at a time.
+
+    Returns the minimum surface, where a point fell, which cells lie in a tile
+    that exists, the tiles read, the tiles missing and the point count.
+
+    The same minimum `minimum_surface` takes over every point at once, kept as
+    a running minimum instead, so memory is one grid and one tile rather than
+    every point in the extent. **Missing tiles are refused unless asked for.**
+    A council-wide build expects them -- the archive covers the municipality
+    and the extent is a rectangle around it -- and records each one; a pilot
+    build that silently lost a tile would draw a plausible surface with a
+    square missing.
+    """
+    names = extent.tile_names()
+    missing = [n for n in names if not (tile_dir / f"{n}.las").exists()]
+    if missing and not allow_missing:
+        raise FileNotFoundError(
+            f"{tile_dir} is missing {', '.join(missing)}. Run `python -m drainlens_pipeline.fetch_tiles` first."
+        )
+    present = [n for n in names if n not in missing]
+    if not present:
+        raise FileNotFoundError(f"{tile_dir} has none of the tiles {extent.name} needs")
+
+    cols = int(round(extent.width_m / cell_size_m))
+    rows = int(round(extent.height_m / cell_size_m))
+    surface = np.full((rows, cols), np.inf)
+    points = 0
+
+    for name in present:
+        header, xyz = read_file(tile_dir / f"{name}.las")
+        points += len(xyz)
+        log(f"  {name}  {header.point_count:>9,} points  Z {header.min_z:.2f}..{header.max_z:.2f}")
+        x, y, z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
+        inside = (x >= extent.min_e) & (x < extent.max_e) & (y >= extent.min_n) & (y < extent.max_n)
+        if not inside.any():
+            continue
+        x, y, z = x[inside], y[inside], z[inside]
+        col = ((x - extent.min_e) / cell_size_m).astype(np.intp)
+        row = rows - 1 - ((y - extent.min_n) / cell_size_m).astype(np.intp)
+        r0, r1, c0, c1 = row.min(), row.max() + 1, col.min(), col.max() + 1
+        window = np.full((r1 - r0) * (c1 - c0), np.inf)
+        flat = (row - r0) * (c1 - c0) + (col - c0)
+        # Highest first, last write wins: the minimum, as in `minimum_surface`.
+        descending = np.argsort(-z, kind="stable")
+        window[flat[descending]] = z[descending]
+        np.minimum(surface[r0:r1, c0:c1], window.reshape(r1 - r0, c1 - c0), out=surface[r0:r1, c0:c1])
+        del xyz, x, y, z, col, row, flat, descending, window
+
+    valid = None
+    if missing:
+        valid = np.zeros((rows, cols), dtype=bool)
+        for name in present:
+            tx, ty = (int(v) for v in name.removeprefix("Tile_").split("_"))
+            e0, n0, e1, n1 = tile_bounds(tx, ty)
+            c0 = int(round((max(e0, extent.min_e) - extent.min_e) / cell_size_m))
+            c1 = int(round((min(e1, extent.max_e) - extent.min_e) / cell_size_m))
+            r0 = rows - int(round((min(n1, extent.max_n) - extent.min_n) / cell_size_m))
+            r1 = rows - int(round((max(n0, extent.min_n) - extent.min_n) / cell_size_m))
+            valid[r0:r1, c0:c1] = True
+
+    return surface, np.isfinite(surface), valid, present, missing, points
+
+
 def build(
     tile_dir: Path,
     extent: Extent = DEMONSTRATION_EXTENT,
     log: Callable[[str], None] = lambda _: None,
     barriers: np.ndarray | None = None,
+    *,
+    allow_missing_tiles: bool = False,
 ) -> TerrainBuild:
     started = time.perf_counter()
     log(f"Reading tiles for {extent.name} ({extent.width_m:.0f} x {extent.height_m:.0f} m)")
-    points, names = load_tiles(tile_dir, extent, log)
-    log(f"  {len(points):,} points in total")
+    minimum, observed, valid, names, missing, point_count = rasterise_tiles(
+        tile_dir, extent, CELL_SIZE_M, allow_missing=allow_missing_tiles, log=log
+    )
+    log(f"  {point_count:,} points in total")
+    if missing:
+        log(f"  {len(missing)} tiles are not in the archive; their cells are left without ground")
 
     log(f"Filtering to ground at {CELL_SIZE_M:.0f} m, window {MAX_WINDOW_M:.0f} m, slope {SLOPE_THRESHOLD:.0%}")
-    surface = build_ground_surface(
-        points,
+    surface = ground_from_minimum(
+        minimum,
+        observed,
         extent.min_e,
         extent.min_n,
-        extent.max_e,
-        extent.max_n,
         cell_size_m=CELL_SIZE_M,
         max_window_m=MAX_WINDOW_M,
         slope_threshold=SLOPE_THRESHOLD,
     )
+    del minimum, observed
 
     # Footprints do two jobs, and the second one is not obvious. They are the
     # barriers the routing surface needs; they are also the repair for the
@@ -222,24 +313,26 @@ def build(
     # comes off a conditioned copy. Swapping these two lines produces a build
     # that succeeds, renders, and can never report ponding.
     log(f"Measuring depressions on the raw surface, {MIN_DEPRESSION_DEPTH_M:.2f} m and deeper")
-    depressions = find_depressions(raw, CELL_SIZE_M)
+    depressions = find_depressions(raw, CELL_SIZE_M, valid=valid)
     log(f"  {len(depressions):,} hollows holding {sum(d.capacity_m3 for d in depressions):,.0f} m3")
 
     if barriers is None:
         log("Conditioning a separate surface and routing it — no barriers, water may cross buildings")
     else:
         log(f"Conditioning a separate surface and routing it around {barriers.sum():,} barrier cells")
-    direction = d8(condition(raw, barriers))
+    direction = d8(condition(raw, barriers, valid=valid), valid=valid)
 
     return TerrainBuild(
         surface,
         extent,
         names,
-        len(points),
+        point_count,
         time.perf_counter() - started,
         depressions,
         direction,
         barriers,
+        valid,
+        tuple(missing),
     )
 
 
@@ -250,6 +343,8 @@ def write(result: TerrainBuild, out_dir: Path) -> None:
     np.save(out_dir / "flow-direction.npy", result.direction)
     if result.barriers is not None:
         np.save(out_dir / "barriers.npy", result.barriers)
+    if result.valid is not None:
+        np.save(out_dir / "ground-valid.npy", result.valid)
     # The table and the membership travel separately. Which cells belong to a
     # hollow is raster-shaped information; writing it as a JSON list of indices
     # cost two megabytes to say what one byte per cell says, and the browser
@@ -257,7 +352,12 @@ def write(result: TerrainBuild, out_dir: Path) -> None:
     rows, cols = result.surface.shape
     np.savez_compressed(
         out_dir / "depression-cells.npz",
-        labels=cell_labels(result.depressions, rows, cols),
+        labels=cell_labels(
+            result.depressions,
+            rows,
+            cols,
+            np.int16 if len(result.depressions) <= np.iinfo(np.int16).max else np.int32,
+        ),
     )
     (out_dir / "depressions.json").write_text(
         json.dumps([d.as_json() for d in result.depressions], indent=2) + "\n", encoding="utf-8"
@@ -282,13 +382,26 @@ def main(argv: list[str] | None = None) -> int:
         help="MGA55 bounds; defaults to the Iteration 1 demonstration extent",
     )
     parser.add_argument(
+        "--name",
+        choices=sorted(EXTENTS),
+        help="a published extent; its bounds win over --extent",
+    )
+    parser.add_argument(
+        "--allow-missing-tiles",
+        action="store_true",
+        help="build over tiles the archive does not have, leaving their cells without ground",
+    )
+    parser.add_argument(
         "--no-footprints",
         action="store_true",
         help="skip the footprint fetch; the routing then lets water cross buildings",
     )
     args = parser.parse_args(argv)
 
-    extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
+    if args.name:
+        extent = EXTENTS[args.name]
+    else:
+        extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)
@@ -301,7 +414,9 @@ def main(argv: list[str] | None = None) -> int:
         log(f"  {len(found):,} rings, {on_ground:,} standing on the ground")
         barriers = barrier_mask(found, extent, CELL_SIZE_M)
 
-    result = build(args.tiles, extent, log=log, barriers=barriers)
+    result = build(
+        args.tiles, extent, log=log, barriers=barriers, allow_missing_tiles=args.allow_missing_tiles
+    )
     write(result, args.out)
 
     surface = result.surface
