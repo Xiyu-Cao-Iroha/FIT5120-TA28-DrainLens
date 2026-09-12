@@ -169,16 +169,41 @@ button:disabled {
  * chosen, because a photograph's contrast changes with every pixel and the only
  * number worth checking is the worst one.
  */
-.home__hero-photo {
+/*
+ * The photograph is the page, not the hero.
+ *
+ * One image, fixed to the viewport, behind everything on the homepage. Each
+ * section paints its own translucent scrim over it rather than an opaque
+ * colour, so the street stays visible the whole way down and the page reads as
+ * one surface instead of five bands.
+ *
+ * `background-attachment: fixed` rather than a pseudo-element behind the
+ * content: the picture then belongs to the viewport, so a 3,000-pixel page
+ * does not stretch a 727-pixel photograph, and there is no stacking context to
+ * get wrong.
+ */
+.home--photo {
   background-color: #0c141c;
-  background-image:
-    linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%),
-    url('/hero-street.webp');
+  background-image: url('/hero-street.webp');
   background-size: cover;
   /* Low and right: that is where the grate and the running water are, and
      `cover` crops whichever axis is long. */
   background-position: 70% 65%;
+  background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+/*
+ * The hero's own scrim, over the page's photograph.
+ *
+ * Flat and strong, because the text column is the whole width here.
+ */
+.home__hero-photo {
+  background-image: linear-gradient(
+    180deg,
+    rgba(12, 20, 28, 0.8) 0%,
+    rgba(12, 20, 28, 0.78) 100%
+  );
 }
 
 .home__hero {
@@ -208,14 +233,12 @@ button:disabled {
      text column — it is still 0.72, where the same worst pixel becomes
      rgb(68, 75, 81) and the four colours measure 8.86, 7.24, 6.08 and 5.44. */
   .home__hero-photo {
-    background-image:
-      linear-gradient(
-        100deg,
-        rgba(12, 20, 28, 0.84) 0%,
-        rgba(12, 20, 28, 0.72) 52%,
-        rgba(12, 20, 28, 0.34) 100%
-      ),
-      url('/hero-street.webp');
+    background-image: linear-gradient(
+      100deg,
+      rgba(12, 20, 28, 0.84) 0%,
+      rgba(12, 20, 28, 0.72) 52%,
+      rgba(12, 20, 28, 0.34) 100%
+    );
   }
 
   .home__hero {
