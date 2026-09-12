@@ -47,6 +47,15 @@ export interface Presentation {
 
 const COMPARISON_TITLE = 'Difference from the all-clear baseline';
 
+/**
+ * The heading over every result that could not be calculated.
+ *
+ * "Insufficient information" is AC 3.1.4.a's own wording. It was "Comparison
+ * unavailable", which is true and which a person could also read as the
+ * service being down.
+ */
+const INSUFFICIENT_TITLE = 'Insufficient information';
+
 export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
   'higher-than-baseline': {
     title: COMPARISON_TITLE,
@@ -59,10 +68,13 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
   },
   'no-clear-change': {
     title: COMPARISON_TITLE,
-    band: 'NO CLEAR DIFFERENCE',
-    finding: 'No clear difference appears under these assumptions',
-    body: 'At this accumulated rainfall amount, the selected assumptions do not produce a clear difference from the all-clear baseline.',
-    comparison: 'No clear difference',
+    // "No clear change", not "No clear difference": AC 3.1.3.e names the two
+    // bands, and the words on screen should be the words in the criteria and
+    // in the explanation beside them.
+    band: 'NO CLEAR CHANGE',
+    finding: 'No clear change under these assumptions',
+    body: 'At this accumulated rainfall amount, the selected assumptions do not produce a clear change from the all-clear baseline.',
+    comparison: 'No clear change',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: false,
   },
@@ -78,7 +90,7 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
  */
 export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> = {
   terrain_unavailable: {
-    title: 'Comparison unavailable',
+    title: INSUFFICIENT_TITLE,
     band: 'TERRAIN UNAVAILABLE',
     finding: 'Terrain data is unavailable for this area',
     body: 'Changing the drainage pit will not fix this. Too little ground was measured around here to route water over. Return to the map or choose another supported address.',
@@ -87,7 +99,7 @@ export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> =
     showsDifference: false,
   },
   invalid_inlet: {
-    title: 'Comparison unavailable',
+    title: INSUFFICIENT_TITLE,
     band: 'DRAIN RECORD UNAVAILABLE',
     finding: 'Required inlet records are missing or invalid',
     body: 'Choose another recorded drainage pit. The official identifier for this one remains visible; the fields we do not hold stay marked unavailable rather than being filled in.',
@@ -96,7 +108,7 @@ export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> =
     showsDifference: false,
   },
   scenario_calculation_failed: {
-    title: 'Comparison unavailable',
+    title: INSUFFICIENT_TITLE,
     band: 'CALCULATION FAILED',
     finding: 'We could not complete this comparison',
     body: 'Your selected rainfall and blockage assumptions are still here. Try again, or review the scenario.',
@@ -105,7 +117,7 @@ export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> =
     showsDifference: false,
   },
   comparison_not_comparable: {
-    title: 'Comparison unavailable',
+    title: INSUFFICIENT_TITLE,
     band: 'RESULTS NOT COMPARABLE',
     finding: 'These two scenario runs cannot be compared',
     body: 'The blocked and all-clear runs were not produced from the same usable inputs. Review the assumptions and run the comparison again at the same accumulated rainfall.',
@@ -174,7 +186,50 @@ export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly bo
  * one, and this sentence is the only thing standing between the two readings.
  */
 export const RAINFALL_CONTROL_NOTE =
-  'This shows how the comparison changes as rainfall accumulates. It does not show when water would reach a location.';
+  'This shows how the comparison changes as rainfall accumulates. It does not show when water would reach a location. A change need not grow steadily with rainfall: it can appear at one amount and not at the next, as low areas fill and overflow.';
+
+/**
+ * What accumulated rainfall is in this model, wherever an amount is chosen.
+ *
+ * AC 3.2.3.c, d and e: a simplified total, no intensity or duration, and not
+ * a forecast of any storm. The model adds one depth of water evenly over the
+ * area and routes it; how hard it fell and for how long are not inputs at all.
+ */
+export const RAINFALL_EXPLAINED =
+  'Accumulated rainfall here is a simplified total: the same depth of water added evenly across the area. The scenario does not model how intense the rain is or how long it lasts, and 20, 40 and 60 mm are comparison amounts, not a weather forecast or a prediction of a future storm.';
+
+/**
+ * What "No clear change" means, said outright beside the finding.
+ *
+ * AC 3.3.2.h and 3.1.3.f. This is the sentence that makes a null result honest
+ * rather than reassuring, which is why it is not inside a collapsed section:
+ * the audit on 13 September found it was not on the screen at all.
+ */
+export const NO_CLEAR_CHANGE_MEANS =
+  'No clear change means this simplified calculation did not identify a clear difference from the all-clear baseline. It does not mean the selected drain has no blockage or flood concern, or that a blockage would have no effect in a real flood.';
+
+/**
+ * Everything the comparison cannot tell a person, AC 3.3.2 a to i, in order.
+ *
+ * Kept as one list so the criteria can be checked against it line by line.
+ */
+export const LIMITATIONS: readonly string[] = [
+  'The blockage condition is an assumption you chose, not an observation of the drain.',
+  'Accumulated rainfall is an input you chose, not a weather observation or forecast.',
+  'The model does not work out the rainfall amount at which a drain would fail.',
+  'Actual pipe hydraulic capacity is not modelled.',
+  'The result does not show a validated flood depth or water depth.',
+  'It does not estimate when floodwater would arrive.',
+  'It does not give a flood probability or a risk score.',
+  NO_CLEAR_CHANGE_MEANS,
+  'It only shows differences from the all-clear baseline, within the area the ground surface covers around the selected drain.',
+];
+
+/**
+ * How strongly to read a result, AC 3.3.3.d.
+ */
+export const HOW_STRONGLY_TO_READ_IT =
+  'Read this as a comparison between two assumptions on an approximate ground surface. Higher than baseline says where, in this model, the blockage leaves more water on the surface — not how much, and not that it would flood. No clear change says the model could not separate the two runs — not that the drain does not matter.';
 
 /**
  * The three kinds of thing on this screen, and their colours.
@@ -212,7 +267,7 @@ export const WHAT_IS_UNCERTAIN: readonly { readonly title: string; readonly body
   },
   {
     title: 'The ground surface is derived from imagery, not survey',
-    body: 'It comes from aerial photography, so 52.1% of this area was measured directly and the rest — under roofs and tree canopy — is interpolated from the nearest measured ground.',
+    body: 'It is photogrammetric — calculated from overlapping aerial photographs rather than a laser or ground survey — so 52.1% of this area was measured directly and the rest, under roofs and tree canopy, is interpolated from the nearest measured ground.',
   },
   {
     title: 'The recorded drainage network has gaps',
@@ -241,5 +296,10 @@ export const HOW_IT_WAS_PRODUCED: readonly { readonly title: string; readonly bo
   {
     title: 'How to read it',
     body: 'Only locations where more water remains than in the all-clear baseline are highlighted. Nothing here is a depth.',
+  },
+  {
+    // AC 3.3.1.e: the simplifications, with their numbers.
+    title: 'Simplified assumptions',
+    body: 'Rain is added evenly across the area and runs downhill over the ground surface. A clear drain takes 60% of the water reaching it, a partly blocked one half of that, and a fully blocked one none; only the selected drain changes. Each rainfall amount is calculated from dry ground, and a change smaller than 0.05 m³ in a one-metre square is not reported.',
   },
 ];

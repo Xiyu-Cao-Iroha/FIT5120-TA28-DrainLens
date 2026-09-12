@@ -28,6 +28,32 @@ export const isSupportedRainfall = (mm: number): boolean =>
   Number.isFinite(mm) && mm >= RAINFALL_RANGE_MM.min && mm <= RAINFALL_RANGE_MM.max;
 
 /**
+ * The accumulated rainfall amounts the scenario explorer offers, and nothing else.
+ *
+ * AC 3.2.3.b asks for "only rainfall levels supported and validated by the
+ * current scenario model", which is a set rather than a range. Chosen on
+ * 13 September, and each one is in for a reason:
+ *
+ * - **all three sit inside `RAINFALL_RANGE_MM`**, the range the engine was
+ *   built and tested against;
+ * - **20 mm and 60 mm are the amounts the blockage sensitivity was measured
+ *   at** (DECISIONS-PENDING.md §1), so the finding a person reads beside the
+ *   result was established at these amounts and not extrapolated to them;
+ * - **40 mm is the middle**, and the default, so the control has a step
+ *   either side of where it opens;
+ * - **every inlet in the Kensington scene was run at all three**, fully and
+ *   partly blocked, with the engine's own mass-balance and monotonicity checks
+ *   in force: the result is recorded in `docs/ALGORITHMS.md`.
+ *
+ * A typed-in amount is not validated merely by lying inside the range, which
+ * is why the free input on the setup screen was removed.
+ */
+export const VALIDATED_RAINFALL_LEVELS_MM = [20, 40, 60] as const;
+
+export const isValidatedRainfall = (mm: number): boolean =>
+  (VALIDATED_RAINFALL_LEVELS_MM as readonly number[]).includes(mm);
+
+/**
  * Where the accumulated rainfall figure came from.
  *
  * `manual` is the MVP path and is complete on its own. `observation` is the

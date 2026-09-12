@@ -12,8 +12,9 @@
  * AC 2.1.1 (Aug-27 set) asks for it and why `EMPTY_SCENARIO.blockage` is null.
  */
 
-import type { BlockageSetting } from '@drainlens/schema';
+import { type BlockageSetting, VALIDATED_RAINFALL_LEVELS_MM } from '@drainlens/schema';
 
+import { RAINFALL_EXPLAINED } from '../scenario/outcome.js';
 import type { ScenarioInputs, SupportedAddress } from '../session.js';
 import { missingScenarioInput } from '../session.js';
 
@@ -42,11 +43,15 @@ export const BLOCKAGE_IS_AN_ASSUMPTION =
 export const RAINFALL_IS_AN_ASSUMPTION =
   'This is a user-selected comparison amount, not a rainfall observation or forecast.';
 
-export const RAINFALL_PRESETS: readonly { readonly label: string; readonly mm: number }[] = [
-  { label: 'Lower comparison amount', mm: 20 },
-  { label: 'Middle comparison amount', mm: 40 },
-  { label: 'Higher comparison amount', mm: 60 },
-];
+/**
+ * The validated levels, labelled. The amounts come from the schema so the
+ * buttons and the check the session applies cannot drift apart.
+ */
+export const RAINFALL_PRESETS: readonly { readonly label: string; readonly mm: number }[] =
+  VALIDATED_RAINFALL_LEVELS_MM.map((mm, index) => ({
+    label: ['Lower comparison amount', 'Middle comparison amount', 'Higher comparison amount'][index] ?? `${String(mm)} mm`,
+    mm,
+  }));
 
 export interface ScenarioSetupProps {
   readonly address: SupportedAddress;
@@ -196,23 +201,12 @@ export function ScenarioSetup({
       </Section>
 
       <Section n={3} title="Total accumulated rainfall">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-          <input
-            type="number"
-            min={0}
-            value={scenario.rainfallMm}
-            onChange={(event) => onRainfall(Number(event.target.value))}
-            aria-label="Accumulated rainfall in millimetres"
-            style={{
-              width: 90,
-              padding: '9px 11px',
-              border: '1px solid #d5ded2',
-              borderRadius: 8,
-              font: 'inherit',
-            }}
-          />
-          <span style={{ color: '#6b7a88' }}>mm</span>
-        </div>
+        {/*
+          The three validated levels and nothing else (AC 3.2.3.b). A number
+          box sat above them until 13 September and accepted any amount,
+          including 500 mm, which the engine then solved as if it had been
+          checked.
+        */}
         {RAINFALL_PRESETS.map((preset) => (
           <button
             key={preset.mm}
@@ -238,6 +232,7 @@ export function ScenarioSetup({
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7a88' }}>
           {RAINFALL_IS_AN_ASSUMPTION}
         </p>
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6b7a88' }}>{RAINFALL_EXPLAINED}</p>
       </Section>
 
       <section

@@ -22,10 +22,11 @@
  * stores such a preference today.
  */
 
-import type {
-  BlockageSetting,
-  ComparisonBand,
-  InsufficiencyReason,
+import {
+  type BlockageSetting,
+  type ComparisonBand,
+  type InsufficiencyReason,
+  isValidatedRainfall,
 } from '@drainlens/schema';
 
 import type { MapMode } from './map/modes.js';
@@ -518,6 +519,10 @@ function step(session: Session, event: SessionEvent): Session {
       return { ...session, scenario: { ...session.scenario, blockage: event.blockage } };
 
     case 'rainfall-selected':
+      // Only a validated level (AC 3.2.3.b). Anything else is ignored rather
+      // than stored: a stored 35 mm would be shown in the summary as if it
+      // were a choice the explorer offered.
+      if (!isValidatedRainfall(event.rainfallMm)) return session;
       return { ...session, scenario: { ...session.scenario, rainfallMm: event.rainfallMm } };
 
     case 'comparison-started':

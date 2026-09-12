@@ -20,8 +20,12 @@ import {
   BASIS_LABELS,
   type Basis,
   HOW_IT_WAS_PRODUCED,
+  HOW_STRONGLY_TO_READ_IT,
+  LIMITATIONS,
+  NO_CLEAR_CHANGE_MEANS,
   type Outcome,
   RAINFALL_CONTROL_NOTE,
+  RAINFALL_EXPLAINED,
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
@@ -51,6 +55,7 @@ export function Result({
   const shown = presentationFor(outcome);
   const [howOpen, setHowOpen] = useState(false);
   const [uncertainOpen, setUncertainOpen] = useState(false);
+  const [limitsOpen, setLimitsOpen] = useState(false);
 
   const blockage =
     scenario.blockage === null
@@ -90,6 +95,27 @@ export function Result({
         <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#61707c' }}>{shown.band}</span>
         <h2 style={{ margin: '4px 0 8px', fontSize: 17 }}>{shown.finding}</h2>
         <p style={{ margin: 0, color: '#4d5f6e', fontSize: 14 }}>{shown.body}</p>
+
+        {/*
+          AC 3.3.2.h and 3.1.3.f, beside the finding and never folded away.
+          The measured reasons can wait behind a toggle; what the answer does
+          not mean cannot.
+        */}
+        {outcome.status === 'successful' && outcome.band === 'no-clear-change' && (
+          <p
+            style={{
+              margin: '10px 0 0',
+              padding: '8px 10px',
+              background: '#fbf6ea',
+              borderLeft: '3px solid #c79a3a',
+              borderRadius: 4,
+              color: '#4a3b17',
+              fontSize: 13,
+            }}
+          >
+            {NO_CLEAR_CHANGE_MEANS}
+          </p>
+        )}
 
         {/*
           A comparison that answers "nothing" and never says why reads as a
@@ -187,12 +213,48 @@ export function Result({
         </button>
 
         {uncertainOpen && (
+          <>
+            <ul style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 13, color: '#4d5f6e' }}>
+              {WHAT_IS_UNCERTAIN.map((item) => (
+                <li key={item.title} style={{ marginBottom: 8 }}>
+                  <strong style={{ color: '#1e2b36' }}>{item.title}</strong>
+                  <br />
+                  {item.body}
+                </li>
+              ))}
+            </ul>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#4d5f6e' }}>
+              <strong style={{ color: '#1e2b36' }}>How strongly to read this</strong>
+              <br />
+              {HOW_STRONGLY_TO_READ_IT}
+            </p>
+          </>
+        )}
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          onClick={() => setLimitsOpen((open) => !open)}
+          aria-expanded={limitsOpen}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: 'inherit',
+            color: '#1f6f5c',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          What this comparison cannot tell you
+        </button>
+
+        {limitsOpen && (
           <ul style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 13, color: '#4d5f6e' }}>
-            {WHAT_IS_UNCERTAIN.map((item) => (
-              <li key={item.title} style={{ marginBottom: 8 }}>
-                <strong style={{ color: '#1e2b36' }}>{item.title}</strong>
-                <br />
-                {item.body}
+            {LIMITATIONS.map((item) => (
+              <li key={item} style={{ marginBottom: 6 }}>
+                {item}
               </li>
             ))}
           </ul>
@@ -334,6 +396,7 @@ function RainfallControl({
         })}
       </div>
       <p style={{ margin: 0, fontSize: 12, color: '#5b6e7e' }}>{RAINFALL_CONTROL_NOTE}</p>
+      <p style={{ margin: '6px 0 0', fontSize: 12, color: '#5b6e7e' }}>{RAINFALL_EXPLAINED}</p>
     </section>
   );
 }
