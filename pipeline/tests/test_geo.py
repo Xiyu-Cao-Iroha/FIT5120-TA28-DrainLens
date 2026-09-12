@@ -235,3 +235,33 @@ class TestResolvingAnExtentByName:
         # the artefact inside says it is `bar`.
         for key, extent in EXTENTS.items():
             assert key == extent.name
+
+
+class TestTheCentralCity:
+    def test_it_sits_on_the_tile_grid(self):
+        from drainlens_pipeline.geo import MELBOURNE_CBD
+
+        for value in (MELBOURNE_CBD.min_e, MELBOURNE_CBD.min_n, MELBOURNE_CBD.max_e, MELBOURNE_CBD.max_n):
+            assert value % TILE_SIZE_M == 0
+
+    def test_it_reaches_every_corner_of_the_hoddle_grid(self):
+        # Measured from the council's street centrelines. The 2 x 2 km guess
+        # made before measuring missed the Flinders Street edge.
+        from drainlens_pipeline.geo import MELBOURNE_CBD
+
+        for easting, northing in (
+            (319_126.0, 5_812_723.0),  # Spencer / La Trobe
+            (319_772.0, 5_811_968.0),  # Spencer / Flinders
+            (321_728.0, 5_812_741.0),  # Spring / Flinders
+            (321_379.0, 5_813_602.0),  # Spring / La Trobe
+        ):
+            assert MELBOURNE_CBD.contains(easting, northing)
+
+    def test_it_is_thirty_tiles_inside_the_council_and_clear_of_kensington(self):
+        from drainlens_pipeline.geo import MELBOURNE_CBD
+
+        assert len(MELBOURNE_CBD.tile_names()) == 30
+        assert resolve_extent("melbourne-cbd") is MELBOURNE_CBD
+        assert CITY_OF_MELBOURNE.contains(MELBOURNE_CBD.min_e, MELBOURNE_CBD.min_n)
+        assert CITY_OF_MELBOURNE.contains(MELBOURNE_CBD.max_e - 1, MELBOURNE_CBD.max_n - 1)
+        assert not MELBOURNE_CBD.contains(DEMONSTRATION_EXTENT.min_e, DEMONSTRATION_EXTENT.min_n)

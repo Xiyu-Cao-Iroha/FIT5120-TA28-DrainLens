@@ -32,10 +32,20 @@ Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `
 ```bash
 python -m drainlens_pipeline.network --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/map.json
 python -m drainlens_pipeline.trace   --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/api/data/city-of-melbourne/trace.json
-python -m drainlens_pipeline.reframe --in ../apps/web/public/data/derived.json --from kensington --to city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json
+python -m drainlens_pipeline.reframe --to city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json --in ../apps/web/public/data/derived.json --from kensington --in ../data/map/derived-melbourne-cbd.json --from melbourne-cbd
 ```
 
-**The third line has to be run again whenever `derived.json` is rebuilt**, and it once was not: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing. `node tools/data/check-derived.mjs` now fails CI when the two copies are not the same shapes moved by (1500, 6000).
+**The derived layers now come from two measured areas**, Kensington and the central city (`melbourne-cbd` in `geo.py`: the whole Hoddle Grid, 3 × 2.5 km, 30 tiles). Each is its own terrain run; `reframe` moves both into the council frame and writes one artefact with an `areas` list. The central city has no bundled copy — the site's fallback stays Kensington — so its terrain has to be built before the line above can run:
+
+```bash
+python -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud-cbd --extent 319000 5811500 322000 5814000
+python -m drainlens_pipeline.terrain --tiles ../data/pointcloud-cbd --out ../data/terrain-cbd --extent 319000 5811500 322000 5814000
+python -m drainlens_pipeline.derived --terrain ../data/terrain-cbd --extent melbourne-cbd --out ../data/map/derived-melbourne-cbd.json
+```
+
+The fetch is 876 MB of the 4.33 GB archive.
+
+**The `reframe` line has to be run again whenever either area's `derived.json` is rebuilt**, and it once was not: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing. `node tools/data/check-derived.mjs` now fails CI when the council copy's Kensington shapes are not the bundled ones moved by (1500, 6000), when anything else falls outside the central city, or when the settings differ.
 
 No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 

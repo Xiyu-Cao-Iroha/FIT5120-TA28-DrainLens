@@ -220,6 +220,31 @@ CITY_OF_MELBOURNE: Final = Extent(
     max_n=5817500.0,
 )
 
+#: The central city: the whole Hoddle Grid, on the point cloud's tile grid.
+#:
+#: **A second terrain extent, not a second pilot.** The map and the trace stay
+#: council-wide; what this adds is measured ground — and so water paths, low
+#: points and the data-quality hatching — under the CBD as well as Kensington.
+#:
+#: Measured from the council's own street centrelines rather than drawn: the
+#: grid's corners sit at Spencer/La Trobe (319,126 E), Spencer/Flinders
+#: (5,811,968 N), Spring/Flinders (321,728 E) and Spring/La Trobe
+#: (5,813,602 N). Rounded outward onto the 500 m tiles that gives 3 x 2.5 km,
+#: all 30 of whose tiles are in the archive. A 2 x 2 km guess made before
+#: measuring cut off the Flinders Street edge.
+#:
+#: **Expect most of it to be hatched.** `docs/DEMO-EXTENT.md` measured the CBD
+#: at 11–17% open cells: the camera sees roofs, and the ground between towers
+#: is interpolated. That is why Kensington was the pilot, and it is the thing
+#: the unavailable layer exists to say.
+MELBOURNE_CBD: Final = Extent(
+    name="melbourne-cbd",
+    min_e=319000.0,
+    min_n=5811500.0,
+    max_e=322000.0,
+    max_n=5814000.0,
+)
+
 #: Every extent that can be built, by the name it is published under.
 #:
 #: One registry rather than a constant per builder. Four entry points each
@@ -229,6 +254,7 @@ CITY_OF_MELBOURNE: Final = Extent(
 EXTENTS: Final[dict[str, Extent]] = {
     DEMONSTRATION_EXTENT.name: DEMONSTRATION_EXTENT,
     CITY_OF_MELBOURNE.name: CITY_OF_MELBOURNE,
+    MELBOURNE_CBD.name: MELBOURNE_CBD,
 }
 
 
