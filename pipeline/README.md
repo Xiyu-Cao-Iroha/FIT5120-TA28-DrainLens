@@ -303,6 +303,30 @@ refuses a list where one name carries two codes for exactly that reason.
 ./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   --areas ../data/sa2-areas.json
 ```
 
+## Resident population — `population`
+
+The Severity Score's denominator, and the one stage that reads an `.xls`.
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.population   --estimates ../data/population/erp-sa2-2005-2015.xls   --areas     ../data/population/sa2-areas.json   --out       ../apps/web/public/data/population.json
+```
+
+**The workbook does not carry the nine-digit SA2 code.** It carries it split
+across four indented columns — state, SA4, SA3, SA2 — so the code is
+reassembled, which is a claim about the structure of an identifier. Matching by
+name instead makes a different claim, that no two areas in the scope share a
+name. `build` requires both joins to agree on every area, which tests both at
+once and is the reason this stage refuses rather than reports.
+
+**The parsing takes rows, not bytes**, unlike `flood_history` — ABS publishes
+this as the older OLE2 `.xls`, which openpyxl cannot read and which nothing
+here can *write*, so a fixture workbook is not an option. `rows_from` is the
+only part that touches `xlrd`, and it either opens a file or raises.
+
+The artefact keeps all 281 areas including the seven nobody lives in. A
+population is a fact; what it is not is a denominator, and `minimumResidents`
+is how the consumer knows which.
+
 **The list has been used once, and it matched.** ABS 3218.0's SA2 population
 estimates cover all 281 areas — by the code and by the name, agreeing on every
 one, with nothing left over on either side. What that settles, what year the

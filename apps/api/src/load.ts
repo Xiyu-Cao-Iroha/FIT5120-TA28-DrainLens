@@ -158,6 +158,12 @@ export async function load(
     await readFile(path.join(BUNDLED.dir, 'flood-history.json'), 'utf8'),
   ) as Artefact;
 
+  // The denominator, read from the same place and for the same reason: it is
+  // Greater Melbourne's population, not this extent's.
+  const population = JSON.parse(
+    await readFile(path.join(BUNDLED.dir, 'population.json'), 'utf8'),
+  ) as Artefact;
+
   const counted: Record<string, number> = {};
   const count = (table: string, n: number) => {
     counted[table] = n;
@@ -243,7 +249,7 @@ export async function load(
       (s as unknown as { last_modified?: string }).last_modified ?? null,
     ]);
   }
-  for (const s of [flood.source, flood.geographySource, trace.source]) {
+  for (const s of [flood.source, flood.geographySource, trace.source, population.source]) {
     if (!s) continue;
     sources.set(s.dataset_id, [
       s.dataset_id,
@@ -576,6 +582,56 @@ export async function load(
   }
   count('flood_area', areaYears);
   count('flood_area_coverage', areas.length);
+
+  // --- The Severity Score's denominator -------------------------------------
+
+  /*
+    One row per area per year, which is what `population` was shaped for.
+
+    The table has been declared and empty since the first migration, and its
+    comment asked whoever filled it to choose the grain deliberately rather
+    than inventing one. The grain is SA2: the score is computed from the
+    published rollups, so `flood_incident` stays empty and its own comment
+    stays true.
+
+    **A year each, rather than one denominator repeated.** The headline score
+    divides by the mid-period figure, but the per-year view divides each year's
+    activity by that year's population -- and six numerators over one
+    denominator is the numerator again with a constant applied, drawn as though
+    it were something else.
+  */
+  const asAt = need(
+    population.asAt as readonly string[] | undefined,
+    'the dates on the population artefact',
+  );
+  const datasetId = need(
+    (population.source as { dataset_id?: string } | undefined)?.dataset_id,
+    'a source on the population artefact',
+  );
+  const populationAreas = need(
+    population.areas as readonly Record<string, unknown>[] | undefined,
+    'areas on the population artefact',
+  );
+
+  let populationRows = 0;
+  for (const area of populationAreas) {
+    const code = need(area.code as string | undefined, 'a code on a population area');
+    const persons = need(area.persons as readonly number[] | undefined, `persons for ${code}`);
+    if (persons.length !== asAt.length) {
+      throw new LoadError(
+        `${code} has ${String(persons.length)} figures for ${String(asAt.length)} dates`,
+      );
+    }
+    for (const [index, date] of asAt.entries()) {
+      await client.query(
+        `INSERT INTO population (area_code, area_level, as_at, persons, dataset_id)
+         VALUES ($1, 'SA2', $2, $3, $4)`,
+        [code, date, persons[index], datasetId],
+      );
+      populationRows += 1;
+    }
+  }
+  count('population', populationRows);
 
   return counted;
 }
