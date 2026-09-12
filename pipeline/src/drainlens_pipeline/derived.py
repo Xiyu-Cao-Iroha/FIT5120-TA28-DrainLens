@@ -42,9 +42,29 @@ COVERAGE_BLOCK_M = 25.0
 
 #: Below this measured share, a coverage block is reported as unavailable.
 #:
-#: A deliberately stated tolerance, not a hidden one. A block that is one third
-#: ground is a block whose slope is mostly interpolation between rooftops.
-COVERAGE_MIN_MEASURED = 0.35
+#: **This was 0.35 until 13 September, and it hatched a third of the square.**
+#: The median block in Kensington is 48% measured ground, so 35% flagged
+#: ordinary terraced housing — a block that is one third ground is a block of
+#: roofs with a street through it, and the street is measured. The hatching
+#: covered 33.4% of the map in a chequerboard and stopped reading as a warning.
+#:
+#: At 0.20 a block is four-fifths roof or canopy: the slope across it is
+#: interpolation between measurements more than a block apart. That is the
+#: bottom tenth of blocks here (the 10th percentile is 0.18), which is what a
+#: warning should single out.
+COVERAGE_MIN_MEASURED = 0.20
+
+#: Fewest contiguous blocks a gap needs before it is drawn.
+#:
+#: One 25 m block with no ground under it is, almost always, one building:
+#: there is no ground surface under a roof for the map to be wrong about. Four
+#: blocks — a place 50 m across — is bigger than a building lot, and is where
+#: the ground *between* buildings goes unmeasured too. With the share above it
+#: leaves 11 places and 6.0% of the square, from 22 places and 33.4%.
+#:
+#: A display filter on the evidence layer, not on the evidence: the ground
+#: surface, the low points and the trace are all computed exactly as before.
+COVERAGE_MIN_BLOCKS = 4
 
 
 class DerivedError(Exception):
@@ -306,12 +326,17 @@ def coverage_gaps(
     *,
     block_m: float = COVERAGE_BLOCK_M,
     min_measured: float = COVERAGE_MIN_MEASURED,
+    min_blocks: int = COVERAGE_MIN_BLOCKS,
 ) -> list[list[list[float]]]:
     """Where there is too little measured ground to say anything.
 
     Summarised into blocks before being outlined. The per-cell mask is holed by
     every roof and street tree, and its outline would be thousands of shapes
     that answer no question a reader is asking.
+
+    Small gaps are dropped by counting blocks, before outlining, rather than by
+    ring area after it: a ring-area filter would also drop the *holes* in a
+    large gap, and hatch measured ground as though it were not.
     """
     step = int(round(block_m / cell_size_m))
     if step < 1:
@@ -324,7 +349,11 @@ def coverage_gaps(
         .reshape(usable_rows // step, step, usable_cols // step, step)
         .mean(axis=(1, 3))
     )
-    return outlines(blocks < min_measured, extent, block_m)
+    thin = blocks < min_measured
+    labels, count = ndimage.label(thin, structure=np.ones((3, 3), dtype=bool))
+    sizes = ndimage.sum(thin, labels, index=range(1, count + 1))
+    kept = [index + 1 for index, size in enumerate(np.atleast_1d(sizes)) if size >= min_blocks]
+    return outlines(np.isin(labels, kept), extent, block_m)
 
 
 def build(
@@ -394,6 +423,7 @@ def build(
             "min_drawn_depression_m2": MIN_DRAWN_DEPRESSION_M2,
             "coverage_block_m": COVERAGE_BLOCK_M,
             "coverage_min_measured": COVERAGE_MIN_MEASURED,
+            "coverage_min_blocks": COVERAGE_MIN_BLOCKS,
             "simplify_tolerance_m": SIMPLIFY_TOLERANCE_M,
             "display_only": (
                 "The depression size threshold is a display filter. The scenario engine "

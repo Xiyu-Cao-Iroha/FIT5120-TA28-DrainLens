@@ -72,10 +72,10 @@ describe('what the loader put in', () => {
   });
 
   it('holds every derived shape, across all three layers', async () => {
-    expect(await count('derived_shape')).toBe(394);
+    expect(await count('derived_shape')).toBe(362);
     expect(Number(await one(`SELECT count(*)::text AS v FROM derived_shape WHERE layer = 'channel'`))).toBe(38);
     expect(Number(await one(`SELECT count(*)::text AS v FROM derived_shape WHERE layer = 'low-point'`))).toBe(310);
-    expect(Number(await one(`SELECT count(*)::text AS v FROM derived_shape WHERE layer = 'unavailable'`))).toBe(46);
+    expect(Number(await one(`SELECT count(*)::text AS v FROM derived_shape WHERE layer = 'unavailable'`))).toBe(14);
   });
 
   it('holds the drainage graph and the vocabulary of ways a path can end', async () => {
