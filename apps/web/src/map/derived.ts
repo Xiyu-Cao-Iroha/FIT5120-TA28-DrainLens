@@ -246,12 +246,20 @@ const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
   return minE <= seen.maxE && maxE >= seen.minE && minN <= seen.maxN && maxN >= seen.minN;
 };
 
-function trace(
+/**
+ * Add one ring to the current path. **Does not begin one.**
+ *
+ * Split out of `trace` because `hatch` composes a clip region from several
+ * rings at once, and `trace`'s `beginPath` threw away every ring but the
+ * last — so only one unavailable area was ever hatched, and *which* one
+ * changed as the view moved. On screen that was areas flickering and
+ * disappearing while the map was dragged.
+ */
+function addRing(
   context: CanvasRenderingContext2D,
   viewport: Viewport,
   path: readonly Local[],
 ): void {
-  context.beginPath();
   for (let index = 0; index < path.length; index += 1) {
     const point = path[index];
     if (!point) continue;
@@ -259,6 +267,16 @@ function trace(
     if (index === 0) context.moveTo(x, y);
     else context.lineTo(x, y);
   }
+}
+
+/** One ring as a path of its own, for drawing it by itself. */
+function trace(
+  context: CanvasRenderingContext2D,
+  viewport: Viewport,
+  path: readonly Local[],
+): void {
+  context.beginPath();
+  addRing(context, viewport, path);
 }
 
 /**
@@ -276,9 +294,11 @@ function hatch(
   palette: DerivedPalette,
 ): void {
   context.save();
+  // One path, every ring in it. `trace` would begin a new one per ring and
+  // clip to whichever came last.
   context.beginPath();
   for (const ring of rings) {
-    trace(context, viewport, ring);
+    addRing(context, viewport, ring);
     context.closePath();
   }
   context.clip();

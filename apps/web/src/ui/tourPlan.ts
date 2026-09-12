@@ -54,7 +54,18 @@ export interface TourStep {
 export const TOUR_STEPS: readonly TourStep[] = [
   {
     target: 'address',
-    body: 'Type an address here and choose it from the list. The search runs in your browser — nothing about the address is sent anywhere.',
+    /*
+      **The second sentence is gone, and it was true.** It said the search runs
+      in the browser and that nothing about the address is sent anywhere. The
+      address screen says it where an address is actually typed, and the
+      homepage says it again under *Find a street*; here it was the longer half
+      of a coach mark that exists to point at a search box.
+
+      A promise repeated in three places is not three times as trusted. It is
+      three copies to keep true, and the two that remain are the ones a person
+      is reading at the moment it matters.
+    */
+    body: 'Type an address here and choose it from the list.',
   },
   {
     target: 'chips',

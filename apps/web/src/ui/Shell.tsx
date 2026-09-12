@@ -9,7 +9,7 @@
  * screen someone is actually reading does not carry it.
  */
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
 import {
   CHANGES_NOTICE,
@@ -62,6 +62,20 @@ function InfoMark() {
 
 export interface ShellProps {
   readonly children: ReactNode;
+  /**
+   * Which screen this is, so a new one starts at the top.
+   *
+   * **The scrolling element is this shell's, not the screen's.** React keeps
+   * the same `<main>` across a screen change, and it keeps its scroll offset
+   * with it — so pressing *See flood history* from the band two thirds of the
+   * way down the homepage landed two thirds of the way down the flood board,
+   * under a heading nobody had read the top of.
+   *
+   * A person who changes screen has not asked to stay where they were. A
+   * person who presses Back has, but this product has no history stack to
+   * restore a position from, so the honest default is the top.
+   */
+  readonly at?: string;
   /** Shown at the right of the header, for "How this works" and the like. */
   readonly actions?: ReactNode;
   /** Where the person is, when they are somewhere with a way back. */
@@ -131,7 +145,16 @@ export function Shell({
   credits,
   servedFrom,
   extentName,
+  at,
 }: ShellProps) {
+  const scrolling = useRef<HTMLElement | null>(null);
+  // Not `scrollTo({ behavior: 'smooth' })`: a screen that arrives already
+  // scrolled and then slides to the top is a page that looks like it moved
+  // under the reader.
+  useEffect(() => {
+    scrolling.current?.scrollTo(0, 0);
+  }, [at]);
+
   return (
     <div
       style={{
@@ -257,7 +280,10 @@ export function Shell({
         </nav>
       )}
 
-      <main style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}>
+      <main
+        ref={scrolling}
+        style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}
+      >
         {children}
       </main>
 
