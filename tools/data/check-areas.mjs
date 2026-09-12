@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Do the three artefacts that describe Greater Melbourne still agree?
+ * Do the four artefacts that describe Greater Melbourne still agree?
  *
- * There are now three files about the same 281 statistical areas, and they are
- * three on purpose:
+ * There are four files about the same 281 statistical areas, and they are four
+ * on purpose:
  *
  * * `flood-history.json` — the board's **thirty**, ranked. AC 2.2.1.b caps it
  *   there, and the cap is recorded as being *"enforced where the data is, not
@@ -11,6 +11,9 @@
  * * `sa2-areas.json` — **every** area in scope, with its ASGS code. A map of
  *   thirty implies the other 251 are empty, and 245 of them are not.
  * * `population.json` — the Severity Score's denominator, by the same code.
+ * * `sa2-points.json` — where each one is drawn, in metres from an extent
+ *   corner. Built from a 121 MB boundary file that is not published, so this
+ *   is the only evidence the placement was done against the same 281.
  *
  * **Two files that must stay equal, with nothing to notice when they stop, is
  * the failure this repository has already had once** — a byte-identical copy
@@ -40,6 +43,7 @@ const fail = (message) => problems.push(message);
 const board = await read('flood-history.json');
 const scope = await read('sa2-areas.json');
 const population = await read('population.json');
+const points = await read('sa2-points.json');
 
 const byName = new Map(scope.areas.map((a) => [a.name, a]));
 const byCode = new Map(scope.areas.map((a) => [a.code, a]));
@@ -137,6 +141,40 @@ if (scored !== population.counts.scored) {
   fail(`population says ${String(population.counts.scored)} areas are scorable; the rows say ${String(scored)}`);
 }
 
+// --- every area has somewhere to be drawn ---------------------------------
+
+const placed = new Map(points.areas.map((p) => [p.code, p]));
+const unplaced = scope.areas.filter((a) => !placed.has(a.code));
+if (unplaced.length > 0) {
+  fail(`${String(unplaced.length)} areas have no point (first: ${unplaced[0].name})`);
+}
+const strays = points.areas.filter((p) => !byCode.has(p.code));
+if (strays.length > 0) {
+  fail(`${String(strays.length)} points belong to no area (first: ${strays[0].name})`);
+}
+for (const p of points.areas) {
+  const area = byCode.get(p.code);
+  if (area !== undefined && area.name !== p.name) {
+    fail(`SA2 ${p.code} is ${area.name} in the scope list and ${p.name} in the points`);
+  }
+}
+
+/*
+  Every point inside the extent it is measured from.
+
+  The coordinates are metres from that extent's own south-west corner, which
+  is the convention every artefact here follows and the reason the browser
+  carries no projection. A point outside the rectangle means the extent was
+  computed from a different set of areas than the one published — the same
+  class of mistake that put every address pin 1.5 km from the house.
+*/
+const { width_m: width, height_m: height } = points.extent;
+for (const p of points.areas) {
+  if (p.e < 0 || p.n < 0 || p.e > width || p.n > height) {
+    fail(`${p.name} is at ${String(p.e)},${String(p.n)} in a ${String(width)} by ${String(height)} extent`);
+  }
+}
+
 // --- say what was checked -------------------------------------------------
 
 const summary =
@@ -144,7 +182,7 @@ const summary =
   `dispatch and ${String(counted.incomplete)} whose total is a floor. The board's ` +
   `${String(board.areas.length)} are the top of them. ${String(population.areas.length)} have a ` +
   `population; ${String(scored)} of those are above the ${String(population.minimumResidents)} ` +
-  `residents a score needs.`;
+  `residents a score needs. All ${String(points.areas.length)} have a point inside the ${String(Math.round(points.extent.width_m/1000))} by ${String(Math.round(points.extent.height_m/1000))} km extent.`;
 
 if (problems.length > 0) {
   console.error(summary);
