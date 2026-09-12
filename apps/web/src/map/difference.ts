@@ -53,6 +53,27 @@ export interface DifferenceArea {
  */
 export const MIN_CELL_PX = 3;
 
+/**
+ * Cells from the scene's frame into the frame of the map they are drawn over.
+ *
+ * Every artefact's metres are measured from its own extent's south-west
+ * corner. The scene is Kensington's; the map is Kensington's when it comes
+ * from the bundled copy and the whole council's when the API answers, whose
+ * corner is 1.5 km west and 6 km south. Drawn unshifted, a difference lands
+ * that far from the drain it belongs to -- on a real street, looking like a
+ * result.
+ */
+export function intoMapFrame(
+  cells: readonly Local[],
+  sceneOrigin: { readonly minE: number; readonly minN: number },
+  mapExtent: { readonly min_e: number; readonly min_n: number },
+): Local[] {
+  const de = sceneOrigin.minE - mapExtent.min_e;
+  const dn = sceneOrigin.minN - mapExtent.min_n;
+  if (de === 0 && dn === 0) return [...cells];
+  return cells.map(([east, north]) => [east + de, north + dn] as const);
+}
+
 export function drawDifference(
   context: CanvasRenderingContext2D,
   area: DifferenceArea,

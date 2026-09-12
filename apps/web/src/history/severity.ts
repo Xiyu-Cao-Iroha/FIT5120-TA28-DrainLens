@@ -251,6 +251,39 @@ export function completenessOf(area: MapArea, mode: MapMode): Completeness {
 
 export type MapMode = 'activity' | 'severity';
 
+/**
+ * What the panel says about completeness, as a label and the sentence after it.
+ *
+ * Out of the component so it can be tested: the first version said "The
+ * counts are exact" about every area without a score, and two of those seven
+ * -- Port Melbourne Industrial and Braeside -- have a withheld region. A
+ * missing denominator and a withheld numerator are separate facts, and one
+ * does not tell you anything about the other.
+ */
+export function completenessText(
+  area: Pick<MapArea, 'complete' | 'suppressedRegions' | 'regions'>,
+  state: Completeness,
+  incidentType: string,
+): { readonly label: string; readonly body: string } {
+  const withheld = `A count inside this area was withheld for privacy — ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
+  switch (state) {
+    case 'minimum':
+      return { label: 'Minimum value.', body: `${withheld} — so the total is a lower bound rather than a number.` };
+    case 'none':
+      return {
+        label: 'No recorded activity.',
+        body: `The SES recorded no ${incidentType.toLowerCase()} dispatch here across the whole period. That is different from a small number.`,
+      };
+    case 'unavailable':
+      return {
+        label: 'Not available.',
+        body: `${area.complete ? 'The counts are exact' : `${withheld}, so the total is a minimum`}; the score is not published because there is no usable population to divide by.`,
+      };
+    case 'exact':
+      return { label: 'Exact.', body: 'No count inside this area was withheld.' };
+  }
+}
+
 export interface Break {
   /** Inclusive lower bound. */
   readonly from: number;

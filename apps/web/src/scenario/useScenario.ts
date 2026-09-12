@@ -44,6 +44,8 @@ export interface ScenarioRunner {
    * suggestion the engine rejected for every pit in the extent.
    */
   readonly drains: readonly SceneDrain[];
+  /** The scene's south-west corner in MGA metres, once loaded. */
+  readonly origin: { readonly minE: number; readonly minN: number } | null;
   readonly running: boolean;
   readonly failure: string | null;
   readonly run: (
@@ -115,6 +117,7 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
   const pending = useRef(new Map<number, (reply: WorkerReply) => void>());
   const [ready, setReady] = useState(false);
   const [drains, setDrains] = useState<readonly SceneDrain[]>([]);
+  const [origin, setOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -128,6 +131,7 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
       const reply = event.data;
       if (reply.type === 'loaded') {
         setDrains(reply.drains);
+        setOrigin(reply.origin);
         setReady(true);
         return;
       }
@@ -181,5 +185,5 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     [],
   );
 
-  return { ready, drains, running, failure, run };
+  return { ready, drains, origin, running, failure, run };
 }

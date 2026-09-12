@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { LEAVES_WINDOW, type Depression, d8FromElevations, depressionFieldFrom } from '@drainlens/scenario';
 
 import type { LoadedScene } from './scene.js';
-import { handle } from './worker.js';
+import { engineInput, handle } from './worker.js';
 
 const WIDTH = 9;
 const HEIGHT = 9;
@@ -161,5 +161,22 @@ describe('what the worker replies', () => {
       if (reply.status === 'successful') expect(asAny.reason).toBeUndefined();
       else expect(asAny.band).toBeUndefined();
     }
+  });
+});
+
+describe('the shape of the hollow reaches the engine', () => {
+  it('passes rim depth on when the scene has it, and nothing when it does not', () => {
+    /*
+     * The published scene has carried `rim-depth.bin` since 29 August, and the
+     * worker never passed it on: the site spread every hollow's water evenly,
+     * the fallback the engine's own comment says hides the product's subject.
+     * Measured on 60 real inlets it changed no band -- but the site should run
+     * the model the finding was made with.
+     */
+    const flat = loadedScene();
+    expect(engineInput(flat).rimDepthM).toBeUndefined();
+
+    const rimDepthM = new Float32Array(WIDTH * HEIGHT).fill(0.1);
+    expect(engineInput({ ...flat, rimDepthM }).rimDepthM).toBe(rimDepthM);
   });
 });

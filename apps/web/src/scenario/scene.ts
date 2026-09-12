@@ -35,6 +35,15 @@ export interface SceneHeader {
     readonly flow: { readonly file: string };
     readonly depressions: { readonly file: string };
     readonly coverage: { readonly file: string };
+    /**
+     * How far each cell sits below its depression's rim, in centimetres.
+     *
+     * Optional in the type because a header without it is still a scene the
+     * engine can solve -- evenly -- but the published pack carries it, and it
+     * went unread in the browser from 29 August until 13 September: the
+     * engine was given the shape in its own tests and never on the site.
+     */
+    readonly 'rim-depth'?: { readonly file: string; readonly scale: number };
   };
   readonly depressions: readonly {
     readonly id: number;
@@ -59,6 +68,8 @@ export interface LoadedScene {
   readonly flow: FlowField;
   readonly depressions: DepressionField;
   readonly coverage: Uint8Array;
+  /** Metres below the rim, per cell. Absent only when the header has no such array. */
+  readonly rimDepthM?: Float32Array;
 }
 
 /** Expand a bitmask, most significant bit first, to one byte per cell. */
@@ -187,6 +198,20 @@ export async function loadScene(
     throw new SceneError(`the flow array holds ${direction.length} cells but the grid is ${cells}`);
   }
 
+  const rim = header.arrays['rim-depth'];
+  let rimDepthM: Float32Array | undefined;
+  if (rim !== undefined) {
+    if (!(rim.scale > 0)) throw new SceneError('the scene does not say how to scale its rim depths');
+    const rimCentimetres = new Int16Array(await fetchBinary(`${base}/${rim.file}`));
+    if (rimCentimetres.length !== cells) {
+      throw new SceneError(
+        `the rim-depth array holds ${rimCentimetres.length} cells but the grid is ${cells}`,
+      );
+    }
+    rimDepthM = new Float32Array(cells);
+    for (let cell = 0; cell < cells; cell += 1) rimDepthM[cell] = rimCentimetres[cell]! / rim.scale;
+  }
+
   return {
     header,
     grid: {
@@ -198,5 +223,6 @@ export async function loadScene(
     flow: { width: header.grid.cols, height: header.grid.rows, direction },
     depressions: depressionFieldFrom(new Int16Array(depressionRaw), header.depressions, cells),
     coverage: unpackBits(new Uint8Array(coverageRaw), cells),
+    ...(rimDepthM === undefined ? {} : { rimDepthM }),
   };
 }

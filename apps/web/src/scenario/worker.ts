@@ -88,6 +88,16 @@ export type WorkerReply =
        */
       readonly drains: readonly SceneDrain[];
       readonly inlets: number;
+      /**
+       * The scene's south-west corner, in MGA metres.
+       *
+       * `higherAreasM` is in the scene's own frame, and the map it is drawn
+       * over need not share it: when the API answers, the map is the
+       * council's, whose corner is 1.5 km west and 6 km south of
+       * Kensington's. Without this the difference layer was drawn that far
+       * from the drain it belongs to.
+       */
+      readonly origin: { readonly minE: number; readonly minN: number };
     }
   | {
       readonly type: 'result';
@@ -147,6 +157,28 @@ export function higherAreasOf(
 }
 
 /**
+ * What the engine is handed for a loaded scene.
+ *
+ * Its own function because what it leaves out is invisible in a result: the
+ * rim depth was loaded by nobody and passed by nobody from 29 August to
+ * 13 September, and every run still returned a plausible band.
+ */
+export function engineInput(loaded: LoadedScene): Parameters<typeof runScenario>[0] {
+  return {
+    grid: loaded.grid,
+    flow: loaded.flow,
+    depressions: loaded.depressions,
+    drains: loaded.header.drains.map((drain) => ({
+      assetNumber: drain.assetNumber,
+      cell: drain.cell,
+      isInlet: drain.isInlet,
+    })),
+    coverage: loaded.coverage,
+    ...(loaded.rimDepthM === undefined ? {} : { rimDepthM: loaded.rimDepthM }),
+  };
+}
+
+/**
  * Turn an engine outcome into a reply.
  *
  * A thrown error becomes `scenario_calculation_failed` rather than escaping.
@@ -164,17 +196,7 @@ export function handle(request: WorkerRequest, loaded: LoadedScene | null): Work
 
   try {
     const outcome = runScenario(
-      {
-        grid: loaded.grid,
-        flow: loaded.flow,
-        depressions: loaded.depressions,
-        drains: loaded.header.drains.map((drain) => ({
-          assetNumber: drain.assetNumber,
-          cell: drain.cell,
-          isInlet: drain.isInlet,
-        })),
-        coverage: loaded.coverage,
-      },
+      engineInput(loaded),
       request.blockage,
       request.drainCell,
       { rainfallPositionsMm: [...request.rainfallPositionsMm] },
@@ -235,6 +257,7 @@ if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessag
             isInlet: drain.isInlet,
           })),
           inlets: drains.filter((drain) => drain.isInlet).length,
+          origin: { minE: scene.header.extent.min_e, minN: scene.header.extent.min_n },
         } satisfies WorkerReply);
         return;
       }
