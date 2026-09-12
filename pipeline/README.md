@@ -35,6 +35,8 @@ python -m drainlens_pipeline.trace   --map ../apps/api/data/city-of-melbourne/ma
 python -m drainlens_pipeline.reframe --in ../apps/web/public/data/derived.json --from kensington --to city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json
 ```
 
+**The third line has to be run again whenever `derived.json` is rebuilt**, and it once was not: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing. `node tools/data/check-derived.mjs` now fails CI when the two copies are not the same shapes moved by (1500, 6000).
+
 No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 
 ## What the graph builder does, and what it refuses to do
