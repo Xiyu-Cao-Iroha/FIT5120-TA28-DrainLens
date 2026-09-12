@@ -148,7 +148,7 @@ const PROVIDES: readonly string[] = [
 const WITHHOLDS: readonly string[] = [
   'Live warnings, forecasts, or any prediction of future flooding',
   'How deep water would be, or when it would arrive',
-  'Anywhere outside one square kilometre of Kensington',
+  'Drainage, water paths or low points anywhere outside the City of Melbourne',
 ];
 
 export interface HomeProps {
