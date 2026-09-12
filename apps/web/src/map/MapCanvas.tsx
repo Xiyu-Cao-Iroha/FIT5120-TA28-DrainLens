@@ -23,6 +23,7 @@ import {
   fit,
   focus,
   pan,
+  scaleToContain,
   scaleToCover,
   toScreen,
   zoomAt,
@@ -143,6 +144,14 @@ export function MapCanvas({
   // leaves you looking at the old neighbourhood with a new name on the panel.
   const movedToRef = useRef<Local | null>(address);
   const bounds = boundsOf(artefact);
+/**
+   * How far out zooming may go, for one viewport.
+   *
+   * Declared here because both zoom handlers and the control's disabled state
+   * must use the same number — a wheel that stops at one floor and a button
+   * that stops at another is two maps.
+   */
+  const floorOf = (v: Viewport) => scaleToContain(v.widthPx, v.heightPx, bounds);
 
   // Size to the element, in device pixels, so the map is not a blurred
   // upscale on the screens most people will open it on.
@@ -226,7 +235,7 @@ export function MapCanvas({
     (event: React.WheelEvent) => {
       if (locked || viewport === null) return;
       const factor = Math.exp(-event.deltaY * 0.0015);
-      setViewport(clamp(zoomAt(viewport, factor, at(event), bounds), bounds));
+      setViewport(clamp(zoomAt(viewport, factor, at(event), bounds, floorOf(viewport)), bounds));
     },
     [locked, viewport, bounds, at],
   );
@@ -331,14 +340,27 @@ export function MapCanvas({
       // button is looking at the middle of the map, while somebody turning a
       // wheel is looking at whatever is under their cursor.
       const centre: [number, number] = [viewport.widthPx / 2, viewport.heightPx / 2];
-      setViewport(clamp(zoomAt(viewport, factor, centre, bounds), bounds));
+      setViewport(clamp(zoomAt(viewport, factor, centre, bounds, floorOf(viewport)), bounds));
     },
     [viewport, bounds],
   );
 
-  // The floor is the scale at which the whole extent is covered: below it the
-  // map would sit in a frame of nothing, which `clamp` already refuses.
-  const minScale = viewport === null ? 0 : scaleToCover(viewport.widthPx, viewport.heightPx, bounds);
+  /*
+    How far out is far enough: the scale at which the whole extent is on screen.
+
+    **It used to be the covering scale**, on the reasoning that below it the map
+    would sit in a frame of nothing. That was written for a square kilometre in
+    a roughly square pane, where covering and containing are nearly the same
+    thing. The council extent is 8.5 by 9 km and a browser pane is wide and
+    short: covering it leaves **41% of its height** on screen and no gesture
+    that reaches the rest, under a button that says *Open the whole map*.
+
+    The opening view still covers, so nothing about a first visit changes. What
+    changes is that zooming out no longer stops early — and `drawMap` paints
+    the ground only inside the extent, so the margin reads as *the map ends
+    here* rather than as empty land.
+  */
+  const minScale = viewport === null ? 0 : floorOf(viewport);
 
   return (
     <div

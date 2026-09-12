@@ -133,7 +133,35 @@ describe('drawing the map', () => {
   it('draws nothing but the ground when the artefact has no layers', () => {
     const context = recorder();
     drawMap(context, artefact({}), view());
-    expect(context.calls.map((call) => call.op)).toEqual(['fillRect']);
+    // Two rectangles: what is beyond the extent, then the extent over it.
+    expect(context.calls.map((call) => call.op)).toEqual(['fillRect', 'fillRect']);
+  });
+
+  it('paints the ground over the extent and not over the canvas', () => {
+    /*
+      **This mattered the moment the map could be zoomed out past covering
+      its extent.** The ground used to be a fill over the whole canvas, which
+      was indistinguishable while no margin could exist. With one, the ground
+      colour outside the extent says *land the council recorded nothing on*,
+      when the truth is that the city continues and the map stops.
+    */
+    const context = recorder();
+    // Half the scale that covers, so the extent is a rectangle inside the
+    // canvas with margin on every side.
+    const zoomedOut = { ...view(), scale: view().scale / 2 };
+    drawMap(context, artefact({}), zoomedOut);
+
+    const [beyond, ground] = context.calls;
+    expect(beyond!.args).toEqual([0, 0, zoomedOut.widthPx, zoomedOut.heightPx]);
+
+    const [x, y, width, height] = ground!.args as number[];
+    expect(width).toBeLessThan(zoomedOut.widthPx);
+    expect(height).toBeLessThan(zoomedOut.heightPx);
+    expect(x).toBeGreaterThan(0);
+    expect(y).toBeGreaterThan(0);
+    // And it is the extent, not an arbitrary inset.
+    expect(width).toBeCloseTo(1000 * zoomedOut.scale, 6);
+    expect(height).toBeCloseTo(1000 * zoomedOut.scale, 6);
   });
 });
 
