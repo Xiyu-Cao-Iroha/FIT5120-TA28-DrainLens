@@ -250,7 +250,21 @@ function SectionHeading({
   );
 }
 
-function Eyebrow({ children }: { readonly children: React.ReactNode }) {
+function Eyebrow({
+  children,
+  /**
+   * Its colour, where the default cannot be read.
+   *
+   * `brand.ink` is measured against the page, and the hero is a photograph
+   * now. Passing the colour in keeps the one that was measured for *that*
+   * surface beside the rest of the hero's palette, rather than leaving a
+   * component to guess which background it landed on.
+   */
+  tone,
+}: {
+  readonly children: React.ReactNode;
+  readonly tone?: string;
+}) {
   return (
     <span
       style={{
@@ -260,10 +274,10 @@ function Eyebrow({ children }: { readonly children: React.ReactNode }) {
         font: type(text.micro, { weight: weight.semibold }),
         letterSpacing: tracking.caps,
         textTransform: 'uppercase',
-        color: brand.ink,
+        color: tone ?? brand.ink,
       }}
     >
-      <span aria-hidden style={{ width: 18, height: 2, background: brand.base }} />
+      <span aria-hidden style={{ width: 18, height: 2, background: tone ?? brand.base }} />
       {children}
     </span>
   );
@@ -318,18 +332,69 @@ function TickMark() {
   );
 }
 
+/**
+ * The photograph behind the first screen, and the price of putting one there.
+ *
+ * A wet street with water running to a grated inlet, which is the one thing
+ * this product is about and the one thing a drawing of a map cannot show: the
+ * moment the surface hands the water over. The homepage's other pictures are
+ * all drawn for a stated reason — *a screenshot at thumbnail size is a grey
+ * smear* — and that reasoning holds for them. It does not hold here, because
+ * what this has to say is not a map.
+ *
+ * **It is a photograph, so it is not evidence.** Nothing in it is measured,
+ * it is not the pilot area, and no number on this site comes from it. The
+ * badge and the footer say what the data is; this says what the subject is.
+ *
+ * 157 KB of WebP at 1600 px — about 15% on top of a first visit, which is the
+ * real cost and is written down rather than absorbed. Resized from the source
+ * rather than shipped at 2.6 MB, and not upscaled past the 1860 px it came at.
+ *
+ * The picture and the scrim over it live in `ui/base.css` as
+ * `.home__hero-photo`, because how dark the scrim has to be depends on whether
+ * the text has a column of its own — which is a layout question and belongs
+ * where the other layout question on this page is already answered.
+ *
+ * **These four colours are the ones measured against it**, against the
+ * brightest pixel under the text rather than the average, because a
+ * photograph's contrast changes with every pixel and the only number worth
+ * checking is the worst one.
+ */
+const ON_PHOTO = {
+  title: '#ffffff',
+  lead: '#e4e9ec',
+  quiet: '#cfd7dc',
+  eyebrow: '#9fd6c4',
+} as const;
+
 function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
   return (
-    <section style={{ background: surface.page }}>
+    <section
+      className="home__hero-photo"
+      style={{
+        // The first screen is the whole screen. `minHeight` rather than
+        // `height`: on a short window, or with the browser's own font size
+        // turned up, the content must be allowed to make the section taller
+        // rather than be cut off by it.
+        minHeight: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}
+    >
       <div
         className="home__hero"
-        style={{ maxWidth: 1080, margin: '0 auto', padding: `${String(space(16))}px ${String(space(6))}px` }}
+        style={{
+          width: '100%',
+          maxWidth: 1080,
+          margin: '0 auto',
+          padding: `${String(space(16))}px ${String(space(6))}px`,
+        }}
       >
         <div>
-          <Eyebrow>Local drainage made easier to understand</Eyebrow>
+          <Eyebrow tone={ON_PHOTO.eyebrow}>Local drainage made easier to understand</Eyebrow>
           <h1
             className="home__title"
-            style={{ margin: `${String(space(4))}px 0 ${String(space(4))}px`, color: ink.strong }}
+            style={{ margin: `${String(space(4))}px 0 ${String(space(4))}px`, color: ON_PHOTO.title }}
           >
             Understand how water moves through your neighbourhood.
           </h1>
@@ -338,7 +403,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               margin: `0 0 ${String(space(7))}px`,
               maxWidth: 460,
               font: type(text.lead, { leading: 1.6 }),
-              color: ink.muted,
+              color: ON_PHOTO.lead,
             }}
           >
             Explore recorded drainage infrastructure, the shape of the ground, and where surface
@@ -366,7 +431,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               flexWrap: 'wrap',
               marginTop: space(6),
               font: type(text.small),
-              color: ink.subtle,
+              color: ON_PHOTO.quiet,
             }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(2) }}>
