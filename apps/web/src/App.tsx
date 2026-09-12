@@ -296,6 +296,16 @@ export function App() {
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
             }}
+            /*
+              The one card here that dispatches rather than describes, and for
+              the opposite reason to the four above it: they all arrive at the
+              same chooser, and this arrives somewhere the chooser cannot
+              reach. It needs an address, so the reducer sends it to the
+              address screen and remembers what it was for.
+            */
+            onCompare={() => {
+              dispatch({ type: 'task-wanted', task: 'compare' });
+            }}
           />
         </Shell>
       );
@@ -551,7 +561,7 @@ export function App() {
             <>
               {crumb('Address search', () => dispatch({ type: 'change-address' }))}
               {separator}
-              {crumb('Choose a task', () => dispatch({ type: 'task-chosen', task: 'compare' }))}
+              {crumb('Choose a task', () => dispatch({ type: 'task-reconsidered' }))}
               {separator}
               {crumb('Compare scenario', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
               {session.screen === 'result' && (
