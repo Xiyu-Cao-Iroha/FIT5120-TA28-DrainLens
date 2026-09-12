@@ -25,7 +25,7 @@ import {
   drawDerived,
 } from './derived.js';
 import { drawMap } from './draw.js';
-import { type Bounds, fit } from './viewport.js';
+import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
 const view = fit(1000, 1000, KENSINGTON);
@@ -443,5 +443,86 @@ describe('which way the water runs', () => {
     const fills = context.calls.filter((c) => c.op === 'fill');
     expect(fills.length).toBeGreaterThan(0);
     for (const fill of fills) expect(fill.dash).toHaveLength(0);
+  });
+});
+
+describe('the hatching, while the map is moving', () => {
+  /*
+    **Reported as the areas wobbling while the map is dragged.** The lines were
+    laid out from the canvas's left edge, so they stayed put while the ground
+    moved under them and appeared to crawl through the shapes they belong to.
+
+    Every line satisfies `x - y = offset`, so a pan of `(dx, dy)` moves the
+    ground by `dx - dy` in that quantity. The test is that the pattern moves by
+    the same amount the ground does.
+  */
+  const hatchOffsets = (centre: readonly [number, number]) => {
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ unavailable: [polygon([[0, 0], [1000, 0], [1000, 1000], [0, 1000], [0, 0]])] }),
+      { ...view, centre },
+    );
+    // The hatch is the only thing drawn after the clip.
+    const clip = context.calls.findIndex((call) => call.op === 'clip');
+    return context.calls
+      .slice(clip)
+      .filter((call) => call.op === 'moveTo')
+      .map((call) => Number(call.args[0]));
+  };
+
+  /**
+   * Where one fixed point of ground sits within the pattern.
+   *
+   * A line satisfies `x - y = offset`, so this is that quantity for a chosen
+   * place on the map, measured from the first line and taken modulo the
+   * spacing. If the hatching is painted on the ground it is the same number
+   * wherever the map has been dragged to.
+   */
+  const phaseAtGround = (centre: readonly [number, number]) => {
+    const offsets = hatchOffsets(centre);
+    const [x, y] = toScreen({ ...view, centre }, [500, 500]);
+    return ((((x - y - offsets[0]!) % HATCH_SPACING_PX) + HATCH_SPACING_PX) % HATCH_SPACING_PX);
+  };
+
+  it('travels with the ground rather than staying on the canvas', () => {
+    /*
+      **Written twice.** The first version compared the *shift* of the first
+      line against an arithmetic prediction, and at this fixture's scale of one
+      pixel per metre the pan it chose moved the pattern by exactly one whole
+      spacing — so the prediction was zero, the buggy code also shifted by
+      zero, and the test passed against the defect it was written for.
+
+      This one cannot go quiet that way: it asks where a fixed piece of ground
+      sits inside the pattern, which is the property being claimed, and any pan
+      that breaks it changes the answer.
+    */
+    const [e, n] = view.centre;
+    const before = phaseAtGround([e, n]);
+    for (const [de, dn] of [
+      [11, 0],
+      [0, 5],
+      [-23, 17],
+      [400, -250],
+    ] as const) {
+      expect(phaseAtGround([e + de, n + dn])).toBeCloseTo(before, 6);
+    }
+  });
+
+  it('does not change the spacing, only where the pattern starts', () => {
+    // The density on screen is the same at every zoom, which is why the
+    // spacing is in pixels. Anchoring must not quietly change that.
+    const offsets = hatchOffsets(view.centre);
+    for (let index = 1; index < offsets.length; index += 1) {
+      expect(offsets[index]! - offsets[index - 1]!).toBeCloseTo(HATCH_SPACING_PX, 6);
+    }
+  });
+
+  it('still covers the canvas from edge to edge', () => {
+    // A phase shift that moved the first line inside the canvas would leave a
+    // wedge of unhatched ground in the corner.
+    const offsets = hatchOffsets(view.centre);
+    expect(offsets[0]).toBeLessThanOrEqual(-view.heightPx + HATCH_SPACING_PX);
+    expect(offsets[offsets.length - 1]).toBeGreaterThanOrEqual(view.widthPx - HATCH_SPACING_PX);
   });
 });
