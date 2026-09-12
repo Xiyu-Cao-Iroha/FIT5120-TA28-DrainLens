@@ -15,6 +15,16 @@ import { ICON_MIN_SCALE, drawPitIcon } from './pitIcon.js';
 
 export interface Palette {
   readonly ground: string;
+  /**
+   * Outside the extent, and it must not look like ground.
+   *
+   * The ground used to be painted over the whole canvas, which was invisible
+   * while the map could never be zoomed out past covering it. It can be now,
+   * and a margin in the ground colour would read as **land inside the extent
+   * with nothing recorded on it** — the opposite of the truth, which is that
+   * the city continues and this map stops.
+   */
+  readonly beyond: string;
   readonly road: string;
   readonly roadEdge: string;
   readonly pipe: string;
@@ -31,6 +41,9 @@ export interface Palette {
 /** Muted on purpose: the recorded network is context, not the answer. */
 export const DAY: Palette = {
   ground: '#eef3ea',
+  // A shade off the ground and cooler than it: enough to read as a different
+  // surface at a glance, quiet enough not to become a border people look at.
+  beyond: '#e4e7e9',
   road: '#ffffff',
   roadEdge: '#e2e8dd',
   pipe: '#31435a',
@@ -525,8 +538,20 @@ export function drawMap(
   const seen = visibleBounds(viewport);
 
   if (options.groundAlreadyDrawn !== true) {
-    context.fillStyle = palette.ground;
+    /*
+      The ground is the extent, not the canvas.
+
+      Zooming out far enough now leaves margin around the map — see
+      `scaleToContain` — and filling all of it with the ground colour would
+      say the city stops at the council boundary. It does not; the map does.
+    */
+    context.fillStyle = palette.beyond;
     context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
+
+    const [left, top] = toScreen(viewport, [0, artefact.extent.height_m]);
+    const [right, bottom] = toScreen(viewport, [artefact.extent.width_m, 0]);
+    context.fillStyle = palette.ground;
+    context.fillRect(left, top, right - left, bottom - top);
   }
 
   if (options.showRoads !== false) {
