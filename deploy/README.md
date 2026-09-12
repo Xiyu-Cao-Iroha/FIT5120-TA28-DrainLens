@@ -174,15 +174,21 @@ The same service, redeployed — this is the "as often as the work needs it" the
 ### 12 September: dev is behind, and this is the record of that
 
 **`drainlens-dev` has not been redeployed since the revision above.** It serves
-`8cd079b`; `develop` is at `0bc9288`. Written down rather than left as a gap,
-because a dev URL that is quietly stale is the same failure as a dev URL that
-quietly serves the wrong extent — which this page already records once, eight
-days of CORS ago.
+`8cd079b` — that number is a fact about the running container and does not
+drift. Written down rather than left as a gap, because a dev URL that is
+quietly stale is the same failure as a dev URL that quietly serves the wrong
+extent, which this page already records once, eight days of CORS ago.
 
 What it does not carry: **the drain-blockage comparison, which is offered from
-the homepage again** (AC 3.1.1) and is the only user-visible change of the
-three merges since. The others are the Iteration 2 criteria, a coverage pass,
-and a pipeline change nothing at runtime reads.
+the homepage again** (AC 3.1.1). That is the only user-visible thing behind, and
+naming it is more use than naming a commit.
+
+> **The first version of this paragraph also said what `develop` was, and the
+> merge that added the paragraph made it wrong within the hour.** A branch tip
+> is not a fact a document can hold — it is a fact `git rev-parse develop`
+> holds. The deployed revision belongs here because a container cannot be asked;
+> the branch does not, because it can. This is the same lesson as the test
+> counts three files away, arrived at from the other direction.
 
 ```bash
 gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
