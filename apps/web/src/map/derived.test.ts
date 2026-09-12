@@ -218,6 +218,40 @@ describe('the unavailable areas', () => {
     expect(ops.filter((op) => op === 'restore')).not.toHaveLength(0);
   });
 
+  it('clips to every unavailable area, not only the last one', () => {
+    /*
+      **Reported as areas flickering and disappearing while the map is
+      dragged**, and this is what it was. `hatch` composed its clip region by
+      calling `trace` once per ring, and `trace` opened with `beginPath` — so
+      every ring but the last was thrown away and only one area was ever
+      hatched. Which one changed as the view moved, because the rings are
+      filtered by visibility first, so panning changed which was last.
+
+      The test is the shape of the path: one `beginPath` before the `clip`,
+      with both rings inside it.
+    */
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({
+        unavailable: [
+          polygon([[100, 800], [300, 800], [300, 950], [100, 950], [100, 800]]),
+          polygon([[600, 100], [800, 100], [800, 250], [600, 250], [600, 100]]),
+        ],
+      }),
+      view,
+    );
+
+    const ops = context.calls.map((call) => call.op);
+    const clip = ops.indexOf('clip');
+    expect(clip).toBeGreaterThan(0);
+    // Two rings are two s, and they must both be inside one path.
+    const before = context.calls.slice(0, clip);
+    expect(before.filter((call) => call.op === 'beginPath')).toHaveLength(1);
+    expect(before.filter((call) => call.op === 'moveTo')).toHaveLength(2);
+    expect(before.filter((call) => call.op === 'closePath')).toHaveLength(2);
+  });
+
   it('restore every save, or the clip leaks into the next layer', () => {
     const context = recorder();
     drawDerived(context, ALL, view);

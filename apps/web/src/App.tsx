@@ -269,6 +269,7 @@ export function App() {
     case 'home':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -321,6 +322,7 @@ export function App() {
       };
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -363,6 +365,7 @@ export function App() {
     case 'history':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -392,7 +395,7 @@ export function App() {
     case 'address':
     case 'unsupported':
       return (
-        <Shell credits={credits}
+        <Shell at={session.screen} credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}>
           <Landing
@@ -424,7 +427,7 @@ export function App() {
 
     case 'choose':
       return (
-        <Shell credits={credits} servedFrom={loaded.servedFrom}
+        <Shell at={session.screen} credits={credits} servedFrom={loaded.servedFrom}
           extentName={loaded.extentName} masthead={false}>
           <Choose
             learned={session.learned}
@@ -445,6 +448,7 @@ export function App() {
     case 'locked':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -484,6 +488,7 @@ export function App() {
     case 'guide':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -537,6 +542,7 @@ export function App() {
     case 'task':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -607,6 +613,7 @@ export function App() {
           : null;
       return (
         <Shell
+          at={session.screen}
           credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
@@ -823,6 +830,7 @@ function MapScreen({
 
   return (
     <Shell
+      at={session.screen}
       credits={credits}
           servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
