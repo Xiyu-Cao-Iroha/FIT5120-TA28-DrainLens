@@ -21,11 +21,9 @@ import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { appliedVersions, migrate } from '../src/migrate.js';
+import { DATABASE_URL } from './url.js';
 import { load } from '../src/load.js';
 
-const URL =
-  process.env.DATABASE_URL ??
-  'postgres://drainlens:drainlens-local-only@localhost:5433/drainlens';
 
 let client: pg.Client;
 
@@ -35,7 +33,7 @@ const one = async (sql: string): Promise<string> => {
 };
 
 beforeEach(async () => {
-  client = new pg.Client({ connectionString: URL });
+  client = new pg.Client({ connectionString: DATABASE_URL });
   await client.connect();
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
 }, 60_000);

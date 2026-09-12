@@ -23,6 +23,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { load } from '../src/load.js';
+import { DATABASE_URL } from './url.js';
 import { migrate } from '../src/migrate.js';
 import { createApp } from '../src/server.js';
 
@@ -35,9 +36,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
 const DATA = path.join(ROOT, 'apps/web/public/data');
 
-const URL =
-  process.env.DATABASE_URL ??
-  'postgres://drainlens:drainlens-local-only@localhost:5433/drainlens';
 
 let pool: pg.Pool;
 let app: ReturnType<typeof createApp>;
@@ -51,7 +49,7 @@ const published = async (name: string): Promise<Record<string, unknown>> =>
   JSON.parse(await readFile(path.join(DATA, name), 'utf8')) as Record<string, unknown>;
 
 beforeAll(async () => {
-  pool = new pg.Pool({ connectionString: URL, max: 4 });
+  pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 });
   const client = await pool.connect();
   try {
     await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
