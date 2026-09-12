@@ -27,25 +27,31 @@ Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `
 
 **Full-size intermediates are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
 
-**The council extent is committed too, and separately, under `apps/api/data/city-of-melbourne/`.** Not because it is small — 6.7 MB of map, 693 KB of trace, 210 KB of derived layers — but because it is the API image that reads it, `/data` is in `.dockerignore` as well as `.gitignore`, and an artefact that is not in the build context cannot be copied into the image. The migration job would then apply its schema changes and load Kensington into a database that was asked for a council. Rebuild it with:
+**The council extent is committed too, and separately, under `apps/api/data/city-of-melbourne/`.** Not because it is small — 6.7 MB of map, 693 KB of trace, 7.6 MB of derived layers — but because it is the API image that reads it, `/data` is in `.dockerignore` as well as `.gitignore`, and an artefact that is not in the build context cannot be copied into the image. The migration job would then apply its schema changes and load Kensington into a database that was asked for a council. Rebuild it with:
 
 ```bash
 python -m drainlens_pipeline.network --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/map.json
 python -m drainlens_pipeline.trace   --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/api/data/city-of-melbourne/trace.json
-python -m drainlens_pipeline.reframe --to city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json --in ../apps/web/public/data/derived.json --from kensington --in ../data/map/derived-melbourne-cbd.json --from melbourne-cbd
 ```
 
-**The derived layers now come from two measured areas**, Kensington and the central city (`melbourne-cbd` in `geo.py`: the whole Hoddle Grid, 3 × 2.5 km, 30 tiles). Each is its own terrain run; `reframe` moves both into the council frame and writes one artefact with an `areas` list. The central city has no bundled copy — the site's fallback stays Kensington — so its terrain has to be built before the line above can run:
+**The derived layers are built council-wide, from one terrain run** over every point-cloud tile the archive has:
 
 ```bash
-python -m drainlens_pipeline.fetch_tiles --out ../data/pointcloud-cbd --extent 319000 5811500 322000 5814000
-python -m drainlens_pipeline.terrain --tiles ../data/pointcloud-cbd --out ../data/terrain-cbd --extent 319000 5811500 322000 5814000
-python -m drainlens_pipeline.derived --terrain ../data/terrain-cbd --extent melbourne-cbd --out ../data/map/derived-melbourne-cbd.json
+python -m drainlens_pipeline.fetch_tiles --name city-of-melbourne --allow-missing-tiles --out ../data/pointcloud-council
+python -m drainlens_pipeline.terrain --name city-of-melbourne --allow-missing-tiles --tiles ../data/pointcloud-council --out ../data/terrain-council
+python -m drainlens_pipeline.derived --terrain ../data/terrain-council --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json
 ```
 
-The fetch is 876 MB of the 4.33 GB archive.
+The fetch is 4.27 GB — 211 of the archive's 215 tiles — and 8.5 GB on disk. **95 of the extent's 306 tiles are not in the archive**, because the archive covers the municipality and the extent is the rectangle around it. Measured from the committed map, **none of the 21,113 pits or 17,242 pipes lies in a missing tile**: the measured ground reaches everywhere the drainage record does. Those cells are not ground — routing treats them as the edge of the calculation, nothing is drawn over them, and the artefact lists them in `missing_tiles` with a `covers` sentence saying so.
 
-**The `reframe` line has to be run again whenever either area's `derived.json` is rebuilt**, and it once was not: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing. `node tools/data/check-derived.mjs` now fails CI when the council copy's Kensington shapes are not the bundled ones moved by (1500, 6000), when anything else falls outside the central city, or when the settings differ.
+It got here in two steps on 13 September, Kensington plus the central city first (`reframe.py`'s `combine`, still there and tested) and then the whole council. Going council-wide needed four things the pilot never had to care about, each checked against the pilot's committed artefacts before it was trusted — `ground-surface`, `ground-observed`, `flow-direction`, the depression labels and `depressions.json` all rebuild **bit-identical**, and so does Kensington's `derived.json`:
+
+- **Tiles rasterised one at a time** (`terrain.rasterise_tiles`), as a running minimum. The council is about 350 million points; holding them all to take one minimum per cell is ten gigabytes.
+- **Depressions, outlines and footprints measured inside their own bounding boxes.** Each had a full-grid pass per object — harmless at one square kilometre, and hours over 76.5 km².
+- **A validity mask** for the missing tiles, threaded through `fill`, `d8`, `find_depressions`, the channel percentile and the coverage gaps.
+- **Wider depression labels** when there are more than 32,767 hollows. The engine reads `int16`; the council's labels are only ever read by `derived`.
+
+The site's bundled fallback stays Kensington's own build, so the two copies are not compared shape for shape — a catchment cut off at Kensington's edge is whole in the council run. `node tools/data/check-derived.mjs` checks what they must share: the same settings, and nothing drawn outside the extent or inside a missing tile. **It exists because the copies drifted once**: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing.
 
 No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 

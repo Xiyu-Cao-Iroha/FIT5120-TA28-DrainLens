@@ -48,12 +48,15 @@ describe('the disclosure before the whole map', () => {
     expect(wide.some((s) => s.includes('nothing is claimed'))).toBe(true);
   });
 
-  it('names both places the ground was measured', () => {
-    // The central city was added on 13 September. A notice still naming only
-    // Kensington would call the CBD's water paths unmeasured while drawing them.
+  it('says the measured ground reaches as far as the drainage record, and no further', () => {
+    // It named Kensington, then Kensington and the central city. Since the
+    // council-wide terrain build every one of the 21,113 recorded pits sits on
+    // a measured tile, so naming places would now understate it -- and the
+    // tiles the archive lacks still have to be disclaimed.
     const ground = lockNotice('city-of-melbourne').find((s) => s.includes('measured ground')) ?? '';
-    expect(ground).toContain('Kensington');
-    expect(ground).toContain('central city');
+    expect(ground).toContain('every part of the City of Melbourne the drainage record does');
+    expect(ground).not.toContain('Kensington');
+    expect(ground).toContain('nothing is claimed');
   });
 
   it('keeps the two sentences that are true of any extent', () => {

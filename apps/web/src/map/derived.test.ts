@@ -20,6 +20,8 @@ import {
   type DerivedArtefact,
   DerivedError,
   HATCH_SPACING_PX,
+  LOW_POINTS_PER_PATH,
+  MIN_STEP_PX,
   arrowsAlong,
   assertDerived,
   drawDerived,
@@ -302,6 +304,76 @@ describe('what is drawn and what is not', () => {
     const context = recorder();
     drawDerived(context, crossing, zoomed);
     expect(context.calls.some((call) => call.op === 'stroke')).toBe(true);
+  });
+
+  it('draws low points a few rings to a path, every edge still dashed', () => {
+    // One fill and stroke per hollow was 30,000 draw calls a frame over the
+    // council; one path for all of them hung the tab. Batches of ten were the
+    // fastest measured.
+    const boxAt = (i: number) => {
+      const e = 20 + (i % 10) * 90;
+      const n = 20 + Math.floor(i / 10) * 90;
+      return polygon([[e, n], [e + 50, n], [e + 50, n + 50], [e, n + 50], [e, n]]);
+    };
+    const count = LOW_POINTS_PER_PATH * 2 + 3;
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ 'low-point': Array.from({ length: count }, (_, i) => boxAt(i)) }),
+      view,
+      { show: { channel: false, lowPoint: true, unavailable: false } },
+    );
+    const ops = context.calls.map((call) => call.op);
+    expect(ops.filter((op) => op === 'closePath')).toHaveLength(count);
+    expect(ops.filter((op) => op === 'beginPath')).toHaveLength(3);
+    expect(ops.filter((op) => op === 'fill')).toHaveLength(3);
+    const strokes = context.calls.filter((call) => call.op === 'stroke');
+    expect(strokes).toHaveLength(3);
+    for (const stroke of strokes) expect(stroke.dash.length).toBeGreaterThan(0);
+  });
+
+  it('leaves out vertices closer together on screen than a couple of pixels, but never the ends', () => {
+    // 400,000 low-point vertices over the whole council, most a fraction of a
+    // pixel apart when zoomed out.
+    const dense = Array.from({ length: 101 }, (_, i) => [100 + i, 500] as const);
+    const show = { channel: true, lowPoint: false, unavailable: false };
+
+    const far = recorder();
+    drawDerived(far, derived({ channel: [line(dense)] }), { ...view, scale: 0.25, centre: [150, 500] as const }, { show });
+    const farPoints = far.calls.filter((c) => (c.op === 'moveTo' || c.op === 'lineTo') && c.dash.length > 0);
+    expect(farPoints.length).toBeLessThan(20);
+    const [firstX] = toScreen({ ...view, scale: 0.25, centre: [150, 500] }, [100, 500]);
+    const [lastX] = toScreen({ ...view, scale: 0.25, centre: [150, 500] }, [200, 500]);
+    expect(farPoints[0]?.args[0]).toBeCloseTo(firstX);
+    expect(farPoints.at(-1)?.args[0]).toBeCloseTo(lastX);
+
+    const near = recorder();
+    drawDerived(near, derived({ channel: [line(dense)] }), { ...view, scale: MIN_STEP_PX, centre: [150, 500] as const }, { show });
+    const nearPoints = near.calls.filter((c) => (c.op === 'moveTo' || c.op === 'lineTo') && c.dash.length > 0);
+    expect(nearPoints).toHaveLength(101);
+  });
+
+  it('leaves out a low point smaller than a pixel, and draws it again zoomed in', () => {
+    // A display filter that moves with the zoom, not a claim about the ground.
+    const speck = derived({ 'low-point': [polygon([[500, 500], [502, 500], [502, 502], [500, 502], [500, 500]])] });
+    const show = { channel: false, lowPoint: true, unavailable: false };
+
+    const far = recorder();
+    drawDerived(far, speck, { ...view, scale: 0.4, centre: [500, 500] as const }, { show });
+    expect(far.calls.some((call) => call.op === 'fill')).toBe(false);
+
+    const near = recorder();
+    drawDerived(near, speck, { ...view, scale: 0.5, centre: [500, 500] as const }, { show });
+    expect(near.calls.some((call) => call.op === 'fill')).toBe(true);
+  });
+
+  it('draws nothing at all when no low point is on screen', () => {
+    const context = recorder();
+    drawDerived(context, derived({ 'low-point': [polygon([[-9000, -9000], [-8000, -9000], [-8000, -8000], [-9000, -9000]])] }), view, {
+      show: { channel: false, lowPoint: true, unavailable: false },
+    });
+    expect(context.calls.some((call) => call.op === 'fill' || call.op === 'stroke')).toBe(false);
+    expect(context.getLineDash()).toEqual([]);
   });
 
   it('draws low points beneath the channels that feed them', () => {
