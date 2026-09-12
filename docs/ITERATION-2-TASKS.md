@@ -59,7 +59,7 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 | W1 | Data — boundaries, population, events | MDS ×2 | D1 and D2 |
 | W2 | Scenario engine — per-location blockage | MIT | Nothing; starts immediately |
 | W3 | Frontend — scenario explorer | MCS + MIT | W2 input shape, not W2 delivery |
-| W4 | Frontend — flood map | MCS | D1, then the boundary artefact |
+| W4 | Frontend — flood map | MCS | **unblocked** — every artefact it needs is published |
 | W5 | Deployment, CI, quality | MIT | First commit |
 | W6 | Acceptance, demo, documentation | MBIS | Features as they land |
 
@@ -69,10 +69,10 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 ### Boundaries
 
-- [ ] **Fetch ABS ASGS 2011 SA2 boundaries** for Greater Melbourne → *4.1.1.a, 4.1.2.a*. **It must be the 2011 edition.** The flood counts were joined to ASGS 2011 for their names; a 2016 or 2021 boundary set will match most areas and silently miss the rest, which is the exact class of error this project reconciles sources to avoid
-- [ ] **Reconcile the boundary set against the counts** → *4.1.2.e*. 281 areas are in scope and 275 have at least one dispatch. Report how many boundary polygons match a name in the artefact and how many do not, before drawing anything
-- [ ] **Reproject and simplify to one artefact**, in the same metre-frame convention every other artefact uses → *D1*. Record the simplification tolerance and measure the artefact both raw and gzipped; the address index is the precedent — four shapes measured, the smallest one rejected with a reason
-- [ ] **Decide and record which areas are drawn** → *4.1.2.e*. All 281, or the published 30 with a sentence saying so. A map of thirty areas implies the rest are empty, and 275 of them are not
+- [x] **Fetched, and it is the 2011 edition** → *4.1.1.a, 4.1.2.a*. ABS 1270.0.55.001, MapInfo Interchange. The 66 kB CSV was tried first and carries no coordinates at all, which cost 66 kB to know rather than to assume
+- [x] **Reconciled before anything was drawn** → *4.1.2.e*. The file holds 2,214 SA2s nationally and **281 in Greater Melbourne — the same 281**, matching the published list on code and on name with none left over either way. `tools/data/check-areas.mjs` holds that in CI
+- [x] **Placed, not reprojected** → *D1 as taken*. With the areas drawn as marks rather than polygons, what was needed was a point each, not a simplified boundary set: `sa2-points.json`, 19 KB, metres from a `greater-melbourne` extent corner in the same convention every other artefact uses. Built from ABS MapInfo Interchange — text, so no dependency was added to read a 121 MB file that is not published. **Two of the 281 have an area centroid outside their own area** (Abbotsford and Strathmore, each cut into a crescent by a river bend) and are placed by point-on-surface instead; every published point is asserted to be inside the area it names
+- [x] **All 281 are drawn** → *4.1.2.e*. The alternative was the published thirty, and the sentence that would have had to go beside it is the argument against it: a map of thirty implies the rest are empty, and 275 of them are not. `sa2-areas.json` publishes the scope for exactly this
 
 ### Population
 
