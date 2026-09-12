@@ -82,8 +82,9 @@ The schema and the loader exist and were run. Against Postgres 16:
 | `pit` · `pipe` · `road` · `street_label` | 895 · 893 · 220 · 163 | `map.json` exactly |
 | `derived_shape` | 394 | 38 channels + 310 low points + 46 unavailable |
 | `trace_link` · `trace_reason` | 734 · 4 | `trace.json` exactly |
-| `flood_area` · `flood_area_coverage` | 180 · 30 | thirty areas over six years |
-| `flood_incident` · `population` | 0 · 0 | empty on purpose, see above |
+| `flood_area` · `flood_area_coverage` | 1,686 · 281 | every area in the scope over six years; thirty carry a `board_rank` |
+| `population` | 1,967 | 281 areas at seven 30 Junes |
+| `flood_incident` | 0 | empty on purpose, see above |
 
 **Two design decisions stopped being assertions and became measurements.**
 Sixty-nine of the 893 pipes name a downstream pit that is not in this extent —
@@ -242,9 +243,16 @@ thirty-area rollup; the 13,339 regions underneath it are computed by the
 pipeline and discarded at build time. Loading them means the pipeline emitting
 the full grain as a file, which means re-fetching the VICSES and ABS sources,
 which are downloaded per run and not kept in the repository. Until then
-`flood_incident` is declared and empty — as is `population` — because inventing
-SA1 codes to make a table look loaded would be fabricating the identifiers this
-product refuses to fabricate.
+`flood_incident` is declared and empty, because inventing SA1 codes to make a
+table look loaded would be fabricating the identifiers this product refuses to
+fabricate.
+
+**`population` is no longer one of them.** It was filled on 12 September, at
+SA2, from ABS 3218.0 — reconciled against its own documentation and matched to
+all 281 areas by two independent joins. That settles the grain question this
+paragraph was waiting on: the score is computed at SA2 from the published
+rollups, so `flood_incident` stays empty and this reasoning stays true of it.
+See [POPULATION-DATA.md](./POPULATION-DATA.md).
 
 ---
 
@@ -416,10 +424,12 @@ erDiagram
     }
 ```
 
-**`flood_incident` and `population` are drawn and empty.** That is the state
-they are in, and a diagram that omitted them would hide the join the flood
-board is eventually meant to make — incidents per person — behind a table
-nobody can see is missing.
+**`flood_incident` is drawn and empty**, and a diagram that omitted it would
+hide the SA1 grain behind a table nobody can see is missing. `population` was
+beside it in that sentence until 12 September and is now loaded; the join it
+was drawn for — incidents per person — is made on
+`flood_area_coverage.sa2_code`, and `apps/api/test-db/load.test.ts` computes
+the Severity Score's own query against it.
 
 **`schema_migration` is not drawn.** It records which migrations have run and
 has no relationship to anything the product is about.
@@ -493,28 +503,31 @@ mitigation, and it costs a cold start.
 
 ## Open questions, in the order they block work
 
-1. **The population dataset does not exist in this repository yet**, and
-   nothing can be joined until it does. It has to be located, downloaded,
-   reconciled against its own documentation and matched to ABS ASGS 2011 — the
-   same discipline the VICSES file went through in
-   [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md), where the file reconciled
-   exactly (13,339 rows, 144 suppressed) and the join was 13,339 of 13,339.
-   **This is the critical path, and it is data work rather than database work.**
+**Three of these four are answered.** They are kept rather than deleted,
+because what a question turned out to be is worth as much as the answer.
 
-2. **Which population, and at which grain.** The flood counts are per SA1 for
-   2011 boundaries. ABS publishes Estimated Resident Population by SA2 annually
-   and Census counts by SA1 for a census year. A count spanning 2009–2015
-   divided by a population from one year is a rate with a date on it, and the
-   board will have to say which year and why.
+1. ~~**The population dataset does not exist in this repository yet.**~~
+   Answered 12 September. ABS 3218.0, SA2 estimates 2005–2015, reconciled
+   against its own Explanatory Notes and matched to **281 of 281** areas by two
+   independent joins that agree on every one. It was the critical path and it
+   was data work rather than database work, as this said.
 
-3. **Per capita of what.** Incidents per resident is not obviously the right
-   normalisation for flooding — dwellings, or area, may be better, and the
-   mentor's phrasing (*"受灾人口/flood"*) is closer to *people affected*, which
-   is a quantity neither dataset holds. This needs to be settled before it is
-   built, because a ranking normalised the wrong way is more confidently wrong
-   than the unnormalised one it replaces.
+2. ~~**Which population, and at which grain.**~~ SA2, at **30 June 2012** — the
+   mid-point of the reporting period, and an ABS *revised* estimate rather than
+   a final one, which is recorded rather than smoothed over. The whole
+   2009–2015 series is loaded beside it, because a per-year view has to divide
+   by that year. [POPULATION-DATA.md](./POPULATION-DATA.md).
+
+3. ~~**Per capita of what.**~~ Per resident, and the number keeps its unit on
+   screen rather than becoming a 0–10 index.
+   [SEVERITY-SCORE.md](./SEVERITY-SCORE.md) is the definition, written before
+   anything computed it. **The question was right to be asked**: seven areas
+   have almost no residents, and one dispatch in an industrial estate of
+   fifteen people would have outscored everywhere in Greater Melbourne by four
+   times. They are published with no score rather than with a large one.
 
 4. **Whether Iteration 2 has a budget** for a continuously running instance.
+   Still open.
 
 ---
 

@@ -232,6 +232,17 @@ export async function traceArtefact(
  * a zero, and equal totals share a rank — are already written and tested in
  * `artefacts.ts`. Expressing them a second time as window functions would be a
  * second implementation of the same rule.
+ *
+ * **`board_rank IS NOT NULL` is AC 2.2.1.b, and it is not a `LIMIT`.** These
+ * tables hold all 281 areas in the scope since the map needed them; the board
+ * is the thirty the pipeline ranked. Selecting `LIMIT 30` here would move a
+ * cap that Iteration 1 recorded as enforced in the data into one SQL clause,
+ * where changing it would break nothing else. Asking for the rows that carry a
+ * rank keeps the count a property of what was loaded.
+ *
+ * The order within them is still recomputed rather than read from
+ * `board_rank`, because the tie flag depends on neighbouring totals and that
+ * rule lives in one place.
  */
 export async function floodHistoryArtefact(
   client: pg.ClientBase,
@@ -253,6 +264,7 @@ export async function floodHistoryArtefact(
     FROM flood_area a
     JOIN flood_area_coverage c
       ON c.extent_scope = a.extent_scope AND c.area_name = a.area_name
+    WHERE c.board_rank IS NOT NULL
     ORDER BY a.area_name, a.financial_year
   `);
   if (rows.rowCount === 0) throw new NotFound('no flood history has been loaded');
@@ -304,15 +316,29 @@ export async function floodHistoryArtefact(
   return { ...base, areas };
 }
 
-/** The one number the health check needs, and nothing about anybody. */
-export async function loaded(client: pg.ClientBase): Promise<{ pits: number; areas: number }> {
-  const result = await client.query<{ pits: string; areas: string }>(`
+/**
+ * The few numbers the health check needs, and nothing about anybody.
+ *
+ * `areas` counts the board, not the table. It did both until the tables grew
+ * from thirty areas to 281, and a health check whose number silently changed
+ * meaning would have been read as "the board grew" by everything watching it —
+ * including `verify-api.mjs`, which compares it against the published
+ * artefact's own length.
+ *
+ * `scopeAreas` is the new number rather than a redefinition of the old one.
+ */
+export async function loaded(
+  client: pg.ClientBase,
+): Promise<{ pits: number; areas: number; scopeAreas: number }> {
+  const result = await client.query<{ pits: string; areas: string; scope: string }>(`
     SELECT (SELECT count(*) FROM pit)::text AS pits,
-           (SELECT count(*) FROM flood_area_coverage)::text AS areas
+           (SELECT count(*) FROM flood_area_coverage WHERE board_rank IS NOT NULL)::text AS areas,
+           (SELECT count(*) FROM flood_area_coverage)::text AS scope
   `);
   return {
     pits: Number(result.rows[0]?.pits ?? 0),
     areas: Number(result.rows[0]?.areas ?? 0),
+    scopeAreas: Number(result.rows[0]?.scope ?? 0),
   };
 }
 

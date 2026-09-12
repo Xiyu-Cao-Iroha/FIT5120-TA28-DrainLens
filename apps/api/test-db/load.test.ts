@@ -19,19 +19,12 @@
  *   npm run test:db
  */
 
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { load } from '../src/load.js';
+import { migrate } from '../src/migrate.js';
 import { DATABASE_URL } from './url.js';
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '../../..');
-
 
 let client: pg.Client;
 
@@ -47,11 +40,19 @@ beforeAll(async () => {
   client = new pg.Client({ connectionString: DATABASE_URL });
   await client.connect();
 
-  // From scratch every run. A test that passes only against a database
-  // somebody loaded by hand last week is not testing the loader.
+  /*
+    From scratch every run. A test that passes only against a database
+    somebody loaded by hand last week is not testing the loader.
+
+    **Through `migrate` rather than by reading `001_init.sql`.** This applied
+    the first migration and nothing else, which was the same schema while
+    there was one migration and quietly stopped being it: 004 added the two
+    columns the loader now writes, and this file failed on them while
+    `migrate.test.ts` — which uses `migrate` — did not. A second way of
+    building the schema is a second schema.
+  */
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-  const migration = await readFile(path.join(ROOT, 'db/migrations/001_init.sql'), 'utf8');
-  await client.query(migration);
+  await migrate(client);
 
   await client.query('BEGIN');
   await load(client);
@@ -82,9 +83,28 @@ describe('what the loader put in', () => {
     expect(await count('trace_reason')).toBe(4);
   });
 
-  it('holds thirty areas over six years', async () => {
-    expect(await count('flood_area')).toBe(180);
-    expect(await count('flood_area_coverage')).toBe(30);
+  it('holds every area in the scope over six years, and ranks thirty of them', async () => {
+    /*
+      **This asserted thirty areas and 180 rows.** The tables held the board;
+      they hold the scope now, because Epic 4's map has to draw all 281 and a
+      map of thirty implies the other 251 are empty.
+
+      AC 2.2.1.b has not moved: it caps what the board *shows*, and exactly
+      thirty rows carry a `board_rank`. The cap is still a property of the
+      data rather than a clause in a query.
+    */
+    expect(await count('flood_area')).toBe(1686);
+    expect(await count('flood_area_coverage')).toBe(281);
+    expect(
+      Number(
+        await one(
+          'SELECT count(*)::text AS v FROM flood_area_coverage WHERE board_rank IS NOT NULL',
+        ),
+      ),
+    ).toBe(30);
+    expect(await one('SELECT area_name AS v FROM flood_area_coverage WHERE board_rank = 1')).toBe(
+      'Bacchus Marsh',
+    );
   });
 
   it('holds the population, one row per area per year', async () => {
@@ -146,22 +166,63 @@ describe('what the loader put in', () => {
     expect(await count('flood_incident')).toBe(0);
   });
 
-  it('cannot yet join the counts to the denominator, and says so', async () => {
+  it('joins the counts to the denominator, which it could not before', async () => {
     /*
-      **Recorded as a test because it is a gap, not a bug, and gaps are the
-      thing that gets forgotten.**
+      **This test used to assert the opposite**, and was written that way on
+      purpose: the gap was real, and a gap nobody writes down is a gap nobody
+      remembers. `population` was keyed by ASGS code and the flood tables by
+      name, with nothing between them.
 
-      `population` holds all 281 areas by ASGS code. `flood_area` holds the
-      published thirty by name. There is no column joining them and there are
-      not the same number of them, so the Severity Score cannot be computed in
-      this database as it stands — the flood artefact would have to publish
-      every in-scope area and carry the code beside the name.
-
-      That is a change to an artefact the board already reads, so it is its own
-      piece of work rather than a line snuck into this one.
+      `sa2_code` is the column that closed it. The query below is the Severity
+      Score's own shape — six years of dispatches over the mid-period
+      population — and the three numbers it returns were measured and written
+      into `docs/SEVERITY-SCORE.md` before any of this ran.
     */
-    expect(Number(await one(`SELECT count(DISTINCT area_name)::text AS v FROM flood_area`))).toBe(30);
-    expect(Number(await one(`SELECT count(DISTINCT area_code)::text AS v FROM population`))).toBe(281);
+    const rate = await client.query<{ name: string; rate: string }>(`
+      SELECT c.area_name AS name,
+             round(sum(a.count)::numeric / p.persons * 1000, 2)::text AS rate
+      FROM flood_area a
+      JOIN flood_area_coverage c
+        ON c.extent_scope = a.extent_scope AND c.area_name = a.area_name
+      JOIN population p
+        ON p.area_code = c.sa2_code AND p.as_at = '2012-06-30'
+      WHERE p.persons >= 1000
+      GROUP BY c.area_name, p.persons
+      ORDER BY sum(a.count)::numeric / p.persons DESC, c.area_name
+      LIMIT 3
+    `);
+
+    expect(rate.rows.map((r) => [r.name, Number(r.rate)])).toEqual([
+      ['Riddells Creek', 17.18],
+      ['Bacchus Marsh', 11.58],
+      ['Gisborne', 11.35],
+    ]);
+  });
+
+  it('has a denominator for every area, and residents in all but seven', async () => {
+    // Seven areas are under the threshold a rate needs — two airports, a
+    // racecourse, industrial land — and three of those would divide by zero.
+    // Every one of the 281 still has a row: a population of fifteen is a fact,
+    // and a missing row would be indistinguishable from a join that failed.
+    expect(
+      Number(
+        await one(`
+          SELECT count(*)::text AS v
+          FROM flood_area_coverage c
+          JOIN population p ON p.area_code = c.sa2_code AND p.as_at = '2012-06-30'
+          WHERE p.persons >= 1000
+        `),
+      ),
+    ).toBe(274);
+    expect(
+      Number(
+        await one(`
+          SELECT count(*)::text AS v FROM flood_area_coverage c
+          LEFT JOIN population p ON p.area_code = c.sa2_code AND p.as_at = '2012-06-30'
+          WHERE p.area_code IS NULL
+        `),
+      ),
+    ).toBe(0);
   });
 });
 
@@ -255,6 +316,15 @@ describe('loading twice', () => {
     await client.query('COMMIT');
 
     expect(await count('pit')).toBe(895);
-    expect(await count('flood_area')).toBe(180);
+    expect(await count('flood_area')).toBe(1686);
+    // The board's ranks are an UPDATE over rows the same run inserted, so a
+    // second load has to leave thirty of them and not sixty.
+    expect(
+      Number(
+        await one(
+          'SELECT count(*)::text AS v FROM flood_area_coverage WHERE board_rank IS NOT NULL',
+        ),
+      ),
+    ).toBe(30);
   });
 });

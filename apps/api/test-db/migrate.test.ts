@@ -80,7 +80,7 @@ describe('migrating an empty database', () => {
     await client.query('COMMIT');
 
     expect(Number(await one('SELECT count(*)::text AS v FROM pit'))).toBe(895);
-    expect(Number(await one('SELECT count(*)::text AS v FROM flood_area'))).toBe(180);
+    expect(Number(await one('SELECT count(*)::text AS v FROM flood_area'))).toBe(1686);
   });
 });
 
