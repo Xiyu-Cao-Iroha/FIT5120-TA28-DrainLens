@@ -306,8 +306,31 @@ function hatch(
   context.strokeStyle = palette.hatch;
   context.lineWidth = 1;
   context.beginPath();
+
+  /*
+    **The pattern is anchored to the ground, not to the screen.**
+
+    These lines were laid out from the canvas's own left edge, so they stayed
+    put while the map moved underneath them — dragging made the hatching crawl
+    through the shapes it belongs to, which reads as the shapes shimmering.
+    Reported as *"it wobbles while dragging"*, and it had been true since the
+    layer was written; the clip fix only made it visible in more places at once.
+
+    Every line here satisfies `x - y = offset`, so a pan of `(dx, dy)` moves
+    the ground under them by `dx - dy` in that quantity. Shifting the whole
+    family by the same amount — read off where the extent's own corner lands —
+    makes the hatching travel with the map. Taken modulo the spacing so the
+    number stays small however far somebody has panned.
+
+    It has a second effect worth having: neighbouring areas now share one
+    continuous pattern rather than each carrying its own, so a cluster of small
+    shapes reads as one texture instead of a scatter of independent ones.
+  */
+  const [originX, originY] = toScreen(viewport, [0, 0]);
+  const phase = (((originX - originY) % HATCH_SPACING_PX) + HATCH_SPACING_PX) % HATCH_SPACING_PX;
+
   const reach = viewport.widthPx + viewport.heightPx;
-  for (let offset = -viewport.heightPx; offset < reach; offset += HATCH_SPACING_PX) {
+  for (let offset = -viewport.heightPx + phase; offset < reach; offset += HATCH_SPACING_PX) {
     context.moveTo(offset, 0);
     context.lineTo(offset + viewport.heightPx, viewport.heightPx);
   }
