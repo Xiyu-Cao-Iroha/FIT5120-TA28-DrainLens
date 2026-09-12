@@ -16,6 +16,8 @@ import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
+import { useAreas } from './history/useAreas.js';
+import { FloodMap } from './screens/FloodMap.js';
 import { Guide } from './screens/Guide.js';
 import { Choose } from './screens/Choose.js';
 import { Home } from './screens/Home.js';
@@ -191,6 +193,9 @@ export function App() {
     '/data/scene',
     session.screen === 'scenario' || session.screen === 'result',
   );
+  // The flood map's three artefacts, 83 KB, fetched when the map is opened
+  // and not on the way past. Same argument as the scenario scene.
+  const areas = useAreas(session.screen === 'flood-map');
   // Every position the last run solved. The rainfall control on the result
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
@@ -310,6 +315,51 @@ export function App() {
         </Shell>
       );
 
+    case 'flood-map': {
+      const back = () => {
+        dispatch({ type: 'back' });
+      };
+      return (
+        <Shell
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          crumbs={
+            <>
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
+              {separator}
+              {crumb('Flood history', back)}
+              {separator}
+              {crumb('Map', undefined, true)}
+            </>
+          }
+        >
+          {areas.problem !== null ? (
+            /*
+              The guard's own sentence, not "something went wrong". It names
+              the field that is wrong, which is the difference between a
+              defect somebody can act on and one they can only report.
+            */
+            <p style={{ padding: 24, color: ink.muted }}>
+              The map cannot be drawn: {areas.problem}
+            </p>
+          ) : areas.data === null ? (
+            <p style={{ padding: 24, color: ink.muted }}>Loading the areas…</p>
+          ) : (
+            <FloodMap
+              areas={areas.data.areas}
+              scope={areas.data.scope}
+              population={areas.data.population}
+              points={areas.data.points}
+              onBack={back}
+            />
+          )}
+        </Shell>
+      );
+    }
+
     case 'history':
       return (
         <Shell
@@ -326,6 +376,9 @@ export function App() {
         >
           <FloodHistory
             artefact={loaded.history}
+            onOpenAreas={() => {
+              dispatch({ type: 'flood-map-opened' });
+            }}
             onOpenMap={() => {
               dispatch({ type: 'map-opened', from: 'history' });
             }}

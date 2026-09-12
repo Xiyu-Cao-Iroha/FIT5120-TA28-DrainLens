@@ -117,8 +117,8 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 ## W4 · Frontend — flood map
 
-- [ ] **The map itself**, drawing the boundary artefact → *4.1.1.a, 4.1.2.a*. Blocked by D1 and the W1 boundary artefact
-- [ ] **One map, two paint functions, one mode switch** → *4.1.1.b, 4.1.1.c*. Two screens would make retaining location and selection across a mode change into work; one map makes it free
+- [x] **The map draws**, 281 areas as marks → *4.1.1.a, 4.1.2.a*
+- [x] **One map, two paint functions, one mode switch** → *4.1.1.b, 4.1.1.c*. Selection and zoom survive a mode change, as predicted, because there is nothing to retain
 - [ ] **Colour ramp with named breaks** → *4.1.2.b, 4.1.2.d*. **The distribution is severely skewed** — 209 at the top and single digits across most areas — so equal-width bins produce one dark area and twenty-nine identical pale ones. Choose the breaks deliberately and put the ranges in the legend
 - [ ] **Recorded activity distinguished from no recorded activity** → *4.1.2.e*
 - [ ] **Area detail panel** → *4.1.4.a–h*, showing what is available and saying why anything absent is absent
