@@ -13,8 +13,8 @@ import json
 
 import pytest
 
-from drainlens_pipeline.geo import CITY_OF_MELBOURNE, DEMONSTRATION_EXTENT, Extent
-from drainlens_pipeline.reframe import ReframeError, main, reframe, shift_coordinates
+from drainlens_pipeline.geo import CITY_OF_MELBOURNE, DEMONSTRATION_EXTENT, MELBOURNE_CBD, Extent
+from drainlens_pipeline.reframe import ReframeError, combine, main, reframe, shift_coordinates
 
 
 def artefact(**layers) -> dict:
@@ -237,3 +237,103 @@ class TestTheCommandThatBuiltTheCouncilArtefacts:
                     "city-of-melbourne",
                 ]
             )
+
+
+def built(name: str, settings: dict | None = None, **layers) -> dict:
+    return {
+        "artefact": "derived-layers",
+        "basis": "derived",
+        "extent": {"name": name},
+        "settings": settings if settings is not None else {"coverage_min_measured": 0.2},
+        "layers": layers,
+    }
+
+
+class TestCombiningMeasuredAreas:
+    """Kensington and the Hoddle Grid, each its own terrain run, as one artefact."""
+
+    def parts(self):
+        return [
+            (built("kensington", channel=[{"g": "line", "c": [[0, 0]]}]), DEMONSTRATION_EXTENT),
+            (
+                built(
+                    "melbourne-cbd",
+                    channel=[{"g": "line", "c": [[0, 0]]}],
+                    unavailable=[{"g": "polygon", "c": [[[0, 0], [1, 0], [0, 0]]]}],
+                ),
+                MELBOURNE_CBD,
+            ),
+        ]
+
+    def test_it_moves_each_area_by_its_own_corner(self):
+        # One offset for both would put the CBD's water paths in Kensington.
+        combined = combine(self.parts(), CITY_OF_MELBOURNE)
+        assert [shape["c"] for shape in combined["layers"]["channel"]] == [
+            [[1500.0, 6000.0]],
+            [[4000.0, 3000.0]],
+        ]
+
+    def test_it_keeps_a_layer_only_one_area_has(self):
+        combined = combine(self.parts(), CITY_OF_MELBOURNE)
+        assert len(combined["layers"]["unavailable"]) == 1
+
+    def test_it_says_where_each_measured_area_is(self):
+        # The browser and the CI check both need the boxes, and a sentence is
+        # not something either can read.
+        combined = combine(self.parts(), CITY_OF_MELBOURNE)
+        assert combined["areas"] == [
+            {"name": "kensington", "e": 1500.0, "n": 6000.0, "width_m": 1000.0, "height_m": 1000.0},
+            {"name": "melbourne-cbd", "e": 4000.0, "n": 3000.0, "width_m": 3000.0, "height_m": 2500.0},
+        ]
+
+    def test_it_still_says_that_everywhere_else_nothing_is_claimed(self):
+        covers = combine(self.parts(), CITY_OF_MELBOURNE)["covers"]
+        assert "kensington and melbourne-cbd" in covers
+        assert "8.50 km2 of the 76.50 km2" in covers
+        assert "has not been measured" in covers
+        assert "nothing is claimed" in covers
+
+    def test_it_refuses_areas_built_with_different_settings(self):
+        # One legend entry meaning two things, with nothing on the map to say
+        # where the meaning changes.
+        parts = self.parts()
+        parts[1] = (built("melbourne-cbd", {"coverage_min_measured": 0.35}), MELBOURNE_CBD)
+        with pytest.raises(ReframeError, match="different settings"):
+            combine(parts, CITY_OF_MELBOURNE)
+
+    def test_it_refuses_areas_that_overlap(self):
+        nearby = Extent("kensington", 317_000.0, 5_815_000.0, 318_000.0, 5_816_000.0)
+        parts = [self.parts()[0], (built("kensington"), nearby)]
+        with pytest.raises(ReframeError, match="overlap"):
+            combine(parts, CITY_OF_MELBOURNE)
+
+    def test_areas_that_only_touch_are_not_an_overlap(self):
+        east = Extent("kensington", 317_500.0, 5_814_500.0, 318_000.0, 5_815_000.0)
+        combine([self.parts()[0], (built("kensington"), east)], CITY_OF_MELBOURNE)
+
+    def test_it_refuses_nothing_at_all(self):
+        with pytest.raises(ReframeError, match="nothing"):
+            combine([], CITY_OF_MELBOURNE)
+
+    def test_the_command_combines_when_given_more_than_one_area(self, tmp_path, capsys):
+        paths = []
+        for artefact, extent in self.parts():
+            path = tmp_path / f"{extent.name}.json"
+            path.write_text(json.dumps(artefact), encoding="utf-8")
+            paths.append(path)
+        out = tmp_path / "council.json"
+        argv = ["--to", "city-of-melbourne", "--out", str(out)]
+        argv += ["--in", str(paths[0]), "--from", "kensington"]
+        argv += ["--in", str(paths[1]), "--from", "melbourne-cbd"]
+        assert main(argv) == 0
+        written = json.loads(out.read_text(encoding="utf-8"))
+        assert [a["name"] for a in written["areas"]] == ["kensington", "melbourne-cbd"]
+        assert "kensington + melbourne-cbd" in capsys.readouterr().err
+
+    def test_the_command_wants_one_extent_per_file(self, tmp_path):
+        path = tmp_path / "a.json"
+        path.write_text(json.dumps(built("kensington")), encoding="utf-8")
+        argv = ["--to", "city-of-melbourne", "--out", str(tmp_path / "o.json")]
+        argv += ["--in", str(path), "--in", str(path), "--from", "kensington"]
+        with pytest.raises(SystemExit):
+            main(argv)

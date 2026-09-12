@@ -48,6 +48,14 @@ describe('the disclosure before the whole map', () => {
     expect(wide.some((s) => s.includes('nothing is claimed'))).toBe(true);
   });
 
+  it('names both places the ground was measured', () => {
+    // The central city was added on 13 September. A notice still naming only
+    // Kensington would call the CBD's water paths unmeasured while drawing them.
+    const ground = lockNotice('city-of-melbourne').find((s) => s.includes('measured ground')) ?? '';
+    expect(ground).toContain('Kensington');
+    expect(ground).toContain('central city');
+  });
+
   it('keeps the two sentences that are true of any extent', () => {
     for (const name of ['kensington', 'city-of-melbourne', 'something-else']) {
       const notice = lockNotice(name);

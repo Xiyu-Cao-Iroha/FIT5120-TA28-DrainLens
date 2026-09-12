@@ -124,7 +124,7 @@ export function lockNotice(extentName: string): readonly string[] {
 
   const ground =
     extentName === 'city-of-melbourne'
-      ? 'The water paths and low areas are calculated here from measured ground, and that ground was measured for one square kilometre of Kensington. Everywhere else on this map, nothing is claimed about where water goes.'
+      ? 'The water paths and low areas are calculated here from measured ground, and that ground was measured in two places: one square kilometre of Kensington, and the central city from Spencer Street to Spring Street. Everywhere else on this map, nothing is claimed about where water goes.'
       : 'The water paths and low areas are calculated here from measured ground. Nobody publishes them.';
 
   return [
