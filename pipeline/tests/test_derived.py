@@ -261,6 +261,55 @@ class TestCoverageGaps:
     def test_finds_a_block_with_too_little_measured_ground(self):
         observed = np.ones((100, 100), dtype=bool)
         observed[0:25, 0:25] = False
+        gaps = dv.coverage_gaps(
+            observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0, min_blocks=1
+        )
+        assert len(gaps) == 1
+
+    def test_leaves_out_a_gap_the_size_of_one_building(self):
+        # One block with nothing measured under it is, almost always, a roof —
+        # and there is no ground under a roof for the map to be wrong about.
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:25, 0:25] = False
+        assert dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0) == []
+
+    def test_draws_a_gap_of_four_blocks(self):
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
+        assert len(gaps) == 1
+        assert dv.ring_area_m2(gaps[0]) == 2500.0
+
+    def test_counts_blocks_that_touch_only_at_a_corner_as_one_gap(self):
+        # Four blocks on a diagonal are one place to the eye, and the outline
+        # tracer already joins them the same way.
+        observed = np.ones((100, 100), dtype=bool)
+        for step in range(4):
+            observed[step * 25 : (step + 1) * 25, step * 25 : (step + 1) * 25] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
+        assert sum(dv.ring_area_m2(ring) for ring in gaps) == 4 * 625.0
+
+    def test_keeps_the_measured_hole_inside_a_large_gap(self):
+        # The reason small gaps are dropped by counting blocks rather than by
+        # ring area: an area filter drops the hole too, and the one measured
+        # block in the middle would be hatched as though it were not.
+        observed = np.zeros((75, 75), dtype=bool)
+        observed[25:50, 25:50] = True
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 75, 75), CELL, block_m=25.0)
+        assert sorted(dv.ring_area_m2(ring) for ring in gaps) == [625.0, 5625.0]
+
+    def test_does_not_flag_a_block_that_is_a_quarter_ground(self):
+        # Terraced housing: roofs, with the street through them measured. The
+        # threshold was 0.35 and flagged these, which hatched a third of the map.
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        observed[0:50:2, 0:50:2] = True  # a quarter of those cells measured
+        assert dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0) == []
+
+    def test_flags_a_block_that_is_a_tenth_ground(self):
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        observed[0:50:10, 0:50] = True  # a tenth of those cells measured
         gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
         assert len(gaps) == 1
 
@@ -321,6 +370,11 @@ class TestBuild:
         settings = self.artefact()["settings"]
         assert "display filter" in settings["display_only"]
         assert settings["min_drawn_depression_m2"] == dv.MIN_DRAWN_DEPRESSION_M2
+
+    def test_states_what_it_takes_to_be_drawn_as_unavailable(self):
+        settings = self.artefact()["settings"]
+        assert settings["coverage_min_measured"] == dv.COVERAGE_MIN_MEASURED
+        assert settings["coverage_min_blocks"] == dv.COVERAGE_MIN_BLOCKS
 
     def test_uses_the_same_frame_as_the_map_geometry(self):
         artefact = self.artefact()
