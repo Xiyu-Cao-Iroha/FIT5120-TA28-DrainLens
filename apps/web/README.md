@@ -82,11 +82,15 @@ Everything under `public/data/` is a build product of the Python pipeline, **com
 | `trace.json` | 37 KB | `drainlens_pipeline.trace` |
 | `addresses.json` | 81 KB, 30 KB gzipped | `drainlens_pipeline.addresses` |
 | `flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` |
+| `sa2-areas.json` | 37 KB | `drainlens_pipeline.flood_history --areas` |
+| `population.json` | 27 KB | `drainlens_pipeline.population` |
 | `scene/` | 7.00 MB, 1.33 MB gzipped | `drainlens_pipeline.scene` |
 
 `scene/` is the outlier and still does not load on a first visit: the scenario worker that reads it starts only on the two comparison screens. Those are reachable again — the homepage offers the comparison for Epic 3 — so it is now a load somebody asked for rather than one nobody could trigger.
 
 The three council artefacts are not here. They are in `apps/api/data/city-of-melbourne/`, where the API's Dockerfile copies them from, because `/data` is ignored by both git and Docker: `map.json` 6.67 MB, `trace.json` 693 KB, `derived.json` 210 KB.
+
+The last two are Epic 4’s, and **nothing in this application reads them yet**. `sa2-areas.json` is every statistical area in Greater Melbourne rather than the board’s top thirty, because a map of thirty implies the other 251 are empty and 245 of them are not; `population.json` is the Severity Score’s denominator. The board keeps its own file and its own cap: AC 2.2.1.b limits it to thirty locations, and that limit is held in the data rather than in a screen. `tools/data/check-areas.mjs` asserts the thirty are the top of the 281 and agree with them field for field.
 
 `flood_history` is the one stage that fetches its own sources rather than reading what an earlier stage wrote — two published files, neither a local export. See [FLOOD-HISTORY-DATA.md](../../docs/FLOOD-HISTORY-DATA.md) for what they are and what they do not support.
 

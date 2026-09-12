@@ -132,7 +132,7 @@ class Place:
     area: str
     greater_capital: str
     #: `SA2_MAINCODE_2011`, nine digits. Empty only for a fixture that predates
-    #: this field; `areas_in_scope` refuses to publish a list containing one.
+    #: this field; `join` refuses to aggregate a scope containing one.
     sa2_code: str = ""
 
 
@@ -147,8 +147,16 @@ class Region:
 
 @dataclass(frozen=True)
 class Area:
-    """One named SA2, aggregated from the regions inside it."""
+    """One SA2, aggregated from the regions inside it.
 
+    **The code is here because the name is not a key.** The board prints names
+    and joins on them, which is safe only inside one Victorian file; anything
+    joined from a national dataset — population, and so the Severity Score —
+    has to join on `SA2_MAINCODE_2011`. It was being read out of the ABS
+    allocation and dropped.
+    """
+
+    code: str
     name: str
     by_year: tuple[int, ...]
     regions: int
@@ -268,68 +276,6 @@ def read_geography(allocation: bytes, *, state: str = "Victoria") -> dict[str, P
     return places
 
 
-@dataclass(frozen=True)
-class Sa2:
-    """One statistical area in scope: what a population row must match."""
-
-    code: str
-    name: str
-    #: How many SA1 regions roll up into it, which is what makes the pair
-    #: checkable: an area the allocation mentions once is usually a typo.
-    regions: int
-
-
-def areas_in_scope(places: Mapping[str, Place], *, scope: str = SCOPE) -> list[Sa2]:
-    """Every SA2 inside the scope, by code and name, ordered by code.
-
-    This is the list a population dataset is matched against, and producing it
-    is the first half of that job: **the match rate is only meaningful against
-    a list that is itself checked.**
-
-    Two properties are asserted rather than assumed, and each one is a way the
-    join could be wrong while looking right:
-
-    * **One name per code.** Two names under one code means the allocation
-      disagrees with itself and the name printed beside a count is a coin toss.
-    * **One code per name.** Two codes under one name means joining population
-      by name -- which is what anybody would reach for first, because the
-      artefact publishes names -- silently attaches one area's residents to
-      another's incidents. ABS does reuse SA2 names across states; whether it
-      does so *inside* Greater Melbourne is a question about this data, and
-      this is where it gets answered instead of assumed.
-    """
-    named: dict[str, str] = {}
-    coded: dict[str, str] = {}
-    counts: dict[str, int] = {}
-    for place in places.values():
-        if place.greater_capital != scope:
-            continue
-        if not place.sa2_code:
-            raise FloodHistoryError(
-                f"{place.area!r} has no SA2_MAINCODE_2011; a list without codes cannot "
-                "be matched against a population dataset by anything but its names"
-            )
-        if named.setdefault(place.sa2_code, place.area) != place.area:
-            raise FloodHistoryError(
-                f"SA2 {place.sa2_code} is named both {named[place.sa2_code]!r} and "
-                f"{place.area!r}; the name beside a count would be whichever row came last"
-            )
-        if coded.setdefault(place.area, place.sa2_code) != place.sa2_code:
-            raise FloodHistoryError(
-                f"{place.area!r} is both SA2 {coded[place.area]} and {place.sa2_code}: "
-                f"joining a population dataset by name would attach one area's residents "
-                "to the other's incidents"
-            )
-        counts[place.sa2_code] = counts.get(place.sa2_code, 0) + 1
-
-    if not named:
-        raise FloodHistoryError(
-            f"no SA1 in the allocation belongs to {scope!r}; the scope must match "
-            "GCCSA_NAME_2011 exactly"
-        )
-    return [Sa2(code, named[code], counts[code]) for code in sorted(named)]
-
-
 def join(
     regions: Sequence[Region],
     places: Mapping[str, Place],
@@ -362,21 +308,54 @@ def join(
             f"no region belongs to {scope!r}; the scope must match GCCSA_NAME_2011 exactly"
         )
 
+    # The pairing, checked here rather than in a second pass over the same
+    # places, so that **every** consumer of an area gets a code that has been
+    # checked against its name. Two ways it could be wrong, and they are
+    # different failures:
+    #
+    #   * Two names under one code means the allocation disagrees with itself,
+    #     and the name printed beside a count is whichever row was read last.
+    #   * Two codes under one name means joining a national dataset by name --
+    #     which is what anybody reaches for, because the artefact publishes
+    #     names -- attaches one area's residents to another's incidents, and
+    #     every number downstream still looks ordinary.
+    named: dict[str, str] = {}
+    coded: dict[str, str] = {}
+    for place in places.values():
+        if place.greater_capital != scope:
+            continue
+        if not place.sa2_code:
+            raise FloodHistoryError(
+                f"{place.area!r} has no SA2_MAINCODE_2011; a list without codes cannot be "
+                "matched against a population dataset by anything but its names"
+            )
+        if named.setdefault(place.sa2_code, place.area) != place.area:
+            raise FloodHistoryError(
+                f"SA2 {place.sa2_code} is named both {named[place.sa2_code]!r} and "
+                f"{place.area!r}; the name beside a count would be whichever row came last"
+            )
+        if coded.setdefault(place.area, place.sa2_code) != place.sa2_code:
+            raise FloodHistoryError(
+                f"{place.area!r} is both SA2 {coded[place.area]} and {place.sa2_code}: "
+                "joining a population dataset by name would attach one area's residents "
+                "to the other's incidents"
+            )
+
     totals: dict[str, list[int]] = {}
     counts: dict[str, list[int]] = {}
     for region in in_scope:
-        name = places[region.code].area
-        if name not in totals:
-            totals[name] = [0] * len(YEARS)
-            counts[name] = [0, 0]
+        code = places[region.code].sa2_code
+        if code not in totals:
+            totals[code] = [0] * len(YEARS)
+            counts[code] = [0, 0]
         for i, value in enumerate(region.by_year):
-            totals[name][i] += value
-        counts[name][0] += 1
-        counts[name][1] += 1 if region.suppressed else 0
+            totals[code][i] += value
+        counts[code][0] += 1
+        counts[code][1] += 1 if region.suppressed else 0
 
     return [
-        Area(name, tuple(totals[name]), counts[name][0], counts[name][1])
-        for name in sorted(totals)
+        Area(code, named[code], tuple(totals[code]), counts[code][0], counts[code][1])
+        for code in sorted(totals)
     ]
 
 
@@ -477,6 +456,59 @@ def _open(url: str, timeout: float) -> bytes:
         return response.read()
 
 
+def scope_artefact(areas: Sequence[Area]) -> dict:
+    """Every area in the scope, with what the SES recorded for it.
+
+    **A second file rather than a longer first one, and the reason is a
+    criterion.** AC 2.2.1.b caps the board at thirty locations, and
+    [ITERATION-1-ACCEPTANCE.md] records that the cap is *"enforced where the
+    data is, not where it is drawn: the pipeline publishes thirty and no
+    more, so the cap cannot be exceeded by a change to a screen"*. Publishing
+    281 areas into `flood-history.json` would hand that guarantee back.
+
+    But Epic 4's map has to draw every area, including the ones with nothing
+    recorded — a map of thirty implies the rest are empty, and 275 of them are
+    not. So the scope goes in its own artefact, and `tools/data/check-areas.mjs`
+    asserts the board's thirty are a subset of this and agree field for field.
+    Two files that must stay equal, with something to notice when they stop.
+    """
+    return {
+        "artefact": "sa2-areas",
+        "version": 1,
+        "basis": "sourceProvided",
+        "note": (
+            "Every SA2 in the scope, by ASGS 2011 code and name, with the dispatches "
+            "recorded in it. The board publishes the highest thirty; this is all of "
+            "them, because a map showing only the thirty implies the rest are empty "
+            "and most of them are not. A count inside an area may have been withheld "
+            "for privacy, in which case its total is a lower bound."
+        ),
+        "source": SOURCE,
+        "geographySource": GEOGRAPHY,
+        "reportingPeriod": REPORTING_PERIOD,
+        "geography": {"unit": "SA2", "standard": "ASGS 2011", "scope": SCOPE},
+        "incidentType": INCIDENT_TYPE,
+        "counts": {
+            "areas": len(areas),
+            "withIncidents": sum(1 for a in areas if a.total > 0),
+            "incomplete": sum(1 for a in areas if not a.complete),
+            "incidents": sum(a.total for a in areas),
+        },
+        "areas": [
+            {
+                "code": a.code,
+                "name": a.name,
+                "total": a.total,
+                "byYear": list(a.by_year),
+                "regions": a.regions,
+                "suppressedRegions": a.suppressed_regions,
+                "complete": a.complete,
+            }
+            for a in areas
+        ],
+    }
+
+
 def fetch(
     *,
     opener: Callable[[str], bytes] | None = None,
@@ -526,8 +558,9 @@ def main(argv: list[str] | None = None) -> int:
         "--areas",
         type=Path,
         help=(
-            "also write the in-scope SA2 code and name list here, which is what a "
-            "population dataset is matched against"
+            "also write every in-scope area here, with its ASGS code and what was "
+            "recorded in it -- the map's data, and what a population dataset is "
+            "matched against"
         ),
     )
     args = parser.parse_args(argv)
@@ -551,31 +584,14 @@ def main(argv: list[str] | None = None) -> int:
     args.out.write_text(json.dumps(artefact, separators=(",", ":")), encoding="utf-8")
 
     if args.areas is not None:
-        scoped = areas_in_scope(places)
+        scoped = scope_artefact(join(regions, places))
         args.areas.parent.mkdir(parents=True, exist_ok=True)
-        args.areas.write_text(
-            json.dumps(
-                {
-                    "artefact": "sa2-areas",
-                    "version": 1,
-                    "basis": "sourceProvided",
-                    "note": (
-                        "Every SA2 in the scope, by ASGS 2011 code and name. The list a "
-                        "population dataset is matched against; the match rate is "
-                        "reported against this and not against the published thirty."
-                    ),
-                    "source": dict(GEOGRAPHY),
-                    "scope": SCOPE,
-                    "counts": {"areas": len(scoped)},
-                    "areas": [
-                        {"code": a.code, "name": a.name, "regions": a.regions} for a in scoped
-                    ],
-                },
-                separators=(",", ":"),
-            ),
-            encoding="utf-8",
+        args.areas.write_text(json.dumps(scoped, separators=(",", ":")), encoding="utf-8")
+        counted = scoped["counts"]
+        print(
+            f"wrote {args.areas}  ({args.areas.stat().st_size / 1024:.1f} KB, "
+            f"{counted['areas']:,} areas in {SCOPE})"
         )
-        print(f"wrote {args.areas}  ({len(scoped):,} areas in {SCOPE})")
 
     counts = artefact["counts"]
     print(f"wrote {args.out}  ({args.out.stat().st_size / 1024:.1f} KB)")

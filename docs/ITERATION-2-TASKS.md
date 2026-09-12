@@ -132,7 +132,7 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 ## W5 · Deployment, CI and quality
 
 - [ ] Migration for the events table, and for anything the Severity Score needs → *4.2.1*
-- [ ] `check-guide.mjs` equivalent for the new artefacts — **an artefact claim belongs in a script, not in a unit test**, which is why the guide check and the docs check are scripts
+- [x] `check-guide.mjs` equivalent for the new artefacts — `tools/data/check-areas.mjs`, in CI. It recomputes the board’s thirty from the 281 and checks the population against the same codes. Mutation-tested: a swapped name, a changed total, a dropped population row and a reordered board are all caught
 - [ ] Boundary artefact size measured raw and gzipped, and recorded
 - [ ] The API compresses `/api/*` already; confirm any new route is under it
 - [ ] `verify-api.mjs` extended to any new endpoint, **deeply** — it compares whole responses against the published artefact, and that is what caught 85 pipes reported as reference number 0

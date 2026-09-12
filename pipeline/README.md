@@ -286,12 +286,22 @@ subset.
 ### The area list, for the population join
 
 `--areas` writes a second file: every SA2 inside Greater Melbourne, by
-`SA2_MAINCODE_2011` and name, with the number of SA1 regions that roll into
-each. Nothing in the product reads it yet. It exists because the Severity
-Score needs a denominator, and a population dataset has to be matched against
-*something* — **and matching it against the published thirty would measure the
-wrong thing**, since those are the top of a ranking and the map is meant to
-show the areas with none.
+`SA2_MAINCODE_2011` and name, **with the dispatches recorded in it** — total,
+the yearly series, the regions inside it and whether any of their counts were
+withheld. Nothing in the product reads it yet.
+
+**It is a second file rather than a longer first one, and the reason is a
+criterion.** AC 2.2.1.b caps the board at thirty locations, and Iteration 1
+recorded that the cap is *enforced where the data is, not where it is drawn* —
+the pipeline publishes thirty and no more, so no change to a screen can exceed
+it. Publishing 281 areas into `flood-history.json` would hand that back. But
+the map has to draw every area, including the ones with nothing recorded: a map
+of thirty implies the other 251 are empty and 245 of them are not.
+
+Two files that must stay equal is a failure this repository has had once, and
+the answer taken then — delete one — is not available here, because these
+answer different questions. `tools/data/check-areas.mjs` is the answer instead:
+it recomputes the board's thirty from the 281 and fails when they disagree.
 
 The code was already being read out of the ABS file and thrown away. That is
 the part worth knowing: the board joins on names, which is safe only because
