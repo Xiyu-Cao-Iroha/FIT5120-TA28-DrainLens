@@ -43,6 +43,7 @@ const scope = (...areas: Partial<ScopeAreas['areas'][number]>[]): ScopeAreas => 
   artefact: 'sa2-areas',
   note: 'Counts of Victoria SES crew dispatches recorded as Flood.',
   incidentType: 'Flood',
+  source: { dataset: 'VICSES Incidents Per SA1 ABS Census Areas, 2009 - 2015', publisher: 'Victoria State Emergency Service', licence: 'CC BY 4.0' },
   reportingPeriod: { start: '2009-07-01', end: '2015-06-30', years: YEARS },
   geography: { unit: 'SA2', standard: 'ASGS 2011', scope: 'Greater Melbourne' },
   areas: areas.map((a, index) => ({
@@ -331,6 +332,7 @@ describe('every field these guards refuse to do without', () => {
     ['is undefined', () => undefined],
     ['says what a count is', (a: ScopeAreas) => ({ ...a, note: '' })],
     ['names its incident type', (a: ScopeAreas) => ({ ...a, incidentType: '' })],
+    ['names who recorded it', (a: ScopeAreas) => ({ ...a, source: undefined as unknown as ScopeAreas['source'] })],
     ['carries a reporting period', (a: ScopeAreas) => ({ ...a, reportingPeriod: undefined })],
     ['names a scope', (a: ScopeAreas) => ({ ...a, geography: { unit: 'SA2', standard: 'x', scope: '' } })],
     ['carries areas', (a: ScopeAreas) => ({ ...a, areas: [] })],

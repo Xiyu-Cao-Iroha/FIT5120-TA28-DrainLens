@@ -27,6 +27,55 @@ import type { MapArtefact } from '../map/artefact.js';
 export const LICENCE_URL = 'https://creativecommons.org/licenses/by/4.0/';
 
 /**
+ * The deed for a licence, by its name.
+ *
+ * Every credit linked to CC BY 4.0 while every source was the council's. The
+ * ABS publishes under CC BY 2.5 Australia, and a link to the wrong licence is
+ * a credit that misstates the terms the data was used under.
+ */
+export function licenceUrl(licence: string): string {
+  const name = licence.trim().toUpperCase();
+  if (name === 'CC BY 2.5 AU') return 'https://creativecommons.org/licenses/by/2.5/au/';
+  if (name === 'CC BY 3.0 AU') return 'https://creativecommons.org/licenses/by/3.0/au/';
+  return LICENCE_URL;
+}
+
+/** What the flood board adds: totals by area and a ranking, not a score or a map. */
+export const BOARD_CHANGES_NOTICE =
+  'The totals for each area and the ranking are added up from this data by DrainLens, not published by the source.';
+
+/** What the flood map adds to its sources, the same clause as `CHANGES_NOTICE`. */
+export const FLOOD_CHANGES_NOTICE =
+  'The Severity Score and where each area is drawn are calculated from this data by DrainLens, not published by the sources.';
+
+interface NamedSource {
+  readonly publisher: string;
+  readonly licence?: string;
+  readonly dataset_id?: string;
+}
+
+/**
+ * The flood map's credit, from the sources its artefacts name.
+ *
+ * It showed the council's drainage credit, which is the drainage map's. The
+ * flood map is the SES's dispatches, the ABS's boundaries and the ABS's
+ * population, and those are who it credits.
+ */
+export function creditsForSources(sources: readonly (NamedSource | undefined)[]): readonly Credit[] {
+  const grouped = new Map<string, { publisher: string; licence: string; datasets: string[] }>();
+  for (const source of sources) {
+    const publisher = source?.publisher?.trim();
+    const licence = source?.licence?.trim();
+    if (!publisher || !licence) continue;
+    const key = `${publisher}\u0000${licence}`;
+    const held = grouped.get(key) ?? { publisher, licence, datasets: [] };
+    if (source?.dataset_id && !held.datasets.includes(source.dataset_id)) held.datasets.push(source.dataset_id);
+    grouped.set(key, held);
+  }
+  return [...grouped.values()].map((held) => ({ ...held, lastModified: null }));
+}
+
+/**
  * The changes notice, which is the clause most often skipped.
  *
  * Kept separate from the credit because it is a different obligation: the

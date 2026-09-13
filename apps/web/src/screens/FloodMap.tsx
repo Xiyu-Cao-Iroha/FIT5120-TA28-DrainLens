@@ -38,6 +38,15 @@ import {
   scoreLabel,
   totalLabel,
 } from '../history/severity.js';
+import {
+  DOTS_NOTE,
+  INFORMATION_TYPES,
+  type Point,
+  activityEvidence,
+  coverageEvidence,
+  notAPrediction,
+  severityEvidence,
+} from '../history/evidence.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
 import {
   brand,
@@ -55,7 +64,8 @@ import {
 /** The question each mode answers, which is the thing being switched. */
 const QUESTIONS: Readonly<Record<MapMode, { readonly tab: string; readonly asks: string }>> = {
   activity: {
-    tab: 'Recorded activity',
+    // AC 4.1.1.a names the mode.
+    tab: 'Historical Flood Activity',
     asks: 'How much flood-related SES activity was recorded?',
   },
   severity: {
@@ -79,6 +89,10 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
   const frameRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const marksRef = useRef<readonly AreaMark[]>([]);
+  // Dragging pans. It had only + , − and "pan north", so once zoomed in
+  // nothing south, east or west of the view could be reached.
+  const drag = useRef<{ x: number; y: number } | null>(null);
+  const dragged = useRef(false);
 
   const bounds = useMemo(
     () => ({ widthM: points.extent.width_m, heightM: points.extent.height_m }),
@@ -230,16 +244,54 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
           >
             {QUESTIONS[mode].asks}
           </p>
+          <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.5 }), color: ink.subtle }}>
+            {notAPrediction(scope)} {DOTS_NOTE}
+          </p>
         </header>
 
         <div ref={frameRef} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           <canvas
             ref={canvasRef}
-            onClick={pick}
+            onClick={(event) => {
+              // A drag that ends over a dot is a pan, not a choice.
+              if (dragged.current) {
+                dragged.current = false;
+                return;
+              }
+              pick(event);
+            }}
+            onPointerDown={(event) => {
+              drag.current = { x: event.clientX, y: event.clientY };
+              dragged.current = false;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const from = drag.current;
+              if (from === null) return;
+              const dx = event.clientX - from.x;
+              const dy = event.clientY - from.y;
+              if (!dragged.current && Math.hypot(dx, dy) < 4) return;
+              dragged.current = true;
+              drag.current = { x: event.clientX, y: event.clientY };
+              setViewport((current) => (current === null ? current : clamp(pan(current, dx, dy), bounds)));
+            }}
+            onPointerUp={() => {
+              drag.current = null;
+            }}
+            onWheel={(event) => {
+              const rect = canvasRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              const at: [number, number] = [event.clientX - rect.left, event.clientY - rect.top];
+              setViewport((current) =>
+                current === null
+                  ? current
+                  : zoomAt(current, event.deltaY < 0 ? 1.2 : 1 / 1.2, at, bounds, scaleToContain(current.widthPx, current.heightPx, bounds)),
+              );
+            }}
             aria-label={`${String(areas.length)} statistical areas, ${QUESTIONS[mode].asks}`}
-            style={{ display: 'block', cursor: 'pointer', background: surface.sunken }}
+            style={{ display: 'block', cursor: 'grab', background: surface.sunken, touchAction: 'none' }}
           />
-          <Legend mode={mode} />
+          <Legend mode={mode} years={years} />
           <Zoom
             onZoom={(by) => {
               setViewport((current) =>
@@ -252,11 +304,6 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
                       bounds,
                       scaleToContain(current.widthPx, current.heightPx, bounds),
                     ),
-              );
-            }}
-            onPan={(dx, dy) => {
-              setViewport((current) =>
-                current === null ? current : clamp(pan(current, dx, dy), bounds),
               );
             }}
           />
@@ -274,7 +321,7 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
         }}
       >
         {chosen === null ? (
-          <Nothing count={areas.length} />
+          <Nothing count={areas.length} mode={mode} scope={scope} population={population} areas={areas} />
         ) : (
           <Detail
             area={chosen}
@@ -282,6 +329,7 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
             years={years}
             population={population}
             scope={scope}
+            areas={areas}
           />
         )}
       </aside>
@@ -295,7 +343,19 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
  * It says what pressing an area gives, rather than sitting empty. An empty
  * panel beside a full map reads as a panel that failed to load.
  */
-function Nothing({ count }: { readonly count: number }) {
+function Nothing({
+  count,
+  mode,
+  scope,
+  population,
+  areas,
+}: {
+  readonly count: number;
+  readonly mode: MapMode;
+  readonly scope: ScopeAreas;
+  readonly population: PopulationArtefact;
+  readonly areas: readonly MapArea[];
+}) {
   return (
     <div style={{ color: ink.muted, font: type(text.label, { leading: 1.6 }) }}>
       <h2
@@ -312,7 +372,119 @@ function Nothing({ count }: { readonly count: number }) {
         that was spread across the years, the population the score is measured against, and how
         complete the record is.
       </p>
+      <Evidence mode={mode} scope={scope} population={population} areas={areas} open />
     </div>
+  );
+}
+
+/**
+ * The evidence behind the map, AC 4.3.1 to 4.3.4 and 4.1.4.h.
+ *
+ * Open beside the map before anything is chosen, and one press away inside an
+ * area's record: "learn more" is not a link to a document somebody will not
+ * open, it is the sentences, here.
+ */
+function Evidence({
+  mode,
+  scope,
+  population,
+  areas,
+  open = false,
+}: {
+  readonly mode: MapMode;
+  readonly scope: ScopeAreas;
+  readonly population: PopulationArtefact;
+  readonly areas: readonly MapArea[];
+  readonly open?: boolean;
+}) {
+  const [shown, setShown] = useState(open);
+  const view = mode === 'activity' ? activityEvidence(scope, areas) : severityEvidence(scope, population);
+  return (
+    <section style={{ marginTop: space(5) }}>
+      <button
+        type="button"
+        aria-expanded={shown}
+        onClick={() => {
+          setShown((now) => !now);
+        }}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          color: brand.ink,
+          font: type(text.label, { weight: weight.semibold }),
+          textDecoration: 'underline',
+          cursor: 'pointer',
+        }}
+      >
+        About the data, the calculation and its limits
+      </button>
+      {shown && (
+        <div style={{ marginTop: space(3) }}>
+          <Points
+            heading={mode === 'activity' ? 'Historical Flood Activity' : 'Severity Score'}
+            points={view}
+          />
+          <Points heading="Coverage and uncertainty" points={coverageEvidence(scope, population, areas)} />
+          <h4 style={headingStyle}>Three kinds of information</h4>
+          {INFORMATION_TYPES.map((kind) => (
+            <div key={kind.key} style={{ marginBottom: space(3) }}>
+              <Badge kind={kind.key} />
+              <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
+                <strong style={{ color: ink.strong }}>{kind.what}.</strong> {kind.purpose} {kind.limits}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const headingStyle = {
+  margin: `${String(space(3))}px 0 ${String(space(2))}px`,
+  font: type(text.micro, { weight: weight.semibold }),
+  letterSpacing: tracking.caps,
+  textTransform: 'uppercase',
+  color: ink.subtle,
+} as const;
+
+function Points({ heading, points }: { readonly heading: string; readonly points: readonly Point[] }) {
+  return (
+    <>
+      <h4 style={headingStyle}>{heading}</h4>
+      {points.map((point) => (
+        <p key={point.title} style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
+          <strong style={{ color: ink.strong }}>{point.title}.</strong> {point.body}
+        </p>
+      ))}
+    </>
+  );
+}
+
+const BADGES = {
+  recorded: { label: 'Recorded by the SES', background: '#dcece6', color: '#1f5b4e' },
+  calculated: { label: 'Calculated by DrainLens', background: '#dde8f2', color: '#2a5678' },
+  written: { label: 'Written by the DrainLens team', background: '#f3e8f6', color: '#6a3a78' },
+} as const;
+
+/** AC 4.3.4.a: the three kinds of information carry three different marks. */
+function Badge({ kind }: { readonly kind: keyof typeof BADGES }) {
+  const badge = BADGES[kind];
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        marginBottom: space(2),
+        padding: '1px 7px',
+        borderRadius: 999,
+        font: type(text.micro, { weight: weight.semibold }),
+        background: badge.background,
+        color: badge.color,
+      }}
+    >
+      {badge.label}
+    </span>
   );
 }
 
@@ -323,12 +495,14 @@ function Detail({
   years,
   population,
   scope,
+  areas,
 }: {
   readonly area: MapArea;
   readonly mode: MapMode;
   readonly years: readonly string[];
   readonly population: PopulationArtefact;
   readonly scope: ScopeAreas;
+  readonly areas: readonly MapArea[];
 }) {
   const state = completenessOf(area, mode);
   const completeness = completenessText(area, state, scope.incidentType);
@@ -351,6 +525,7 @@ function Detail({
       </p>
 
       <Section title="Recorded activity">
+        <Badge kind="recorded" />
         <p style={{ margin: `0 0 ${String(space(3))}px` }}>
           <strong style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}>
             {totalLabel(area)}
@@ -385,12 +560,20 @@ function Detail({
             </span>
             <span style={{ width: 28, textAlign: 'right', font: type(text.micro), color: ink.muted }}>
               {String(count)}
+              {area.complete ? '' : '+'}
             </span>
           </div>
         ))}
+        <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
+          One count is one SES crew dispatch, not one flood event.
+          {area.complete
+            ? ''
+            : ' A count inside this area was withheld, so each year is a minimum as well as the total.'}
+        </p>
       </Section>
 
       <Section title="Severity Score">
+        <Badge kind="calculated" />
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>
           <strong style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}>
             {scoreLabel(area)}
@@ -407,16 +590,26 @@ function Detail({
           */}
           {area.persons === null ? (
             <>
-              No score: this area has fewer than{' '}
-              {population.minimumResidents.toLocaleString('en-AU')} residents, and a rate per
-              resident needs residents. It is not a low score.
+              No score: this area had{' '}
+              {(area.personsByYear[population.asAt.indexOf(population.denominator)] ?? 0).toLocaleString('en-AU')}{' '}
+              residents on {population.denominator}, fewer than{' '}
+              {population.minimumResidents.toLocaleString('en-AU')}, and a rate per resident needs
+              residents. It is not a low score.
             </>
           ) : (
             <>
               {area.persons.toLocaleString('en-AU')} residents at {population.denominator}, from{' '}
               {population.source.publisher}. It is not a count of people affected.
+              {area.complete
+                ? ''
+                : ' Because a count inside this area was withheld, the score is a minimum too.'}
             </>
           )}
+        </p>
+        <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
+          Calculated by DrainLens from recorded SES activity and ABS population. It is not the
+          physical severity of any flood, a flood probability, or a measure of current or future
+          flood risk.
         </p>
       </Section>
 
@@ -427,6 +620,7 @@ function Detail({
       </Section>
 
       <Section title="Recorded events">
+        <Badge kind="written" />
         {/*
           The empty state first, and it is not a placeholder. Verified events
           are written by hand from named sources, so almost every one of the
@@ -440,6 +634,7 @@ function Detail({
           the record.
         </p>
       </Section>
+      <Evidence mode={mode} scope={scope} population={population} areas={areas} />
     </div>
   );
 }
@@ -464,7 +659,7 @@ function Section({ title, children }: { readonly title: string; readonly childre
 }
 
 /** The key, over the map rather than beside it, because the map is the page. */
-function Legend({ mode }: { readonly mode: MapMode }) {
+function Legend({ mode, years }: { readonly mode: MapMode; readonly years: readonly string[] }) {
   return (
     <div
       style={{
@@ -489,6 +684,18 @@ function Legend({ mode }: { readonly mode: MapMode }) {
       >
         {QUESTIONS[mode].tab}
       </p>
+      {/*
+        AC 4.1.3.c and e, 4.3.3.d: what the numbers are, over what years, and
+        who produced them. A band name without its unit is a judgement with
+        the workings hidden; a score without "calculated" borrows the SES's
+        authority.
+      */}
+      <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.4 }), color: ink.muted }}>
+        {mode === 'activity'
+          ? `SES crew dispatches, ${years[0] ?? ''} to ${years.at(-1) ?? ''}`
+          : `Dispatches per 1,000 residents, ${years[0] ?? ''} to ${years.at(-1) ?? ''}`}
+      </p>
+      <Badge kind={mode === 'activity' ? 'recorded' : 'calculated'} />
       {legendFor(mode).map((entry) => (
         <div
           key={entry.label}
@@ -514,13 +721,7 @@ function Legend({ mode }: { readonly mode: MapMode }) {
   );
 }
 
-function Zoom({
-  onZoom,
-  onPan,
-}: {
-  readonly onZoom: (by: number) => void;
-  readonly onPan: (dx: number, dy: number) => void;
-}) {
+function Zoom({ onZoom }: { readonly onZoom: (by: number) => void }) {
   const button = {
     width: 32,
     height: 32,
@@ -547,16 +748,7 @@ function Zoom({
       <button type="button" aria-label="Zoom out" style={button} onClick={() => { onZoom(1 / 1.5); }}>
         −
       </button>
-      <button
-        type="button"
-        aria-label="Pan north"
-        style={button}
-        onClick={() => {
-          onPan(0, 80);
-        }}
-      >
-        ↑
-      </button>
+
     </div>
   );
 }
