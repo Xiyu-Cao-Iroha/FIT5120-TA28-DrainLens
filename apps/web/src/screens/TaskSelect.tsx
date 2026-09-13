@@ -127,11 +127,11 @@ export interface TaskSelectProps {
  * out of the commit that removed them rather than written again: what the
  * screen offers should not have drifted while it was switched off.
  *
- * **This is not yet the way in AC 3.1.1 describes.** That one opens the
- * explorer from the map, and it needs the supported and unsupported locations
- * marked there first (3.1.1.a and 3.1.1.d), which is engine work. This is the
- * route that already runs end to end, restored first so the rest of Epic 3
- * can be walked in a browser while the rest of it is built.
+ * **It is one of two ways in.** AC 3.1.1 opens the explorer from the map, and
+ * since 13 September a drain's card on the full map offers the comparison
+ * where one can be calculated and says why not where it cannot
+ * (`scenario-from-map` in session.ts). This route, by address, came back
+ * first because it already ran end to end.
  */
 export const GUIDED: readonly {
   readonly task: Task;

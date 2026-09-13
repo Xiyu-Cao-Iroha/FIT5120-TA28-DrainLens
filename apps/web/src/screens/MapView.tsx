@@ -19,6 +19,13 @@
  * selected.
  */
 
+import {
+  COMPARE_HERE,
+  type PitSupport,
+  type ScenarioSupport,
+  UNSUPPORTED_TEXT,
+  supportOf,
+} from '../scenario/support.js';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
@@ -170,6 +177,15 @@ export interface MapViewProps {
    * voice on the same sentence.
    */
   readonly legend?: boolean | undefined;
+  /**
+   * Which drains a comparison can be calculated for, once known.
+   *
+   * With `onCompare`, a pit's card offers the comparison on a drain that
+   * supports one and says why not on one that does not (AC 3.1.1). Absent, the
+   * card is as it was: the guide and the side-by-side map have no comparison.
+   */
+  readonly scenarioSupport?: ScenarioSupport | null | undefined;
+  readonly onCompare?: ((pitId: string) => void) | undefined;
 }
 
 export function MapView({
@@ -192,6 +208,8 @@ export function MapView({
   openAcrossM,
   locked = false,
   legend = true,
+  scenarioSupport = null,
+  onCompare,
 }: MapViewProps) {
   // Also decides whether the map offers a next step, which only a guided task
   // has. Arriving from a homepage mode card is `full-map`: a mode is a view,
@@ -545,6 +563,14 @@ export function MapView({
           }}
         >
           {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
+          {onCompare !== undefined && scenarioSupport !== null && (
+            <CompareEntry
+              support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
+              onCompare={() => {
+                onCompare(String(hit.feature.asset_number ?? ''));
+              }}
+            />
+          )}
         </MapCallout>
       )}
 
@@ -815,3 +841,40 @@ function Badge({ basis }: { readonly basis: string }) {
 
 /** Re-exported so the scenario screens keep the visibility they always had. */
 export const EVERYTHING = visibilityOf(ALL_ON);
+
+/**
+ * The way into the comparison from a drain on the map, or why there is none.
+ *
+ * AC 3.1.1 asks for the explorer to open from the local drainage map. On a
+ * drain that cannot be compared the card says why instead of offering a button
+ * that is bound to fail — and says, every time, that this is a limit of the
+ * calculation and not a finding about the drain (3.1.1.e).
+ */
+function CompareEntry({ support, onCompare }: { readonly support: PitSupport; readonly onCompare: () => void }) {
+  if (support === 'supported') {
+    return (
+      <button
+        type="button"
+        onClick={onCompare}
+        style={{
+          display: 'block',
+          width: '100%',
+          marginTop: 10,
+          padding: '9px 12px',
+          fontWeight: 600,
+          color: '#ffffff',
+          background: '#0f8b8d',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          font: 'inherit',
+        }}
+      >
+        {COMPARE_HERE} →
+      </button>
+    );
+  }
+  return (
+    <p style={{ margin: '10px 0 0', fontSize: 12, color: '#5b6e7e' }}>{UNSUPPORTED_TEXT[support]}</p>
+  );
+}

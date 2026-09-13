@@ -259,6 +259,28 @@ describe('selection', () => {
     expect(Math.max(...radii(chosen))).toBeGreaterThan(Math.max(...radii(plain)));
   });
 
+  it('rings the drains a comparison can use, and only those', () => {
+    // AC 3.1.1.a: marked before anybody chooses. A ring, not a fill, so the
+    // recorded pit underneath still reads as the council's.
+    const two = artefact({
+      pit: [
+        { g: 'point', c: [450, 500], asset_number: 111 },
+        { g: 'point', c: [550, 500], asset_number: 222 },
+      ],
+    });
+    const context = recorder();
+    const at = view();
+    drawMap(context, two, at, { comparablePits: new Set(['222']) });
+    const arcsAt = (east: number) => {
+      const [x] = toScreen(at, [east, 500]);
+      return context.calls.filter((call) => call.op === 'arc' && Math.abs((call.args[0] as number) - x) < 0.01);
+    };
+    expect(arcsAt(450)).toHaveLength(1);
+    expect(arcsAt(550)).toHaveLength(2);
+    const [dot, ring] = arcsAt(550).map((call) => call.args[2] as number);
+    expect(ring).toBeGreaterThan(dot!);
+  });
+
   it('leaves the others alone', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { selectedPit: 999999 });
