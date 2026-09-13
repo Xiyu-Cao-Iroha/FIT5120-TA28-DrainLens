@@ -47,6 +47,15 @@ import {
   notAPrediction,
   severityEvidence,
 } from '../history/evidence.js';
+import {
+  EVENTS_UNAVAILABLE,
+  type FloodEvent,
+  NOT_COMPLETE,
+  againstRecord,
+  eventDate,
+  eventsFor,
+  noEventsText,
+} from '../history/events.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
 import {
   brand,
@@ -79,10 +88,12 @@ export interface FloodMapProps {
   readonly scope: ScopeAreas;
   readonly population: PopulationArtefact;
   readonly points: PointsArtefact;
+  /** Checked events only, or null when the list could not be loaded. */
+  readonly events: readonly FloodEvent[] | null;
   readonly onBack: () => void;
 }
 
-export function FloodMap({ areas, scope, population, points, onBack }: FloodMapProps) {
+export function FloodMap({ areas, scope, population, points, events, onBack }: FloodMapProps) {
   const [mode, setMode] = useState<MapMode>('activity');
   const [selected, setSelected] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -330,6 +341,7 @@ export function FloodMap({ areas, scope, population, points, onBack }: FloodMapP
             population={population}
             scope={scope}
             areas={areas}
+            events={events}
           />
         )}
       </aside>
@@ -496,7 +508,9 @@ function Detail({
   population,
   scope,
   areas,
+  events,
 }: {
+  readonly events: readonly FloodEvent[] | null;
   readonly area: MapArea;
   readonly mode: MapMode;
   readonly years: readonly string[];
@@ -619,23 +633,78 @@ function Detail({
         </p>
       </Section>
 
-      <Section title="Recorded events">
+      <Section title="Verified flood events">
         <Badge kind="written" />
-        {/*
-          The empty state first, and it is not a placeholder. Verified events
-          are written by hand from named sources, so almost every one of the
-          281 areas will have none — this is what the section says most of the
-          time, and a section that only looks right when it is full would be
-          wrong on nearly every area.
-        */}
-        <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
-          No verified events have been recorded for {area.name}. That means nobody has written one
-          up from a named source — not that nothing happened here. The dispatch counts above are
-          the record.
-        </p>
+        <Events area={area} events={events} period={scope.reportingPeriod} />
       </Section>
       <Evidence mode={mode} scope={scope} population={population} areas={areas} />
     </div>
+  );
+}
+
+/**
+ * AC 4.2.1 to 4.2.3 for one area.
+ *
+ * The empty state is written first and is not a placeholder: events are
+ * written by hand and checked by a second person, so almost every one of the
+ * 281 areas has none, and this is what the section says most of the time.
+ */
+function Events({
+  area,
+  events,
+  period,
+}: {
+  readonly area: MapArea;
+  readonly events: readonly FloodEvent[] | null;
+  readonly period: { readonly start: string; readonly end: string };
+}) {
+  const note = { margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted };
+  if (events === null) return <p style={note}>{EVENTS_UNAVAILABLE}</p>;
+  const here = eventsFor(events, area.code);
+  if (here.length === 0) return <p style={note}>{noEventsText(area.name)}</p>;
+  return (
+    <>
+      {here.map((event) => (
+        <article
+          key={event.id}
+          style={{
+            margin: `0 0 ${String(space(3))}px`,
+            padding: space(3),
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            background: surface.raised,
+          }}
+        >
+          <h4 style={{ margin: 0, font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+            {event.name}
+          </h4>
+          <p style={{ margin: `${String(space(1))}px 0 ${String(space(2))}px`, font: type(text.micro), color: ink.subtle }}>
+            <time dateTime={event.date}>{eventDate(event.date)}</time> · {event.places.join(', ')}
+          </p>
+          <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
+            {event.summary}
+          </p>
+          <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
+            {againstRecord(event, period)} Areas: {event.areas.map((a) => a.name).join(', ')}.
+          </p>
+          <ul style={{ margin: `0 0 ${String(space(2))}px`, paddingLeft: space(4), font: type(text.micro, { leading: 1.6 }) }}>
+            {event.sources.map((source) => (
+              <li key={source.url}>
+                <a href={source.url} target="_blank" rel="noopener noreferrer" style={{ color: brand.base }}>
+                  {source.title}
+                </a>{' '}
+                <span style={{ color: ink.subtle }}>— {source.publisher}</span>
+              </li>
+            ))}
+          </ul>
+          <p style={{ margin: 0, font: type(text.micro), color: ink.subtle }}>
+            Written by the DrainLens team; checked against these sources by {event.checkedBy} on{' '}
+            {event.checkedOn === null ? '' : eventDate(event.checkedOn)}.
+          </p>
+        </article>
+      ))}
+      <p style={note}>{NOT_COMPLETE}</p>
+    </>
   );
 }
 

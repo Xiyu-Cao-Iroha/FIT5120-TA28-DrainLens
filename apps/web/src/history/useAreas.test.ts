@@ -1,5 +1,5 @@
 /**
- * Fetching the map's three artefacts, without React.
+ * Fetching the map's artefacts, without React.
  *
  * `loadAreas` is exported and the hook around it is four lines, for the same
  * reason `positionsFor` and `resultOf` were pulled out of `useScenario`: the
@@ -49,6 +49,12 @@ const artefacts: Record<string, unknown> = {
     extent: { name: 'greater-melbourne', min_e: 1, min_n: 1, width_m: 1000, height_m: 1000 },
     areas: [{ code: '206011105', name: 'Brunswick', e: 100, n: 200 }],
   },
+  '/data/flood-events.json': {
+    artefact: 'flood-events',
+    note: 'Not a complete record.',
+    process: 'Checked by a second person.',
+    events: [],
+  },
 };
 
 const from = (over: Record<string, unknown> = {}) => {
@@ -61,11 +67,12 @@ const from = (over: Record<string, unknown> = {}) => {
 };
 
 describe('loading the map’s artefacts', () => {
-  it('reads all three and joins them', async () => {
+  it('reads all four and joins them', async () => {
     const { asked, get } = from();
     const data = await loadAreas(get);
 
     expect(asked.sort()).toEqual([
+      '/data/flood-events.json',
       '/data/population.json',
       '/data/sa2-areas.json',
       '/data/sa2-points.json',
@@ -73,6 +80,18 @@ describe('loading the map’s artefacts', () => {
     expect(data.areas).toHaveLength(1);
     expect(data.areas[0]!.rate).toBeCloseTo(1, 6);
     expect(data.areas[0]!.regions).toBe(50);
+    expect(data.events).toEqual([]);
+  });
+
+  it('keeps the map when the events file is wrong, and says the events are unknown rather than none', async () => {
+    const broken = from({ '/data/flood-events.json': { artefact: 'something-else' } });
+    expect((await loadAreas(broken.get)).events).toBeNull();
+
+    const missing = from();
+    const get = (url: string) => (url.endsWith('flood-events.json') ? Promise.reject(new Error('404')) : missing.get(url));
+    const data = await loadAreas(get);
+    expect(data.areas).toHaveLength(1);
+    expect(data.events).toBeNull();
   });
 
   it('refuses a wrong artefact rather than drawing whatever arrived', async () => {
