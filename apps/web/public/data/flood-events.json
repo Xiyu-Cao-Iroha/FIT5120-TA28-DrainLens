@@ -1,0 +1,130 @@
+{
+  "artefact": "flood-events",
+  "version": 1,
+  "note": "A short list of flood events in Greater Melbourne, each written by the DrainLens team from the sources linked under it. It is not a complete record of historical flooding, and an area with no event here is not an area that has never flooded.",
+  "process": "An event is drafted from at least two sources, and every sentence in its summary must be stated on one of them. It is shown on the site only after a team member has opened every source and confirmed every sentence, the places and the areas; that person's name and the date go in checkedBy and checkedOn. Until both are filled in, the event is kept in this file and not shown.",
+  "events": [
+    {
+      "id": "melbourne-storm-2010-03",
+      "name": "Melbourne storm and flash flooding, March 2010",
+      "date": "2010-03-06",
+      "places": ["Melbourne CBD", "Southern Cross Station", "Arts Centre", "Etihad Stadium"],
+      "areas": [
+        { "code": "206041122", "name": "Melbourne" },
+        { "code": "206041126", "name": "Southbank" },
+        { "code": "206041118", "name": "Docklands" }
+      ],
+      "summary": "A severe storm with large hail crossed Melbourne on 6 March 2010. Flash flooding was widespread across the city, and streets across the CBD flooded. Hail and water came through the roof of Southern Cross Station onto a platform, and the Arts Centre and Etihad Stadium were damaged. The Victoria State Emergency Service received more than 7,500 calls for help.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, 2010",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-2010/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Massive hailstones pound Melbourne",
+          "publisher": "ABC News",
+          "url": "https://www.abc.net.au/news/2010-03-07/massive-hailstones-pound-melbourne/352744",
+          "accessed": "2026-09-13"
+        }
+      ],
+      "draftedOn": "2026-09-13",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "melbourne-storms-2011-02",
+      "name": "Victorian storms, February 2011",
+      "date": "2011-02-04",
+      "places": ["Oakleigh", "Narre Warren", "Chelsea"],
+      "areas": [
+        { "code": "212051326", "name": "Oakleigh - Huntingdale" },
+        { "code": "212021298", "name": "Narre Warren" },
+        { "code": "208031186", "name": "Chelsea - Bonbeach" }
+      ],
+      "summary": "Storms on 4 February 2011 brought flash flooding to metropolitan Melbourne. Oakleigh, Narre Warren and Chelsea were among the Melbourne suburbs hardest hit, with up to 150 millimetres of rain. More than 6,000 calls for help were made across Victoria.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, February 2011",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-february-2011/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Victoria wakes to storm devastation",
+          "publisher": "ABC News",
+          "url": "https://www.abc.net.au/news/2011-02-05/victoria-wakes-to-storm-devastation/1930566",
+          "accessed": "2026-09-13"
+        }
+      ],
+      "draftedOn": "2026-09-13",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "melbourne-storm-2011-12",
+      "name": "Christmas Day storm, 2011",
+      "date": "2011-12-25",
+      "places": ["Eltham", "Broadmeadows", "Keilor"],
+      "areas": [
+        { "code": "209031209", "name": "Eltham" },
+        { "code": "210051242", "name": "Broadmeadows" },
+        { "code": "210011228", "name": "Keilor" }
+      ],
+      "summary": "Thunderstorms developed over Melbourne's western and northern suburbs at about 2.30 pm on Christmas Day 2011 and lasted up to seven hours, bringing hail and flash flooding. Eltham, Broadmeadows and Keilor were among the worst hit, and thousands of homes were damaged. The State Emergency Service received more than 4,200 requests for assistance, most of them for hail damage, wind damage and flash flooding.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, 2011",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-2011/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Melbourne mops up after wild Christmas storms",
+          "publisher": "ABC News",
+          "url": "https://www.abc.net.au/news/2011-12-26/melbourne-mops-up-after-wild-christmas-storms/3747086",
+          "accessed": "2026-09-13"
+        }
+      ],
+      "draftedOn": "2026-09-13",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "maribyrnong-river-flood-2022-10",
+      "name": "Maribyrnong River flood, October 2022",
+      "date": "2022-10",
+      "places": ["Maribyrnong township", "Kensington Banks", "Ascot Chase"],
+      "areas": [
+        { "code": "213031349", "name": "Maribyrnong" },
+        { "code": "206041121", "name": "Kensington" },
+        { "code": "206031113", "name": "Ascot Vale" }
+      ],
+      "summary": "The Maribyrnong River flooded in October 2022, affecting more than 500 homes and businesses near the river, including in Maribyrnong township, Kensington Banks and Ascot Chase. Melbourne Water appointed an independent panel led by Tony Pagone to review the flood, and accepted all 15 of its recommendations. The panel's final report, released on 3 May 2024, found that the Flemington Racecourse flood wall increased flood depth by 0.8 to 3 centimetres at about 240 properties.",
+      "sources": [
+        {
+          "title": "Maribyrnong River flood",
+          "publisher": "Melbourne Water",
+          "url": "https://www.melbournewater.com.au/water-and-environment/flooding-and-drainage/maribyrnong-river-flood",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Maribyrnong flood independent review panel issues final report",
+          "publisher": "Melbourne Water",
+          "url": "https://www.melbournewater.com.au/about/publications/news/maribyrnong-flood-independent-review-panel-issues-final-report",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Maribyrnong River flood inquiry report",
+          "publisher": "ABC News",
+          "url": "https://www.abc.net.au/news/2023-10-06/maribyrnong-river-flood-inquiry-report-melbourne-water/102943164",
+          "accessed": "2026-09-13"
+        }
+      ],
+      "draftedOn": "2026-09-13",
+      "checkedBy": null,
+      "checkedOn": null
+    }
+  ]
+}

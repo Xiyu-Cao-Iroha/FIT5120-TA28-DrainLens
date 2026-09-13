@@ -1,7 +1,7 @@
 /**
  * The flood map's artefacts, loaded when the map is opened and not before.
  *
- * Three files, 83 KB between them, for a screen most visits never reach. That
+ * Four files, 90 KB between them, for a screen most visits never reach. That
  * is small beside the scenario scene's five megabytes, and it is the same
  * argument: the homepage should not pay for a page nobody asked for. `scene/`
  * was moved behind its own screen for exactly this reason, and adding 83 KB to
@@ -26,12 +26,19 @@ import {
   assertScopeAreas,
   joinAreas,
 } from './severity.js';
+import { type FloodEvent, assertEvents, verifiedEvents } from './events.js';
 
 export interface AreaData {
   readonly areas: readonly MapArea[];
   readonly scope: ScopeAreas;
   readonly population: PopulationArtefact;
   readonly points: PointsArtefact;
+  /**
+   * The checked events, or null when the list could not be loaded. Null is not
+   * an empty list: an empty list says no verified event exists for an area,
+   * and a failed load does not know that.
+   */
+  readonly events: readonly FloodEvent[] | null;
 }
 
 export interface AreaLoad {
@@ -44,17 +51,26 @@ export interface AreaLoad {
 export async function loadAreas(
   get: (url: string) => Promise<unknown> = async (url) => (await fetch(url)).json(),
 ): Promise<AreaData> {
-  const [scope, population, points] = await Promise.all([
+  const [scope, population, points, events] = await Promise.all([
     get('/data/sa2-areas.json'),
     get('/data/population.json'),
     get('/data/sa2-points.json'),
+    // The events are editorial and the map does not depend on them, so a bad
+    // events file costs the events section and nothing else.
+    get('/data/flood-events.json').then(
+      (value) => {
+        assertEvents(value);
+        return verifiedEvents(value);
+      },
+      () => null,
+    ).catch(() => null),
   ]);
   assertScopeAreas(scope);
   assertPopulation(population);
   assertPoints(points);
   // The join refuses rather than dropping: an area missing from the map is
   // indistinguishable from an area with nothing recorded in it.
-  return { areas: joinAreas(scope, population, points), scope, population, points };
+  return { areas: joinAreas(scope, population, points), scope, population, points, events };
 }
 
 export function useAreas(enabled: boolean): AreaLoad {

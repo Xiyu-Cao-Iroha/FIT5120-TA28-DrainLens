@@ -81,6 +81,12 @@ jobs:
       - name: Check the scenario tile pack against its index and the council map
         run: node tools/data/check-scene-tiles.mjs
 
+      # The verified events are written by hand, so nothing rebuilds them and
+      # nothing else notices an event tied to an area the map does not have —
+      # that event is shown nowhere, silently.
+      - name: Check the verified flood events against the map's areas
+        run: node tools/data/check-events.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage

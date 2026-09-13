@@ -366,6 +366,7 @@ export function App() {
               scope={areas.data.scope}
               population={areas.data.population}
               points={areas.data.points}
+              events={areas.data.events}
               onBack={back}
             />
           )}
