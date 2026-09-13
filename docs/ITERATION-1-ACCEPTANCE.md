@@ -468,7 +468,7 @@ Comments in `apps/web/src/scenario/`, `screens/ScenarioSetup.tsx`, `screens/Resu
 
 ## Definition of done
 
-From *Iteration 1 Requirements*. The revised criteria document does not restate these, and they still govern.
+From the current Iteration 1 requirements. These checks govern delivery but do not add interaction outcomes to the acceptance criteria above.
 
 ### Epic 1 — Interactive local drainage and water flow
 
