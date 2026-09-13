@@ -155,6 +155,12 @@ describe('zooming', () => {
     expect(zoomAt(view, 1000, [400, 400], KENSINGTON).scale).toBe(MAX_SCALE);
   });
 
+  it('stops sooner when a map says its own detail runs out sooner', () => {
+    // The flood map's boundaries are simplified to 25 m; it passes its own cap.
+    const view = { ...square(), scale: 0.01 };
+    expect(zoomAt(view, 1000, [400, 400], KENSINGTON, 0.001, 0.05).scale).toBe(0.05);
+  });
+
   it('refuses a factor that is not positive', () => {
     expect(() => zoomAt(square(), 0, [0, 0], KENSINGTON)).toThrow(ViewportError);
     expect(() => zoomAt(square(), -2, [0, 0], KENSINGTON)).toThrow(/positive/);

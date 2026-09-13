@@ -187,12 +187,14 @@ export function zoomAt(
    * screen, and there is no gesture that brings it back.
    */
   minScale = scaleToCover(viewport.widthPx, viewport.heightPx, bounds),
+  /** How far in is far enough. The flood map's data stops being true long before the drainage map's does. */
+  maxScale = MAX_SCALE,
 ): Viewport {
   if (!(factor > 0)) throw new ViewportError('a zoom factor must be positive');
 
   const held = toLocal(viewport, anchor);
   const floor = minScale;
-  const scale = Math.min(Math.max(viewport.scale * factor, floor), MAX_SCALE);
+  const scale = Math.min(Math.max(viewport.scale * factor, floor), maxScale);
 
   const zoomed: Viewport = { ...viewport, scale };
   const movedTo = toLocal(zoomed, anchor);

@@ -31,6 +31,7 @@ import {
   breaksFor,
   completenessOf,
   completenessText,
+  decodeRing,
   joinAreas,
   scoreLabel,
   totalLabel,
@@ -79,6 +80,7 @@ const points = (count: number): PointsArtefact => ({
     name: `Area ${String(index)}`,
     e: 100 * index,
     n: 200 * index,
+    rings: [[0, 0, 100, 0, 0, 100, -100, 0]],
   })),
 });
 
@@ -295,6 +297,19 @@ describe('refusing artefacts the map cannot draw', () => {
     expect(() => {
       assertPoints({ ...p, areas: [{ ...p.areas[0]!, e: 999_999 }] });
     }).toThrow(/outside its own extent/);
+  });
+
+  it('refuses an area with no boundary, and decodes one that has', () => {
+    const p = points(1);
+    expect(() => {
+      assertPoints({ ...p, areas: [{ ...p.areas[0]!, rings: [] }] });
+    }).toThrow(/no boundary to draw/);
+    expect(() => {
+      assertPoints({ ...p, areas: [{ ...p.areas[0]!, rings: [[0, 0, 1]] }] });
+    }).toThrow(/no boundary to draw/);
+    expect([...decodeRing([10, 20, 5, 0, 0, 5, -5, 0])]).toEqual([10, 20, 15, 20, 15, 25, 10, 25]);
+    const [joinedArea] = joinAreas(scope({}), population([1000, 1000]), p);
+    expect([...joinedArea!.rings[0]!]).toEqual([0, 0, 100, 0, 100, 100, 0, 100]);
   });
 
   it('refuses artefacts that are something else entirely', () => {

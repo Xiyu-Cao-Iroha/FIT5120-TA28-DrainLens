@@ -67,7 +67,32 @@ export interface PointsArtefact {
     readonly width_m: number;
     readonly height_m: number;
   };
-  readonly areas: readonly { readonly code: string; readonly name: string; readonly e: number; readonly n: number }[];
+  readonly areas: readonly {
+    readonly code: string;
+    readonly name: string;
+    readonly e: number;
+    readonly n: number;
+    /**
+     * The boundary, one flat list per part: the first vertex in whole metres,
+     * then each vertex as the step from the one before. `decodeRing` adds
+     * them back up.
+     */
+    readonly rings: readonly (readonly number[])[];
+  }[];
+}
+
+/** A ring as published — first vertex, then steps — back into local metres. */
+export function decodeRing(flat: readonly number[]): Float64Array {
+  const out = new Float64Array(flat.length);
+  let e = 0;
+  let n = 0;
+  for (let index = 0; index < flat.length; index += 2) {
+    e = index === 0 ? flat[0]! : e + flat[index]!;
+    n = index === 0 ? flat[1]! : n + flat[index + 1]!;
+    out[index] = e;
+    out[index + 1] = n;
+  }
+  return out;
 }
 
 export function assertScopeAreas(value: unknown): asserts value is ScopeAreas {
@@ -164,6 +189,18 @@ export function assertPoints(value: unknown): asserts value is PointsArtefact {
     if (area.e < 0 || area.n < 0 || area.e > extent.width_m || area.n > extent.height_m) {
       fail(`places ${area.name} outside its own extent`);
     }
+    // A shape is what the map draws and what a click lands on. An area without
+    // one is on the list and nowhere on the map, which reads as an area with
+    // nothing recorded in it.
+    if (
+      !Array.isArray(area.rings) ||
+      area.rings.length === 0 ||
+      !area.rings.every(
+        (ring: unknown) => Array.isArray(ring) && ring.length >= 6 && ring.length % 2 === 0 && ring.every(Number.isFinite),
+      )
+    ) {
+      fail(`has no boundary to draw ${area.name} with`);
+    }
   }
 }
 
@@ -199,8 +236,11 @@ export interface MapArea {
   readonly rate: number | null;
   /** Residents at each date the population artefact carries. */
   readonly personsByYear: readonly number[];
+  /** Where the area's name is written: a point inside it. */
   readonly e: number;
   readonly n: number;
+  /** The boundary in local metres, `e, n, e, n, …`, one array per part. */
+  readonly rings: readonly Float64Array[];
 }
 
 /**
@@ -240,6 +280,7 @@ export function joinAreas(
       personsByYear: series,
       e: point.e,
       n: point.n,
+      rings: point.rings.map(decodeRing),
     };
   });
 }

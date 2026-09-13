@@ -3,45 +3,57 @@
  *
  * The same reasoning as `map/drawMap.test.ts`: what goes wrong in drawing is
  * order and omission. Here there is a third thing, and it is the one worth
- * catching — **a mark that makes a claim the data does not**. An area with
+ * catching — **a shape that makes a claim the data does not**. An area with
  * nothing recorded painted in the palest band, a lower bound drawn as a value,
- * or a dash left set from the previous mark all render perfectly.
+ * or a dash left set from the previous area all render perfectly.
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
-  FLOOR_RING,
+  EMPTY_FILL,
+  FLOOR_HATCH,
+  GROUND,
+  HATCH_ON_DARK,
   NOTHING_RECORDED,
   NO_SCORE,
   RAMPS,
+  areaAt,
   drawAreas,
   fillFor,
+  inShape,
   legendFor,
-  markAt,
-  marksFor,
 } from './drawAreas.js';
 import { type MapArea, completenessOf } from './severity.js';
-import { type Bounds, fit } from '../map/viewport.js';
+import { type Bounds, fit, toScreen } from '../map/viewport.js';
 
-const MELBOURNE: Bounds = { widthM: 109_000, heightM: 116_000 };
+const MELBOURNE: Bounds = { widthM: 138_000, heightM: 148_000 };
 const viewport = fit(800, 600, MELBOURNE);
 
-const area = (over: Partial<MapArea> = {}): MapArea => ({
-  code: '206011105',
-  name: 'Brunswick',
-  total: 24,
-  byYear: [24],
-  complete: true,
-  suppressedRegions: 0,
-  persons: 24_000,
-  rate: 1,
-  regions: 46,
-  personsByYear: [24_000],
-  e: 50_000,
-  n: 50_000,
-  ...over,
-});
+/** A square `half` metres either side of a point, as local metres. */
+const square = (e: number, n: number, half = 5_000) =>
+  Float64Array.from([e - half, n - half, e + half, n - half, e + half, n + half, e - half, n + half]);
+
+const area = (over: Partial<MapArea> = {}): MapArea => {
+  const e = over.e ?? 69_000;
+  const n = over.n ?? 74_000;
+  return {
+    code: '206011105',
+    name: 'Brunswick',
+    total: 24,
+    byYear: [24],
+    complete: true,
+    suppressedRegions: 0,
+    persons: 24_000,
+    rate: 1,
+    regions: 46,
+    personsByYear: [24_000],
+    e,
+    n,
+    rings: [square(e, n)],
+    ...over,
+  };
+};
 
 interface Call {
   readonly op: string;
@@ -49,15 +61,26 @@ interface Call {
   readonly fill: string;
   readonly stroke: string;
   readonly dash: readonly number[];
+  readonly width: number;
 }
 
 function recorder() {
   const calls: Call[] = [];
-  const state = { fillStyle: '', strokeStyle: '', dash: [] as readonly number[] };
+  const state = { fillStyle: '', strokeStyle: '', dash: [] as readonly number[], lineWidth: 0 };
+  const push = (op: string, args: readonly unknown[]) => {
+    calls.push({
+      op,
+      args,
+      fill: state.fillStyle,
+      stroke: state.strokeStyle,
+      dash: state.dash,
+      width: state.lineWidth,
+    });
+  };
   const note =
     (op: string) =>
     (...args: unknown[]) => {
-      calls.push({ op, args, fill: state.fillStyle, stroke: state.strokeStyle, dash: state.dash });
+      push(op, args);
     };
 
   const context = {
@@ -74,21 +97,33 @@ function recorder() {
     set strokeStyle(value: string) {
       state.strokeStyle = value;
     },
-    lineWidth: 0,
+    get lineWidth() {
+      return state.lineWidth;
+    },
+    set lineWidth(value: number) {
+      state.lineWidth = value;
+    },
+    lineJoin: 'round' as CanvasLineJoin,
     font: '',
     textAlign: 'center' as CanvasTextAlign,
-    textBaseline: 'bottom' as CanvasTextBaseline,
+    textBaseline: 'middle' as CanvasTextBaseline,
     clearRect: note('clearRect'),
+    fillRect: note('fillRect'),
     beginPath: note('beginPath'),
-    arc: note('arc'),
+    moveTo: note('moveTo'),
+    lineTo: note('lineTo'),
+    closePath: note('closePath'),
     fill: note('fill'),
     stroke: note('stroke'),
+    save: note('save'),
+    restore: note('restore'),
+    clip: note('clip'),
     setLineDash: (dash: readonly number[]) => {
       state.dash = dash;
-      calls.push({ op: 'setLineDash', args: [dash], fill: state.fillStyle, stroke: state.strokeStyle, dash });
+      push('setLineDash', [dash]);
     },
     fillText: note('fillText'),
-    measureText: () => ({ width: 40 }) as TextMetrics,
+    strokeText: note('strokeText'),
   };
   return context;
 }
@@ -96,7 +131,7 @@ function recorder() {
 const draw = (areas: readonly MapArea[], mode: 'activity' | 'severity', selected: string | null = null) => {
   const context = recorder();
   drawAreas(context as never, {
-    marks: marksFor(areas, mode, viewport, selected),
+    areas,
     mode,
     stateOf: (a) => completenessOf(a, mode),
     selected,
@@ -107,93 +142,98 @@ const draw = (areas: readonly MapArea[], mode: 'activity' | 'severity', selected
   return context.calls;
 };
 
-describe('what a mark says', () => {
-  it('fills an area that has a value, in its band', () => {
+const fills = (calls: readonly Call[]) => calls.filter((c) => c.op === 'fill');
+
+describe('what an area says', () => {
+  it('paints the ground first, then fills an area that has a value in its band', () => {
     const calls = draw([area({ total: 24 })], 'activity');
-    const fills = calls.filter((c) => c.op === 'fill');
-    expect(fills).toHaveLength(1);
-    expect(fills[0]!.fill).toBe(RAMPS.activity[1]);
+    expect(calls.find((c) => c.op === 'fillRect')?.fill).toBe(GROUND);
+    expect(fills(calls)).toHaveLength(1);
+    expect(fills(calls)[0]!.fill).toBe(RAMPS.activity[1]);
+    // Even-odd, so a ring inside a ring is a hole.
+    expect(fills(calls)[0]!.args).toEqual(['evenodd']);
   });
 
-  it('does not fill an area with no recorded activity', () => {
+  it('does not colour an area with no recorded activity, and outlines it grey', () => {
     /*
       The distinction the whole map turns on. A zero in the palest band says
-      the SES went there rarely; they did not go. It is drawn as an outlined
-      ring with nothing in it.
+      the SES went there rarely; they did not go.
     */
     const calls = draw([area({ total: 0 })], 'activity');
-    expect(calls.filter((c) => c.op === 'fill')).toHaveLength(0);
-    expect(calls.find((c) => c.op === 'stroke')?.stroke).toBe(NOTHING_RECORDED);
+    expect(fills(calls)[0]!.fill).toBe(EMPTY_FILL);
+    expect(calls.some((c) => c.op === 'stroke' && c.stroke === NOTHING_RECORDED)).toBe(true);
   });
 
-  it('does not fill an area with no score, and dashes its ring', () => {
+  it('does not colour an area with no score, and dashes its outline', () => {
     const calls = draw([area({ rate: null, persons: null })], 'severity');
-    expect(calls.filter((c) => c.op === 'fill')).toHaveLength(0);
-    const stroke = calls.find((c) => c.op === 'stroke');
-    expect(stroke?.stroke).toBe(NO_SCORE);
-    expect(stroke?.dash).toEqual([3, 3]);
+    expect(fills(calls)[0]!.fill).toBe(EMPTY_FILL);
+    expect(calls.find((c) => c.op === 'stroke' && c.stroke === NO_SCORE)?.dash).toEqual([4, 3]);
   });
 
-  it('rings a floor, and rings it in the mark colour it is not', () => {
+  it('hatches a floor over its colour, inside its own shape', () => {
     // 80 of the 281 carry this, so it is the common qualification rather than
     // an edge case, and it has to survive being seen at a glance.
     const calls = draw([area({ complete: false, suppressedRegions: 2 })], 'activity');
-    const stroke = calls.find((c) => c.op === 'stroke');
-    expect(stroke?.stroke).toBe(FLOOR_RING);
-    expect(calls.filter((c) => c.op === 'fill')).toHaveLength(1);
+    expect(fills(calls)[0]!.fill).toBe(RAMPS.activity[1]);
+    const clip = calls.findIndex((c) => c.op === 'clip');
+    expect(clip).toBeGreaterThan(-1);
+    const after = calls.slice(clip);
+    expect(after.some((c) => c.op === 'stroke' && c.stroke.startsWith('rgba(30, 43, 54'))).toBe(true);
+    expect(after.some((c) => c.op === 'restore')).toBe(true);
+  });
+
+  it('hatches light over the dark bands, where a dark hatch would disappear', () => {
+    const calls = draw([area({ total: 120, complete: false, suppressedRegions: 1 })], 'activity');
+    expect(calls.some((c) => c.op === 'stroke' && c.stroke === HATCH_ON_DARK)).toBe(true);
   });
 
   it('clears a dash before every stroke, not only before a dashed one', () => {
     /*
-      A dash left set by the previous mark draws a solid ring dashed, which
-      says "no score" about an area that has one. The guard is one line and
-      this is the test that keeps it.
+      A dash left set by the previous area draws a solid edge dashed, which
+      says "no score" about an area that has one.
     */
     const calls = draw(
-      [area({ code: 'a', rate: null, persons: null, total: 0 }), area({ code: 'b', total: 24, e: 60_000 })],
+      [area({ code: 'a', rate: null, persons: null, total: 0 }), area({ code: 'b', total: 24, e: 90_000 })],
       'severity',
+      'b',
     );
-    const strokes = calls.filter((c) => c.op === 'stroke');
-    expect(strokes).toHaveLength(2);
-    expect(strokes.some((s) => s.dash.length > 0)).toBe(true);
-    expect(strokes.some((s) => s.dash.length === 0)).toBe(true);
+    const selection = calls.filter((c) => c.op === 'stroke' && c.stroke === FLOOR_HATCH);
+    expect(selection).toHaveLength(1);
+    expect(selection[0]!.dash).toEqual([]);
+  });
+
+  it('draws nothing for an area that is off the canvas', () => {
+    expect(fills(draw([area({ e: -50_000, n: -50_000 })], 'activity'))).toHaveLength(0);
   });
 });
 
-describe('order, which is the whole of the overlap rule', () => {
-  it('draws the busiest area last, so it is never hidden under a quiet one', () => {
-    // At the scale that fits 109 by 116 km into a pane, neighbours touch.
-    // Whichever is drawn last is the one a reader sees.
-    const marks = marksFor(
-      [area({ code: 'quiet', total: 2 }), area({ code: 'busy', total: 209 })],
+describe('the selected area', () => {
+  it('is outlined and named, and nothing else is named', () => {
+    const calls = draw(
+      [area({ code: 'a', name: 'Alpha' }), area({ code: 'b', name: 'Beta', e: 90_000 })],
       'activity',
-      viewport,
-      null,
+      'a',
     );
-    expect(marks.map((m) => m.area.code)).toEqual(['quiet', 'busy']);
+    expect(calls.filter((c) => c.op === 'fillText').map((c) => c.args[0])).toEqual(['Alpha']);
+    expect(calls.some((c) => c.op === 'stroke' && c.stroke === FLOOR_HATCH && c.width === 2.5)).toBe(true);
+    expect(draw([area()], 'activity').some((c) => c.op === 'fillText')).toBe(false);
+  });
+});
+
+describe('what a click lands on', () => {
+  it('finds the area whose shape holds the point, and nothing outside every area', () => {
+    const a = area({ code: 'a' });
+    const b = area({ code: 'b', e: 90_000 });
+    const [x, y] = toScreen(viewport, [90_000, 74_000]);
+    expect(areaAt([a, b], viewport, x, y)?.code).toBe('b');
+    expect(areaAt([a, b], viewport, 1, 1)).toBeNull();
   });
 
-  it('hit-tests from the top down, so a click selects what was pressed', () => {
-    const marks = marksFor(
-      [area({ code: 'under', total: 1 }), area({ code: 'over', total: 90 })],
-      'activity',
-      viewport,
-      null,
-    );
-    const [, top] = marks;
-    expect(markAt(marks, top!.x, top!.y)?.code).toBe('over');
-    expect(markAt(marks, 5, 5)).toBeNull();
-  });
-
-  it('draws the selected area larger, and labels only that one', () => {
-    const calls = draw([area({ code: 'a' }), area({ code: 'b', e: 60_000 })], 'activity', 'a');
-    const labels = calls.filter((c) => c.op === 'fillText');
-    // The fit scale for the whole extent is below the label threshold, so
-    // nothing is labelled; what is asserted here is that it is not *every*
-    // mark that gets one.
-    expect(labels.length).toBeLessThan(2);
-    const marks = marksFor([area({ code: 'a' })], 'activity', viewport, 'a');
-    expect(marks[0]!.r).toBeGreaterThan(marksFor([area({ code: 'a' })], 'activity', viewport, null)[0]!.r);
+  it('treats a ring inside a ring as a hole, as the fill does', () => {
+    const holed = area({ rings: [square(69_000, 74_000, 5_000), square(69_000, 74_000, 1_000)] });
+    expect(inShape(holed, 69_000, 74_000)).toBe(false);
+    expect(inShape(holed, 72_000, 74_000)).toBe(true);
+    expect(inShape(holed, 80_000, 74_000)).toBe(false);
   });
 });
 
@@ -215,20 +255,20 @@ describe('the legend', () => {
 
   it('carries the floor in both, because both can show one', () => {
     for (const mode of ['activity', 'severity'] as const) {
-      expect(legendFor(mode).some((e) => e.ringed)).toBe(true);
+      expect(legendFor(mode).some((e) => e.hatched)).toBe(true);
     }
   });
 
   it('has one band entry per break, and each carries its numbers', () => {
     // AC 4.1.2.d. A band named without its range is a judgement with the
     // workings hidden.
-    // Four bands, the floor ring, the withheld zero, and no recorded activity.
+    // Four bands, the hatched floor, the withheld zero, and no recorded activity.
     expect(legendFor('activity')).toHaveLength(4 + 3);
     // The two areas published as zero because everything in them was withheld
-    // draw as an unfilled floor ring, and had no legend entry for it.
+    // draw hatched over no colour, and had no legend entry for it.
     const withheldZero = legendFor('activity').find((e) => e.label.startsWith('0+'));
     expect(withheldZero?.fill).toBeNull();
-    expect(withheldZero?.ringed).toBe(true);
+    expect(withheldZero?.hatched).toBe(true);
     expect(fillFor(area({ total: 0, complete: false, suppressedRegions: 1 }), 'activity', 'minimum')).toBeNull();
     expect(legendFor('severity')).toHaveLength(3 + 2);
     for (const entry of legendFor('severity').slice(0, 3)) {

@@ -6,19 +6,25 @@ browser draws all of it with one affine transform and no map library; this
 keeps that true for Greater Melbourne rather than introducing a second way of
 placing things on a canvas.
 
-**A point per area rather than a boundary, which was a decision and not an
-omission.** Drawing the areas as marks at their centres avoids fetching,
-reprojecting and simplifying 281 polygons, and avoids shipping them to every
-visitor. What it costs is that a mark is not a shape: the colour belongs to the
-whole area and the map has to say so, because a soft mark reads as *worst here,
-fading outwards* and the data says nothing of the kind.
+**A point and a shape per area.** The first version published only a point
+and drew each area as a dot, which avoided shipping 281 polygons but left a map
+of Greater Melbourne with no map in it: dots floating on an empty ground, with
+nothing to say where Port Phillip Bay or the city is. The areas are now drawn as
+their own boundaries, and the point stays as where a name is written.
+
+**Simplified to 25 metres, and the map will not zoom past what that
+supports.** The Greater Melbourne boundaries are 182,991 vertices; at 25 m they
+are about 20,000, which is roughly 150 KB before compression. Each ring is
+simplified on its own, so two neighbours can disagree along a shared edge by up
+to twice the tolerance — invisible at the scales the flood map allows, and the
+reason it caps its zoom rather than borrowing the drainage map's.
 
 **The source is MapInfo Interchange rather than the shapefile.** MIF is text,
 it is 35 MB against 48, and parsing it needs nothing this project does not
 already have — a shapefile would have added a dependency to read a file we
 throw away after taking 281 points out of it. The polygons are not published:
-they stay in `/data`, which is git-ignored, so deciding later to draw real
-boundaries costs the work but not the download.
+they stay in `/data`, which is git-ignored; what is published is the
+simplified outline, in the same metre frame as everything else.
 
 **A centroid is not always inside its own area.** Two of the 281 — Abbotsford
 and Strathmore, both cut into a crescent by a river bend — have an area
@@ -54,6 +60,9 @@ CODE, NAME, GCCSA = 0, 2, 8
 #: point never sits exactly on an edge.
 EXTENT_ROUNDING_M = 1000
 
+#: How far a simplified boundary may stray from the published one.
+SIMPLIFY_M = 25.0
+
 
 class AreaPointsError(RuntimeError):
     """The boundaries do not support the positions they would be used for."""
@@ -67,6 +76,9 @@ class Placed:
     name: str
     easting: float
     northing: float
+    #: The boundary, in MGA zone 55 metres, simplified. Every part of it: an
+    #: area in two pieces is drawn in two pieces.
+    rings: tuple[tuple[tuple[float, float], ...], ...] = ()
 
 
 def read_attributes(text: str, *, scope: str = SCOPE) -> list[tuple[int, list[str]]]:
@@ -167,6 +179,62 @@ def inside(point: tuple[float, float], ring: Sequence[tuple[float, float]]) -> b
     return hit
 
 
+def simplify(ring: Sequence[tuple[float, float]], tolerance: float) -> list[tuple[float, float]]:
+    """Douglas-Peucker, iteratively, keeping both ends.
+
+    A closed ring's two ends are the same vertex, and the distance to a
+    zero-length chord is the distance to that vertex, so a closed ring
+    simplifies without being opened first.
+    """
+    count = len(ring)
+    if count < 3:
+        return list(ring)
+    keep = [False] * count
+    keep[0] = keep[-1] = True
+    stack = [(0, count - 1)]
+    while stack:
+        first, last = stack.pop()
+        if last <= first + 1:
+            continue
+        (x1, y1), (x2, y2) = ring[first], ring[last]
+        dx, dy = x2 - x1, y2 - y1
+        length = math.hypot(dx, dy)
+        worst, at = -1.0, first
+        for index in range(first + 1, last):
+            x, y = ring[index]
+            if length == 0:
+                distance = math.hypot(x - x1, y - y1)
+            else:
+                distance = abs(dx * (y - y1) - dy * (x - x1)) / length
+            if distance > worst:
+                worst, at = distance, index
+        if worst > tolerance:
+            keep[at] = True
+            stack.append((first, at))
+            stack.append((at, last))
+    return [point for point, kept in zip(ring, keep) if kept]
+
+
+def shape(
+    feature: Sequence[Sequence[tuple[float, float]]], tolerance: float = SIMPLIFY_M
+) -> tuple[tuple[tuple[float, float], ...], ...]:
+    """A feature's rings in metres, simplified, open, and without the specks.
+
+    A ring that simplifies to fewer than three distinct vertices encloses
+    nothing at this tolerance — a sliver of river bank or a rock — and is
+    dropped rather than drawn as a line.
+    """
+    rings = []
+    for ring in feature:
+        metres = [to_mga55(lat, lon) for lon, lat in ring]
+        simple = simplify(metres, tolerance)
+        if len(simple) > 1 and simple[0] == simple[-1]:
+            simple = simple[:-1]
+        if len(simple) >= 3:
+            rings.append(tuple(simple))
+    return tuple(rings)
+
+
 def point_on_surface(ring: Sequence[tuple[float, float]]) -> tuple[float, float]:
     """A point inside a ring whose centroid is not, near the middle of it.
 
@@ -226,7 +294,10 @@ def place(
                 "name and its colour in a different area"
             )
         easting, northing = to_mga55(point[1], point[0])
-        placed.append(Placed(parts[CODE], name, easting, northing))
+        rings = shape(feature)
+        if not rings:
+            raise AreaPointsError(f"{name!r} simplifies to nothing, so it cannot be drawn")
+        placed.append(Placed(parts[CODE], name, easting, northing, rings))
     return placed
 
 
@@ -240,20 +311,25 @@ def build(placed: Sequence[Placed], *, scope: str = SCOPE) -> dict:
     if not placed:
         raise AreaPointsError("no areas were placed")
 
-    min_e = math.floor(min(p.easting for p in placed) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
-    min_n = math.floor(min(p.northing for p in placed) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
-    width = math.ceil((max(p.easting for p in placed) - min_e) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
-    height = math.ceil((max(p.northing for p in placed) - min_n) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
+    # The extent holds every boundary, not only every point: an outer area's
+    # shape runs far past the point inside it, and a frame cut to the points
+    # would put its edge at a negative coordinate the map cannot pan to.
+    eastings = [p.easting for p in placed] + [e for p in placed for ring in p.rings for e, _ in ring]
+    northings = [p.northing for p in placed] + [n for p in placed for ring in p.rings for _, n in ring]
+    min_e = math.floor(min(eastings) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
+    min_n = math.floor(min(northings) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
+    width = math.ceil((max(eastings) - min_e) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
+    height = math.ceil((max(northings) - min_n) / EXTENT_ROUNDING_M) * EXTENT_ROUNDING_M
 
     return {
         "artefact": "sa2-points",
-        "version": 1,
+        "version": 2,
         "basis": "derived",
         "note": (
-            "One point per statistical area, inside the area it names, in metres east "
-            "and north of the extent's south-west corner. Calculated by DrainLens from "
-            "ABS boundaries; it is where an area is drawn, not where flooding was "
-            "recorded, and the value shown beside it belongs to the whole area."
+            "Each statistical area's boundary, simplified, and one point inside it where "
+            "its name is written, in metres east and north of the extent's south-west "
+            "corner. Calculated by DrainLens from ABS boundaries; the colour an area is "
+            "drawn in belongs to the whole area, not to any part of it."
         ),
         "source": dict(SOURCE),
         "scope": scope,
@@ -265,7 +341,15 @@ def build(placed: Sequence[Placed], *, scope: str = SCOPE) -> dict:
             "height_m": height,
             "crs": "EPSG:28355",
         },
-        "counts": {"areas": len(placed)},
+        "counts": {"areas": len(placed), "vertices": sum(len(r) for p in placed for r in p.rings)},
+        "rings": {
+            "simplified_m": SIMPLIFY_M,
+            "encoding": (
+                "Each ring is a flat list of whole metres: the first vertex as e, n, then "
+                "each following vertex as the difference from the one before. The ring "
+                "closes back to its first vertex."
+            ),
+        },
         "areas": [
             {
                 "code": p.code,
@@ -275,10 +359,29 @@ def build(placed: Sequence[Placed], *, scope: str = SCOPE) -> dict:
                 # per area claiming something the method does not support.
                 "e": round(p.easting - min_e),
                 "n": round(p.northing - min_n),
+                "rings": [encode(ring, min_e, min_n) for ring in p.rings],
             }
             for p in placed
         ],
     }
+
+
+def encode(ring: Sequence[tuple[float, float]], min_e: float, min_n: float) -> list[int]:
+    """Whole metres, each vertex as the step from the last.
+
+    Rounded before differencing, so the steps add back up to exactly the
+    rounded positions rather than drifting a metre per vertex.
+    """
+    flat: list[int] = []
+    last_e = last_n = 0
+    for index, (e, n) in enumerate(ring):
+        re, rn = round(e - min_e), round(n - min_n)
+        if index == 0:
+            flat += [re, rn]
+        else:
+            flat += [re - last_e, rn - last_n]
+        last_e, last_n = re, rn
+    return flat
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -314,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
     assert isinstance(extent, dict) and isinstance(counts, dict)
     print(f"wrote {args.out}  ({args.out.stat().st_size / 1024:.1f} KB)")
     print(f"  areas placed   {counts['areas']:>7,}")
+    print(f"  vertices       {counts['vertices']:>7,}")
     print(f"  extent         {extent['width_m'] / 1000:.0f} by {extent['height_m'] / 1000:.0f} km")
     return 0
 
