@@ -26,6 +26,7 @@ import {
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
+  groundUncertainty,
   presentationFor,
 } from './outcome.js';
 
@@ -223,10 +224,12 @@ describe('what is missing or uncertain', () => {
     expect(item?.body).toMatch(/assumption and not a measurement/i);
   });
 
-  it('gives the measured share of ground rather than a vague hedge', () => {
-    // A caveat with no number in it is decoration.
-    const item = WHAT_IS_UNCERTAIN.find((i) => /ground surface/i.test(i.title));
-    expect(item?.body).toContain('52.1%');
+  it('gives the measured share of ground in the window rather than a vague hedge', () => {
+    // A caveat with no number in it is decoration -- and a number from another
+    // place is worse. It said 52.1%, Kensington's, for every window.
+    expect(groundUncertainty(0.521).body).toContain('52.1% of the ground in this one-kilometre calculation window');
+    expect(groundUncertainty(0.3).body).toContain('30.0%');
+    expect(groundUncertainty(null).body).not.toMatch(/\d+(\.\d+)?%/);
   });
 
   it('rules out every underground claim AD6 forbids', () => {
@@ -321,8 +324,8 @@ describe('the Iteration 2 wording', () => {
   });
 
   it('calls the ground surface photogrammetric', () => {
-    const item = WHAT_IS_UNCERTAIN.find((i) => /ground surface/i.test(i.title));
-    expect(item?.body).toMatch(/photogrammetric/);
+    const item = groundUncertainty(0.5);
+    expect(item.body).toMatch(/photogrammetric/);
     expect([...LIMITATIONS, RAINFALL_EXPLAINED, HOW_STRONGLY_TO_READ_IT].join(' ').toLowerCase()).not.toContain('lidar');
   });
 });

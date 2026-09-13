@@ -75,6 +75,12 @@ jobs:
       - name: Check the council derived layers against the bundled copy
         run: node tools/data/check-derived.mjs
 
+      # The comparison fetches four tiles by name for whichever drain is
+      # chosen, so a missing tile is one street's comparison failing on the
+      # site while every other street works.
+      - name: Check the scenario tile pack against its index and the council map
+        run: node tools/data/check-scene-tiles.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage

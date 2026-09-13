@@ -6,12 +6,11 @@
  * comparison is running sees the answer to what they asked last rather than
  * whichever run happened to finish second.
  *
- * **It loads only where it is needed.** Starting the worker fetches the scene:
- * `scene.json` plus the elevation, flow, depression and coverage arrays, a bit
- * over five megabytes. That used to happen on every visit, including visits
- * that never left the homepage. With the comparison out of the Iteration 1
- * interface (AC 1.1.1) it would be five megabytes for a screen nobody can
- * reach, so the caller says when it is wanted and the worker starts then.
+ * **It loads only where it is needed.** Starting the worker fetches the tile
+ * index -- which drains support a scenario and where their windows are -- and
+ * each comparison then fetches the one-kilometre window around its drain,
+ * about 1.3 MB compressed. The caller says when the worker is wanted and it
+ * starts then, so a visit that never opens the comparison downloads none of it.
  *
  * The map's own ground surface is a separate, smaller read in `terrain.ts`,
  * and is unaffected by this.
@@ -26,7 +25,7 @@ import {
   isValidatedRainfall,
 } from '@drainlens/schema';
 
-import type { SceneDrain, SolvedPosition, WorkerReply, WorkerRequest } from './worker.js';
+import type { SolvedPosition, WorkerReply, WorkerRequest } from './worker.js';
 
 export type ScenarioResult =
   | {
@@ -36,25 +35,29 @@ export type ScenarioResult =
       readonly positions: readonly SolvedPosition[];
       /** Metres per grid cell, for sizing the difference layer on the map. */
       readonly cellSizeM: number;
+      /** The calculation window's south-west corner, in MGA metres. */
+      readonly origin: { readonly minE: number; readonly minN: number } | null;
+      /** Share of the window's ground that was measured, or null if unknown. */
+      readonly measuredShare: number | null;
     }
   | { readonly status: 'insufficient-information'; readonly reason: InsufficiencyReason };
 
 export interface ScenarioRunner {
   readonly ready: boolean;
   /**
-   * The drains the scene places, once it has loaded.
+   * Inlets a scenario can be calculated for, by asset number, once loaded.
    *
-   * The single source for which pits a scenario can use and which cell each
-   * one occupies. Deriving either from the map artefact is what produced a
-   * suggestion the engine rejected for every pit in the extent.
+   * The single source for which pits the explorer offers. Deriving it from the
+   * map artefact is what produced a suggestion the engine rejected for every
+   * pit in the extent.
    */
-  readonly drains: readonly SceneDrain[];
-  /** The scene's south-west corner in MGA metres, once loaded. */
-  readonly origin: { readonly minE: number; readonly minN: number } | null;
+  readonly supported: ReadonlySet<string>;
+  /** Inlets with no measured ground around them: marked, and never offered. */
+  readonly withoutGround: ReadonlySet<string>;
   readonly running: boolean;
   readonly failure: string | null;
   readonly run: (
-    drainCell: number,
+    assetNumber: string,
     blockage: BlockageSetting,
     rainfallMm: number,
   ) => Promise<ScenarioResult>;
@@ -119,6 +122,8 @@ export function resultOf(reply: WorkerReply): ScenarioResult {
     band: reply.band,
     positions: reply.positions,
     cellSizeM: reply.cellSizeM,
+    origin: reply.origin ?? null,
+    measuredShare: reply.measuredShare ?? null,
   };
 }
 
@@ -127,8 +132,8 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
   const nextId = useRef(1);
   const pending = useRef(new Map<number, (reply: WorkerReply) => void>());
   const [ready, setReady] = useState(false);
-  const [drains, setDrains] = useState<readonly SceneDrain[]>([]);
-  const [origin, setOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
+  const [supported, setSupported] = useState<ReadonlySet<string>>(() => new Set());
+  const [withoutGround, setWithoutGround] = useState<ReadonlySet<string>>(() => new Set());
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -141,8 +146,8 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     worker.onmessage = (event: MessageEvent<WorkerReply>) => {
       const reply = event.data;
       if (reply.type === 'loaded') {
-        setDrains(reply.drains);
-        setOrigin(reply.origin);
+        setSupported(new Set(reply.supported));
+        setWithoutGround(new Set(reply.withoutGround));
         setReady(true);
         return;
       }
@@ -165,7 +170,7 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
   }, [base, enabled]);
 
   const run = useCallback(
-    (drainCell: number, blockage: BlockageSetting, rainfallMm: number) =>
+    (assetNumber: string, blockage: BlockageSetting, rainfallMm: number) =>
       new Promise<ScenarioResult>((resolve) => {
         const worker = workerRef.current;
         if (worker === null) {
@@ -192,9 +197,9 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
         });
 
         worker.postMessage({
-          type: 'run',
+          type: 'run-asset',
           id,
-          drainCell,
+          assetNumber,
           blockage,
           rainfallPositionsMm: positions,
         } satisfies WorkerRequest);
@@ -202,5 +207,5 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     [],
   );
 
-  return { ready, drains, origin, running, failure, run };
+  return { ready, supported, withoutGround, running, failure, run };
 }

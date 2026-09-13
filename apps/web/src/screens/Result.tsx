@@ -29,6 +29,7 @@ import {
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
+  groundUncertainty,
   presentationFor,
 } from '../scenario/outcome.js';
 import type { SolvedPosition } from '../scenario/worker.js';
@@ -42,6 +43,8 @@ export interface ResultProps {
   readonly positions?: readonly SolvedPosition[];
   /** Reads the cache above; never starts another solve. */
   readonly onRainfall?: (rainfallMm: number) => void;
+  /** Share of the calculation window's ground that was measured, or null. */
+  readonly measuredShare?: number | null;
   readonly onAction: (action: Action) => void;
 }
 
@@ -50,6 +53,7 @@ export function Result({
   scenario,
   positions = [],
   onRainfall,
+  measuredShare = null,
   onAction,
 }: ResultProps) {
   const shown = presentationFor(outcome);
@@ -215,7 +219,9 @@ export function Result({
         {uncertainOpen && (
           <>
             <ul style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 13, color: '#4d5f6e' }}>
-              {WHAT_IS_UNCERTAIN.map((item) => (
+              {WHAT_IS_UNCERTAIN.map((item) =>
+                /ground surface/i.test(item.title) ? groundUncertainty(measuredShare) : item,
+              ).map((item) => (
                 <li key={item.title} style={{ marginBottom: 8 }}>
                   <strong style={{ color: '#1e2b36' }}>{item.title}</strong>
                   <br />

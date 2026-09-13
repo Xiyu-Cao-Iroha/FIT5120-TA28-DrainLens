@@ -70,6 +70,13 @@ export interface LoadedScene {
   readonly coverage: Uint8Array;
   /** Metres below the rim, per cell. Absent only when the header has no such array. */
   readonly rimDepthM?: Float32Array;
+  /**
+   * The share of cells whose ground was measured rather than interpolated.
+   *
+   * Per window, because it varies across the council: the result screen said
+   * "52.1% of this area was measured" everywhere, and 52.1% is Kensington's.
+   */
+  readonly measuredShare?: number;
 }
 
 /** Expand a bitmask, most significant bit first, to one byte per cell. */

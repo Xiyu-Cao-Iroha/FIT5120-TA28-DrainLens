@@ -260,15 +260,30 @@ export const BASIS_COLOURS: Readonly<Record<Basis, { background: string; color: 
  * reasonable person would want to know before acting, and each is measured
  * rather than hedged — a caveat with no number in it is decoration.
  */
+/**
+ * The ground-surface limitation, with the measured share of *this* window.
+ *
+ * It said 52.1% for every comparison, which is Kensington's figure; across the
+ * council a window runs from mostly measured parkland to mostly interpolated
+ * towers. Null when the share is not known says so rather than borrowing one.
+ */
+export function groundUncertainty(measuredShare: number | null): { readonly title: string; readonly body: string } {
+  const how =
+    measuredShare === null
+      ? 'so part of this area was measured directly'
+      : `so ${(measuredShare * 100).toFixed(1)}% of the ground in this one-kilometre calculation window was measured directly`;
+  return {
+    title: 'The ground surface is derived from imagery, not survey',
+    body: `It is photogrammetric — calculated from overlapping aerial photographs rather than a laser or ground survey — ${how}, and the rest, under roofs and tree canopy, is interpolated from the nearest measured ground.`,
+  };
+}
+
 export const WHAT_IS_UNCERTAIN: readonly { readonly title: string; readonly body: string }[] = [
   {
     title: 'How much water a drain takes is assumed',
     body: 'The model assumes a clear drain captures 60% of the water reaching it. The council record does not describe inlet geometry or grate condition, so this figure is an assumption and not a measurement.',
   },
-  {
-    title: 'The ground surface is derived from imagery, not survey',
-    body: 'It is photogrammetric — calculated from overlapping aerial photographs rather than a laser or ground survey — so 52.1% of this area was measured directly and the rest, under roofs and tree canopy, is interpolated from the nearest measured ground.',
-  },
+  groundUncertainty(null),
   {
     title: 'The recorded drainage network has gaps',
     body: 'Some pipes stop without the record saying where they go. Those gaps are shown as gaps rather than joined up, so a path that ends may be the end of the record rather than the end of the drainage.',

@@ -373,6 +373,21 @@ What the data does and does not support — the reporting period, why Flood
 alone, why Greater Melbourne, and the four limitations the page has to carry
 — is in [FLOOD-HISTORY-DATA.md](../docs/FLOOD-HISTORY-DATA.md).
 
+## The scenario engine's terrain, council-wide — `scene_tiles`
+
+```bash
+python -m drainlens_pipeline.scene_tiles --terrain ../data/terrain-council --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/web/public/data/scene-tiles
+```
+
+12 minutes. **211 tiles, 64 MB, committed**, and every one of the council's 9,239 inlets has a window. The comparison used to run over Kensington's square kilometre and nowhere else; it now runs over the one-kilometre window around whichever drain is chosen, stitched in the browser from the four 500 m tiles that make it up (`apps/web/src/scenario/sceneTiles.ts`).
+
+- **One council-wide build, cut afterwards.** The flow field, the conditioned surface and the depressions come from the terrain run over the whole extent, so ground either side of a tile edge is the same ground in both tiles. The command refuses to write if the conditioned surface does not reproduce the terrain build's flow directions cell for cell.
+- **The window is where water stops being followed.** A flow direction pointing out of it becomes *leaves*, a spill outside it becomes *leaves*, and a hollow the window cuts is not a hollow in it — its capacity is the whole hollow's, and giving that to part of its cells would store water that is not there.
+- **The window is chosen so the drain sits in its middle quarter** where the four tiles exist: at least 250 m of ground on every side before water leaves.
+- **Pre-gzipped**, decompressed in the worker, and served by nginx as `application/gzip` so it is not compressed twice.
+
+The Kensington scene in `apps/web/public/data/scene/` stays, read only by the map's ground-surface shading.
+
 ## Built since this file was first written
 
 Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), an address index (`addresses`) with a fixture standing in for it, the recorded flood incidents (`flood_history`), and `reframe` — which moves an artefact from one extent's coordinate frame into another's, and is how the Kensington derived layers were placed on the council map.

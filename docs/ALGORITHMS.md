@@ -305,6 +305,35 @@ depth, the engine's mass-balance and monotonicity checks in force:
 | Checks refused a comparison | — | **none** — no *comparison not comparable*, no *calculation failed* |
 | Runs with any position higher than baseline | — | 5 runs, 3 inlets, 14 positions (the table above) |
 
+### Council-wide, since the scene tiles
+
+The comparison now runs over the one-kilometre window around the chosen drain,
+stitched from four 500 m tiles cut from the council-wide terrain build
+(`scene_tiles.py`, `sceneTiles.ts`). Validated the same way, 13 September:
+
+| | Inlets | Runs | Successful | Refused by the checks | Invalid inlet | Inlets with any position higher |
+|---|---:|---:|---:|---:|---:|---:|
+| Kensington, every inlet | 475 | 950 | 946 | **0** | 4 | 2 |
+| Council, seeded 3% sample | 322 | 644 | 628 | **0** | 16 | 2 |
+
+**Kensington through the tiles reproduces the Kensington scene.** Every status
+matches, and for inlets 1363588 and 1363621 every count of cells higher than
+baseline is identical to the table above. Inlet 1730246 no longer shows a
+difference: it sits near Kensington's edge, and its window is now the one with
+it in the middle, so the water around it is followed further before it leaves.
+
+**The invalid inlets are two drains snapped onto one cell.** Snapping moves a
+pit up to three metres onto the busiest flow cell; where a junction pit and an
+inlet land on the same cell, the engine finds the junction first. It is the
+same four Kensington runs as before the tiles, not something the tiles added.
+
+**One defect was caught by the mass-balance check on the way.** The engine
+indexes its depression stores by id, and council ids (past 21,000) reached a
+window of a few hundred depressions unrenumbered: 70% of the rain in the first
+window tried vanished into writes past the end of a typed array, and every
+comparison came back *not comparable*. The window now renumbers its hollows
+from zero, and `solvePosition` refuses ids that are not dense.
+
 Why these three amounts: all inside `RAINFALL_RANGE_MM` (0–120 mm), 20 and 60 mm
 are where the blockage sensitivity in DECISIONS-PENDING.md §1 was measured, and
 40 mm is the default with a step either side. A fourth level is a new

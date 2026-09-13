@@ -33,7 +33,7 @@ import { type DifferenceArea, intoMapFrame } from './map/difference.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
-import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
+import type { SolvedPosition } from './scenario/worker.js';
 import {
   INITIAL_SESSION,
   type Session,
@@ -190,7 +190,7 @@ export function App() {
   // Only the two comparison screens use it, and neither is reachable in the
   // Iteration 1 interface. See the note at the top of `useScenario`.
   const scenario = useScenario(
-    '/data/scene',
+    '/data/scene-tiles',
     session.screen === 'scenario' || session.screen === 'result',
   );
   // The flood map's three artefacts, 83 KB, fetched when the map is opened
@@ -203,6 +203,10 @@ export function App() {
   // Metres per grid cell, from the run that produced `positions`. Held beside
   // them so the two can never describe different grids.
   const [cellSizeM, setCellSizeM] = useState(1);
+  // The window the last successful run was calculated in, for placing its
+  // difference on whichever map is served.
+  const [windowOrigin, setWindowOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
+  const [measuredShare, setMeasuredShare] = useState<number | null>(null);
   // The scenario panel is 420px of a laptop screen. Reading a result means
   // looking at the map it is about, and a teammate reported not being able to.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -571,18 +575,9 @@ export function App() {
     case 'scenario':
     case 'result': {
       const startComparison = (): void => {
-        // The scene's own cell for this asset. Never recomputed
-        // from the map geometry: the pipeline snaps drains onto
-        // the flow field, so a cell worked out here disagrees with
-        // the scene for every drain in the extent.
-        const drain = scenario.drains.find(
-          (d) => d.assetNumber === session.scenario.pitId,
-        );
-        const cell = drain?.isInlet === true ? drain.cell : null;
-        if (cell === null || session.scenario.blockage === null) {
-          // A pit the scene does not place cannot carry a
-          // scenario, and that is an inlet problem rather than a
-          // crash.
+        const pitId = session.scenario.pitId;
+        const blockage = session.scenario.blockage;
+        if (pitId === null || blockage === null) {
           dispatch({ type: 'comparison-started' });
           dispatch({
             type: 'comparison-finished',
@@ -591,23 +586,27 @@ export function App() {
           return;
         }
 
+        // By asset number. The worker finds the drain's window and the cell
+        // the pipeline snapped it to; nothing here works a cell out from the
+        // map geometry, which is how every drain once came back invalid.
         dispatch({ type: 'comparison-started' });
-        void scenario
-          .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
-          .then((result) => {
-            // Cleared on failure: leaving the previous run's
-            // positions attached would let the control offer
-            // answers to a question nobody asked.
-            setPositions(result.status === 'successful' ? result.positions : []);
-            if (result.status === 'successful') setCellSizeM(result.cellSizeM);
-            dispatch({
-              type: 'comparison-finished',
-              outcome:
-                result.status === 'successful'
-                  ? { kind: 'comparison', band: result.band }
-                  : { kind: 'insufficient', reason: result.reason },
-            });
+        void scenario.run(pitId, blockage, session.scenario.rainfallMm).then((result) => {
+          // Cleared on failure: leaving the previous run's positions attached
+          // would let the control offer answers to a question nobody asked.
+          setPositions(result.status === 'successful' ? result.positions : []);
+          if (result.status === 'successful') {
+            setCellSizeM(result.cellSizeM);
+            setWindowOrigin(result.origin);
+            setMeasuredShare(result.measuredShare);
+          }
+          dispatch({
+            type: 'comparison-finished',
+            outcome:
+              result.status === 'successful'
+                ? { kind: 'comparison', band: result.band }
+                : { kind: 'insufficient', reason: result.reason },
           });
+        });
       };
 
       const onAction = (action: Action) => {
@@ -650,7 +649,7 @@ export function App() {
               cells: intoMapFrame(
                 positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)
                   ?.higherAreasM ?? [],
-                scenario.origin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
+                windowOrigin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
                 loaded.map.extent,
               ),
               cellSizeM,
@@ -699,6 +698,7 @@ export function App() {
                   }
                   scenario={session.scenario}
                   positions={positions}
+                  measuredShare={measuredShare}
                   onRainfall={(rainfallMm) => {
                     const solved = positions.find((p) => p.rainfallMm === rainfallMm);
                     if (solved === undefined) return;
@@ -716,7 +716,7 @@ export function App() {
                   scenario={session.scenario}
                   suggestedPitId={
                     session.scenario.pitId === null
-                      ? nearestInlet(loaded, session.address, scenario.drains)
+                      ? nearestInlet(loaded, session.address, scenario.supported)
                       : null
                   }
                   onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
@@ -761,12 +761,10 @@ export function App() {
                 session={session}
                 suggestedPitId={
                   session.scenario.pitId === null
-                    ? nearestInlet(loaded, session.address, scenario.drains)
+                    ? nearestInlet(loaded, session.address, scenario.supported)
                     : null
                 }
-                scenarioDrains={
-                  new Set(scenario.drains.filter((d) => d.isInlet).map((d) => d.assetNumber))
-                }
+                scenarioDrains={scenario.supported}
                 difference={differenceShown}
                 onPickPit={(pitId) =>
                   dispatch({ type: 'pit-selected', pitId, suggested: false })
@@ -1107,18 +1105,15 @@ function MapCanvasPane({
 function nearestInlet(
   loaded: Loaded,
   address: SupportedAddress | null,
-  drains: readonly SceneDrain[],
+  usable: ReadonlySet<string>,
 ): string | null {
   const pits = loaded.map.layers.pit ?? [];
-  if (address === null || pits.length === 0 || drains.length === 0) return null;
+  if (address === null || pits.length === 0 || usable.size === 0) return null;
 
   // Only what the engine will accept. Reading "is this an inlet?" off the
   // asset description instead was how a suggestion the scene cannot place
   // reached the screen, and the comparison then failed on the person rather
   // than on us.
-  const usable = new Set(
-    drains.filter((drain) => drain.isInlet).map((drain) => drain.assetNumber),
-  );
 
   let bestId: string | null = null;
   let bestDistance = Infinity;

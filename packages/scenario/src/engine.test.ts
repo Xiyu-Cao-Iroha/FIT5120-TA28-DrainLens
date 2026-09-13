@@ -251,6 +251,22 @@ describe('rejecting inputs it cannot honour', () => {
     ).toThrow(/non-negative/);
   });
 
+  it('refuses depressions not numbered 0..n-1, instead of losing their water', () => {
+    // Council ids reached a one-kilometre window unrenumbered on 13 September
+    // and 70% of the rain vanished into writes past the end of a typed array.
+    const bowlish = bowlScene();
+    const only = bowlish.depressions.depressions[0]!;
+    const sparse = {
+      ...bowlish,
+      depressions: {
+        cellDepression: bowlish.depressions.cellDepression.map((id) => (id >= 0 ? 7000 : id)),
+        depressions: [{ ...only, id: 7000 }],
+      },
+    };
+    expect(() => solvePosition(sparse, 'clear', null, 10)).toThrow(/numbered densely/);
+    expect(() => solvePosition(bowlish, 'clear', null, 10)).not.toThrow();
+  });
+
   it('refuses a drain outside the window', () => {
     const broken = { ...scene, drains: [{ assetNumber: 'P-x', cell: 9999 }] };
     expect(() => solvePosition(broken, 'clear', null, 10)).toThrow(/outside the calculation window/);
