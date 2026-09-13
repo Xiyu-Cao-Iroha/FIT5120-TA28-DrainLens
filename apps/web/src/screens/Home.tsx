@@ -162,7 +162,14 @@ export interface HomeProps {
 
 export function Home({ history, onOpenMap, onOpenHistory, onCompare }: HomeProps) {
   return (
-    <div className="home--photo">
+    /*
+      `height: 100%` is what lets the hero's `minHeight: 100%` mean the first
+      screen. Without a definite height here the percentage has nothing to
+      resolve against and the hero is only as tall as its content. The
+      sections after it overflow this box and `<main>` scrolls over them as
+      before.
+    */
+    <div style={{ height: '100%' }}>
       {/*
         The hero's button is called, not forwarded. Its `onClick` hands the
         click event to whatever it is given, and an event arriving where a mode
@@ -195,28 +202,10 @@ function Band({
   readonly tone?: 'page' | 'raised' | 'tint';
   readonly id?: string;
 }) {
-  /*
-    A scrim, not a surface.
-
-    These were three opaque light tones, which ended the photograph at the
-    bottom of the hero. They are now three depths of the same dark wash over
-    it, so the street runs the length of the page and the sections are told
-    apart by weight rather than by colour.
-
-    **0.80 is the lightest of them, and it is the one that had to be
-    measured.** Against the brightest pixel anywhere in the picture — the
-    overcast sky, pure white — 0.80 leaves `rgb(61, 67, 73)`, on which the
-    four colours in `ON_PHOTO` measure 10.01, 8.18, 6.87 and 6.15. Everything
-    darker than that is safer still: 0.84 gives 11.54, 9.43, 7.92 and 7.08.
-  */
   const background =
-    tone === 'raised'
-      ? 'rgba(12, 20, 28, 0.80)'
-      : tone === 'tint'
-        ? 'rgba(12, 20, 28, 0.88)'
-        : 'rgba(12, 20, 28, 0.84)';
+    tone === 'raised' ? surface.raised : tone === 'tint' ? surface.sunken : surface.page;
   return (
-    <section id={id} style={{ background, borderTop: `1px solid rgba(255, 255, 255, 0.08)` }}>
+    <section id={id} style={{ background, borderTop: `1px solid ${line.hair}` }}>
       <div
         style={{
           maxWidth: 1080,
@@ -241,12 +230,12 @@ function SectionHeading({
 }) {
   return (
     <>
-      {eyebrow !== undefined && <Eyebrow tone={ON_PHOTO.eyebrow}>{eyebrow}</Eyebrow>}
+      {eyebrow !== undefined && <Eyebrow>{eyebrow}</Eyebrow>}
       <h2
         className="home__section-title"
         style={{
           margin: `${String(space(3))}px 0 ${String(space(3))}px`,
-          color: ON_PHOTO.title,
+          color: ink.strong,
           maxWidth: 620,
         }}
       >
@@ -258,7 +247,7 @@ function SectionHeading({
             margin: `0 0 ${String(space(10))}px`,
             maxWidth: 620,
             font: type(text.body, { leading: 1.6 }),
-            color: ON_PHOTO.lead,
+            color: ink.muted,
           }}
         >
           {body}
@@ -988,7 +977,7 @@ function Paths({
         style={{
           margin: `${String(space(5))}px 0 0`,
           font: type(text.label, { leading: 1.6 }),
-          color: ON_PHOTO.lead,
+          color: ink.muted,
         }}
       >
         Or{' '}
@@ -1002,18 +991,7 @@ function Paths({
             border: 'none',
             padding: 0,
             font: type(text.label, { weight: weight.semibold }),
-            /*
-              The only link on this page with no surface of its own, so it is
-              the only one the photograph reaches. `brand.ink` measures
-              **1.30:1** against the band — effectively invisible — where the
-              same brand in `ON_PHOTO.eyebrow` measures 6.15.
-
-              Every other brand-coloured control here sits on a light button or
-              card and keeps the colour it was measured for.
-            */
-            color: ON_PHOTO.eyebrow,
-            textDecoration: 'underline',
-            textUnderlineOffset: 3,
+            color: brand.ink,
           }}
         >
           open the map with every mode on →
@@ -1050,9 +1028,8 @@ function Flow() {
                 width: 30,
                 height: 30,
                 borderRadius: radius.pill,
-                // Inverted with the page: a dark disc on a dark wash is a hole.
-                background: ON_PHOTO.title,
-                color: '#0c141c',
+                background: ink.strong,
+                color: ink.inverse,
                 font: type(text.label, { weight: weight.semibold, leading: 1 }),
               }}
             >
@@ -1062,12 +1039,12 @@ function Flow() {
               style={{
                 margin: `${String(space(3))}px 0 ${String(space(2))}px`,
                 font: type(text.body, { weight: weight.semibold, leading: 1.35 }),
-                color: ON_PHOTO.title,
+                color: ink.strong,
               }}
             >
               {step.title}
             </h3>
-            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ON_PHOTO.lead }}>
+            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
               {step.body}
             </p>
           </li>
