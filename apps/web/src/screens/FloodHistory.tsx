@@ -715,8 +715,8 @@ function ToTheMap({
       </h2>
       <p style={{ margin: `0 0 ${String(space(4))}px`, maxWidth: 620, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
         {pilot === null
-          ? 'The drainage map covers one square kilometre of Kensington and shows the recorded pits and pipes, the shape of the ground, and where surface water is likely to run.'
-          : `${pilot.name} — the area the drainage map covers — recorded ${String(pilot.total)}${pilot.complete ? '' : ' or more'} flood incidents over the same six years, which places it well down this list. The map does not rank anything: it shows the recorded pits and pipes under one square kilometre, the shape of the ground, and where surface water is likely to run.`}
+          ? 'The drainage map shows the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.'
+          : `${pilot.name}, where the drainage map began, recorded ${String(pilot.total)}${pilot.complete ? '' : ' or more'} flood incidents over the same six years, which places it well down this list. The map does not rank anything: it shows the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.`}
       </p>
       <button
         type="button"

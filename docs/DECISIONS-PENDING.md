@@ -96,6 +96,8 @@ Blocking a hundred drains — far more than any believable scenario — raises w
 
 **Still needs the team:** whether the demonstration leads with where water collects (C) or with the comparison. That is a rehearsal decision, not a code one.
 
+**Re-measured 13 September, and the finding stands.** Two things changed under it. The engine now receives each hollow's rim depth instead of spreading water evenly, and the comparison runs over a one-kilometre window around any inlet on the council map rather than only in Kensington. Across every Kensington inlet at 20, 40 and 60 mm, **three inlets** show a position higher than baseline, with rim depth or without it, at different rainfall amounts. Through the council's one-kilometre windows, two Kensington inlets do, and two in a seeded 3% sample of the council's inlets. Every other successful run reads *No clear change*, and the mass-balance and monotonicity checks refused none. The tables are in [ALGORITHMS.md](./ALGORITHMS.md). The screen now says *No clear change*, the AC 3.1.3.e wording, rather than *No clear difference*.
+
 ---
 
 ## 2 · The street cross-section — **DECIDED: built**
@@ -199,7 +201,11 @@ The gates table has four rows with a dash where a status belongs, and these are 
 
 ---
 
-## 8 · Where the measured ground stops, on a map that no longer stops there — **OPEN, deferred to 13 September**
+## 8 · Where the measured ground stops, on a map that no longer stops there — **DECIDED 13 September: measure the rest**
+
+> **What was done.** None of the three options below. The ground was measured for the whole council instead: every tile the City of Melbourne 2018 point cloud archive has, 211 of the extent's 306 (#125 for the central city, #127 for the council). Water flow, Low areas and *Not enough ground measured* are drawn wherever that ground exists. **The other 95 tiles are not in the archive**, and not one of the council's 21,113 pits or 17,242 pipes lies in them, so the measured ground covers everywhere the drainage record does. The artefact names the missing tiles and says nothing is claimed there, and `tools/data/check-derived.mjs` fails CI if any shape has a point inside one. The comparison followed (#130): it runs in the kilometre around any of the 9,239 inlets, and says how much of that window's ground was measured.
+>
+> The text below is the problem as it stood on 11 September, kept because it is why the ground was extended rather than outlined.
 
 The recorded network now covers the City of Melbourne. The terrain does not, and cannot be made to for free: the ground surface is 6.6 million points over **one square kilometre of Kensington**, and the derived layers — surface-water paths, low points, the data-quality hatching — are calculated from it.
 
