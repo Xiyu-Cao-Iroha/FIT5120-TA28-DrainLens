@@ -25,9 +25,9 @@ export function notAPrediction(scope: ScopeAreas): string {
   return `A record of what happened between ${scope.reportingPeriod.years[0] ?? ''} and ${scope.reportingPeriod.years.at(-1) ?? ''}. Neither view is a forecast, and neither describes flooding today or in the future.`;
 }
 
-/** Why the areas are dots, not shapes. */
-export const DOTS_NOTE =
-  'Each dot marks one statistical area, placed inside the area it names. The value belongs to the whole area, not to the spot where the dot sits, and nothing is drawn where the area’s boundary runs.';
+/** What an area's shape and colour do and do not say. */
+export const AREAS_NOTE =
+  'Each area is drawn as its ABS boundary, simplified to about 25 metres. The colour belongs to the whole area: it says nothing about which part of the area the dispatches were in.';
 
 /** Counts the evidence sentences need, taken from the areas rather than typed in. */
 export function countsOf(areas: readonly MapArea[]) {

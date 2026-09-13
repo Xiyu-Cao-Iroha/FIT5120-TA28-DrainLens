@@ -11,7 +11,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  DOTS_NOTE,
+  AREAS_NOTE,
   INFORMATION_TYPES,
   activityEvidence,
   countsOf,
@@ -109,6 +109,7 @@ describe('AC 4.3.4 and the map header', () => {
 
   it('says neither view is a prediction, with the years from the data', () => {
     expect(notAPrediction(scope)).toMatch(/between 2009-10 and 2014-15\. Neither view is a forecast/);
-    expect(DOTS_NOTE).toMatch(/belongs to the whole area/);
+    expect(AREAS_NOTE).toMatch(/belongs to the whole area/);
+    expect(AREAS_NOTE).toMatch(/simplified to about 25 metres/);
   });
 });

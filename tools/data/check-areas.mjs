@@ -175,6 +175,50 @@ for (const p of points.areas) {
   }
 }
 
+/*
+  Every shape inside the extent, and every name inside its own shape.
+
+  The map draws the boundary and writes the name at the point. A boundary that
+  runs off the extent cannot be panned to; a point outside its own simplified
+  shape is a name written on a neighbour — which simplification can cause,
+  and which nothing on screen would reveal.
+*/
+const decode = (flat) => {
+  const out = [];
+  let e = 0;
+  let n = 0;
+  for (let i = 0; i < flat.length; i += 2) {
+    e = i === 0 ? flat[0] : e + flat[i];
+    n = i === 0 ? flat[1] : n + flat[i + 1];
+    out.push([e, n]);
+  }
+  return out;
+};
+let vertices = 0;
+for (const p of points.areas) {
+  const rings = (p.rings ?? []).map(decode);
+  if (rings.length === 0) {
+    fail(`${p.name} has no boundary to draw`);
+    continue;
+  }
+  let inside = false;
+  for (const ring of rings) {
+    vertices += ring.length;
+    for (const [e, n] of ring) {
+      if (e < 0 || n < 0 || e > width || n > height) {
+        fail(`${p.name}'s boundary reaches ${String(e)},${String(n)}, outside the ${String(width)} by ${String(height)} extent`);
+        break;
+      }
+    }
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+      const [e1, n1] = ring[i];
+      const [e2, n2] = ring[j];
+      if (n1 > p.n !== n2 > p.n && p.e < ((e2 - e1) * (p.n - n1)) / (n2 - n1) + e1) inside = !inside;
+    }
+  }
+  if (!inside) fail(`${p.name}'s name point is outside its own simplified boundary`);
+}
+
 // --- every legend entry describes something -------------------------------
 
 /*
@@ -227,7 +271,7 @@ const summary =
   `dispatch and ${String(counted.incomplete)} whose total is a floor. The board's ` +
   `${String(board.areas.length)} are the top of them. ${String(population.areas.length)} have a ` +
   `population; ${String(scored)} of those are above the ${String(population.minimumResidents)} ` +
-  `residents a score needs. All ${String(points.areas.length)} have a point inside the ${String(Math.round(points.extent.width_m/1000))} by ${String(Math.round(points.extent.height_m/1000))} km extent.`;
+  `residents a score needs. All ${String(points.areas.length)} have a boundary (${vertices.toLocaleString("en-AU")} vertices) and a name point inside the ${String(Math.round(points.extent.width_m/1000))} by ${String(Math.round(points.extent.height_m/1000))} km extent, each name inside its own shape.`;
 
 if (problems.length > 0) {
   console.error(summary);

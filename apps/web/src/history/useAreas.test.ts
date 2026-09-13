@@ -47,7 +47,7 @@ const artefacts: Record<string, unknown> = {
   '/data/sa2-points.json': {
     artefact: 'sa2-points',
     extent: { name: 'greater-melbourne', min_e: 1, min_n: 1, width_m: 1000, height_m: 1000 },
-    areas: [{ code: '206011105', name: 'Brunswick', e: 100, n: 200 }],
+    areas: [{ code: '206011105', name: 'Brunswick', e: 100, n: 200, rings: [[0, 0, 500, 0, 0, 500]] }],
   },
   '/data/flood-events.json': {
     artefact: 'flood-events',

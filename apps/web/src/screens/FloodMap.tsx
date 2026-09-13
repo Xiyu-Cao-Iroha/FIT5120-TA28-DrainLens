@@ -21,11 +21,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  type AreaMark,
+  EMPTY_FILL,
+  GROUND,
+  MAX_AREA_SCALE,
+  areaAt,
   drawAreas,
   legendFor,
-  markAt,
-  marksFor,
 } from '../history/drawAreas.js';
 import {
   type MapArea,
@@ -39,7 +40,7 @@ import {
   totalLabel,
 } from '../history/severity.js';
 import {
-  DOTS_NOTE,
+  AREAS_NOTE,
   INFORMATION_TYPES,
   type Point,
   activityEvidence,
@@ -99,7 +100,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const marksRef = useRef<readonly AreaMark[]>([]);
+  const viewportRef = useRef<Viewport | null>(null);
   // Dragging pans. It had only + , − and "pan north", so once zoomed in
   // nothing south, east or west of the view could be reached.
   const drag = useRef<{ x: number; y: number } | null>(null);
@@ -142,10 +143,9 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
     if (!context) return;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    const marks = marksFor(areas, mode, viewport, selected);
-    marksRef.current = marks;
+    viewportRef.current = viewport;
     drawAreas(context, {
-      marks,
+      areas,
       mode,
       stateOf: (area) => completenessOf(area, mode),
       selected,
@@ -158,12 +158,14 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
   const pick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const area = markAt(marksRef.current, event.clientX - rect.left, event.clientY - rect.top);
+    const current = viewportRef.current;
+    if (!current) return;
+    const area = areaAt(areas, current, event.clientX - rect.left, event.clientY - rect.top);
     // A click on nothing clears the selection rather than keeping it. A panel
     // describing an area the person is no longer pointing at is a caption on
     // the wrong photograph.
     setSelected(area?.code ?? null);
-  }, []);
+  }, [areas]);
 
   const chosen = areas.find((a) => a.code === selected) ?? null;
   const years = scope.reportingPeriod.years;
@@ -256,7 +258,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
             {QUESTIONS[mode].asks}
           </p>
           <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.5 }), color: ink.subtle }}>
-            {notAPrediction(scope)} {DOTS_NOTE}
+            {notAPrediction(scope)} {AREAS_NOTE}
           </p>
         </header>
 
@@ -264,7 +266,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
           <canvas
             ref={canvasRef}
             onClick={(event) => {
-              // A drag that ends over a dot is a pan, not a choice.
+              // A drag that ends over an area is a pan, not a choice.
               if (dragged.current) {
                 dragged.current = false;
                 return;
@@ -296,11 +298,18 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
               setViewport((current) =>
                 current === null
                   ? current
-                  : zoomAt(current, event.deltaY < 0 ? 1.2 : 1 / 1.2, at, bounds, scaleToContain(current.widthPx, current.heightPx, bounds)),
+                  : zoomAt(
+                      current,
+                      event.deltaY < 0 ? 1.2 : 1 / 1.2,
+                      at,
+                      bounds,
+                      scaleToContain(current.widthPx, current.heightPx, bounds),
+                      MAX_AREA_SCALE,
+                    ),
               );
             }}
             aria-label={`${String(areas.length)} statistical areas, ${QUESTIONS[mode].asks}`}
-            style={{ display: 'block', cursor: 'grab', background: surface.sunken, touchAction: 'none' }}
+            style={{ display: 'block', cursor: 'grab', background: GROUND, touchAction: 'none' }}
           />
           <Legend mode={mode} years={years} />
           <Zoom
@@ -314,6 +323,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
                       [current.widthPx / 2, current.heightPx / 2],
                       bounds,
                       scaleToContain(current.widthPx, current.heightPx, bounds),
+                      MAX_AREA_SCALE,
                     ),
               );
             }}
@@ -773,12 +783,15 @@ function Legend({ mode, years }: { readonly mode: MapMode; readonly years: reado
           <span
             aria-hidden
             style={{
-              width: 14,
-              height: 14,
+              width: 16,
+              height: 12,
               flexShrink: 0,
-              borderRadius: '50%',
-              background: entry.fill ?? 'transparent',
-              border: `${entry.ringed ? '2px' : '1px'} ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
+              borderRadius: 2,
+              // The same hatch the map draws over a floor: 45°, six pixels apart.
+              background: entry.hatched
+                ? `repeating-linear-gradient(135deg, rgba(30, 43, 54, 0.55) 0 1px, transparent 1px 6px), ${entry.fill ?? EMPTY_FILL}`
+                : (entry.fill ?? EMPTY_FILL),
+              border: `1px ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
             }}
           />
           <span style={{ font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>

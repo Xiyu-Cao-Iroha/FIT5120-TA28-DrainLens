@@ -23,6 +23,9 @@ from drainlens_pipeline.area_points import (
     Placed,
     build,
     centroid,
+    encode,
+    shape,
+    simplify,
     inside,
     place,
     point_on_surface,
@@ -180,7 +183,7 @@ def test_publishes_metres_from_the_extents_own_corner():
     assert extent["min_e"] == 320_000
     assert extent["min_n"] == 5_812_000
     assert extent["crs"] == "EPSG:28355"
-    assert artefact["areas"][0] == {"code": "206011105", "name": "Brunswick", "e": 400, "n": 3600}
+    assert artefact["areas"][0] == {"code": "206011105", "name": "Brunswick", "e": 400, "n": 3600, "rings": []}
     assert artefact["areas"][1]["e"] == 2900
 
 
@@ -232,3 +235,60 @@ def test_main_reports_a_refusal_without_a_traceback(tmp_path, capsys):
     assert main(["--mid", str(mid_file), "--mif", str(mif_file), "--out", str(out)]) == 1
     assert "GCCSA_NAME_2011" in capsys.readouterr().err
     assert not out.exists()
+
+
+# --- the shapes -----------------------------------------------------------
+
+
+def test_simplify_drops_a_vertex_that_is_within_tolerance_and_keeps_a_corner():
+    line = [(0.0, 0.0), (50.0, 3.0), (100.0, 0.0), (100.0, 100.0)]
+    assert simplify(line, 25.0) == [(0.0, 0.0), (100.0, 0.0), (100.0, 100.0)]
+    assert simplify(line, 1.0) == line
+
+
+def test_simplify_keeps_a_closed_ring_closed_and_leaves_short_ones_alone():
+    ring = [(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0), (0.0, 0.0)]
+    assert simplify(ring, 25.0) == ring
+    assert simplify([(0.0, 0.0), (1.0, 1.0)], 25.0) == [(0.0, 0.0), (1.0, 1.0)]
+
+
+def test_shape_projects_opens_and_drops_a_speck():
+    speck = [(144.5, -37.5), (144.5000001, -37.5), (144.5, -37.5000001), (144.5, -37.5)]
+    closed = SQUARE + [SQUARE[0]]
+    rings = shape([closed, speck])
+    assert len(rings) == 1
+    assert len(rings[0]) == 4
+    easting, northing = rings[0][0]
+    assert 200_000 < easting < 800_000 and 5_000_000 < northing < 6_000_000
+
+
+def test_encode_is_whole_metre_steps_that_add_back_up():
+    ring = [(1000.4, 2000.6), (1010.5, 2000.4), (1010.4, 2020.0)]
+    flat = encode(ring, 1000, 2000)
+    assert flat == [0, 1, 10, -1, 0, 20]
+    e, n, back = 0, 0, []
+    for i in range(0, len(flat), 2):
+        e, n = (flat[i], flat[i + 1]) if i == 0 else (e + flat[i], n + flat[i + 1])
+        back.append((e, n))
+    assert back == [(0, 1), (10, 0), (10, 20)]
+
+
+def test_place_publishes_the_shape_and_the_extent_holds_all_of_it():
+    placed = place([(0, ["206011105", "", "Brunswick"] + [""] * 5 + [SCOPE])], [[CRESCENT]])
+    assert placed[0].rings
+    artefact = build(placed)
+    extent = artefact["extent"]
+    area = artefact["areas"][0]
+    assert area["rings"] and len(area["rings"][0]) % 2 == 0
+    e, n = 0, 0
+    for i in range(0, len(area["rings"][0]), 2):
+        e, n = (area["rings"][0][i], area["rings"][0][i + 1]) if i == 0 else (e + area["rings"][0][i], n + area["rings"][0][i + 1])
+        assert 0 <= e <= extent["width_m"] and 0 <= n <= extent["height_m"]
+    assert artefact["version"] == 2
+    assert artefact["counts"]["vertices"] == len(placed[0].rings[0])
+
+
+def test_refuses_an_area_that_simplifies_to_nothing():
+    speck = [(144.5, -37.5), (144.5000001, -37.5), (144.5, -37.5000001)]
+    with pytest.raises(AreaPointsError, match="simplifies to nothing"):
+        place([(0, ["1", "", "Speck"] + [""] * 5 + [SCOPE])], [[speck]])
