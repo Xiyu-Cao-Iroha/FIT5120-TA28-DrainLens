@@ -104,9 +104,9 @@ export type Screen =
    * done. See `LOCK_NOTICE`.
    */
   | 'locked'
-  /** Unreachable — the comparison is out of the Iteration 1 interface. */
+  /** The comparison: from the task question, or from a drain on the map (`scenario-from-map`). */
   | 'scenario'
-  /** Unreachable — as above. */
+  /** The comparison's result. */
   | 'result'
   | 'unsupported';
 
@@ -206,6 +206,12 @@ export interface Session {
    * changing their address rather than by choosing a task.
    */
   readonly pendingTask: Task | null;
+  /**
+   * Where the comparison was opened from: the task question, or a drain on the
+   * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
+   * has no task question behind it, and may have no address at all.
+   */
+  readonly scenarioOrigin: 'task' | 'map';
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -232,6 +238,7 @@ export const INITIAL_SESSION: Session = {
   learned: NOTHING_LEARNED,
   guideSection: null,
   pendingTask: null,
+  scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
@@ -278,6 +285,12 @@ export type SessionEvent =
   | { readonly type: 'task-wanted'; readonly task: Task }
   /** Back to the task question from a task -- the comparison's breadcrumb. */
   | { readonly type: 'task-reconsidered' }
+  /**
+   * The comparison, opened on a drain chosen on the map (AC 3.1.1: "given the
+   * user is viewing the local drainage map, when the user opens the Scenario
+   * Explorer"). No address is needed: the drain is the location.
+   */
+  | { readonly type: 'scenario-from-map'; readonly pitId: string }
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
   | { readonly type: 'blockage-selected'; readonly blockage: BlockageSetting }
   | { readonly type: 'rainfall-selected'; readonly rainfallMm: number }
@@ -504,6 +517,7 @@ function step(session: Session, event: SessionEvent): Session {
         screen: screenForTask(event.task),
         task: event.task,
         pendingTask: null,
+        scenarioOrigin: 'task',
         // The other way into the map. A mode left over from an earlier trip
         // through the homepage would quietly override the task's own defaults.
         mapMode: null,
@@ -532,7 +546,23 @@ function step(session: Session, event: SessionEvent): Session {
       return { ...session, running: false, screen: 'result', outcome: event.outcome };
 
     case 'back':
+      if (session.screen === 'scenario' && session.scenarioOrigin === 'map') {
+        return { ...session, screen: 'explore' };
+      }
       return { ...session, screen: BACK[session.screen] };
+
+    case 'scenario-from-map':
+      return {
+        ...session,
+        screen: 'scenario',
+        task: 'compare',
+        pendingTask: null,
+        scenarioOrigin: 'map',
+        // The drain is chosen; the blockage is not. A pre-selected assumption
+        // is one the interface made on the person's behalf.
+        scenario: { ...EMPTY_SCENARIO, rainfallMm: session.scenario.rainfallMm, pitId: event.pitId },
+        outcome: null,
+      };
 
     case 'map-opened':
       return {

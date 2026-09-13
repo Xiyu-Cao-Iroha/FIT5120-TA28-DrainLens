@@ -33,6 +33,7 @@ import { type DifferenceArea, intoMapFrame } from './map/difference.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
+import { UNSUPPORTED_TEXT, supportOf, useScenarioSupport } from './scenario/support.js';
 import type { SolvedPosition } from './scenario/worker.js';
 import {
   INITIAL_SESSION,
@@ -207,6 +208,8 @@ export function App() {
   // difference on whichever map is served.
   const [windowOrigin, setWindowOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
   const [measuredShare, setMeasuredShare] = useState<number | null>(null);
+  // Why the last drain tapped on the comparison map cannot be compared.
+  const [refusal, setRefusal] = useState<string | null>(null);
   // The scenario panel is 420px of a laptop screen. Reading a result means
   // looking at the map it is about, and a teammate reported not being able to.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -663,9 +666,15 @@ export function App() {
           extentName={loaded.extentName}
           crumbs={
             <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
-              {separator}
-              {crumb('Choose a task', () => dispatch({ type: 'task-reconsidered' }))}
+              {session.scenarioOrigin === 'map' ? (
+                crumb('Full map', () => dispatch({ type: 'back' }))
+              ) : (
+                <>
+                  {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+                  {separator}
+                  {crumb('Choose a task', () => dispatch({ type: 'task-reconsidered' }))}
+                </>
+              )}
               {separator}
               {crumb('Compare scenario', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
               {session.screen === 'result' && (
@@ -712,7 +721,8 @@ export function App() {
                 />
               ) : (
                 <ScenarioSetup
-                  address={session.address!}
+                  address={session.address}
+                  refusal={refusal}
                   scenario={session.scenario}
                   suggestedPitId={
                     session.scenario.pitId === null
@@ -765,10 +775,16 @@ export function App() {
                     : null
                 }
                 scenarioDrains={scenario.supported}
+                onRefusePit={(pitId) => {
+                  setRefusal(
+                    `Pit ${pitId}: ${UNSUPPORTED_TEXT[supportOf({ supported: scenario.supported, withoutGround: scenario.withoutGround }, pitId) === 'no-measured-ground' ? 'no-measured-ground' : 'not-an-inlet']}`,
+                  );
+                }}
                 difference={differenceShown}
-                onPickPit={(pitId) =>
-                  dispatch({ type: 'pit-selected', pitId, suggested: false })
-                }
+                onPickPit={(pitId) => {
+                  setRefusal(null);
+                  dispatch({ type: 'pit-selected', pitId, suggested: false });
+                }}
               />
             </div>
           </div>
@@ -812,6 +828,8 @@ function MapScreen({
   readonly crumb: (label: string, onClick?: () => void, current?: boolean) => React.ReactNode;
 }) {
   const [touring, setTouring] = useState(false);
+  // Which drains the comparison can use, for the pit card's way in (AC 3.1.1).
+  const scenarioSupport = useScenarioSupport(true);
 
   /*
     Open it once, for somebody who has not had it.
@@ -900,6 +918,10 @@ function MapScreen({
         }
         onClearAddress={() => {
           dispatch({ type: 'address-cleared' });
+        }}
+        scenarioSupport={scenarioSupport}
+        onCompare={(pitId) => {
+          dispatch({ type: 'scenario-from-map', pitId });
         }}
       />
       {touring && (
@@ -1044,6 +1066,7 @@ function MapCanvasPane({
   scenarioDrains,
   difference,
   onPickPit,
+  onRefusePit,
 }: {
   readonly loaded: Loaded;
   readonly session: Session;
@@ -1053,6 +1076,8 @@ function MapCanvasPane({
   /** Asset numbers the scene places as inlets. Anything else cannot run. */
   readonly scenarioDrains: ReadonlySet<string>;
   readonly onPickPit: (pitId: string) => void;
+  /** A pit that cannot be compared was tapped: say why (AC 3.1.1.d). */
+  readonly onRefusePit: (pitId: string) => void;
 }) {
   const pitId = session.scenario.pitId;
   const followed = useMemo(
@@ -1070,6 +1095,8 @@ function MapCanvasPane({
       // asset number and the map does not mark leaves the person holding an
       // identifier with no way to find it — which is what a teammate hit.
       suggestedPit={pitId === null && suggestedPitId !== null ? Number(suggestedPitId) : null}
+      comparablePits={scenarioDrains}
+      openAt={session.address === null && pitId !== null ? pitPosition(loaded, pitId) : null}
       address={
         session.address === null
           ? null
@@ -1084,9 +1111,18 @@ function MapCanvasPane({
         if (hit?.kind !== 'pit') return;
         const asset = String(hit.feature.asset_number ?? '');
         if (scenarioDrains.has(asset)) onPickPit(asset);
+        // It used to be ignored in silence, which reads as a map that does not
+        // respond. Saying why is AC 3.1.1.d; saying what it does not mean, e.
+        else onRefusePit(asset);
       }}
     />
   );
+}
+
+/** Where a pit is on the served map, in local metres, or null. */
+function pitPosition(loaded: Loaded, pitId: string): readonly [number, number] | null {
+  const pit = (loaded.map.layers.pit ?? []).find((p) => String(p.asset_number ?? '') === pitId);
+  return pit === undefined ? null : [pit.c[0], pit.c[1]];
 }
 
 /**

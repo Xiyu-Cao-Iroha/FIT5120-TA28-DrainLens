@@ -32,6 +32,7 @@ export interface Palette {
   readonly pitEdge: string;
   readonly selected: string;
   readonly suggested: string;
+  readonly comparable: string;
   readonly label: string;
   readonly labelHalo: string;
   readonly address: string;
@@ -50,6 +51,8 @@ export const DAY: Palette = {
   pit: '#2f6f62',
   pitEdge: '#ffffff',
   selected: '#0f766e',
+  // Teal ring: a drain the comparison can be calculated for (AC 3.1.1.a).
+  comparable: '#0f8b8d',
   // Amber, matching the panel's "suggested, not your choice yet" note. A
   // suggestion drawn in the chosen colour is a choice the person did not make.
   suggested: '#b4690e',
@@ -170,6 +173,7 @@ function drawPits(
   seen: Extremes,
   selectedAsset: number | null,
   suggestedAsset: number | null = null,
+  comparable: ReadonlySet<string> | null = null,
 ): void {
   const radius = Math.max(2.5, Math.min(7, viewport.scale * 2.2));
   context.lineWidth = 1.5;
@@ -190,6 +194,19 @@ function drawPits(
       context.fill();
       context.strokeStyle = palette.pitEdge;
       context.stroke();
+    }
+
+    // Which drains a comparison can use, before anybody chooses (AC 3.1.1.a).
+    // A ring rather than a fill, so the recorded pit underneath still reads as
+    // the council's; nothing is drawn on the others, and the legend says that
+    // an unringed drain is a limit of the calculation, not a finding.
+    if (comparable !== null && comparable.has(String(pit.asset_number ?? ''))) {
+      context.beginPath();
+      context.arc(x, y, radius + 3.5, 0, Math.PI * 2);
+      context.strokeStyle = palette.comparable;
+      context.lineWidth = 2;
+      context.stroke();
+      context.lineWidth = 1.5;
     }
 
     // A ring around, not a different fill: the suggestion has to read as
@@ -391,6 +408,8 @@ export interface DrawOptions {
    * reading an asset number with no way to find it.
    */
   readonly suggestedPit?: number | null;
+  /** Drains a comparison can be calculated for, ringed (AC 3.1.1.a). */
+  readonly comparablePits?: ReadonlySet<string> | null;
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
@@ -570,6 +589,7 @@ export function drawMap(
       seen,
       options.selectedPit ?? null,
       options.suggestedPit ?? null,
+      options.comparablePits ?? null,
     );
   }
   if (viewport.scale >= LABEL_MIN_SCALE) {

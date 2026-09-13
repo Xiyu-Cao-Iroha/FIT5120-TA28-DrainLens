@@ -898,3 +898,29 @@ describe('rainfall is one of the validated levels', () => {
     }
   });
 });
+
+describe('opening the comparison from a drain on the map', () => {
+  it('goes straight to the comparison with that drain chosen and nothing else assumed', () => {
+    // AC 3.1.1: from the local drainage map. No address is needed.
+    const onMap = reduce(INITIAL_SESSION, { type: 'map-opened' });
+    const next = reduce({ ...onMap, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1144908' });
+    expect(next.screen).toBe('scenario');
+    expect(next.scenario.pitId).toBe('1144908');
+    expect(next.scenario.pitWasSuggested).toBe(false);
+    expect(next.scenario.blockage).toBeNull();
+    expect(next.address).toBeNull();
+  });
+
+  it('goes back to the map it came from, not to a task question it never saw', () => {
+    const next = reduce({ ...INITIAL_SESSION, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1' });
+    expect(reduce(next, { type: 'back' }).screen).toBe('explore');
+  });
+
+  it('still goes back to the task question when opened from one', () => {
+    const address = { id: 'a', label: '46 Gatehouse Drive', eastingM: 1, northingM: 1 };
+    const withAddress = { ...INITIAL_SESSION, address, screen: 'task' as const };
+    const fromMap = reduce({ ...withAddress, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1' });
+    const fromTask = reduce(fromMap, { type: 'task-chosen', task: 'compare' });
+    expect(reduce(fromTask, { type: 'back' }).screen).toBe('task');
+  });
+});

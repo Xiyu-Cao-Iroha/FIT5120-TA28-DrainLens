@@ -44,6 +44,8 @@ export interface MapCanvasProps {
   readonly selectedPit?: number | null;
   /** Offered but not confirmed — drawn as a ring, not a fill. */
   readonly suggestedPit?: number | null;
+  /** Drains a comparison can be calculated for, ringed on the map. */
+  readonly comparablePits?: ReadonlySet<string> | null;
   /** The painted terrain raster, or null when it is off or not loaded. */
   readonly terrain?: HTMLCanvasElement | null;
   /**
@@ -81,6 +83,15 @@ export interface MapCanvasProps {
    * drag them back, so this is read when the viewport is first built.
    */
   readonly address?: Local | null;
+  /**
+   * Where to open when there is no address, in local metres.
+   *
+   * The comparison opened on a drain from the map has a drain and no address;
+   * opening on the whole council would leave the chosen pit a speck somewhere
+   * in 76 square kilometres. Only the opening view, like `address`, and no
+   * marker: it is not the person's location.
+   */
+  readonly openAt?: Local | null;
   /** A followed downstream path, drawn over the network it was read from. */
   readonly trace?: Trace | null;
   /**
@@ -119,12 +130,14 @@ export function MapCanvas({
   show,
   selectedPit = null,
   suggestedPit = null,
+  comparablePits = null,
   terrain = null,
   openAcrossM,
   locked = false,
   showPipes = true,
   showPits = true,
   address = null,
+  openAt = null,
   trace = null,
   difference = null,
   onSelect,
@@ -137,7 +150,7 @@ export function MapCanvas({
   const dragRef = useRef<{ x: number; y: number; moved: number } | null>(null);
   // Held in a ref rather than read in the effect, so that changing the
   // address does not re-run the resize effect and yank a panned map back.
-  const openingRef = useRef<Local | null>(address);
+  const openingRef = useRef<Local | null>(address ?? openAt);
   // The address the view has already been moved to. A *re-render* must not
   // drag a panned map back, which is what `openingRef` protects against — but
   // a genuinely different address must, or searching for one from the map
@@ -208,6 +221,7 @@ export function MapCanvas({
     drawMap(context, artefact, viewport, {
       selectedPit,
       suggestedPit,
+      comparablePits,
       address,
       showPipes,
       showPits,
@@ -223,7 +237,7 @@ export function MapCanvas({
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
-  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, address, trace,
+  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, address, trace,
       terrain, showPipes, showPits, difference]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {

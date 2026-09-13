@@ -15,6 +15,7 @@
 import { type BlockageSetting, VALIDATED_RAINFALL_LEVELS_MM } from '@drainlens/schema';
 
 import { RAINFALL_EXPLAINED } from '../scenario/outcome.js';
+import { SUPPORT_LEGEND } from '../scenario/support.js';
 import type { ScenarioInputs, SupportedAddress } from '../session.js';
 import { missingScenarioInput } from '../session.js';
 
@@ -54,7 +55,10 @@ export const RAINFALL_PRESETS: readonly { readonly label: string; readonly mm: n
   }));
 
 export interface ScenarioSetupProps {
-  readonly address: SupportedAddress;
+  /** Null when the comparison was opened on a drain from the map. */
+  readonly address: SupportedAddress | null;
+  /** Why the drain last tapped on the map cannot be compared, or null. */
+  readonly refusal?: string | null;
   readonly scenario: ScenarioInputs;
   readonly suggestedPitId: string | null;
   readonly onUsePit: (pitId: string, suggested: boolean) => void;
@@ -66,6 +70,7 @@ export interface ScenarioSetupProps {
 
 export function ScenarioSetup({
   address,
+  refusal = null,
   scenario,
   suggestedPitId,
   onUsePit,
@@ -90,8 +95,19 @@ export function ScenarioSetup({
       </p>
       <p style={{ margin: '0 0 18px', color: '#6b7a88', fontSize: 13 }}>
         <span aria-hidden>◎ </span>
-        {address.label}
+        {address === null ? 'A drain chosen on the map' : address.label}
       </p>
+
+      {/* AC 3.1.1.a, d and e: which drains can be compared, before choosing. */}
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: '#5b6e7e' }}>
+        <span aria-hidden style={{ color: '#0f8b8d' }}>◯ </span>
+        {SUPPORT_LEGEND}
+      </p>
+      {refusal !== null && (
+        <p role="status" style={{ margin: '0 0 14px', padding: '8px 10px', background: '#f4f6f2', borderRadius: 6, fontSize: 12, color: '#4d5f6e' }}>
+          {refusal}
+        </p>
+      )}
 
       <ol
         style={{
