@@ -28,7 +28,9 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/addresses.json` | 678 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
 | `/data/flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` | Recorded flood incidents by named area, and what a count is |
 | `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
-| `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
+| `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Kensington's ground surface, now read only by the map's *Ground surface* layer |
+| `/data/scene-tiles/index.json` | 176 KB | `drainlens_pipeline.scene_tiles` | Which 500 m tiles exist; for every inlet, the window it is calculated in |
+| `/data/scene-tiles/Tile_*/` | ~300 KB each, 64 MB in all | `drainlens_pipeline.scene_tiles` | Pre-gzipped elevation, flow, depressions, rim depth, measured; `tile.json` with the depressions and drains in it |
 
 **Coordinates in every artefact are metres east and north of the extent's south-west corner**, to a decimetre. Not latitude and longitude. The projection was done at build time, so no projection runs in the browser and there is no second place for the map and the model to disagree about where a pit is.
 

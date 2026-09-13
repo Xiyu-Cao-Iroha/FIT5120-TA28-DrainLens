@@ -6,20 +6,35 @@
  * calculation reads as a crash — the person taps again, and now two runs are
  * competing.
  *
- * The worker loads the scene once and keeps it. Every subsequent comparison is
- * arithmetic over arrays already in memory, so changing a blockage setting
- * costs a calculation rather than a megabyte.
+ * The worker loads the council's tile index once, and for each comparison the
+ * one-kilometre window around the chosen drain, keeping the last few windows.
+ * A second comparison in the same street is arithmetic over arrays already in
+ * memory, so changing a blockage setting costs a calculation rather than a
+ * download.
  */
 
 import { runScenario } from '@drainlens/scenario';
 import type { BlockageSetting } from '@drainlens/schema';
 
-import { type LoadedScene, loadScene } from './scene.js';
+import type { InsufficiencyReason } from '@drainlens/schema';
 
+import type { LoadedScene } from './scene.js';
+import { type TileIndex, loadIndex, loadWindow, windowKey } from './sceneTiles.js';
+
+/** A comparison on a scene already in hand, by the scene's own cell. */
 export interface RunRequest {
   readonly type: 'run';
   readonly id: number;
   readonly drainCell: number;
+  readonly blockage: BlockageSetting;
+  readonly rainfallPositionsMm: readonly number[];
+}
+
+/** A comparison for a drain, by asset number: the worker finds its window. */
+export interface AssetRunRequest {
+  readonly type: 'run-asset';
+  readonly id: number;
+  readonly assetNumber: string;
   readonly blockage: BlockageSetting;
   readonly rainfallPositionsMm: readonly number[];
 }
@@ -30,7 +45,7 @@ export interface LoadRequest {
   readonly base: string;
 }
 
-export type WorkerRequest = LoadRequest | RunRequest;
+export type WorkerRequest = LoadRequest | AssetRunRequest;
 
 /** One accumulated-rainfall position, as the interface needs it. */
 export interface SolvedPosition {
@@ -77,27 +92,17 @@ export type WorkerReply =
       readonly type: 'loaded';
       readonly id: number;
       /**
-       * Every drain, with the cell the scene put it in.
+       * Every inlet a scenario can be calculated for: an inlet with a window of
+       * four measured tiles around it. The map marks these before anybody
+       * chooses (AC 3.1.1.a), and only these can be chosen.
        *
-       * The interface must never work this out for itself. The pipeline snaps
-       * each drain up to three metres onto the flow field — a kerbside inlet
-       * recorded in the middle of the road belongs to the gutter it drains,
-       * not to the cell its coordinate landed in — so a cell derived from the
-       * map geometry disagrees with the scene for every drain in the extent,
-       * and the engine then finds no drain there at all.
+       * The interface must never work this out for itself — not from the asset
+       * description, not from the map geometry. Both were tried, and both
+       * offered drains the engine then refused.
        */
-      readonly drains: readonly SceneDrain[];
-      readonly inlets: number;
-      /**
-       * The scene's south-west corner, in MGA metres.
-       *
-       * `higherAreasM` is in the scene's own frame, and the map it is drawn
-       * over need not share it: when the API answers, the map is the
-       * council's, whose corner is 1.5 km west and 6 km south of
-       * Kensington's. Without this the difference layer was drawn that far
-       * from the drain it belongs to.
-       */
-      readonly origin: { readonly minE: number; readonly minN: number };
+      readonly supported: readonly string[];
+      /** Inlets with no window of measured ground around them (AC 3.1.1.d). */
+      readonly withoutGround: readonly string[];
     }
   | {
       readonly type: 'result';
@@ -121,6 +126,17 @@ export type WorkerReply =
        * every position, and two values here could only ever disagree.
        */
       readonly cellSizeM: number;
+      /**
+       * The calculation window's south-west corner, in MGA metres.
+       *
+       * `higherAreasM` is in the window's own frame, and the map it is drawn
+       * over is not: when the API answers the map is the council's, and when
+       * it does not the map is Kensington's. Without this the difference
+       * layer was drawn up to kilometres from the drain it belongs to.
+       */
+      readonly origin?: { readonly minE: number; readonly minN: number };
+      /** Share of the window's ground that was measured, 0 to 1. */
+      readonly measuredShare?: number;
     }
   | {
       readonly type: 'result';
@@ -130,7 +146,8 @@ export type WorkerReply =
     }
   | { readonly type: 'failed'; readonly id: number; readonly message: string };
 
-let scene: LoadedScene | null = null;
+let tileIndex: TileIndex | null = null;
+let tileBase = '';
 
 /**
  * The cells a position marks higher than baseline, as local metres.
@@ -186,7 +203,7 @@ export function engineInput(loaded: LoadedScene): Parameters<typeof runScenario>
  * and those are defects, but a defect that reaches a resident should still be
  * a screen that says what happened and offers a retry, not a blank page.
  */
-export function handle(request: WorkerRequest, loaded: LoadedScene | null): WorkerReply {
+export function handle(request: RunRequest | LoadRequest, loaded: LoadedScene | null): WorkerReply {
   if (request.type === 'load') {
     throw new Error('a load request is handled asynchronously, not here');
   }
@@ -239,6 +256,90 @@ export function handle(request: WorkerRequest, loaded: LoadedScene | null): Work
   }
 }
 
+/**
+ * Why a drain has no scenario, from the index alone and before any download.
+ *
+ * An inlet listed without ground is `terrain_unavailable` — every drain there
+ * fails the same way, so the screen says choosing another will not help.
+ * Anything else not listed is not an inlet the pack knows, `invalid_inlet`.
+ */
+export function unsupportedReason(index: TileIndex, assetNumber: string): InsufficiencyReason | null {
+  if (index.windows[assetNumber] !== undefined) return null;
+  return (index.inletsWithoutWindow ?? []).includes(assetNumber) ? 'terrain_unavailable' : 'invalid_inlet';
+}
+
+/**
+ * A comparison for a drain by asset number: find its window, load it, solve.
+ *
+ * Separate from the message loop so it can be tested with a fake loader.
+ */
+export async function runForAsset(
+  request: AssetRunRequest,
+  index: TileIndex,
+  windowFor: (window: readonly [number, number]) => Promise<LoadedScene>,
+): Promise<WorkerReply> {
+  const reason = unsupportedReason(index, request.assetNumber);
+  if (reason !== null) {
+    return { type: 'result', id: request.id, status: 'insufficient-information', reason };
+  }
+  const window = index.windows[request.assetNumber]!;
+  let loaded: LoadedScene;
+  try {
+    loaded = await windowFor(window);
+  } catch {
+    return { type: 'result', id: request.id, status: 'insufficient-information', reason: 'scenario_calculation_failed' };
+  }
+  // The window's own cell for this drain, which the pipeline snapped onto the
+  // flow path. Never recomputed from the map geometry.
+  const drain = loaded.header.drains.find((d) => d.assetNumber === request.assetNumber && d.isInlet);
+  if (drain === undefined) {
+    return { type: 'result', id: request.id, status: 'insufficient-information', reason: 'invalid_inlet' };
+  }
+  const reply = handle(
+    {
+      type: 'run',
+      id: request.id,
+      drainCell: drain.cell,
+      blockage: request.blockage,
+      rainfallPositionsMm: request.rainfallPositionsMm,
+    },
+    loaded,
+  );
+  if (reply.type === 'result' && reply.status === 'successful') {
+    return {
+      ...reply,
+      origin: { minE: loaded.header.extent.min_e, minN: loaded.header.extent.min_n },
+      ...(loaded.measuredShare === undefined ? {} : { measuredShare: loaded.measuredShare }),
+    };
+  }
+  return reply;
+}
+
+/** The windows kept in memory. A street's worth of comparisons reuse one. */
+export const WINDOWS_KEPT = 2;
+
+const windows = new Map<string, Promise<LoadedScene>>();
+
+function cachedWindow(window: readonly [number, number]): Promise<LoadedScene> {
+  if (tileIndex === null) return Promise.reject(new Error('the scene tile index has not been loaded'));
+  const key = windowKey(window);
+  const held = windows.get(key);
+  if (held !== undefined) {
+    windows.delete(key);
+    windows.set(key, held);
+    return held;
+  }
+  const loading = loadWindow(tileBase, tileIndex, window);
+  loading.catch(() => windows.delete(key));
+  windows.set(key, loading);
+  while (windows.size > WINDOWS_KEPT) {
+    const oldest = windows.keys().next().value;
+    if (oldest === undefined) break;
+    windows.delete(oldest);
+  }
+  return loading;
+}
+
 // The worker body. Skipped when this module is imported by a test, which has no
 // `postMessage` on the global.
 if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessage === 'function') {
@@ -246,27 +347,26 @@ if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessag
     const request = event.data;
     try {
       if (request.type === 'load') {
-        scene = await loadScene(request.base);
-        const drains = scene.header.drains;
+        tileBase = request.base;
+        tileIndex = await loadIndex(request.base);
         self.postMessage({
           type: 'loaded',
           id: request.id,
-          drains: drains.map((drain) => ({
-            assetNumber: String(drain.assetNumber),
-            cell: drain.cell,
-            isInlet: drain.isInlet,
-          })),
-          inlets: drains.filter((drain) => drain.isInlet).length,
-          origin: { minE: scene.header.extent.min_e, minN: scene.header.extent.min_n },
+          supported: Object.keys(tileIndex.windows),
+          withoutGround: tileIndex.inletsWithoutWindow ?? [],
         } satisfies WorkerReply);
         return;
       }
-      self.postMessage(handle(request, scene));
+      if (tileIndex === null) {
+        self.postMessage({ type: 'failed', id: request.id, message: 'the scene tile index has not been loaded' } satisfies WorkerReply);
+        return;
+      }
+      self.postMessage(await runForAsset(request, tileIndex, cachedWindow));
     } catch (error) {
       self.postMessage({
         type: 'failed',
         id: request.id,
-        message: String(error),
+        message: error instanceof Error ? error.message : String(error),
       } satisfies WorkerReply);
     }
   };
