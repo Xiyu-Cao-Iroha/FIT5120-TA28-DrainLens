@@ -18,7 +18,7 @@ Iteration 1 is frozen and serving. `origin/main` stays at `138a002` for the whol
 
 - **The map is the whole City of Melbourne** when the database answers — 21,113 pits and 17,242 pipes against Kensington 895 and 893 — with the container copy as the fallback. The API serves it compressed.
 - **A guided tutorial** on the real map, with the four-card chooser behind *Get started* and the whole map behind an unlock.
-- **The terrain, derived layers and scenario engine still cover the Kensington square kilometre only.** The drainage map grew; the measured ground did not. That mismatch is [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md) and it is now on Epic 3 critical path through AC 3.3.2.i.
+- ~~**The terrain, derived layers and scenario engine still cover the Kensington square kilometre only.**~~ **Since 13 September they cover the council**: 211 point-cloud tiles, every one the archive has (#125, #127), and the comparison runs around any of the 9,239 inlets (#130). [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md) records how.
 
 ---
 
@@ -84,34 +84,34 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 ### Events
 
-- [ ] **Define what *verified* means** and who does it → *4.2.2.a*. A named process, before any content
-- [ ] **Schema for events**: name, first recorded date, associated places, area, team-written summary, source links → *4.2.1.a–e*
-- [ ] **Three or four events, well sourced** → *4.2.1, 4.2.2*. **Thin and honest beats long and quick.** 4.2.3 is written on the assumption that most areas have none
-- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader
+- [x] **Define what *verified* means** and who does it → *4.2.2.a*. Written into `flood-events.json` itself: two sources at least, every sentence stated on one of them, and shown only once a team member has filled in `checkedBy` and `checkedOn`. The loader filters on those two fields (#133)
+- [x] **Schema for events**: name, first recorded date, associated places, area, team-written summary, source links → *4.2.1.a–e*. A published file with a guard (`history/events.ts`) and `tools/data/check-events.mjs` in CI, not a table: the events are hand-written and a table would add a migration and an API route for four rows
+- [x] **Three or four events, well sourced** → *4.2.1, 4.2.2*. Four drafted: Melbourne storm March 2010, storms February 2011, Christmas Day storm 2011, Maribyrnong River flood October 2022 — AIDR, ABC News and Melbourne Water
+- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader. **This is the check that makes the four events appear** — it is waiting for a team member
 
 ---
 
 ## W2 · Scenario engine
 
 - [ ] **Per-location blockage** → *3.1.2.c*. The engine applies one setting to every inlet and `packages/scenario` asserts that against AC 2.1.2.d (Aug-27 set). The input shape, the worker cache key and the checks all change. **Update the tests that hold the old line rather than deleting them** — the invariant is not wrong, it is superseded, and the commit should say so
-- [ ] **A sufficiency test that does not require running the scenario** → *3.1.1.a, 3.1.1.d*. `terrain_unavailable` and `invalid_inlet` are answerable from the coverage mask and the inlet classification alone. `scenario_calculation_failed` and `comparison_not_comparable` are not, which is why 3.1.4 stays
-- [ ] **Choose and pin the validated rainfall levels** → *3.2.3.b*. `RAINFALL_RANGE_MM` is a continuous 0–120 mm range; the criterion asks for a validated set. The sensitivity work used 20, 60 and 200 mm and 200 is outside the published range
+- [x] **A sufficiency test that does not require running the scenario** → *3.1.1.a, 3.1.1.d*. Answered from the tile index alone — an inlet has a window or it does not (#130, #131). `terrain_unavailable` and `invalid_inlet` are answerable from the coverage mask and the inlet classification alone. `scenario_calculation_failed` and `comparison_not_comparable` are not, which is why 3.1.4 stays
+- [x] **Choose and pin the validated rainfall levels** → *3.2.3.b*. **20, 40, 60 mm** (#129), validated in ALGORITHMS.md. `RAINFALL_RANGE_MM` is a continuous 0–120 mm range; the criterion asks for a validated set. The sensitivity work used 20, 60 and 200 mm and 200 is outside the published range
 - [ ] **Re-run the blockage sensitivity against per-location blocking** → *3.1.3.f, 3.3.2.h*. The existing measurement already covers the single-inlet case at 0.0 m³, but it was taken with a global setting; confirm the new input path reproduces it. **If it does not, that is a defect in the change, not a discovery**
-- [ ] Mass balance and monotonicity checks still pass with the new input shape → *3.2.2.d*
+- [x] Mass balance and monotonicity checks still pass with the new input shape → *3.2.2.d*. None refused across 950 Kensington and 644 council runs
 
 ---
 
 ## W3 · Frontend — scenario explorer
 
-- [ ] **Route back into the interface** → *3.1.1*. Iteration 1 removed it by AC 1.1.1.e: one entry in `TaskSelect.tsx` and one card in `Home.tsx` restore it, and the screens and their tests are untouched
-- [ ] **Mark supported and unsupported locations on the map** → *3.1.1.a, 3.1.1.d*, with wording that does not read as "this drain is fine" → *3.1.1.e*
+- [x] **Route back into the interface** → *3.1.1*. From a drain on the full map (#131), and from the homepage card. Iteration 1 removed it by AC 1.1.1.e: one entry in `TaskSelect.tsx` and one card in `Home.tsx` restore it, and the screens and their tests are untouched
+- [x] **Mark supported and unsupported locations on the map** → *3.1.1.a, 3.1.1.d*, with wording that does not read as "this drain is fine" → *3.1.1.e* (#131)
 - [ ] **Blockage control bound to the selected location only** → *3.1.2.c*
-- [ ] **Rainfall control offering the validated levels** → *3.2.3.a, 3.2.3.b*
+- [x] **Rainfall control offering the validated levels** → *3.2.3.a, 3.2.3.b* (#129)
 - [ ] **Selection summary before the run** → *3.1.2.f*
 - [ ] Labels for assumption and input → *3.1.2.d, 3.1.2.e*
-- [ ] **Result explanation extended to nine limitations** → *3.3.2.a–i*. Iteration 1 covered most of them; c, h and i need writing. **h does not go under *More information*** — it is the sentence that makes a null result honest
-- [ ] **The supported-calculation-area boundary on screen** → *3.3.2.i*. Blocked by [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md)
-- [ ] Uncertainty explanation, including photogrammetric rather than LiDAR and 52.1% of cells measured → *3.3.3.b*
+- [x] **Result explanation extended to nine limitations** → *3.3.2.a–i* (#129). Iteration 1 covered most of them; c, h and i need writing. **h does not go under *More information*** — it is the sentence that makes a null result honest
+- [x] **The supported-calculation-area boundary on screen** → *3.3.2.i*. §8 was resolved by measuring the council; the result names its one-kilometre window and how much of it was measured (#130)
+- [x] Uncertainty explanation, including photogrammetric rather than LiDAR and the share of cells measured → *3.3.3.b*. The share is now the chosen drain's window, not a fixed 52.1% (#129, #130)
 
 ---
 
@@ -119,19 +119,19 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 - [x] **The map draws**, 281 areas as marks → *4.1.1.a, 4.1.2.a*
 - [x] **One map, two paint functions, one mode switch** → *4.1.1.b, 4.1.1.c*. Selection and zoom survive a mode change, as predicted, because there is nothing to retain
-- [ ] **Colour ramp with named breaks** → *4.1.2.b, 4.1.2.d*. **The distribution is severely skewed** — 209 at the top and single digits across most areas — so equal-width bins produce one dark area and twenty-nine identical pale ones. Choose the breaks deliberately and put the ranges in the legend
-- [ ] **Recorded activity distinguished from no recorded activity** → *4.1.2.e*
-- [ ] **Area detail panel** → *4.1.4.a–h*, showing what is available and saying why anything absent is absent
-- [ ] **Completeness states** — Exact, Minimum value, Not available → *4.1.6.a*, with the two distinct causes kept distinct: a suppressed numerator is a floor, a missing denominator is no score
-- [ ] **Events section**, including the empty state → *4.2.1, 4.2.3*. **Build the empty state first**; it is what almost every area shows
-- [ ] **Evidence explanations** → *4.3.1, 4.3.2, 4.3.3*. 4.3.1 is six sentences that already exist on the Iteration 1 board and should be lifted rather than rewritten
-- [ ] **A third provenance mark** → *4.3.4.a*. The legend separates *recorded by the council* from *calculated by DrainLens*; a verified event is neither
+- [x] **Colour ramp with named breaks** → *4.1.2.b, 4.1.2.d*. Activity 1–10 / 11–25 / 26–50 / 51+, severity at the quartiles 1.3 and 3.0, ranges on the legend. **The distribution is severely skewed** — 209 at the top and single digits across most areas — so equal-width bins produce one dark area and twenty-nine identical pale ones. Choose the breaks deliberately and put the ranges in the legend
+- [x] **Recorded activity distinguished from no recorded activity** → *4.1.2.e*, with *0+* for a zero that is only a floor (#132)
+- [x] **Area detail panel** → *4.1.4.a–h*, showing what is available and saying why anything absent is absent (#132)
+- [x] **Completeness states** — Exact, Minimum value, Not available → *4.1.6.a* (#128 corrected one sentence), with the two distinct causes kept distinct: a suppressed numerator is a floor, a missing denominator is no score
+- [x] **Events section**, including the empty state → *4.2.1, 4.2.3*. **Build the empty state first**; it is what almost every area shows (#133)
+- [x] **Evidence explanations** → *4.3.1, 4.3.2, 4.3.3* (#132). 4.3.1 is six sentences that already exist on the Iteration 1 board and should be lifted rather than rewritten
+- [x] **A third provenance mark** → *4.3.4.a*: *Recorded by the SES*, *Calculated by DrainLens*, *Written by the DrainLens team* (#132). The legend separates *recorded by the council* from *calculated by DrainLens*; a verified event is neither
 
 ---
 
 ## W5 · Deployment, CI and quality
 
-- [ ] Migration for the events table, and for anything the Severity Score needs → *4.2.1*
+- [x] ~~Migration for the events table~~ — the events are a published file (#133); the Severity Score's population is loaded → *4.2.1*
 - [x] `check-guide.mjs` equivalent for the new artefacts — `tools/data/check-areas.mjs`, in CI. It recomputes the board’s thirty from the 281 and checks the population against the same codes. Mutation-tested: a swapped name, a changed total, a dropped population row and a reordered board are all caught
 - [ ] Boundary artefact size measured raw and gzipped, and recorded
 - [ ] The API compresses `/api/*` already; confirm any new route is under it
@@ -144,7 +144,7 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 ## W6 · Acceptance, demo and documentation
 
 - [ ] Acceptance checklist in use — **134 sub-criteria**, against 96 in Iteration 1
-- [ ] Severity Score definition written **before** the score is computed → *4.3.2.c*
+- [x] Severity Score definition written **before** the score is computed → *4.3.2.c*. [SEVERITY-SCORE.md](./SEVERITY-SCORE.md), 12 September
 - [ ] Desk check 1 — the scenario journey end to end
 - [ ] Desk check 2 — the flood map, both modes, including an area with no events and an area with no score
 - [ ] Manual click-through in a real browser, desktop and mobile

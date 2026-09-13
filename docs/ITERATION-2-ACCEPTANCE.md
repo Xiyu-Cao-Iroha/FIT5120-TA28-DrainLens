@@ -4,7 +4,7 @@ DrainLens · TA28 · demonstration **date to be confirmed**
 
 What "done" means for Epic 3 and Epic 4. The work that produces it is in [ITERATION-2-TASKS.md](./ITERATION-2-TASKS.md).
 
-**Tick a criterion only when it has been seen working on the deployed build** — not when the code that should satisfy it has been merged. Nothing below is ticked, because nothing below has been seen on an Iteration 2 build.
+**Tick a criterion only when it has been seen working on the deployed build** — not when the code that should satisfy it has been merged. Nothing below is ticked yet: the work for most of it is merged to `develop` (see *Where this stands*), and none of #128–#133 had been deployed when this was written.
 
 **Source:** *Iteration 2 Requirements*, received **10 September 2026**. Epic 3 and Epic 4 are both **Must Have** (US 3.1–3.3, US 4.1–4.3). Epic 5 is Should / Could / Will not have and has no criteria here. Where this file and that document disagree, the document wins and this file has a bug.
 
@@ -33,35 +33,39 @@ What must not happen is the one change that would make the screen look better an
 
 ---
 
-## Where this stands, 11 September 2026
+## Where this stands, 13 September 2026
 
-### Epic 3 — mostly built, and unreachable on purpose
+**Merged to `develop`, not yet deployed to `drainlens-dev`.** The earlier status of 11 September is in this file's history; it described Epic 3 as switched off and Epic 4 as a board with no map, and neither is true now.
 
-The scenario explorer **is** Iteration 1 old Epic 2, demonstrated on 1 September and then taken out of the interface by AC 1.1.1.e. `packages/scenario`, `apps/web/src/scenario/`, `screens/ScenarioSetup.tsx`, `screens/Result.tsx`, `map/difference.ts` and the scenario parts of `session.ts` are all in the repository and all still tested, with the comparison unreachable.
+### Epic 3 — reachable, council-wide, in the criteria's words
 
-**Three things in Epic 3 are genuinely new, and one of them changes the engine.**
-
-| | |
-|---|---|
-| **AC 3.1.2.c** — *allow only the selected drainage location to have its blockage assumption changed* | **This contradicts what was built.** The Iteration 1 blockage setting is constant for the whole scenario, and `packages/scenario` has tests holding that line against AC 2.1.2.d (Aug-27 set). Per-location blockage is a change to the engine input, not to a screen |
-| **AC 3.1.1.a and 3.1.1.d** — identify and distinguish locations that support scenario calculation | Iteration 1 let a person choose any pit and told them afterwards, through the data-sufficiency gate. Saying so **before** the choice is new, and needs the sufficiency question to be answerable without running the scenario |
-| **AC 3.2.3.b** — *only rainfall levels supported and validated by the current scenario model* | `RAINFALL_RANGE_MM` is a continuous 0–120 mm range today. A set of validated levels is a different thing from a range, and which levels have been validated has to be decided and written down |
-
-Everything else in Epic 3 has an implementation to point at: two bands (`COMPARISON_BANDS`), four named insufficiency reasons (`INSUFFICIENCY_REASONS`), difference-only output, the caching worker that lets rainfall move without re-running, and the *Why this is usually the answer here* explanation on the result screen.
-
-### Epic 4 — the board exists; the map, the score and the events do not
-
-Iteration 1 Epic 2 shipped a **ranked board** of 30 Greater Melbourne SA2 areas, verified against its own Data Quality Statement: 13,339 SA1 regions, **144 suppressed**, six financial years from 1 July 2009 to 30 June 2015, counting VICSES *Flood* dispatches only. See [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md).
-
-Epic 4 asks for three things that board is not:
-
-| Wanted | What exists | What is missing |
+| | What was done | PR |
 |---|---|---|
-| A **map** of Greater Melbourne statistical areas, coloured by dispatch count (4.1.1, 4.1.2) | A ranked list. `flood-history.json` carries names, totals, per-year counts and coverage — **and no geometry at all** | SA2 boundary polygons (ABS ASGS 2011), and a decision about how a roughly 10,000 km² map in latitude and longitude coexists with a metre-framed local one |
-| A population-based **Severity Score** (4.1.3, 4.3.2) | The `population` table, **declared and deliberately empty**: the dataset is not in the repository and has not been reconciled against its own documentation or matched to ASGS 2011 | The ABS population data, that reconciliation, and a written definition of the score |
-| **Verified flood events** with sources (4.2) | Nothing. There is no events table and no editorial process | A table, the events themselves, team-written summaries, source links, and a review step that makes "verified" mean something |
+| **3.1.1** entry, **a**, **d**, **e** | A drain on the full map opens the comparison with that drain chosen. The comparison map rings every drain a scenario can be calculated for, before anybody chooses; a drain that cannot be compared says why — not a surface inlet in the record, or not enough measured ground — and that this is about the calculation, not a sign the drain has no concern | #131 |
+| **3.1.2.c** | The engine's input is one drain and one blockage setting: only the selected drain changes, and the assumptions step says so | — |
+| **3.1.3.e**, **3.1.4.a** | *No clear change* / *Higher than baseline*; *Insufficient information* | #129 |
+| **3.2.3.b** | Rainfall offered at **20, 40 and 60 mm** only, each validated over every Kensington inlet and a council sample with the engine's checks in force (ALGORITHMS.md). The free number box, which accepted 500 mm, is gone | #129 |
+| **3.3.2.a–i**, **3.3.3.b, d** | *What this comparison cannot tell you*, nine items; what *No clear change* does not mean, beside the finding; photogrammetric ground and the window's measured share | #129, #130 |
+| Coverage | The comparison runs in the one-kilometre window around any of the council's 9,239 inlets, from 211 terrain tiles, not only in Kensington. DECISIONS-PENDING.md §8 | #130 |
+| Correctness | The difference highlight was drawn 1.5 km west and 6 km south of its drain on the council map; the browser never loaded rim depth, so every comparison spread water evenly. Both fixed | #128 |
 
-**The suppression work is already done, and it lands straight on 4.1.5 and 4.1.6.** `flood_area_coverage.complete` is false wherever a region inside an area was withheld — **nine of the thirty published areas** — and the board already shows those totals as floors. `Exact / Minimum value / Not available` is that same distinction with a third state added for a missing denominator.
+**The measurement at the top of this file still holds** — re-run with rim depth and council-wide in DECISIONS-PENDING.md §1.
+
+### Epic 4 — map, score, evidence and events
+
+| | What was done | PR |
+|---|---|---|
+| **4.1.1**, **4.1.2** | All 281 areas as marks, two modes (*Historical Flood Activity*, *Severity Score*), named breaks with ranges, *0+* for areas published as zero because everything was withheld, drag to pan | earlier, #132 |
+| **4.1.3**, **4.3.2** | Dispatches per 1,000 residents at 30 June 2012, labelled *Calculated by DrainLens* on the legend and in every area record. SEVERITY-SCORE.md | earlier, #132 |
+| **4.1.4–4.1.6** | Area record with per-year counts, floors marked `+`, *No score* with the area's residents, completeness in words | earlier, #128, #132 |
+| **4.3.1–4.3.4** | Every evidence sentence, with its numbers read from the artefacts — **80 of the 281 areas** hold a withheld count, 7 have no score — and three marks for three kinds of information | #132 |
+| **4.2.1–4.2.3** | `flood-events.json`, four events with two or three sources each. **None is shown until a team member checks it** and fills in `checkedBy` and `checkedOn`; until then every area shows the 4.2.3 empty state | #133 |
+
+### Still needs a person
+
+- **4.2.2.a** — a team member to open every source of the four drafted events and sign them off. Nothing in code can do this, which is the point of it.
+- **Deploy #128–#133** to `drainlens-dev`, then walk both journeys in a browser and tick what is seen.
+- Desk check 2, and the rehearsal decision on leading with *No clear change* (DECISIONS-PENDING.md §1).
 
 ---
 
@@ -339,7 +343,7 @@ From *Iteration 2 Requirements*.
 - [ ] **4.1.5.d** Avoid presenting the displayed total as an exact complete count
 - [ ] **4.1.5.e** Explain that the incomplete historical record also affects any derived Severity Score
 
-> **This is the one part of Epic 4 that is finished before it starts.** 144 of 13,339 SA1 regions were withheld by the publisher for privacy, nine of the thirty published areas contain at least one, and the schema column that carries a withheld count is `NULL` rather than `0` — with a comment saying that a schema unable to tell those apart would produce a ranking that is quietly wrong. The board shows those totals as floors already.
+> **This is the one part of Epic 4 that is finished before it starts.** 144 of 13,339 SA1 regions were withheld by the publisher for privacy, nine of the thirty published areas contain at least one (80 of all 281 areas), and the schema column that carries a withheld count is `NULL` rather than `0` — with a comment saying that a schema unable to tell those apart would produce a ranking that is quietly wrong. The board shows those totals as floors already.
 >
 > **e is the new half.** A floor in the numerator makes the Severity Score a floor too, and that has to propagate rather than be quietly dropped when the number is divided.
 

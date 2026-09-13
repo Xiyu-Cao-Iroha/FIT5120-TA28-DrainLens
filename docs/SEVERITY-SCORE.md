@@ -1,6 +1,6 @@
 # The Severity Score — what it is, before it is computed
 
-DrainLens · TA28 · defined **12 September 2026**, with no line of it written yet
+DrainLens · TA28 · defined **12 September 2026**, before any line of it was written; computed and on the flood map since
 
 AC 4.1.3 asks for a population-based Severity Score, and three of its eight sub-criteria are about what the score must not be taken for: the number of people affected, the physical severity of a flood, or a probability. [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md) says why those three exist — *"Dispatches per 1,000 residents over six years" is a defensible definition. "Severity" is not, on its own.*
 
@@ -121,8 +121,8 @@ And the area the rate puts first — **Riddells Creek, 17.18 per 1,000 from 67 d
 
 ---
 
-## Still open
+## Settled since
 
-- **The bands.** *Lower / Moderate / Higher* need thresholds, and the quartiles above are the obvious candidates. They are a reading aid over the rate and must not replace it on screen.
-- **Rounding.** Two significant figures reads well at these magnitudes; whether `0.00` and `no recorded activity` are distinguishable enough is a legibility question, not an arithmetic one.
-- **Nothing is computed yet.** No stage produces this, `population` is still empty, and the figures in this file were measured to write it rather than published by it.
+- **The bands.** *Lower — up to 1.3*, *Moderate — above 1.3, up to 3.0*, *Higher — above 3.0*: the first and third quartiles to one decimal place (`SEVERITY_BREAKS` in `apps/web/src/history/severity.ts`). The ranges are on the legend beside the names, and the rate itself is still what the area record shows. The legend first said *under 1.3* while a rate of exactly 1.3 banded Lower; it now says *up to*.
+- **Rounding.** Two decimal places (`scoreLabel`), with a `+` where a count inside the area was withheld. An area with no score says *No score* and shows its residents, so it cannot be read as a low score.
+- **It is computed.** The population is loaded (`population.json` and the `population` table), the join covers all 281 areas, and the map labels the number *Calculated by DrainLens* wherever it appears (AC 4.1.3.e, 4.3.2.e).

@@ -40,14 +40,14 @@ import {
 /**
  * Which screen the person is on.
  *
- * **Three of these are unreachable, and deliberately so.** It was four until
- * 11 September.
+ * **None of these is hidden any more.** Four were until 11 September, and
+ * three until 13 September.
  *
  * `task` was one of two steps between the homepage and the map. Since
  * 3 September the homepage opens the map directly and an address is named in
  * the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put it.
  * `scenario` and `result` are the drain-blockage comparison, which AC 1.1.1
- * requires to be absent from the Iteration 1 interface.
+ * kept out of the Iteration 1 interface.
  *
  * **`address` stopped being one of them on 11 September.** The guide asks
  * where you live before it can point at a pit near you, and this is the screen
@@ -55,10 +55,12 @@ import {
  * again without being rewritten. Kept code that turns out to be needed is the
  * argument for keeping it, and it is worth saying once that the argument paid.
  *
- * They are kept rather than deleted: their screens and tests are intact, and
- * Iteration 2 decides whether to restore them or remove them. Nothing
- * dispatches an event that reaches any of them, which is what makes them
- * hidden rather than merely unvisited.
+ * **`scenario`, `result` and `task` came back on 13 September**, for AC 3.1.1:
+ * the homepage's comparison card asks for an address and opens the comparison,
+ * a drain on the full map opens it directly (`scenario-from-map`), and the
+ * comparison's *Choose a task* breadcrumb reaches `task`. The same argument as
+ * `address`: they were kept rather than deleted, with their tests, and were
+ * reached again rather than rewritten.
  */
 export type Screen =
   /** What somebody lands on: what this is, before it asks anything of them. */
@@ -76,7 +78,7 @@ export type Screen =
   | 'flood-map'
   /** The guide's way in, and reachable again since 11 September. */
   | 'address'
-  /** Unreachable — the homepage's cards took this over. */
+  /** The task question, reached from the comparison's breadcrumb. */
   | 'task'
   | 'explore'
   /**

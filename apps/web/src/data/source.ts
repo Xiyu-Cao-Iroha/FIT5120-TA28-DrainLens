@@ -42,13 +42,15 @@ export const BUNDLED_EXTENT = 'kensington';
 export const API_EXTENT = 'city-of-melbourne';
 
 /**
- * The derived layers cover one square kilometre of whichever map is showing.
+ * The derived layers cover the measured ground of whichever map is showing.
  *
  * Surface-water paths, low points and the data-quality hatching are calculated
- * from a measured ground surface, and that surface exists for Kensington and
- * nowhere else: 6.6 million points over one square kilometre. Expanding the
- * recorded network did not expand the terrain, and inventing paths across the
- * other 75.5 km² would be exactly the fabrication this product refuses.
+ * from a measured ground surface. The bundled copy is Kensington's square
+ * kilometre; since 13 September the database copy is the whole council, from
+ * every point-cloud tile the archive has — 211 of the extent's 306. The other
+ * 95 were never measured and nothing is drawn in them, and the artefact
+ * carries a `covers` sentence saying so. Inventing paths across unmeasured
+ * ground would be exactly the fabrication this product refuses.
  *
  * **They arrive already in the frame of the map they are drawn over**, because
  * `pipeline/reframe.py` moves them at build time. Every artefact's
