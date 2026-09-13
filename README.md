@@ -115,7 +115,7 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure, and again after the coverage pass that followed it.
+Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure. The Node coverage and test counts were re-measured again on **13 September 2026**, after #133.
 
 **This table is the only place the test counts are written.** Every prose restatement of them has gone stale, three times, and the third was hours old — see the note under *Suite runtime*.
 
