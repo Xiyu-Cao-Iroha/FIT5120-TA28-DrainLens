@@ -1,0 +1,539 @@
+# The database, and what it is allowed to hold
+
+DrainLens · TA28 · **proposed and built, 5 September 2026**
+
+Iteration 1 shipped with no application server and no database, and that was a
+recorded decision. It is being reversed for Iteration 2. This document says
+what the database holds, what it deliberately does not, and what has to stay
+true afterwards.
+
+---
+
+## What was recorded, and why it was too broad
+
+The technical-choices table in
+[PRE-DEPLOYMENT-WALKTHROUGH.md](./PRE-DEPLOYMENT-WALKTHROUGH.md) reads:
+
+| Choice | Instead of | Why |
+|---|---|---|
+| Static artefacts | REST API + database | AD1. No endpoint that receives an address can leak one. |
+
+**The reason supports a narrower conclusion than the one it was used for.** It
+argues against one thing: an endpoint that receives a resident's address. The
+drainage network, the terrain and the flood history are published council and
+State Emergency Service data. They contain nothing about anybody. Storing them
+in a database breaks no promise this product has made.
+
+AD1 itself says the product has **no accounts and no identity**. It does not
+say "no database", and the two are not the same claim. The table conflated
+them, and this document is the correction.
+
+---
+
+## The line that does not move
+
+**The address index stays in the browser.** Not because AD1's wording forbids
+otherwise, but because two things already visible to a resident say so:
+
+- The guided tour, step one: *"The search runs in your browser — nothing about
+  the address is sent anywhere."*
+- This repository's interface contract: *"the cheapest way to keep a promise
+  about data is to never receive it."*
+
+An address search that calls a server sends every keystroke of somebody's home
+address to that server, and a log line is storage. Moving `addresses.json`
+behind an API would make both of those sentences false, and they would have to
+be removed from the interface in the same change — which is a decision about
+what the product promises, not a decision about where data lives. It is not
+part of this one.
+
+At 4,089 addresses and 66 KB over the wire there is no technical reason to move
+it either.
+
+---
+
+## What goes in, and what stays a file
+
+| | Where | Why |
+|---|---|---|
+| Flood incidents, **all 13,339 SA1 regions** | **Database** | The artefact publishes 30 areas. The pipeline computes 281 in scope and reads 13,339 regions, and throws the rest away at build time. |
+| ABS population by area | **Database** | New. The join it enables is the whole reason the mentor asked for this. |
+| Drainage pits, pipes, roads, street labels | **Database** | Tabular and modest: 895 + 893 + 220 + 163 rows. Geometry stored as coordinate arrays, exactly as the artefact holds it. |
+| Downstream links and their termination reasons | **Database** | 893 edges with a reason each — a graph, which is a thing databases are good at. |
+| Surface-water paths, low points, unavailable areas | **Database** | 38 + 310 + 46 shapes. |
+| The address index | **File** | See above. |
+| `scene/*.bin` — elevation, flow, depressions, coverage | **File** | A 1000 × 1000 `Int16Array` is not a table. Storing a million cells as rows to serve them back as a typed array is a worse version of a file, and the client reads them into `ArrayBuffer`s anyway. |
+
+**The pipeline stays the source of truth for derivation.** Nothing is computed
+in the database. `drainlens_pipeline` still does the D8 routing, the SMRF
+filtering, the ABS join and the suppression handling; what changes is that it
+writes rows as well as files. A backend that tried to *derive* these per
+request would be rebuilding a pipeline that already exists and can be checked
+offline — which is what the interface contract says, and it is still right.
+
+---
+
+## Built and verified, 5 September
+
+The schema and the loader exist and were run. Against Postgres 16:
+
+| Table | Rows | Matches |
+|---|---:|---|
+| `pit` · `pipe` · `road` · `street_label` | 895 · 893 · 220 · 163 | `map.json` exactly |
+| `derived_shape` | 394 | 38 channels + 310 low points + 46 unavailable |
+| `trace_link` · `trace_reason` | 734 · 4 | `trace.json` exactly |
+| `flood_area` · `flood_area_coverage` | 1,686 · 281 | every area in the scope over six years; thirty carry a `board_rank` |
+| `population` | 1,967 | 281 areas at seven 30 Junes |
+| `flood_incident` | 0 | empty on purpose, see above |
+
+**Two design decisions stopped being assertions and became measurements.**
+Sixty-nine of the 893 pipes name a downstream pit that is not in this extent —
+a foreign key on `dnstr_pit` would have rejected sixty-nine rows the council
+record actually contains. And twenty-two of the 895 pits have no recorded
+object type, which is the nullable column doing the work AC 1.1.7.f needs.
+
+The board rebuilds from rows: Bacchus Marsh 209, Croydon 196, Eltham 179,
+Boronia - The Basin 160 (incomplete), Dandenong 133 (incomplete) — **and the
+query finds the Dandenong/Gisborne tie at 133** rather than silently ordering
+one above the other.
+
+Twelve integration tests assert all of it, behind `npm run test:db` with its
+own CI job and a Postgres service container. They are not in the five-second
+suite, because tests that need a container do not fail without one — they
+refuse to start, and nobody could then test anything.
+
+---
+
+## Schema
+
+**`db/migrations/001_init.sql` is the schema. This section is not a copy of
+it** — a second copy drifts, and the one in a design document drifts silently.
+Read the migration; it carries a comment per decision.
+
+### Three things the draft got wrong, found by running it
+
+The first draft of this section was written from the artefacts as I understood
+them. Loading the real files broke it three times, and each break was the
+schema claiming something the data does not say.
+
+**`source.title NOT NULL`.** The map artefact names a dataset id, a publisher
+and a licence per layer and carries **no human title**. The load failed on the
+first row. Writing the id into the column to fill it would have invented a
+title; the column is nullable now.
+
+**`retrieved date`.** The artefacts record `last_modified` — when the
+*publisher* last changed the dataset. That is not when we fetched it. A column
+named for one fact holding the other is a lie that survives every future
+reader, so the column is `last_modified`.
+
+**`trace_termination (pit, reason)`.** This was fiction. The artefact does not
+say which pit ends for which reason: it publishes the four reasons, the
+sentence shown for each, and how many pits fall into each. Which reason applies
+to a given pit depends on where the walk started and is worked out when a path
+is followed. It is `trace_reason` — a vocabulary — now.
+
+The third is the one worth remembering. It would have loaded without error
+against a plausible-looking artefact, and produced a table that answered
+questions confidently and wrongly.
+
+### Four things the deep comparison caught that the guards did not
+
+The API's first version passed `assertUsable`, `assertDerived`, `assertTrace`
+and `assertFloodHistory`, and passed spot checks on layer counts and one pit.
+It was still wrong in four ways, all found by comparing a whole response with
+the file it replaces.
+
+**Thirty-seven links lost their reason.** 697 of the 734 name the pit a pipe
+reaches; the other 37 name the pipe and a reason the destination is unknown —
+the record has the pipe and not its end. Stored as `to_pit NULL` with `ends`
+dropped, they came back as `{ pipe, to: null }`. `traceDownstream` tests
+`link.to === undefined`, which `null` is not, **so the client would have walked
+into a pit that does not exist** instead of stopping and saying why. There is a
+CHECK constraint on it now: a link has a destination or a reason, never both
+and never neither.
+
+**Two hundred and fifteen pits lost their key.** The artefact carries an empty
+array for a pit with nothing leaving it, and `traceDownstream` documents the
+difference: an absent key is *a pit we do not carry*, an empty array is *the
+record says there is no pipe*. They render alike today and are different
+questions. Rebuilding is a left join from `pit` now.
+
+**Every street lost its display name.** The artefact carries `name`
+(`SMITHFIELD  ROAD`) and `maplabel` (`Smithfield  Road`), and `draw.ts` reads
+`maplabel ?? name`. The column did not exist, so all 163 streets would have
+been drawn in capitals.
+
+**Twenty-two pits had their links reordered**, because the query sorted by pipe
+id and the artefact uses the pipeline's order. `traceDownstream` walks them in
+the order it is given, so which path a resident is shown first would have
+depended on an id. `trace_link.position` keeps it.
+
+> **The lesson is about the tests, not the schema.** Guards check that an
+> artefact can qualify itself; they do not check that it says the same thing as
+> the one it replaces. Counts and spot checks miss a dropped field on every row.
+> Only a comparison with no opinion about which fields matter finds these, and
+> it found four.
+
+### Two decisions that became measurements
+
+**No foreign key on `pipe.dnstr_pit`.** Sixty-nine of the 893 pipes name a
+downstream pit that is not in this extent. A constraint would have rejected
+sixty-nine rows the council record actually contains — the database editing the
+record rather than storing it. It is also the same fact a resident already sees
+on the map, as a path that stops because the record stops.
+
+**`pit.object_type` nullable.** Twenty-two of the 895 pits have none. NULL is
+"the council record has no value here", which `PitDetail` renders as *Not
+recorded*; an empty string would print as a value.
+
+## What the API serves
+
+Built, running, and answering on every route. `apps/api`, Hono on Node, with
+`pg` and a pool of five.
+
+
+`apps/api` — Node, TypeScript, Hono, on Cloud Run beside the existing service.
+
+| Method | Path | Answers |
+|---|---|---|
+| `GET` | `/api/flood-history` | The board as it exists today, assembled from rows |
+| `GET` | `/api/flood-history/areas?per=capita` | Ranked by incidents per thousand residents — the mentor's fifth point |
+| `GET` | `/api/flood-history/areas/:name` | One area, all six years, with its region count and how many were withheld |
+| `GET` | `/api/map/:extent` | Pits, pipes, roads, labels — the shape `map.json` has now |
+| `GET` | `/api/derived/:extent` | Channels, low points, unavailable areas |
+| `GET` | `/api/trace/:extent` | Links and terminations |
+
+**Every one of them is a `GET` with no body and no identifier for a person.**
+There is no `POST` in Iteration 2's scope: Epic 4's drain checks would add one,
+and that needs its own decision about moderation and abuse before a write path
+exists at all.
+
+**The response shapes do not change.** The frontend's `assertUsable`,
+`assertDerived`, `assertTrace` and `assertFloodHistory` stay exactly as they
+are, and keep refusing an artefact that cannot qualify itself. What changes is
+where the bytes come from. That is deliberate: it means the whole frontend test
+suite is still testing the thing that ships, and a rollback is a URL change.
+
+---
+
+## Getting the data in
+
+**Changed on 5 September, while building it.** This section first said the
+pipeline would gain a `--to-database` flag and write rows alongside files. That
+is two writers and two truths that can disagree, and the disagreement would be
+invisible until somebody compared a map with a query.
+
+The loader reads the **published artefacts** instead. There is one derivation,
+one writer, one language touching the connection, and a database that can be
+rebuilt from a checkout at any time.
+
+```
+pipeline  ──derives──>  JSON artefacts  ──loader──>  Postgres
+                        (the record)
+```
+
+`apps/api/src/load.ts`, in one transaction, truncating before it inserts so a
+re-run replaces rather than doubles. A load that throws leaves the previous
+rows in place rather than a half-populated map, and every field it reads is one
+the artefact is contracted to carry — a missing one throws with its name rather
+than becoming a NULL that reads as "the council recorded nothing".
+
+**What this costs is the SA1 grain.** The published artefact holds the
+thirty-area rollup; the 13,339 regions underneath it are computed by the
+pipeline and discarded at build time. Loading them means the pipeline emitting
+the full grain as a file, which means re-fetching the VICSES and ABS sources,
+which are downloaded per run and not kept in the repository. Until then
+`flood_incident` is declared and empty, because inventing SA1 codes to make a
+table look loaded would be fabricating the identifiers this product refuses to
+fabricate.
+
+**`population` is no longer one of them.** It was filled on 12 September, at
+SA2, from ABS 3218.0 — reconciled against its own documentation and matched to
+all 281 areas by two independent joins. That settles the grain question this
+paragraph was waiting on: the score is computed at SA2 from the published
+rollups, so `flood_incident` stays empty and this reasoning stays true of it.
+See [POPULATION-DATA.md](./POPULATION-DATA.md).
+
+---
+
+## The entity relationship diagram
+
+Generated from `db/migrations/001_init.sql` rather than drawn beside it, so a
+column that changes in one and not the other is a diff rather than a
+disagreement nobody notices.
+
+**Read the line style first.** A solid line is a foreign key the database
+enforces. **A dashed line is a join the data cannot support**, and every one of
+them is dashed for a measured reason rather than for convenience:
+
+| Dashed | Why the constraint is absent |
+|---|---|
+| `pipe` → `pit` | **69 of 893 pipes** name an upstream or downstream pit outside this extent. A foreign key would reject rows the council record actually contains, and the map draws those as a path that stops |
+| `trace_link` → `pit`, `pipe` | The trace is derived from the same incomplete topology. **37 links** name no destination at all and carry a reason instead |
+| `flood_incident` → `sa1_region` | The intended join, and `flood_incident` is **empty**: the SA1 grain is not in any published artefact. Declared so the shape is visible, unconstrained so nobody reads an empty table as a satisfied one |
+| `flood_area` → `flood_area_coverage` | Two halves of one published rollup, joined on `(extent_scope, area_name)`. Neither owns the other |
+
+```mermaid
+erDiagram
+    source ||--o{ pit : attributes
+    source ||--o{ pipe : attributes
+    source ||--o{ road : attributes
+    source ||--o{ street_label : attributes
+    source ||--o{ population : attributes
+
+    extent ||--o{ pit : holds
+    extent ||--o{ pipe : holds
+    extent ||--o{ road : holds
+    extent ||--o{ street_label : holds
+    extent ||--o{ derived_shape : holds
+    extent ||--o{ trace_link : holds
+    extent ||--o{ trace_reason : holds
+    extent ||--o{ artefact_envelope : describes
+
+    pit ||..o{ pipe : "is upstream of"
+    pit ||..o{ pipe : "is downstream of"
+    pit ||..o{ trace_link : "water leaves"
+    pipe ||..o{ trace_link : "water travels along"
+    trace_reason ||..o{ trace_link : "explains an ending"
+
+    sa1_region ||..o{ flood_incident : "counted in"
+    flood_area_coverage ||..o{ flood_area : "qualifies"
+
+    source {
+        text dataset_id PK
+        text title "nullable: not one of the seven sources carries one"
+        text publisher
+        text licence
+        date last_modified
+    }
+
+    extent {
+        text id PK
+        float min_e "metres east of the frame origin"
+        float min_n
+        float width_m
+        float height_m
+        text crs
+    }
+
+    artefact_envelope {
+        text name PK
+        text extent_id FK
+        int version
+        jsonb envelope "the prose and provenance, served back untouched"
+    }
+
+    pit {
+        bigint asset_number PK
+        text extent_id FK
+        text dataset_id FK
+        float e_m "metres east of the extent corner, not longitude"
+        float n_m
+        text description
+        text object_type "NULL for 22 of 895"
+    }
+
+    pipe {
+        bigint ref PK
+        text extent_id FK
+        text dataset_id FK
+        bigint upstr_pit "not a foreign key"
+        bigint dnstr_pit "not a foreign key"
+        int diameter_mm "a dimension, never a capacity"
+        text material
+        jsonb path
+    }
+
+    road {
+        bigint id PK
+        text extent_id FK
+        text dataset_id FK
+        text str_type
+        text seg_descr
+        jsonb rings
+    }
+
+    street_label {
+        bigint id PK
+        text extent_id FK
+        text dataset_id FK
+        text name
+        text maplabel "the cased form of name; the API dropped it once and 163 streets shouted"
+        jsonb path
+    }
+
+    derived_shape {
+        bigint id PK
+        text extent_id FK
+        text layer "channel, low-point or unavailable"
+        text geometry "line or polygon"
+        jsonb coordinates
+    }
+
+    trace_link {
+        text extent_id PK
+        bigint from_pit PK
+        bigint via_pipe PK
+        bigint to_pit "NULL exactly when ends is set"
+        text ends "why the path stops, when it does"
+        int position
+    }
+
+    trace_reason {
+        text extent_id PK
+        text reason PK
+        text sentence "shown to a resident, in the record's words"
+        int occurrences
+    }
+
+    sa1_region {
+        char7 sa1_code_2011 PK
+        text sa2_name "SA2 contains SA1s, not the reverse"
+        text greater_capital
+    }
+
+    flood_incident {
+        char7 sa1_code_2011 PK
+        char7 financial_year PK
+        text incident_type PK
+        int count "NULL means withheld for privacy, never zero"
+    }
+
+    flood_area {
+        text extent_scope PK
+        text area_name PK
+        char7 financial_year PK
+        text incident_type PK
+        int count
+    }
+
+    flood_area_coverage {
+        text extent_scope PK
+        text area_name PK
+        int regions
+        int suppressed_regions
+        bool complete "false where a region was withheld, so the total is a floor"
+    }
+
+    population {
+        text area_code PK
+        text area_level PK
+        date as_at PK
+        int persons
+        text dataset_id FK
+    }
+```
+
+**`flood_incident` is drawn and empty**, and a diagram that omitted it would
+hide the SA1 grain behind a table nobody can see is missing. `population` was
+beside it in that sentence until 12 September and is now loaded; the join it
+was drawn for — incidents per person — is made on
+`flood_area_coverage.sa2_code`, and `apps/api/test-db/load.test.ts` computes
+the Severity Score's own query against it.
+
+**`schema_migration` is not drawn.** It records which migrations have run and
+has no relationship to anything the product is about.
+
+---
+
+## How it is deployed
+
+**Live since 5 September 2026:**
+https://drainlens-api-205559161217.australia-southeast1.run.app/health —
+`drainlens-api-00001-69r`, over a `db-f1-micro` Cloud SQL instance in
+`australia-southeast1`, serving 895 pits and 30 areas. Every response was
+compared against the artefact it reproduces and matched.
+
+The runbook is [`deploy/API-DEPLOYMENT.md`](../deploy/API-DEPLOYMENT.md): a
+Cloud SQL instance, an image built from `deploy/api/Dockerfile`, a Cloud Run
+job that migrates and loads, and a Cloud Run service that serves. The job and
+the service are the same image, because a migration built from a different
+commit than the server it migrates for is a failure nobody can reproduce
+afterwards.
+
+---
+
+## What must still be true afterwards
+
+1. **No endpoint receives an address.** Every route above takes an extent id or
+   an area name, both of which are public.
+2. **The Cloud Run request-log exclusion stays applied to the API service too.**
+   It is per-service. A new service is a new place for `httpRequest.remoteIp`
+   to be written, and the exclusion has to be verified against the API the same
+   way it was verified against the site — with a positive control, because an
+   empty log during a quiet hour proves nothing.
+3. **Cloud SQL logs are a second place IPs can appear.** `log_connections` and
+   `log_disconnections` record client addresses. Rather than rely on a default
+   nobody checked, the instance is created with both set to `off` explicitly —
+   a flag that is set can be read back, and a default cannot be told apart from
+   an oversight. `deploy/API-DEPLOYMENT.md` step 3.
+4. **The database accepts no direct connection.** This is weaker than what this
+   document first said, and the difference is worth writing down rather than
+   quietly softening. "No public IP" would need a VPC and either a serverless
+   connector or Direct VPC egress — more moving parts and, for the connector,
+   more money than the database. What is deployed instead is an instance with
+   its default public IP and **no authorized networks**, which is not the same
+   as reachable: with no network authorised, the only way in is the Cloud SQL
+   Auth connector, over TLS, with IAM. A scanner finding the address finds a
+   port that refuses it.
+
+   The failure mode to watch for is somebody adding an authorized network to
+   make a connection work. That solves an IAM problem by opening the instance
+   to the internet, and the runbook says so where it would be tempting.
+5. **`FORBIDDEN_WIRE_KEYS` still applies.** Adding a server does not make
+   `photo`, `image` or `imageData` acceptable on the wire; AD10 keeps the
+   classification on the device.
+
+---
+
+## Cost, honestly
+
+Cloud SQL is not free and has no free tier. The smallest shared-core instance
+(`db-f1-micro`, 10 GB HDD) is roughly **AUD 12–15 a month** in
+`australia-southeast1`, billed whether or not anything queries it. Firestore
+would have been near-zero at this traffic, and was not chosen.
+
+**That is a real trade and it should be said out loud in the handover**: the
+relational engine was chosen because the flood-and-population question is a
+join, and a join is what the alternative could not do without duplicating the
+answer at write time. Stopping the instance between demonstrations is the
+mitigation, and it costs a cold start.
+
+---
+
+## Open questions, in the order they block work
+
+**Three of these four are answered.** They are kept rather than deleted,
+because what a question turned out to be is worth as much as the answer.
+
+1. ~~**The population dataset does not exist in this repository yet.**~~
+   Answered 12 September. ABS 3218.0, SA2 estimates 2005–2015, reconciled
+   against its own Explanatory Notes and matched to **281 of 281** areas by two
+   independent joins that agree on every one. It was the critical path and it
+   was data work rather than database work, as this said.
+
+2. ~~**Which population, and at which grain.**~~ SA2, at **30 June 2012** — the
+   mid-point of the reporting period, and an ABS *revised* estimate rather than
+   a final one, which is recorded rather than smoothed over. The whole
+   2009–2015 series is loaded beside it, because a per-year view has to divide
+   by that year. [POPULATION-DATA.md](./POPULATION-DATA.md).
+
+3. ~~**Per capita of what.**~~ Per resident, and the number keeps its unit on
+   screen rather than becoming a 0–10 index.
+   [SEVERITY-SCORE.md](./SEVERITY-SCORE.md) is the definition, written before
+   anything computed it. **The question was right to be asked**: seven areas
+   have almost no residents, and one dispatch in an industrial estate of
+   fifteen people would have outscored everywhere in Greater Melbourne by four
+   times. They are published with no score rather than with a large one.
+
+4. **Whether Iteration 2 has a budget** for a continuously running instance.
+   Still open.
+
+---
+
+## What this replaces
+
+When this is built, the technical-choices table's *"Static artefacts | REST API
++ database"* row is rewritten rather than deleted: the reasoning was sound for
+Iteration 1 and the row should say what changed and when, not pretend the
+decision was always this one.

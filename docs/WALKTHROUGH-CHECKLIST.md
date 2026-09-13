@@ -1,8 +1,10 @@
-# Paired walkthrough — 77 criteria, in the order you click them
+# Paired walkthrough — the 77 criteria of 27 August, in the order you click them
 
 DrainLens · TA28 · a working sheet for a paired session, **not a record of one**
 
 Fill it in while doing it. An entry written afterwards from memory is worth less than a blank one, and a blank one is honest.
+
+> **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
 
 ---
 
@@ -59,7 +61,7 @@ Type `46 Gatehouse Drive` — do not paste, so you see the suggestions appear.
 | 1.1.1.a | The chosen address is shown on the next screen | | |
 | 1.1.1.b | The task page opens | | |
 | 1.1.1.c | All three tasks are offered, named as the criterion words them | | |
-| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too | | |
+| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too. One key is expected and is not a failure: `drainlens.tour.seen`, holding `1` — it says the map tour has been shown once on this browser and nothing more. Anything else in there is a defect | | |
 
 Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 

@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Code quality — DrainLens</title>
+    <!--
+      A standalone page, not part of the application.
+
+      It is served by the same container and sits behind the same access gate,
+      so it needs no build step and cannot break the map by existing. It is
+      also the reason it does not use `kensington-sans.woff2`: that file is
+      subset to the 120 characters the interface uses, and this page has
+      characters the interface does not. A missing glyph falls back one
+      character at a time, which looks like a defect on a page about defects.
+    -->
+    <style>
+      :root {
+        --ink-strong: #17242e;
+        --ink-base: #33475a;
+        --ink-muted: #5b6e7e;
+        --brand: #1f5b4e;
+        --brand-tint: #eef4f2;
+        --paper: #ffffff;
+        --page: #f5f8f7;
+        --hair: #e1e8e4;
+        --rule: #c3cdc7;
+        --warn-tint: #fdf7ec;
+        --warn-rule: #e6d8bc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 24px 64px;
+        background: var(--page);
+        color: var(--ink-base);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 15px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        margin: 0 0 6px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 34px;
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+        color: var(--ink-strong);
+        font-weight: 650;
+      }
+
+      .lede {
+        margin: 0 0 28px;
+        max-width: 74ch;
+        font-size: 16px;
+        color: var(--ink-base);
+      }
+
+      .lede strong {
+        color: var(--ink-strong);
+      }
+
+      section {
+        margin: 0 0 22px;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        font-weight: 600;
+      }
+
+      .cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--hair);
+        border-radius: 10px;
+        padding: 18px 20px;
+      }
+
+      .card h3 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        color: var(--ink-strong);
+        font-weight: 650;
+      }
+
+      .card .rule {
+        margin: 0 0 12px;
+        font-size: 13.5px;
+        color: var(--ink-muted);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 17px;
+      }
+
+      li {
+        margin-bottom: 7px;
+      }
+
+      li:last-child {
+        margin-bottom: 0;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.94em;
+        background: var(--page);
+        border: 1px solid var(--hair);
+        border-radius: 4px;
+        padding: 0 4px;
+        color: var(--ink-strong);
+      }
+
+      .figures {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .figure {
+        background: var(--brand-tint);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+
+      .figure .n {
+        display: block;
+        font-size: 25px;
+        line-height: 1.1;
+        font-weight: 650;
+        color: var(--brand);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .figure .of {
+        display: block;
+        margin-top: 3px;
+        font-size: 13px;
+        color: var(--ink-muted);
+      }
+
+      .caught {
+        background: var(--paper);
+        border: 1px solid var(--hair);
+        border-left: 4px solid var(--brand);
+        border-radius: 10px;
+        padding: 18px 22px;
+      }
+
+      .caught li {
+        margin-bottom: 11px;
+      }
+
+      .caught b {
+        color: var(--ink-strong);
+      }
+
+      .dod {
+        background: var(--brand);
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 18px 22px;
+      }
+
+      .dod h2 {
+        color: #cfe0d9;
+      }
+
+      .dod p {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .dod code {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+      }
+
+      .open {
+        background: var(--warn-tint);
+        border: 1px solid var(--warn-rule);
+        border-radius: 10px;
+        padding: 18px 22px;
+      }
+
+      .open b {
+        color: var(--ink-strong);
+      }
+
+      footer {
+        margin-top: 26px;
+        padding-top: 14px;
+        border-top: 1px solid var(--rule);
+        font-size: 13.5px;
+        color: var(--ink-muted);
+      }
+
+      footer a {
+        color: var(--ink-muted);
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+          padding: 0;
+          font-size: 11pt;
+        }
+        .card,
+        .caught,
+        .open,
+        .dod {
+          break-inside: avoid;
+        }
+        .dod {
+          background: #ffffff;
+          color: var(--ink-base);
+          border: 2px solid var(--brand);
+        }
+        .dod h2 {
+          color: var(--ink-muted);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">DrainLens · I2 Product Discovery · 07 / 09</p>
+      <h1>Code quality</h1>
+      <p class="lede">
+        Every number on this page was <strong>measured on 7 September 2026</strong>, by running the
+        command named beside it. None is carried forward from an earlier run, and the things that
+        are not green are on the page with the things that are — a quality report showing only
+        passes is not evidence of quality, it is evidence of what was reported.
+      </p>
+
+      <section>
+        <h2>Release quality checks</h2>
+        <div class="cols">
+          <div class="card">
+            <h3>Code review</h3>
+            <p class="rule">Branch → pull request → written review → merge</p>
+            <ul>
+              <li>
+                <b>70 merged pull requests.</b> Every change to <code>main</code> has been through
+                one — there is no other route.
+              </li>
+              <li>
+                <b>Zero direct pushes to <code>main</code></b>, enforced by a GitHub ruleset and
+                <b>tested by attempting one</b>. A rule nobody has seen refuse anything is a rule
+                nobody should trust.
+              </li>
+              <li>
+                Feature branches are cut from <code>develop</code>; <code>develop → main</code> is
+                the release. Every PR description says what changed and <em>why</em>, including the
+                defects found while making it.
+              </li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Automated checks</h3>
+            <p class="rule">Three CI jobs, on every pull request</p>
+            <ul>
+              <li>
+                <code>check</code> — TypeScript build, then Vitest with coverage thresholds
+                <b>enforced in configuration</b>: 88% overall, 90% for the judgement-carrying
+                packages. A shortfall fails the job rather than printing a warning.
+              </li>
+              <li>
+                <code>database</code> — 42 tests against a real <b>Postgres 16</b> service
+                container, not a mock.
+              </li>
+              <li>
+                <code>pipeline</code> — 377 pytest tests with a 90% gate in
+                <code>pyproject.toml</code>.
+              </li>
+              <li>
+                Also in <code>check</code>: a documentation and source-encoding check, and
+                <code>npm ci</code> rather than <code>npm install</code>, so lockfile drift fails
+                the build instead of passing quietly. <code>npm audit</code>: 0 vulnerabilities.
+              </li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Release evidence</h3>
+            <p class="rule">Recorded per deployment in <code>deploy/README.md</code></p>
+            <ul>
+              <li>The Cloud Run revision id, and the image tag it was built from.</li>
+              <li>
+                <b>The deployed bundle hash, compared against a local build</b> of the same commit —
+                the check that caught a deployment silently falling back to Buildpacks and shipping
+                something other than this repository.
+              </li>
+              <li>
+                The access gate answering 401 without credentials <em>and 200 with them</em>: a 401
+                alone is half a check.
+              </li>
+              <li>
+                The privacy check with a <b>positive control</b> — zero log entries carrying a
+                client address, alongside proof that logging is happening at all.
+              </li>
+              <li>p95 latency and the fetch-failure rate, from a script in the repository.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="figures">
+          <div class="figure">
+            <span class="n">1,099</span>
+            <span class="of">automated tests</span>
+          </div>
+          <div class="figure">
+            <span class="n">92.6%</span>
+            <span class="of">TypeScript line coverage, gate 88%</span>
+          </div>
+          <div class="figure">
+            <span class="n">91.8%</span>
+            <span class="of">Python line coverage, gate 90%</span>
+          </div>
+          <div class="figure">
+            <span class="n">70</span>
+            <span class="of">reviewed pull requests</span>
+          </div>
+          <div class="figure">
+            <span class="n">0</span>
+            <span class="of">direct pushes to main</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>What the checks actually caught</h2>
+        <div class="caught">
+          <ul>
+            <li>
+              <b>Four shape changes that the type system and the artefact guards both accepted.</b>
+              Found only by comparing whole API responses against the published files: 37 drainage
+              links lost the reason a path stops and gained a null destination — the client would
+              have walked into a pit that does not exist; 215 pits lost an empty key, turning “the
+              record says there is no pipe” into “a pit we do not carry”; 163 street labels lost
+              their display name; 22 pits had their links reordered.
+            </li>
+            <li>
+              <b>A server that built, started, exited zero and listened on nothing.</b> Its
+              entry guard tested for a filename ending in <code>server.ts</code> — true of the
+              source, false of the <code>dist/server.js</code> that actually ships. Every test
+              passed, because the tests import the app and never run that line. Only building and
+              running it showed the defect.
+            </li>
+            <li>
+              <b>167 drainage pits described as surface inlets that the council record calls
+              junctions.</b> One sentence had been shown for all 895 pits. Nobody noticed, because
+              a sentence that is right 77% of the time reads exactly like one that is always right.
+              It surfaced when a drawing had to decide whether to draw water entering — a picture
+              cannot be vague — and the classification is now a tested rule.
+            </li>
+            <li>
+              <b>A source file that was invisible to every code search.</b> A raw NUL byte inside a
+              string made <code>git</code> and <code>grep</code> treat the whole file as binary and
+              skip it silently. It is now refused by a CI check that was watched failing on the real
+              defect before it was trusted.
+            </li>
+            <li>
+              <b>The promise that no address leaves the browser is enforced by a test, not by
+              reading the code.</b> It replaces both storages, <code>history</code> and
+              <code>document.cookie</code> with traps, plays a whole session, and asserts nothing
+              was written — then proves the traps work by writing to one on purpose.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="dod">
+        <h2>Definition of done — what must pass before a user story closes</h2>
+        <p>
+          Acceptance criteria met · TypeScript build clean · both suites green with coverage
+          thresholds enforced · documentation and encoding check passing · merged through a
+          reviewed pull request · and, for anything a visitor can see,
+          <b>verified in a real browser and recorded in the deployment log</b> — because a green
+          suite says the code is right and says nothing about which build is serving.
+        </p>
+      </section>
+
+      <section class="open">
+        <h2>What is not green</h2>
+        <ul>
+          <li>
+            <b>The suite-runtime gate cannot be passed or failed, because it never said which clock
+            it means.</b> Three runs of the same command: the test runner reported 3.74 s, 3.69 s
+            and 5.12 s; the wall clock for those same three commands was 6.42 s, 6.42 s and 8.10 s.
+            Both are honest measurements of different things. Recorded as a gate needing
+            restatement rather than settled by choosing the flattering number.
+          </li>
+          <li>
+            <b>The mobile layout is an unticked definition-of-done item.</b> Measured rather than
+            left as a checkbox: at 375 pixels the map legend covers more than half the map and the
+            layer controls take two rows above it.
+          </li>
+          <li>
+            <b>One colour token fails accessibility.</b> The palette's quietest grey measures 3.34:1
+            against white where normal text needs 4.5:1, across about 25 strings — including the
+            licence attribution the product is required to display. Fixing it changes how the whole
+            product looks, so it is a design decision on the board rather than a silent edit.
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        Measured 7 September 2026 by running <code>npm run coverage</code>,
+        <code>npm run test:db</code>, <code>pytest</code> and
+        <code>node tools/docs/check.mjs</code>, and by walking the deployed site in a browser. The
+        gates themselves live in <code>vitest.config.ts</code> and
+        <code>pipeline/pyproject.toml</code>; the deployment records live in
+        <code>deploy/README.md</code>. DrainLens · Team TA28 HexaNexus.
+      </footer>
+    </main>
+  </body>
+</html>

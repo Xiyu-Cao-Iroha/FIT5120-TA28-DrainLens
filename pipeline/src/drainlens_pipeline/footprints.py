@@ -162,28 +162,47 @@ def barrier_mask(
     if rows < 1 or cols < 1:
         raise FootprintError("the extent is smaller than one cell")
 
+    # Everything happens inside the outline's bounding box. Building a
+    # full-grid array per ring and OR-ing it in was invisible at one square
+    # kilometre and ran for hours over the City of Melbourne's 26,601 ground
+    # footprints -- two 76-million-cell passes each.
     mask = np.zeros((rows, cols), dtype=bool)
     for footprint in footprints:
         if ground_only and not footprint.on_the_ground:
             continue
+        box = None
         inside = None
         for index, ring in enumerate(footprint.rings):
             filled = _rasterise_ring(ring, extent, cell_size_m, rows, cols)
             if filled is None:
                 break
+            (r0, r1, c0, c1), crossings = filled
             if index == 0:
-                inside = filled
-            elif inside is not None:
-                inside &= ~filled  # a hole: a courtyard is open to the sky
+                box, inside = (r0, r1, c0, c1), crossings.copy()
+                continue
+            # A hole: a courtyard is open to the sky. Only the part of it that
+            # overlaps the outline's box can change anything.
+            br0, br1, bc0, bc1 = box
+            lo_r, hi_r = max(r0, br0), min(r1, br1)
+            lo_c, hi_c = max(c0, bc0), min(c1, bc1)
+            if lo_r < hi_r and lo_c < hi_c:
+                inside[lo_r - br0 : hi_r - br0, lo_c - bc0 : hi_c - bc0] &= ~crossings[
+                    lo_r - r0 : hi_r - r0, lo_c - c0 : hi_c - c0
+                ]
         if inside is not None:
-            mask |= inside
+            br0, br1, bc0, bc1 = box
+            mask[br0:br1, bc0:bc1] |= inside
     return mask
 
 
 def _rasterise_ring(
     ring: np.ndarray, extent: Extent, cell_size_m: float, rows: int, cols: int
-) -> np.ndarray | None:
-    """Even-odd fill of one ring, evaluated only over its own bounding box."""
+) -> tuple[tuple[int, int, int, int], np.ndarray] | None:
+    """Even-odd fill of one ring over its own bounding box.
+
+    Returns the box as ``(row_start, row_stop, col_start, col_stop)`` and the
+    fill inside it, rather than a grid the size of the extent.
+    """
     if len(ring) < 3:
         return None
 
@@ -214,6 +233,4 @@ def _rasterise_ring(
             boundary = (bx - ax) * (yy - ay) / (by - ay) + ax
         crossings ^= straddles & (xx < boundary)
 
-    filled = np.zeros((rows, cols), dtype=bool)
-    filled[row_lo : row_hi + 1, col_lo : col_hi + 1] = crossings
-    return filled
+    return (row_lo, row_hi + 1, col_lo, col_hi + 1), crossings

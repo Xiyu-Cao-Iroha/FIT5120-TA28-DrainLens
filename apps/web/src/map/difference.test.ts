@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference } from './difference.js';
+import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference, intoMapFrame } from './difference.js';
 import type { Local, Viewport } from './viewport.js';
 
 /** 200 px square, one pixel per metre, centred on (100, 100). */
@@ -90,5 +90,20 @@ describe('drawing where the two runs disagree', () => {
     // Culling on the centre rather than the extent would clip the patch a
     // pixel early at every border, which reads as a straight-edged result.
     expect(at([[200, 100]], 10, VIEW).rects).toHaveLength(1);
+  });
+});
+
+describe('which map the difference is drawn over', () => {
+  const kensington = { minE: 316_500, minN: 5_814_500 };
+
+  it('moves Kensington cells onto the council map by the difference between the corners', () => {
+    // The council's corner is 315,000 / 5,808,500: Kensington's origin is its (1500, 6000).
+    const moved = intoMapFrame([[10, 20]], kensington, { min_e: 315_000, min_n: 5_808_500 });
+    expect(moved).toEqual([[1510, 6020]]);
+  });
+
+  it('leaves them where they are on the map they came from', () => {
+    const cells = [[10, 20], [11, 20]] as const;
+    expect(intoMapFrame(cells, kensington, { min_e: 316_500, min_n: 5_814_500 })).toEqual(cells);
   });
 });

@@ -149,7 +149,11 @@ def fill_holes(surface: np.ndarray, observed: np.ndarray) -> np.ndarray:
         raise GroundError("no cell in the extent contains a point")
     if observed.all():
         return surface.copy()
-    _, nearest = ndimage.distance_transform_edt(~observed, return_indices=True)
+    # Indices only. The distances are never used, and over the City of
+    # Melbourne they would be another 600 MB of float64 held for nothing.
+    nearest = ndimage.distance_transform_edt(
+        ~observed, return_distances=False, return_indices=True
+    )
     return surface[tuple(nearest)]
 
 
@@ -215,6 +219,36 @@ def build_ground_surface(
     filter rejected the ground itself.
     """
     surface, observed = minimum_surface(points, min_e, min_n, max_e, max_n, cell_size_m)
+    return ground_from_minimum(
+        surface,
+        observed,
+        min_e,
+        min_n,
+        cell_size_m=cell_size_m,
+        max_window_m=max_window_m,
+        slope_threshold=slope_threshold,
+        min_measured_fraction=min_measured_fraction,
+    )
+
+
+def ground_from_minimum(
+    surface: np.ndarray,
+    observed: np.ndarray,
+    min_e: float,
+    min_n: float,
+    *,
+    cell_size_m: float = 1.0,
+    max_window_m: float = DEFAULT_MAX_WINDOW_M,
+    slope_threshold: float = DEFAULT_SLOPE_THRESHOLD,
+    min_measured_fraction: float = 0.05,
+) -> GroundSurface:
+    """The filter, from a minimum surface that has already been rasterised.
+
+    Split out of `build_ground_surface` so a large extent can be rasterised a
+    tile at a time: the City of Melbourne is about 420 million points, and
+    holding them all at once to take one minimum per cell is ten gigabytes
+    spent on a number that can be kept as a running minimum instead.
+    """
     filled = fill_holes(surface, observed)
     objects = object_mask(
         filled, cell_size_m, max_window_m=max_window_m, slope_threshold=slope_threshold

@@ -42,9 +42,29 @@ COVERAGE_BLOCK_M = 25.0
 
 #: Below this measured share, a coverage block is reported as unavailable.
 #:
-#: A deliberately stated tolerance, not a hidden one. A block that is one third
-#: ground is a block whose slope is mostly interpolation between rooftops.
-COVERAGE_MIN_MEASURED = 0.35
+#: **This was 0.35 until 13 September, and it hatched a third of the square.**
+#: The median block in Kensington is 48% measured ground, so 35% flagged
+#: ordinary terraced housing — a block that is one third ground is a block of
+#: roofs with a street through it, and the street is measured. The hatching
+#: covered 33.4% of the map in a chequerboard and stopped reading as a warning.
+#:
+#: At 0.20 a block is four-fifths roof or canopy: the slope across it is
+#: interpolation between measurements more than a block apart. That is the
+#: bottom tenth of blocks here (the 10th percentile is 0.18), which is what a
+#: warning should single out.
+COVERAGE_MIN_MEASURED = 0.20
+
+#: Fewest contiguous blocks a gap needs before it is drawn.
+#:
+#: One 25 m block with no ground under it is, almost always, one building:
+#: there is no ground surface under a roof for the map to be wrong about. Four
+#: blocks — a place 50 m across — is bigger than a building lot, and is where
+#: the ground *between* buildings goes unmeasured too. With the share above it
+#: leaves 11 places and 6.0% of the square, from 22 places and 33.4%.
+#:
+#: A display filter on the evidence layer, not on the evidence: the ground
+#: surface, the low points and the trace are all computed exactly as before.
+COVERAGE_MIN_BLOCKS = 4
 
 
 class DerivedError(Exception):
@@ -90,6 +110,7 @@ def trace_channels(
     *,
     percentile: float = CHANNEL_PERCENTILE,
     min_length: int = 8,
+    valid: np.ndarray | None = None,
 ) -> list[list[tuple[int, int]]]:
     """Follow the channels downstream, from each head to where they merge.
 
@@ -99,7 +120,12 @@ def trace_channels(
     above it, and the map goes solid.
     """
     rows, cols = direction.shape
-    channel = accumulated >= np.percentile(accumulated, percentile)
+    # The share is of ground that exists. Counting cells in tiles the archive
+    # does not have would lower the bar by however much of the grid is empty.
+    pool = accumulated if valid is None else accumulated[valid]
+    channel = accumulated >= np.percentile(pool, percentile)
+    if valid is not None:
+        channel &= valid
 
     # A head is a channel cell with nothing upstream of it that is also channel.
     upstream_count = np.zeros((rows, cols), dtype=np.int32)
@@ -245,8 +271,15 @@ def outlines(
     labels, count = ndimage.label(mask, structure=np.ones((3, 3), dtype=bool))
     rows = mask.shape[0]
 
-    for index in range(1, count + 1):
-        region = labels == index
+    # Each region is traced inside its own bounding box. `labels == index` over
+    # the whole grid, once per region, was a full pass per hollow: harmless at
+    # one square kilometre, and hours over the City of Melbourne.
+    for index, box in enumerate(ndimage.find_objects(labels), start=1):
+        if box is None:
+            continue
+        r0, c0 = box[0].start, box[1].start
+        region = labels[box] == index
+        box_rows, box_cols = region.shape
         # Edges between a cell inside the region and one outside it. Each is a
         # unit segment on the grid lattice; chaining them gives the boundary.
         segments: dict[tuple[float, float], list[tuple[float, float]]] = {}
@@ -254,20 +287,23 @@ def outlines(
         def add(a: tuple[float, float], b: tuple[float, float]) -> None:
             segments.setdefault(a, []).append(b)
 
-        for r, c in np.argwhere(region):
-            r, c = int(r), int(c)
+        for lr, lc in np.argwhere(region):
+            lr, lc = int(lr), int(lc)
+            r, c = lr + r0, lc + c0
             # Grid corners of this cell, in local metres, north-up.
             left = extent.min_e + c * cell_size_m
             right = left + cell_size_m
             top = extent.min_n + (rows - r) * cell_size_m
             bottom = top - cell_size_m
-            if r == 0 or not region[r - 1, c]:
+            # The box is the region's own, so a neighbour outside it is outside
+            # the region -- the same answer the grid edge gives.
+            if lr == 0 or not region[lr - 1, lc]:
                 add((left, top), (right, top))
-            if r == rows - 1 or not region[r + 1, c]:
+            if lr == box_rows - 1 or not region[lr + 1, lc]:
                 add((right, bottom), (left, bottom))
-            if c == 0 or not region[r, c - 1]:
+            if lc == 0 or not region[lr, lc - 1]:
                 add((left, bottom), (left, top))
-            if c == mask.shape[1] - 1 or not region[r, c + 1]:
+            if lc == box_cols - 1 or not region[lr, lc + 1]:
                 add((right, top), (right, bottom))
 
         while segments:
@@ -306,12 +342,18 @@ def coverage_gaps(
     *,
     block_m: float = COVERAGE_BLOCK_M,
     min_measured: float = COVERAGE_MIN_MEASURED,
+    min_blocks: int = COVERAGE_MIN_BLOCKS,
+    valid: np.ndarray | None = None,
 ) -> list[list[list[float]]]:
     """Where there is too little measured ground to say anything.
 
     Summarised into blocks before being outlined. The per-cell mask is holed by
     every roof and street tree, and its outline would be thousands of shapes
     that answer no question a reader is asking.
+
+    Small gaps are dropped by counting blocks, before outlining, rather than by
+    ring area after it: a ring-area filter would also drop the *holes* in a
+    large gap, and hatch measured ground as though it were not.
     """
     step = int(round(block_m / cell_size_m))
     if step < 1:
@@ -324,7 +366,22 @@ def coverage_gaps(
         .reshape(usable_rows // step, step, usable_cols // step, step)
         .mean(axis=(1, 3))
     )
-    return outlines(blocks < min_measured, extent, block_m)
+    thin = blocks < min_measured
+    if valid is not None:
+        # A block in a tile the archive does not have is not "too little ground
+        # measured"; it is outside what was measured at all, which the map says
+        # by drawing nothing there. The tile edge is a multiple of the block, so
+        # a block is wholly one or the other.
+        covered = (
+            valid[:usable_rows, :usable_cols]
+            .reshape(usable_rows // step, step, usable_cols // step, step)
+            .all(axis=(1, 3))
+        )
+        thin &= covered
+    labels, count = ndimage.label(thin, structure=np.ones((3, 3), dtype=bool))
+    sizes = ndimage.sum(thin, labels, index=range(1, count + 1))
+    kept = [index + 1 for index, size in enumerate(np.atleast_1d(sizes)) if size >= min_blocks]
+    return outlines(np.isin(labels, kept), extent, block_m)
 
 
 def build(
@@ -337,10 +394,11 @@ def build(
     depression_labels: np.ndarray,
     depressions: list[dict],
     log=lambda _: None,
+    valid: np.ndarray | None = None,
 ) -> dict:
     """The three derived layers, in the frame `network.py` uses."""
     accumulated = flow_accumulation(direction, conditioned)
-    traced = trace_channels(direction, accumulated)
+    traced = trace_channels(direction, accumulated, valid=valid)
     channels = []
     for path in traced:
         metres = [
@@ -361,7 +419,7 @@ def build(
     )
     log(f"  low points  {len(hollows):>4} rings from {len(drawn)} of {len(depressions)} hollows")
 
-    gaps = coverage_gaps(observed, extent, cell_size_m)
+    gaps = coverage_gaps(observed, extent, cell_size_m, valid=valid)
     log(f"  gaps        {len(gaps):>4} rings")
 
     return {
@@ -394,6 +452,7 @@ def build(
             "min_drawn_depression_m2": MIN_DRAWN_DEPRESSION_M2,
             "coverage_block_m": COVERAGE_BLOCK_M,
             "coverage_min_measured": COVERAGE_MIN_MEASURED,
+            "coverage_min_blocks": COVERAGE_MIN_BLOCKS,
             "simplify_tolerance_m": SIMPLIFY_TOLERANCE_M,
             "display_only": (
                 "The depression size threshold is a display filter. The scenario engine "
@@ -403,13 +462,37 @@ def build(
     }
 
 
+def covering(extent: Extent, missing_tiles: list[str]) -> dict:
+    """What an artefact built over missing tiles has to say about them.
+
+    The shapes cannot say it. A reader looking at a quarter of the map with no
+    water paths on it needs to tell "no water goes here" from "nobody measured
+    this ground", and the browser and the CI check both need the list rather
+    than a sentence.
+    """
+    tiles = extent.tile_names()
+    unknown = sorted(set(missing_tiles) - set(tiles))
+    if unknown:
+        raise DerivedError(f"{', '.join(unknown)} are not tiles of {extent.name}")
+    measured = len(tiles) - len(missing_tiles)
+    return {
+        "missing_tiles": sorted(missing_tiles),
+        "covers": (
+            f"These layers are calculated from a measured ground surface wherever the City "
+            f"of Melbourne 2018 point cloud has a tile: {measured} of the {len(tiles)} 500 m "
+            f"tiles in this extent. The other {len(missing_tiles)} are not in the archive, so "
+            f"that ground has not been measured and nothing is claimed about where water goes."
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
     import json
     import sys
     from pathlib import Path
 
-    from .geo import DEMONSTRATION_EXTENT
+    from .geo import EXTENTS, resolve_extent
     from .hydrology import condition
 
     parser = argparse.ArgumentParser(
@@ -418,25 +501,40 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--terrain", type=Path, default=Path("../data/terrain"))
     parser.add_argument("--out", type=Path, default=Path("../data/map/derived.json"))
+    parser.add_argument(
+        "--extent",
+        choices=sorted(EXTENTS),
+        help="a published extent; defaults to the Iteration 1 demonstration extent",
+    )
     args = parser.parse_args(argv)
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)
 
-    extent = DEMONSTRATION_EXTENT
+    extent = resolve_extent(args.extent)
     surface = np.load(args.terrain / "ground-surface.npy").astype(np.float64)
     log(f"Deriving layers for {extent.name}")
+
+    # Present only when the terrain build had tiles missing. Without it every
+    # cell is ground, which is what a pilot extent's build means.
+    valid_path = args.terrain / "ground-valid.npy"
+    valid = np.load(valid_path) if valid_path.exists() else None
 
     artefact = build(
         extent,
         1.0,
         direction=np.load(args.terrain / "flow-direction.npy"),
-        conditioned=condition(surface),
+        conditioned=condition(surface, valid=valid),
         observed=np.load(args.terrain / "ground-observed.npy"),
         depression_labels=np.load(args.terrain / "depression-cells.npz")["labels"],
         depressions=json.loads((args.terrain / "depressions.json").read_text(encoding="utf-8")),
         log=log,
+        valid=valid,
     )
+
+    if valid is not None:
+        manifest = json.loads((args.terrain / "terrain.json").read_text(encoding="utf-8"))
+        artefact.update(covering(extent, manifest.get("missing_tiles", [])))
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(artefact, separators=(",", ":")), encoding="utf-8")

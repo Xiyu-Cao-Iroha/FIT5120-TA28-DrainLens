@@ -8,7 +8,7 @@
  *
  * The other half of the job is telling two failures apart. "We have no record
  * of that address" and "that address is real but outside the pilot area" are
- * different things to a resident, and AC 1.1.4 requires the second to be
+ * different things to a resident, and AC 1.1.8 requires the second to be
  * explained rather than dressed up as the first — or worse, answered with a
  * nearby address they did not ask for.
  */
@@ -41,6 +41,155 @@ export interface AddressIndex {
    * the case while the stand-in is in place.
    */
   readonly streets?: readonly string[];
+}
+
+/**
+ * The index as it travels: streets once, then a triple per address.
+ *
+ * **The whole index has to reach the browser before the first keystroke**,
+ * because nothing about a typed address is ever sent anywhere. At the
+ * demonstration extent that was 678 KB and cost nobody a thought; across the
+ * council it is 62,397 addresses, and as a list of objects that is 10.9 MB to
+ * download and parse. Grouped like this it is 1.33 MB and 489 KB gzipped.
+ *
+ * `id` and `label` are not carried because both are exactly reconstructible
+ * from the number, the street and the suburb — 5.7 MB of text the browser can
+ * write itself. `pipeline/addresses.py` records the four shapes that were
+ * measured and why the smallest one was not taken.
+ */
+export interface PackedIndex {
+  readonly area: string;
+  readonly streets?: readonly string[];
+  /** The extent the coordinates below are measured from. See `unpack`. */
+  readonly extent: Frame;
+  /** `"Gatehouse Drive|Kensington"`, one per group, in the order `at` uses. */
+  readonly on: readonly string[];
+  /** Per group, `[number, e, n]` for each address on that street. */
+  readonly at: readonly (readonly (readonly [string, number, number])[])[];
+}
+
+/**
+ * An extent's south-west corner and size, as every artefact carries it.
+ *
+ * Coordinates in this product are metres from *their own* extent's corner, so
+ * a coordinate means nothing without the frame it belongs to. This is the
+ * smallest thing that says which frame.
+ */
+export interface Frame {
+  readonly min_e: number;
+  readonly min_n: number;
+  readonly width_m: number;
+  readonly height_m: number;
+}
+
+export class IndexError extends Error {}
+
+/**
+ * How far to move a coordinate from one frame into another, or a refusal.
+ *
+ * The same rule as `pipeline/reframe.py`, which does this for the derived
+ * layers at build time: the source extent has to sit **inside** the target,
+ * because that is the only case where the shift is a translation and nothing
+ * is being invented. A source that hangs over an edge would put addresses
+ * outside the map they are drawn on, and every check downstream — "is this
+ * pit near that address" — would go on answering, wrongly.
+ *
+ * Refusing is the whole point. This is the failure the frames were separated
+ * to make impossible, and the one that cannot be seen on screen: a pin 1.5 km
+ * from the house is still a pin, on a street, inside the map.
+ */
+export function shiftInto(
+  // Typed as optional against the type saying it is required, because this
+  // arrives as parsed JSON: the type describes the artefact this code is
+  // written for, and the check is for the one it might be handed.
+  from: Frame | undefined,
+  to: Frame,
+  area: string,
+): readonly [number, number] {
+  if (from === undefined) {
+    throw new IndexError(
+      `the ${area} address index does not say which extent its coordinates are measured from`,
+    );
+  }
+  const east = from.min_e - to.min_e;
+  const north = from.min_n - to.min_n;
+  const fits =
+    east >= 0 &&
+    north >= 0 &&
+    east + from.width_m <= to.width_m &&
+    north + from.height_m <= to.height_m;
+  if (!fits) {
+    throw new IndexError(
+      `the ${area} address index does not fit inside the map it would be drawn on: ` +
+        `${String(from.width_m)}x${String(from.height_m)} m at (${String(east)}, ${String(north)}) ` +
+        `of ${String(to.width_m)}x${String(to.height_m)} m`,
+    );
+  }
+  return [east, north];
+}
+
+/**
+ * Unpack the shipped index once, on load.
+ *
+ * The rest of this module works on `IndexedAddress`, and it stays that way:
+ * search runs on every keystroke and is not the place to be rebuilding labels.
+ *
+ * **It refuses rather than repairs.** An index whose `on` and `at` disagree in
+ * length has lost the correspondence between a street and its addresses, and
+ * the failure that produces is an address silently placed on another street —
+ * plausible on screen, wrong in the only way this product cannot afford. A
+ * search box that says the index is broken is recoverable; one that confidently
+ * points at the wrong house is not.
+ *
+ * **`into` is the frame of the map the addresses will be drawn on, and it is
+ * required.** The index ships in the pilot extent's frame and is the one
+ * artefact that never comes from the API, so when the API answers with the
+ * council the two frames differ — Kensington's corner is the council's
+ * (1500, 6000). Unshifted, every pin landed **1.5 km west and 6 km south** of
+ * the house somebody typed, on a real street, inside the extent, looking
+ * entirely like a map. `pipeline/reframe.py` does this at build time for the
+ * derived layers; the index cannot be done at build time, because which map it
+ * will be drawn on is not known until the API either answers or does not.
+ *
+ * On the fallback the two frames are the same extent and the shift is zero.
+ */
+export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
+  if (!Array.isArray(raw.on) || !Array.isArray(raw.at)) {
+    throw new IndexError('the address index carries no addresses');
+  }
+  if (raw.on.length !== raw.at.length) {
+    throw new IndexError(
+      `the address index has ${String(raw.on.length)} streets and ${String(raw.at.length)} groups of addresses`,
+    );
+  }
+
+  const [east, north] = shiftInto(raw.extent, into, raw.area);
+
+  const addresses: IndexedAddress[] = [];
+  raw.on.forEach((key, group) => {
+    const [street, suburb = ''] = key.split('|');
+    for (const [number, rawE, rawN] of raw.at[group] ?? []) {
+      const e = rawE + east;
+      const n = rawN + north;
+      const label = suburb === '' ? `${number} ${street ?? ''}` : `${number} ${street ?? ''}, ${suburb}`;
+      addresses.push({
+        // The same id the pipeline used to write, rebuilt from the same parts.
+        id: `${raw.area}/${label.toLowerCase().replace(/ /g, '-').replace(/,/g, '')}`,
+        label,
+        number,
+        street: street ?? '',
+        suburb,
+        e,
+        n,
+      });
+    }
+  });
+
+  return {
+    area: raw.area,
+    addresses,
+    ...(raw.streets === undefined ? {} : { streets: raw.streets }),
+  };
 }
 
 /**
@@ -157,7 +306,7 @@ export type Resolution =
  * covered street and outside the covered part of it. A query naming no street
  * we hold is not something this product can say anything about at all.
  *
- * Neither case is ever resolved to a nearby address. AC 1.1.4 asks the product
+ * Neither case is ever resolved to a nearby address. AC 1.1.8 asks the product
  * to explain, and answering "did you mean number 44?" when somebody asked
  * about 46 is the failure the criterion exists to prevent.
  */

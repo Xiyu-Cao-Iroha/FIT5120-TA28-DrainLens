@@ -9,12 +9,12 @@
  * screen someone is actually reading does not carry it.
  */
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
 import {
   CHANGES_NOTICE,
   type Credit,
-  LICENCE_URL,
+  licenceUrl,
   describeDatasets,
 } from './attribution.js';
 import {
@@ -62,10 +62,58 @@ function InfoMark() {
 
 export interface ShellProps {
   readonly children: ReactNode;
+  /**
+   * Which screen this is, so a new one starts at the top.
+   *
+   * **The scrolling element is this shell's, not the screen's.** React keeps
+   * the same `<main>` across a screen change, and it keeps its scroll offset
+   * with it — so pressing *See flood history* from the band two thirds of the
+   * way down the homepage landed two thirds of the way down the flood board,
+   * under a heading nobody had read the top of.
+   *
+   * A person who changes screen has not asked to stay where they were. A
+   * person who presses Back has, but this product has no history stack to
+   * restore a position from, so the honest default is the top.
+   */
+  readonly at?: string;
   /** Shown at the right of the header, for "How this works" and the like. */
   readonly actions?: ReactNode;
   /** Where the person is, when they are somewhere with a way back. */
   readonly crumbs?: ReactNode;
+  /**
+   * The way out, drawn as a control rather than as a place.
+   *
+   * A breadcrumb says where you *are*; the first crumb happens to be
+   * clickable, which is not the same thing as a way back and is not read as
+   * one. Screens that were opened from somewhere pass `back` and get a button
+   * that says so, at the top left where a person looks for it.
+   */
+  readonly back?: { readonly label: string; readonly onBack: () => void };
+  /**
+   * The right-hand end of the breadcrumb row.
+   *
+   * One caller uses it, for the map's *tutorial* control. It is here rather
+   * than in `actions` because the header is the site's own furniture — name,
+   * navigation — and this is a control that belongs to one screen. The
+   * prototype put it on this row for the same reason.
+   */
+  readonly trailing?: ReactNode;
+  /**
+   * The name and mark at the top, which the map does without.
+   *
+   * On the homepage the masthead says what this is to somebody who has just
+   * arrived. On the map it says it again to somebody who is already inside,
+   * and costs 56 pixels of the thing they came for — stacked with the
+   * advisory banner and the breadcrumb, the map was starting an eighth of the
+   * way down a laptop window. Nothing goes with it: the mark is not a link,
+   * and the way back is the Back control on the row below.
+   *
+   * **The advisory banner is not part of this and cannot be turned off.** It
+   * is the one line that stops a simplified drainage map being read as an
+   * official flood map, and the screen most likely to be mistaken for one is
+   * exactly the screen this prop exists for.
+   */
+  readonly masthead?: boolean;
   /**
    * Who the data belongs to, read from the artefacts.
    *
@@ -74,9 +122,42 @@ export interface ShellProps {
    * requires the credit to be visible wherever the work is.
    */
   readonly credits?: readonly Credit[];
+  /** What was changed from the sources, for the credit. Defaults to the drainage map's. */
+  readonly creditNotice?: string;
+  /**
+   * Where the artefacts on this screen came from: the API over the database,
+   * the copies bundled with the site, or some of each.
+   *
+   * Shown because a fallback nobody can see is indistinguishable from an API
+   * nobody is using -- and because "this map is the database's answer" is a
+   * claim, and a claim this product makes visible rather than asserts.
+   */
+  readonly servedFrom?: 'api' | 'bundled' | 'mixed';
+  /** Which extent is on screen, so the footer can say how much ground it is. */
+  readonly extentName?: string;
 }
 
-export function Shell({ children, actions, crumbs, credits }: ShellProps) {
+export function Shell({
+  children,
+  actions,
+  crumbs,
+  back,
+  trailing,
+  masthead = true,
+  credits,
+  creditNotice,
+  servedFrom,
+  extentName,
+  at,
+}: ShellProps) {
+  const scrolling = useRef<HTMLElement | null>(null);
+  // Not `scrollTo({ behavior: 'smooth' })`: a screen that arrives already
+  // scrolled and then slides to the top is a page that looks like it moved
+  // under the reader.
+  useEffect(() => {
+    scrolling.current?.scrollTo(0, 0);
+  }, [at]);
+
   return (
     <div
       style={{
@@ -89,55 +170,57 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
         background: surface.page,
       }}
     >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: space(3),
-          padding: `${String(space(3))}px ${String(space(6))}px`,
-          background: surface.raised,
-          borderBottom: `1px solid ${line.base}`,
-          flexShrink: 0,
-        }}
-      >
-        <span
-          aria-hidden
+      {masthead && (
+        <header
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: radius.base,
-            background: ink.strong,
-            color: ink.inverse,
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: 17,
-            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: space(3),
+            padding: `${String(space(3))}px ${String(space(6))}px`,
+            background: surface.raised,
+            borderBottom: `1px solid ${line.base}`,
+            flexShrink: 0,
           }}
         >
-          ≈
-        </span>
-        <span>
-          <strong
-            style={{
-              display: 'block',
-              font: type(text.lead, { weight: weight.semibold, leading: 1.15 }),
-              letterSpacing: tracking.title,
-              color: ink.strong,
-            }}
-          >
-            DrainLens
-          </strong>
           <span
+            aria-hidden
             style={{
-              font: type(text.small, { leading: 1.3 }),
-              color: ink.subtle,
+              width: 32,
+              height: 32,
+              borderRadius: radius.base,
+              background: ink.strong,
+              color: ink.inverse,
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 17,
+              lineHeight: 1,
             }}
           >
-            Local drainage explorer
+            ≈
           </span>
-        </span>
-        <span style={{ marginLeft: 'auto' }}>{actions}</span>
-      </header>
+          <span>
+            <strong
+              style={{
+                display: 'block',
+                font: type(text.lead, { weight: weight.semibold, leading: 1.15 }),
+                letterSpacing: tracking.title,
+                color: ink.strong,
+              }}
+            >
+              DrainLens
+            </strong>
+            <span
+              style={{
+                font: type(text.small, { leading: 1.3 }),
+                color: ink.subtle,
+              }}
+            >
+              Local drainage explorer
+            </span>
+          </span>
+          <span style={{ marginLeft: 'auto' }}>{actions}</span>
+        </header>
+      )}
 
       <div
         role="note"
@@ -157,10 +240,13 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
         {INDICATIVE}
       </div>
 
-      {crumbs !== undefined && (
+      {(crumbs !== undefined || back !== undefined) && (
         <nav
           aria-label="Breadcrumb"
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: space(4),
             padding: `${String(space(2))}px ${String(space(6))}px`,
             font: type(text.label, { leading: 1.4 }),
             color: ink.subtle,
@@ -169,15 +255,44 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
             flexShrink: 0,
           }}
         >
+          {back !== undefined && (
+            <button
+              type="button"
+              onClick={back.onBack}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: space(1),
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                border: `1px solid ${line.base}`,
+                borderRadius: radius.base,
+                background: surface.raised,
+                color: ink.strong,
+                font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              <span aria-hidden>←</span> {back.label}
+            </button>
+          )}
           {crumbs}
+          {trailing !== undefined && (
+            <span style={{ marginLeft: 'auto', display: 'inline-flex' }}>{trailing}</span>
+          )}
         </nav>
       )}
 
-      <main style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}>
+      <main
+        ref={scrolling}
+        style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}
+      >
         {children}
       </main>
 
-      {credits !== undefined && credits.length > 0 && <Attribution credits={credits} />}
+      {credits !== undefined && credits.length > 0 && (
+        <Attribution credits={credits} servedFrom={servedFrom} extentName={extentName} notice={creditNotice ?? CHANGES_NOTICE} />
+      )}
     </div>
   );
 }
@@ -190,7 +305,40 @@ export function Shell({ children, actions, crumbs, credits }: ShellProps) {
  * as the indicative banner above it. It is small and quiet, which the licence
  * permits; it is not absent, which the licence does not.
  */
-function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
+/**
+ * How much ground is on screen, which changed with where it came from.
+ *
+ * The database holds the whole City of Melbourne and the container holds the
+ * pilot square kilometre, so when the instance is stopped the map does not
+ * merely come from somewhere else -- **it gets smaller**. A footer that said
+ * only where the data came from would leave somebody to notice that on their
+ * own, by finding a street missing.
+ */
+const AREA: Record<string, string> = {
+  'city-of-melbourne': 'Showing the whole City of Melbourne.',
+  kensington:
+    'Showing the Kensington pilot square kilometre — the wider council map needs the database, which is not answering.',
+};
+
+const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
+  api: 'Served from the DrainLens database.',
+  bundled: 'Served from the copy bundled with this site.',
+  mixed: 'Served partly from the DrainLens database and partly from the bundled copy.',
+};
+
+function Attribution({
+  credits,
+  servedFrom,
+  extentName,
+  notice,
+}: {
+  readonly credits: readonly Credit[];
+  readonly notice: string;
+  // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
+  // treats those as different, and the caller always passes the key.
+  readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
+  readonly extentName: string | undefined;
+}) {
   return (
     <footer
       style={{
@@ -206,7 +354,7 @@ function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
         <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
           {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
           <a
-            href={LICENCE_URL}
+            href={licenceUrl(credit.licence)}
             target="_blank"
             rel="license noreferrer"
             style={{ color: ink.muted, textDecorationColor: line.strong }}
@@ -216,7 +364,11 @@ function Attribution({ credits }: { readonly credits: readonly Credit[] }) {
           {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
         </span>
       ))}
-      <span>{CHANGES_NOTICE}</span>
+      <span>{notice}</span>
+      {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
+      {extentName !== undefined && AREA[extentName] !== undefined && (
+        <span> {AREA[extentName]}</span>
+      )}
     </footer>
   );
 }

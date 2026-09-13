@@ -56,6 +56,29 @@ const distanceToPath = (point: Screen, path: readonly Local[], viewport: Viewpor
 };
 
 /**
+ * What a press is allowed to land on, given what the map actually drew.
+ *
+ * **A hidden layer offers nothing.** `pick` used to be handed every layer the
+ * artefact carries whatever the switches said, so turning Pits off hid the
+ * markers and left them selectable: a press on apparently blank ground opened
+ * a card about a pit that was not on the map. Nothing failed, because nothing
+ * asked.
+ *
+ * It is a function rather than two arguments to `pick` so it can be tested
+ * against the real thing it protects — a press landing exactly on a hidden
+ * pit — without a canvas.
+ */
+export function selectableLayers(
+  layers: { readonly pit?: readonly Pit[]; readonly pipe?: readonly Pipe[] },
+  shown: { readonly pits: boolean; readonly pipes: boolean },
+): { readonly pit: readonly Pit[]; readonly pipe: readonly Pipe[] } {
+  return {
+    pit: shown.pits ? (layers.pit ?? []) : [],
+    pipe: shown.pipes ? (layers.pipe ?? []) : [],
+  };
+}
+
+/**
  * The nearest thing within reach of a tap, or nothing.
  *
  * Pits win ties with pipes. A pit is what the interface can say something

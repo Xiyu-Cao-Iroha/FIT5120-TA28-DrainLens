@@ -2,6 +2,8 @@
 
 The offline geospatial pipeline. Runs once, on a developer machine, and publishes versioned static artefacts. **Never deployed** — nothing in here executes in production.
 
+> The water side of this pipeline — filling, conditioning, D8, depressions and how the browser engine consumes them — is walked end to end in [docs/ALGORITHMS.md](../docs/ALGORITHMS.md).
+
 ## Setup
 
 ```
@@ -23,7 +25,35 @@ py -m venv .venv                      # python3 -m venv .venv on macOS/Linux
 
 Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `stormwater-pits`, both CC BY, last modified 26 February 2023).
 
-**Full-size artefacts are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
+**Full-size intermediates are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
+
+**The council extent is committed too, and separately, under `apps/api/data/city-of-melbourne/`.** Not because it is small — 6.7 MB of map, 693 KB of trace, 7.6 MB of derived layers — but because it is the API image that reads it, `/data` is in `.dockerignore` as well as `.gitignore`, and an artefact that is not in the build context cannot be copied into the image. The migration job would then apply its schema changes and load Kensington into a database that was asked for a council. Rebuild it with:
+
+```bash
+python -m drainlens_pipeline.network --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/map.json
+python -m drainlens_pipeline.trace   --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/api/data/city-of-melbourne/trace.json
+```
+
+**The derived layers are built council-wide, from one terrain run** over every point-cloud tile the archive has:
+
+```bash
+python -m drainlens_pipeline.fetch_tiles --name city-of-melbourne --allow-missing-tiles --out ../data/pointcloud-council
+python -m drainlens_pipeline.terrain --name city-of-melbourne --allow-missing-tiles --tiles ../data/pointcloud-council --out ../data/terrain-council
+python -m drainlens_pipeline.derived --terrain ../data/terrain-council --extent city-of-melbourne --out ../apps/api/data/city-of-melbourne/derived.json
+```
+
+The fetch is 4.27 GB — 211 of the archive's 215 tiles — and 8.5 GB on disk. **95 of the extent's 306 tiles are not in the archive**, because the archive covers the municipality and the extent is the rectangle around it. Measured from the committed map, **none of the 21,113 pits or 17,242 pipes lies in a missing tile**: the measured ground reaches everywhere the drainage record does. Those cells are not ground — routing treats them as the edge of the calculation, nothing is drawn over them, and the artefact lists them in `missing_tiles` with a `covers` sentence saying so.
+
+It got here in two steps on 13 September, Kensington plus the central city first (`reframe.py`'s `combine`, still there and tested) and then the whole council. Going council-wide needed four things the pilot never had to care about, each checked against the pilot's committed artefacts before it was trusted — `ground-surface`, `ground-observed`, `flow-direction`, the depression labels and `depressions.json` all rebuild **bit-identical**, and so does Kensington's `derived.json`:
+
+- **Tiles rasterised one at a time** (`terrain.rasterise_tiles`), as a running minimum. The council is about 350 million points; holding them all to take one minimum per cell is ten gigabytes.
+- **Depressions, outlines and footprints measured inside their own bounding boxes.** Each had a full-grid pass per object — harmless at one square kilometre, and hours over 76.5 km².
+- **A validity mask** for the missing tiles, threaded through `fill`, `d8`, `find_depressions`, the channel percentile and the coverage gaps.
+- **Wider depression labels** when there are more than 32,767 hollows. The engine reads `int16`; the council's labels are only ever read by `derived`.
+
+The site's bundled fallback stays Kensington's own build, so the two copies are not compared shape for shape — a catchment cut off at Kensington's edge is whole in the council run. `node tools/data/check-derived.mjs` checks what they must share: the same settings, and nothing drawn outside the extent or inside a missing tile. **It exists because the copies drifted once**: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing.
+
+No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 
 ## What the graph builder does, and what it refuses to do
 
@@ -243,9 +273,124 @@ Comparing our per-cell D8 directions to their line bearings gives agreement *wor
 
 So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
 
+## Recorded flood incidents — `flood_history`
+
+The one stage that fetches its own sources. Everything else here reads what an
+earlier stage wrote or what was downloaded into `data/`; this reads two
+published files, neither of which is a local export.
+
+It also needs both, and that is the interesting part. The incident counts come
+from VICSES per ABS SA1 region, and the Data Quality Statement says in as many
+words that **"SA1 regions are not named"** — so the area name AC 2.1.1.d
+requires has to come from ABS ASGS 2011. All **13,339** codes join with nothing
+left over on either side, which is better evidence of the 7-digit code's
+structure than the sentence describing it.
+
+**The join is asserted before the scope filter, not after.** Writing those two
+steps in the wrong order was the first mistake here: a scope filter posing as
+an integrity check passes silently while dropping regions, and a missing area
+is indistinguishable from an area with no incidents once it is gone. Ordered
+correctly it failed loudly on 3,681 regions rather than quietly ranking a
+subset.
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history
+# or from files you already have -- both or neither, so a published file is
+# never silently mixed with a local one
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history \
+  --incidents incidents.xlsx --geography SA1_2011_AUST.csv
+```
+
+### The area list, for the population join
+
+`--areas` writes a second file: every SA2 inside Greater Melbourne, by
+`SA2_MAINCODE_2011` and name, **with the dispatches recorded in it** — total,
+the yearly series, the regions inside it and whether any of their counts were
+withheld. Nothing in the product reads it yet.
+
+**It is a second file rather than a longer first one, and the reason is a
+criterion.** AC 2.2.1.b caps the board at thirty locations, and Iteration 1
+recorded that the cap is *enforced where the data is, not where it is drawn* —
+the pipeline publishes thirty and no more, so no change to a screen can exceed
+it. Publishing 281 areas into `flood-history.json` would hand that back. But
+the map has to draw every area, including the ones with nothing recorded: a map
+of thirty implies the other 251 are empty and 245 of them are not.
+
+Two files that must stay equal is a failure this repository has had once, and
+the answer taken then — delete one — is not available here, because these
+answer different questions. `tools/data/check-areas.mjs` is the answer instead:
+it recomputes the board's thirty from the 281 and fails when they disagree.
+
+The code was already being read out of the ABS file and thrown away. That is
+the part worth knowing: the board joins on names, which is safe only because
+it never leaves one state's worth of rows, and the first person to join a
+national population file would reach for the name too. `areas_in_scope`
+refuses a list where one name carries two codes for exactly that reason.
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   --areas ../data/sa2-areas.json
+```
+
+## Resident population — `population`
+
+The Severity Score's denominator, and the one stage that reads an `.xls`.
+
+```bash
+./.venv/Scripts/python.exe -m drainlens_pipeline.population   --estimates ../data/population/erp-sa2-2005-2015.xls   --areas     ../data/population/sa2-areas.json   --out       ../apps/web/public/data/population.json
+```
+
+**The workbook does not carry the nine-digit SA2 code.** It carries it split
+across four indented columns — state, SA4, SA3, SA2 — so the code is
+reassembled, which is a claim about the structure of an identifier. Matching by
+name instead makes a different claim, that no two areas in the scope share a
+name. `build` requires both joins to agree on every area, which tests both at
+once and is the reason this stage refuses rather than reports.
+
+**The parsing takes rows, not bytes**, unlike `flood_history` — ABS publishes
+this as the older OLE2 `.xls`, which openpyxl cannot read and which nothing
+here can *write*, so a fixture workbook is not an option. `rows_from` is the
+only part that touches `xlrd`, and it either opens a file or raises.
+
+The artefact keeps all 281 areas including the seven nobody lives in. A
+population is a fact; what it is not is a denominator, and `minimumResidents`
+is how the consumer knows which.
+
+**The list has been used once, and it matched.** ABS 3218.0's SA2 population
+estimates cover all 281 areas — by the code and by the name, agreeing on every
+one, with nothing left over on either side. What that settles, what year the
+denominator is, and why over a quarter of the areas have a total that is a
+floor rather than an exact value is in
+[POPULATION-DATA.md](../docs/POPULATION-DATA.md). **No stage here reads that
+workbook yet**; the match was measured before a stage was written, which is the
+order this repository takes sources in.
+
+`fetch` checks that each download is an archive holding the file it should,
+because **data.vic's own catalogue link for this dataset is dead** and serves a
+404 HTML page that `curl` saves as 119 KB of "spreadsheet" without complaint.
+Assert the content, not the status code.
+
+What the data does and does not support — the reporting period, why Flood
+alone, why Greater Melbourne, and the four limitations the page has to carry
+— is in [FLOOD-HISTORY-DATA.md](../docs/FLOOD-HISTORY-DATA.md).
+
+## The scenario engine's terrain, council-wide — `scene_tiles`
+
+```bash
+python -m drainlens_pipeline.scene_tiles --terrain ../data/terrain-council --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/web/public/data/scene-tiles
+```
+
+12 minutes. **211 tiles, 64 MB, committed**, and every one of the council's 9,239 inlets has a window. The comparison used to run over Kensington's square kilometre and nowhere else; it now runs over the one-kilometre window around whichever drain is chosen, stitched in the browser from the four 500 m tiles that make it up (`apps/web/src/scenario/sceneTiles.ts`).
+
+- **One council-wide build, cut afterwards.** The flow field, the conditioned surface and the depressions come from the terrain run over the whole extent, so ground either side of a tile edge is the same ground in both tiles. The command refuses to write if the conditioned surface does not reproduce the terrain build's flow directions cell for cell.
+- **The window is where water stops being followed.** A flow direction pointing out of it becomes *leaves*, a spill outside it becomes *leaves*, and a hollow the window cuts is not a hollow in it — its capacity is the whole hollow's, and giving that to part of its cells would store water that is not there.
+- **The window is chosen so the drain sits in its middle quarter** where the four tiles exist: at least 250 m of ground on every side before water leaves.
+- **Pre-gzipped**, decompressed in the worker, and served by nginx as `application/gzip` so it is not compressed twice.
+
+The Kensington scene in `apps/web/public/data/scene/` stays, read only by the map's ground-surface shading.
+
 ## Built since this file was first written
 
-Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), and an address index (`addresses`) with a fixture standing in for it.
+Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), an address index (`addresses`) with a fixture standing in for it, the recorded flood incidents (`flood_history`), and `reframe` — which moves an artefact from one extent's coordinate frame into another's, and is how the Kensington derived layers were placed on the council map.
 
 **The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
 

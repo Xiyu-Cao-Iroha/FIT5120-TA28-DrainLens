@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { type ArtefactError, assertUsable, boundsOf } from './artefact.js';
-import { TAP_RADIUS_PX, distanceToSegment, pick } from './hit.js';
+import { TAP_RADIUS_PX, distanceToSegment, pick, selectableLayers } from './hit.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
@@ -141,5 +141,49 @@ describe('the artefact contract', () => {
   it('refuses one with no layers block', () => {
     const { layers: _dropped, ...without } = usable;
     expect(() => assertUsable(without)).toThrow(/no layers/);
+  });
+});
+
+describe('only what is drawn can be selected', () => {
+  /*
+   * The press lands exactly on the pit every time below. What changes is
+   * whether the layer was drawn, which is the whole of the defect: with Pits
+   * switched off the markers disappeared and the pits stayed selectable, so a
+   * press on apparently blank ground opened a card about something not on the
+   * map.
+   */
+  const on = toScreen(view, [500, 500]);
+  const layers = {
+    pit: [pit(500, 500, 1147906)],
+    pipe: [pipe([[400, 500], [600, 500]], 77)],
+  };
+
+  it('finds the pit when its layer is drawn', () => {
+    const shown = selectableLayers(layers, { pits: true, pipes: true });
+    expect(pick(on, view, shown)?.kind).toBe('pit');
+  });
+
+  it('finds nothing where a hidden pit is, even dead centre', () => {
+    const shown = selectableLayers(layers, { pits: false, pipes: false });
+    expect(pick(on, view, shown)).toBeNull();
+  });
+
+  it('falls through to the pipe when only the pits are hidden', () => {
+    // Not "nothing": the pipe is still on screen under the press, and it is
+    // only the pit that was winning the tie.
+    const shown = selectableLayers(layers, { pits: false, pipes: true });
+    expect(pick(on, view, shown)?.kind).toBe('pipe');
+  });
+
+  it('hides the pipes without hiding the pits', () => {
+    const shown = selectableLayers(layers, { pits: true, pipes: false });
+    expect(pick(on, view, shown)?.kind).toBe('pit');
+    expect(shown.pipe).toEqual([]);
+  });
+
+  it('offers nothing for a layer the artefact does not carry', () => {
+    // An absent layer and a switched-off one are the same to a press, and
+    // neither may reach `pick` as undefined.
+    expect(selectableLayers({}, { pits: true, pipes: true })).toEqual({ pit: [], pipe: [] });
   });
 });

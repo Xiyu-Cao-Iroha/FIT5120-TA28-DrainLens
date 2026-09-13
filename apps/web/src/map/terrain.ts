@@ -1,7 +1,7 @@
 /**
  * The ground surface, as a layer under everything else.
  *
- * AC 1.1.3.b names terrain as one of the five controllable layers, and until
+ * AC 1.1.4 names Terrain as one of the four modes, and until
  * now there was nothing to control: the map drew the recorded network and the
  * derived paths over a flat colour. That flat colour was the one thing on
  * screen quietly implying the ground is level, in a product whose entire
@@ -63,6 +63,20 @@ export interface TerrainRaster {
  */
 const LOW: readonly [number, number, number] = [108, 140, 158];
 const HIGH: readonly [number, number, number] = [226, 212, 178];
+
+/**
+ * The same two ends, for the legend to draw its scale from.
+ *
+ * Exported rather than repeated. The legend had these as its own hex literals,
+ * and a key whose colours are a copy of the map's is a key that can quietly
+ * stop matching it — which is the one failure a legend has.
+ */
+function hex([r, g, b]: readonly [number, number, number]): string {
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export const RAMP_LOW_HEX = hex(LOW);
+export const RAMP_HIGH_HEX = hex(HIGH);
 
 /** Buildings, drawn as buildings. Deliberately off the ground ramp. */
 const BARRIER: readonly [number, number, number] = [176, 172, 166];

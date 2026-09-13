@@ -11,9 +11,20 @@
 
 import type { LineFeature, MapArtefact, Pipe, Pit, PolygonFeature, Road, StreetName } from './artefact.js';
 import { type Local, type Viewport, toScreen, visibleBounds } from './viewport.js';
+import { ICON_MIN_SCALE, drawPitIcon } from './pitIcon.js';
 
 export interface Palette {
   readonly ground: string;
+  /**
+   * Outside the extent, and it must not look like ground.
+   *
+   * The ground used to be painted over the whole canvas, which was invisible
+   * while the map could never be zoomed out past covering it. It can be now,
+   * and a margin in the ground colour would read as **land inside the extent
+   * with nothing recorded on it** — the opposite of the truth, which is that
+   * the city continues and this map stops.
+   */
+  readonly beyond: string;
   readonly road: string;
   readonly roadEdge: string;
   readonly pipe: string;
@@ -21,6 +32,7 @@ export interface Palette {
   readonly pitEdge: string;
   readonly selected: string;
   readonly suggested: string;
+  readonly comparable: string;
   readonly label: string;
   readonly labelHalo: string;
   readonly address: string;
@@ -30,12 +42,17 @@ export interface Palette {
 /** Muted on purpose: the recorded network is context, not the answer. */
 export const DAY: Palette = {
   ground: '#eef3ea',
+  // A shade off the ground and cooler than it: enough to read as a different
+  // surface at a glance, quiet enough not to become a border people look at.
+  beyond: '#e4e7e9',
   road: '#ffffff',
   roadEdge: '#e2e8dd',
   pipe: '#31435a',
   pit: '#2f6f62',
   pitEdge: '#ffffff',
   selected: '#0f766e',
+  // Teal ring: a drain the comparison can be calculated for (AC 3.1.1.a).
+  comparable: '#0f8b8d',
   // Amber, matching the panel's "suggested, not your choice yet" note. A
   // suggestion drawn in the chosen colour is a choice the person did not make.
   suggested: '#b4690e',
@@ -156,6 +173,7 @@ function drawPits(
   seen: Extremes,
   selectedAsset: number | null,
   suggestedAsset: number | null = null,
+  comparable: ReadonlySet<string> | null = null,
 ): void {
   const radius = Math.max(2.5, Math.min(7, viewport.scale * 2.2));
   context.lineWidth = 1.5;
@@ -164,12 +182,32 @@ function drawPits(
     if (east < seen.minE || east > seen.maxE || north < seen.minN || north > seen.maxN) continue;
     const isSelected = selectedAsset !== null && pit.asset_number === selectedAsset;
     const [x, y] = toScreen(viewport, pit.c);
-    context.beginPath();
-    context.arc(x, y, isSelected ? radius + 2.5 : radius, 0, Math.PI * 2);
-    context.fillStyle = isSelected ? palette.selected : palette.pit;
-    context.fill();
-    context.strokeStyle = palette.pitEdge;
-    context.stroke();
+    if (viewport.scale >= ICON_MIN_SCALE) {
+      // Close enough for the grate to be countable. See map/pitIcon.ts for
+      // why it is a fixed size and why it is not the artwork's own colour.
+      drawPitIcon(context, x, y, isSelected ? palette.selected : palette.pit);
+      context.lineWidth = 1.5;
+    } else {
+      context.beginPath();
+      context.arc(x, y, isSelected ? radius + 2.5 : radius, 0, Math.PI * 2);
+      context.fillStyle = isSelected ? palette.selected : palette.pit;
+      context.fill();
+      context.strokeStyle = palette.pitEdge;
+      context.stroke();
+    }
+
+    // Which drains a comparison can use, before anybody chooses (AC 3.1.1.a).
+    // A ring rather than a fill, so the recorded pit underneath still reads as
+    // the council's; nothing is drawn on the others, and the legend says that
+    // an unringed drain is a limit of the calculation, not a finding.
+    if (comparable !== null && comparable.has(String(pit.asset_number ?? ''))) {
+      context.beginPath();
+      context.arc(x, y, radius + 3.5, 0, Math.PI * 2);
+      context.strokeStyle = palette.comparable;
+      context.lineWidth = 2;
+      context.stroke();
+      context.lineWidth = 1.5;
+    }
 
     // A ring around, not a different fill: the suggestion has to read as
     // "this one, if you want it" rather than as an already-made choice.
@@ -364,19 +402,21 @@ export interface DrawOptions {
   /**
    * A pit offered but not yet confirmed.
    *
-   * Drawn as a ring rather than filled, because AC 2.1.1.d requires a
+   * Drawn as a ring rather than filled, because AC 2.1.1.d (Aug-27 set) requires a
    * suggestion to be clearly labelled and require confirmation — and a
    * suggestion the panel names but the map does not show leaves the person
    * reading an asset number with no way to find it.
    */
   readonly suggestedPit?: number | null;
+  /** Drains a comparison can be calculated for, ringed (AC 3.1.1.a). */
+  readonly comparablePits?: ReadonlySet<string> | null;
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
   /**
    * Which recorded layers to draw.
    *
-   * Pits and pipes are separate because AC 1.1.3.b names them separately, and
+   * Pits and pipes are separate because AC 1.1.5 names them separately, and
    * because they answer different questions: the pipes are where water goes,
    * the pits are where it can get in.
    */
@@ -395,12 +435,87 @@ export interface DrawOptions {
   readonly groundAlreadyDrawn?: boolean;
 }
 
+/** The address pin: head radius, and the drop from the head's centre to the tip. */
+export const PIN_HEAD_R = 7.5;
+export const PIN_DROP = 21;
+
+/**
+ * The outline of a map pin whose tip is exactly on the point it marks.
+ *
+ * A teardrop is a circle plus the two tangent lines from the tip to it, and
+ * the tangency is what makes the shape read as one form rather than as a
+ * lollipop. For a tip at distance `PIN_DROP` from a head of radius
+ * `PIN_HEAD_R`, each tangent point sits `acos(r / d)` around the head from the
+ * line joining the two centres — which is why the head has to be smaller than
+ * the drop, and why this is computed rather than eyeballed.
+ *
+ * Exported for the test, which checks the tangent rather than the pixels.
+ */
+export function pinOutline(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+): void {
+  const cy = y - PIN_DROP;
+  const spread = Math.acos(PIN_HEAD_R / PIN_DROP);
+  const down = Math.PI / 2;
+  context.beginPath();
+  // The long way around, over the top of the head, between the two tangents.
+  context.arc(x, cy, PIN_HEAD_R, down + spread, down - spread);
+  context.lineTo(x, y);
+  context.closePath();
+}
+
+/**
+ * How far from the pin a press still counts as pressing it.
+ *
+ * A pin is 15 pixels across and 28 tall, which is smaller than a fingertip and
+ * about the size of a careless mouse. The pad is added around the shape rather
+ * than baked into a bigger drawing: the mark stays the size it should be and
+ * the target is the size a hand needs.
+ */
+export const PIN_TOUCH_PAD_PX = 6;
+
+/**
+ * Is this press on the address pin?
+ *
+ * **Built from the same two constants that draw it**, so the target and the
+ * mark cannot drift apart — the failure that would produce is a pin somebody
+ * can see and cannot press, which reads as the application ignoring them.
+ *
+ * A rectangle rather than the teardrop itself. Pointer accuracy is worth more
+ * here than geometric honesty, and the difference between the box and the
+ * shape is a few pixels of empty ground beside a mark nothing else occupies.
+ */
+export function pressedThePin(
+  press: readonly [number, number],
+  pin: readonly [number, number],
+): boolean {
+  const [px, py] = press;
+  const [x, tip] = pin;
+  const halfWidth = PIN_HEAD_R + PIN_TOUCH_PAD_PX;
+  // The head's top is PIN_DROP + PIN_HEAD_R above the tip; the tip is the
+  // bottom of the shape.
+  return (
+    px >= x - halfWidth &&
+    px <= x + halfWidth &&
+    py >= tip - PIN_DROP - PIN_HEAD_R - PIN_TOUCH_PAD_PX &&
+    py <= tip + PIN_TOUCH_PAD_PX
+  );
+}
+
 /**
  * The selected address.
  *
- * A ring rather than a filled dot, so it reads as "here" rather than as one
- * more asset in a layer of dots — and it is deliberately the one thing on this
- * map that is not drawn from an artefact.
+ * **A pin standing on the point, not a ring around it.** The ring this
+ * replaced was centred on the address, which put the mark and the thing it
+ * marks in the same place: at street zoom it sat over the very pits and paths
+ * a person had come to read, and it was reported — fairly — as looking like a
+ * crosshair rather than like *you are here*. A pin occupies the empty space
+ * above instead, and its tip is the only part that claims a position.
+ *
+ * It is deliberately the one thing on this map that is not drawn from an
+ * artefact, and it keeps the warm colour no layer uses.
  */
 export function drawAddress(
   context: CanvasRenderingContext2D,
@@ -409,21 +524,26 @@ export function drawAddress(
   palette: Palette,
 ): void {
   const [x, y] = toScreen(viewport, at);
-  context.lineWidth = 3;
-  context.strokeStyle = palette.addressHalo;
-  context.beginPath();
-  context.arc(x, y, 8, 0, Math.PI * 2);
-  context.stroke();
 
+  // A shadow on the ground, so the pin reads as standing on the point rather
+  // than as floating above it with its tip pointing at nothing.
+  context.beginPath();
+  context.ellipse(x, y, 4, 1.6, 0, 0, Math.PI * 2);
+  context.fillStyle = 'rgba(15, 23, 42, 0.22)';
+  context.fill();
+
+  pinOutline(context, x, y);
   context.lineWidth = 2.5;
-  context.strokeStyle = palette.address;
-  context.beginPath();
-  context.arc(x, y, 8, 0, Math.PI * 2);
+  context.strokeStyle = palette.addressHalo;
   context.stroke();
-
-  context.beginPath();
-  context.arc(x, y, 2.5, 0, Math.PI * 2);
   context.fillStyle = palette.address;
+  context.fill();
+
+  // The eye. It sits on the head's centre, which `pinOutline` also uses, so
+  // the two cannot drift apart when the proportions are changed.
+  context.beginPath();
+  context.arc(x, y - PIN_DROP, 2.8, 0, Math.PI * 2);
+  context.fillStyle = palette.addressHalo;
   context.fill();
 }
 
@@ -437,8 +557,20 @@ export function drawMap(
   const seen = visibleBounds(viewport);
 
   if (options.groundAlreadyDrawn !== true) {
-    context.fillStyle = palette.ground;
+    /*
+      The ground is the extent, not the canvas.
+
+      Zooming out far enough now leaves margin around the map — see
+      `scaleToContain` — and filling all of it with the ground colour would
+      say the city stops at the council boundary. It does not; the map does.
+    */
+    context.fillStyle = palette.beyond;
     context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
+
+    const [left, top] = toScreen(viewport, [0, artefact.extent.height_m]);
+    const [right, bottom] = toScreen(viewport, [artefact.extent.width_m, 0]);
+    context.fillStyle = palette.ground;
+    context.fillRect(left, top, right - left, bottom - top);
   }
 
   if (options.showRoads !== false) {
@@ -457,6 +589,7 @@ export function drawMap(
       seen,
       options.selectedPit ?? null,
       options.suggestedPit ?? null,
+      options.comparablePits ?? null,
     );
   }
   if (viewport.scale >= LABEL_MIN_SCALE) {

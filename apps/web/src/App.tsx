@@ -8,57 +8,196 @@
 
 import { useEffect, useMemo, useReducer, useState } from 'react';
 
-import type { AddressIndex } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
 import { EVERYTHING, MapView } from './screens/MapView.js';
 import { MapCanvas } from './map/MapCanvas.js';
+import { FloodHistory } from './screens/FloodHistory.js';
+import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
+import { useAreas } from './history/useAreas.js';
+import { FloodMap } from './screens/FloodMap.js';
+import { Guide } from './screens/Guide.js';
+import { Choose } from './screens/Choose.js';
+import { Home } from './screens/Home.js';
+import { LockedMap } from './screens/LockedMap.js';
+import { SECTIONS, type SectionId } from './tutorial/sections.js';
+import { progress } from './tutorial/progress.js';
+import { GUIDED_SECTIONS } from './tutorial/lessons.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
 import { ScenarioSetup } from './screens/ScenarioSetup.js';
 import { TaskSelect } from './screens/TaskSelect.js';
-import type { DifferenceArea } from './map/difference.js';
+import { type DifferenceArea, intoMapFrame } from './map/difference.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
-import type { SceneDrain, SolvedPosition } from './scenario/worker.js';
-import { INITIAL_SESSION, type Session, type SupportedAddress, reduce } from './session.js';
+import { UNSUPPORTED_TEXT, supportOf, useScenarioSupport } from './scenario/support.js';
+import { BOARD_CHANGES_NOTICE, FLOOD_CHANGES_NOTICE, creditsForSources } from './ui/attribution.js';
+import type { SolvedPosition } from './scenario/worker.js';
+import {
+  INITIAL_SESSION,
+  type Session,
+  type SessionEvent,
+  type SupportedAddress,
+  reduce,
+} from './session.js';
 import { Shell } from './ui/Shell.js';
-import { creditsFor } from './ui/attribution.js';
+import { Spinner } from './ui/Spinner.js';
+import { Tour } from './ui/Tour.js';
+import {
+  API_BASE,
+  API_EXTENT,
+  BUNDLED_EXTENT,
+  type Origin,
+  fetchArtefact,
+  fetchTogether,
+  served,
+} from './data/source.js';
+import { tourGate } from './ui/tourGate.js';
+import { type Credit, creditsFor } from './ui/attribution.js';
+
+/*
+  The sections of the guide that have steps written used to be a hand-kept
+  array here. It is `GUIDED_SECTIONS` in `tutorial/lessons.ts` now, derived
+  from the lessons that exist — one place to add a section rather than two, and
+  the drift it removes would have shown as a card offering a guide that opens
+  an empty room.
+*/
 
 interface Loaded {
   readonly map: MapArtefact;
   readonly derived: DerivedArtefact;
   readonly trace: TraceArtefact;
   readonly index: AddressIndex;
+  readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
+  /** Where the three artefacts describing this place came from -- all of them. */
+  readonly servedFrom: Origin | 'mixed';
+  /** `city-of-melbourne` or `kensington`, depending on which answered. */
+  readonly extentName: string;
 }
 
 async function load(): Promise<Loaded> {
-  const [map, derived, trace, addresses] = await Promise.all([
-    fetch('/data/map.json').then((r) => r.json()),
-    fetch('/data/derived.json').then((r) => r.json()),
-    fetch('/data/trace.json').then((r) => r.json()),
+  // Four artefacts come from the database through the API, each falling back
+  // to the copy in this container if it cannot answer. `source.ts` says why
+  // the fallback exists and why it is not hidden.
+  //
+  // The flood history is 5.4 KB and joins the others rather than being
+  // fetched when the board opens: a separate round trip for five kilobytes
+  // buys a loading state nobody needed.
+  const at = (path: string) => (API_BASE === '' ? null : `${API_BASE}${path}`);
+
+  // A fallback that says nothing is indistinguishable from an API nobody is
+  // using. The footer tells a visitor which source answered; this tells
+  // whoever is looking at a console *why*, which the footer cannot.
+  const note = (url: string, reason: string) => {
+    console.warn(`DrainLens: ${url} did not answer (${reason}); using the bundled copy`);
+  };
+
+  /*
+    The three that describe one place, fetched as a set.
+
+    The API's extent is the whole council and the container's is the pilot
+    square kilometre, so these three have to come from the same side or the
+    derived layers land a kilometre and a half from the streets they belong
+    to. `fetchTogether` makes that structural rather than hoped for.
+  */
+  const place = await fetchTogether<[MapArtefact, DerivedArtefact, TraceArtefact]>([
+    {
+      api: at(`/api/map/${API_EXTENT}`),
+      bundled: '/data/map.json',
+      guard: assertUsable,
+      onFallback: note,
+    },
+    {
+      api: at(`/api/derived/${API_EXTENT}`),
+      bundled: '/data/derived.json',
+      guard: assertDerived,
+      onFallback: note,
+    },
+    {
+      api: at(`/api/trace/${API_EXTENT}`),
+      bundled: '/data/trace.json',
+      guard: assertTrace,
+      onFallback: note,
+    },
+  ]);
+  const [map, derived, trace] = place.values;
+
+  const [history, addresses] = await Promise.all([
+    fetchArtefact<FloodHistoryArtefact>({
+      api: at('/api/flood-history'),
+      bundled: '/data/flood-history.json',
+      guard: assertFloodHistory,
+      onFallback: note,
+    }),
+    // **Never from a server, and not routed through `fetchArtefact` so that no
+    // later edit there can change that.** The landing page tells a resident the
+    // search runs in their browser and that nothing about the address is sent
+    // anywhere; an address index fetched from an API would still keep that
+    // promise, and an index fetched *per query* would not. Bundled is the shape
+    // that cannot drift into the second.
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
-  assertUsable(map);
-  assertDerived(derived);
-  assertTrace(trace);
+  // Unpacked once, here, rather than on every keystroke. The shipped shape
+  // groups addresses by street and leaves out what it can rebuild; `unpack`
+  // refuses an index whose groups do not line up rather than repairing it.
+  //
+  // **Into the frame of the map that was actually served.** The index is the
+  // one artefact that never comes from the API, so it always arrives in the
+  // pilot extent's frame -- and when the API answers, the map under it is the
+  // council's, whose corner is 1.5 km west and 6 km south of Kensington's.
+  // Every pin was landing there: on a real street, inside the extent, looking
+  // like a map. `unpack` refuses if the index does not fit inside the map.
+  const packed = addresses as PackedIndex & { fixture?: string };
+  const index = unpack(packed, map.extent);
 
-  const index = addresses as AddressIndex & { fixture?: string };
-  if (!Array.isArray(index.addresses)) {
-    throw new Error('the address index carries no addresses');
-  }
-  return { map, derived, trace, index, fixtureNote: index.fixture };
+  return {
+    map,
+    derived,
+    trace,
+    history: history.value,
+    index,
+    fixtureNote: packed.fixture,
+    servedFrom: served([place.from, history.from]),
+    // Which extent is actually on screen, so the interface can say so rather
+    // than leaving somebody to notice the map got smaller.
+    extentName: place.from === 'api' ? API_EXTENT : BUNDLED_EXTENT,
+  };
 }
 
 export function App() {
-  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION);
+  /*
+    Seeded from the device, then mirrored back to it.
+
+    The session is the authoritative copy and `progress` is a mirror, which is
+    the only arrangement where a browser that refuses to store anything still
+    lets somebody finish the guide -- they just start again next time. Reading
+    it here rather than inside the reducer keeps `session.ts`'s rule intact:
+    nothing in that file touches storage of any kind, and a test enforces it by
+    running a whole session against traps rather than by reading the source.
+  */
+  const [session, dispatch] = useReducer(reduce, INITIAL_SESSION, (initial) => ({
+    ...initial,
+    learned: progress.read(),
+  }));
+  useEffect(() => {
+    progress.write(session.learned);
+  }, [session.learned]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const scenario = useScenario('/data/scene');
+  // Only the two comparison screens use it, and neither is reachable in the
+  // Iteration 1 interface. See the note at the top of `useScenario`.
+  const scenario = useScenario(
+    '/data/scene-tiles',
+    session.screen === 'scenario' || session.screen === 'result',
+  );
+  // The flood map's three artefacts, 83 KB, fetched when the map is opened
+  // and not on the way past. Same argument as the scenario scene.
+  const areas = useAreas(session.screen === 'flood-map');
   // Every position the last run solved. The rainfall control on the result
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
@@ -66,6 +205,12 @@ export function App() {
   // Metres per grid cell, from the run that produced `positions`. Held beside
   // them so the two can never describe different grids.
   const [cellSizeM, setCellSizeM] = useState(1);
+  // The window the last successful run was calculated in, for placing its
+  // difference on whichever map is served.
+  const [windowOrigin, setWindowOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
+  const [measuredShare, setMeasuredShare] = useState<number | null>(null);
+  // Why the last drain tapped on the comparison map cannot be compared.
+  const [refusal, setRefusal] = useState<string | null>(null);
   // The scenario panel is 420px of a laptop screen. Reading a result means
   // looking at the map it is about, and a teammate reported not being able to.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -91,7 +236,7 @@ export function App() {
   if (loaded === null) {
     return (
       <Shell>
-        <p style={{ padding: 24 }}>Loading the pilot area…</p>
+        <Spinner label="Loading the pilot area…" />
       </Shell>
     );
   }
@@ -119,13 +264,152 @@ export function App() {
       </strong>
     );
 
-  const separator = <span style={{ margin: '0 8px', color: '#c3cdba' }}>›</span>;
+  // Decorative: it repeats a gap the layout already makes, so a screen
+  // reader is not given it. It is still coloured to be seen, because a
+  // separator nobody can see is a pair of crumbs that look like one.
+  const separator = (
+    <span aria-hidden style={{ margin: '0 8px', color: ink.subtle }}>
+      ›
+    </span>
+  );
 
   switch (session.screen) {
+    case 'home':
+      return (
+        <Shell
+          at={session.screen}
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          actions={
+            <HomeNav
+              onOpenMap={() => {
+                dispatch({ type: 'get-started' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+            />
+          }
+        >
+          <Home
+            history={loaded.history}
+            onOpenMap={(mode) => {
+              /*
+                Everything on the homepage now goes to the four cards.
+
+                A card here that started its section directly would be a second
+                front door with different manners -- one that skips the screen
+                showing what is done and what is left. The chooser is where
+                that choice is made, and the cards here describe rather than
+                dispatch.
+              */
+              void mode;
+              dispatch({ type: 'get-started' });
+            }}
+            onOpenHistory={() => {
+              dispatch({ type: 'history-opened' });
+            }}
+            /*
+              The one card here that dispatches rather than describes, and for
+              the opposite reason to the four above it: they all arrive at the
+              same chooser, and this arrives somewhere the chooser cannot
+              reach. It needs an address, so the reducer sends it to the
+              address screen and remembers what it was for.
+            */
+            onCompare={() => {
+              dispatch({ type: 'task-wanted', task: 'compare' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'flood-map': {
+      const back = () => {
+        dispatch({ type: 'back' });
+      };
+      return (
+        <Shell
+          at={session.screen}
+          credits={
+            areas.data === null
+              ? []
+              : creditsForSources([areas.data.scope.source, areas.data.scope.geographySource, areas.data.population.source])
+          }
+          creditNotice={FLOOD_CHANGES_NOTICE}
+          crumbs={
+            <>
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
+              {separator}
+              {crumb('Flood history', back)}
+              {separator}
+              {crumb('Map', undefined, true)}
+            </>
+          }
+        >
+          {areas.problem !== null ? (
+            /*
+              The guard's own sentence, not "something went wrong". It names
+              the field that is wrong, which is the difference between a
+              defect somebody can act on and one they can only report.
+            */
+            <p style={{ padding: 24, color: ink.muted }}>
+              The map cannot be drawn: {areas.problem}
+            </p>
+          ) : areas.data === null ? (
+            <p style={{ padding: 24, color: ink.muted }}>Loading the areas…</p>
+          ) : (
+            <FloodMap
+              areas={areas.data.areas}
+              scope={areas.data.scope}
+              population={areas.data.population}
+              points={areas.data.points}
+              events={areas.data.events}
+              onBack={back}
+            />
+          )}
+        </Shell>
+      );
+    }
+
+    case 'history':
+      return (
+        <Shell
+          at={session.screen}
+          credits={creditsForSources([loaded.history.source, loaded.history.geographySource])}
+          creditNotice={BOARD_CHANGES_NOTICE}
+          servedFrom={loaded.servedFrom}
+          back={{
+            label: 'Home',
+            onBack: () => {
+              dispatch({ type: 'go-home' });
+            },
+          }}
+          crumbs={crumb('Flood history', undefined, true)}
+        >
+          <FloodHistory
+            artefact={loaded.history}
+            onOpenAreas={() => {
+              dispatch({ type: 'flood-map-opened' });
+            }}
+            onOpenMap={() => {
+              dispatch({ type: 'map-opened', from: 'history' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
+            }}
+          />
+        </Shell>
+      );
+
     case 'address':
     case 'unsupported':
       return (
-        <Shell credits={credits}>
+        <Shell at={session.screen} credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}>
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -141,17 +425,148 @@ export function App() {
               })
             }
             onUnsupported={(typed) => dispatch({ type: 'address-rejected', typed })}
+            // The chooser, or the homepage -- the reducer knows which, from
+            // whether a guide section is pending.
+            onBack={() => {
+              dispatch({ type: 'address-abandoned' });
+            }}
+            onHome={() => {
+              dispatch({ type: 'go-home' });
+            }}
           />
+        </Shell>
+      );
+
+    case 'choose':
+      return (
+        <Shell at={session.screen} credits={credits} servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName} masthead={false}>
+          <Choose
+            learned={session.learned}
+            guided={GUIDED_SECTIONS}
+            onStart={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onSkip={() => {
+              dispatch({ type: 'map-opened', from: 'home' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'go-home' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'locked':
+      return (
+        <Shell
+          at={session.screen}
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          masthead={false}
+          back={{
+            label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+            onBack: () => {
+              dispatch({ type: 'leave-map' });
+            },
+          }}
+          crumbs={crumb('The whole map', undefined, true)}
+        >
+          <LockedMap
+            map={loaded.map}
+            learned={session.learned}
+            extentName={loaded.extentName}
+            /*
+              Only the sections that have a guide written. Offering a card
+              whose guide has no steps in it would be a button that opens an
+              empty room, which is worse than not offering it. The others join
+              this list as they land.
+            */
+            available={GUIDED_SECTIONS}
+            onStartGuide={(section) => {
+              dispatch({ type: 'guide-chosen', section });
+            }}
+            onOpenAnyway={() => {
+              dispatch({ type: 'lock-passed' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'leave-map' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'guide':
+      return (
+        <Shell
+          at={session.screen}
+          credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+          masthead={false}
+          back={{
+            label: 'Address',
+            onBack: () => {
+              dispatch({ type: 'back' });
+            },
+          }}
+          crumbs={crumb(SECTIONS[session.guideSection ?? 'drainage'].label, undefined, true)}
+          trailing={
+            // The way out of the guide, which is a different thing from the
+            // way back one step. Asked for by name: somebody three steps in
+            // who wants out should not have to press Back three times.
+            <button
+              type="button"
+              onClick={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              style={{
+                border: `1px solid ${line.base}`,
+                borderRadius: radius.base,
+                background: surface.raised,
+                color: ink.base,
+                padding: `${String(space(2))}px ${String(space(3))}px`,
+                font: type(text.label, { weight: weight.medium }),
+                cursor: 'pointer',
+              }}
+            >
+              Home
+            </button>
+          }
+        >
+          {session.address === null || session.guideSection === null ? null : (
+            <Guide
+              map={loaded.map}
+              derived={loaded.derived}
+              trace={loaded.trace}
+              index={loaded.index}
+              address={session.address}
+              section={session.guideSection}
+              onFinish={() => {
+                dispatch({ type: 'guide-finished' });
+              }}
+            />
+          )}
         </Shell>
       );
 
     case 'task':
       return (
         <Shell
+          at={session.screen}
           credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+              {crumb('Home', () => {
+                dispatch({ type: 'go-home' });
+              })}
+              {separator}
+              {crumb('Address search', () => {
+                dispatch({ type: 'change-address' });
+              })}
               {separator}
               {crumb('Choose a task', undefined, true)}
             </>
@@ -167,6 +582,41 @@ export function App() {
 
     case 'scenario':
     case 'result': {
+      const startComparison = (): void => {
+        const pitId = session.scenario.pitId;
+        const blockage = session.scenario.blockage;
+        if (pitId === null || blockage === null) {
+          dispatch({ type: 'comparison-started' });
+          dispatch({
+            type: 'comparison-finished',
+            outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
+          });
+          return;
+        }
+
+        // By asset number. The worker finds the drain's window and the cell
+        // the pipeline snapped it to; nothing here works a cell out from the
+        // map geometry, which is how every drain once came back invalid.
+        dispatch({ type: 'comparison-started' });
+        void scenario.run(pitId, blockage, session.scenario.rainfallMm).then((result) => {
+          // Cleared on failure: leaving the previous run's positions attached
+          // would let the control offer answers to a question nobody asked.
+          setPositions(result.status === 'successful' ? result.positions : []);
+          if (result.status === 'successful') {
+            setCellSizeM(result.cellSizeM);
+            setWindowOrigin(result.origin);
+            setMeasuredShare(result.measuredShare);
+          }
+          dispatch({
+            type: 'comparison-finished',
+            outcome:
+              result.status === 'successful'
+                ? { kind: 'comparison', band: result.band }
+                : { kind: 'insufficient', reason: result.reason },
+          });
+        });
+      };
+
       const onAction = (action: Action) => {
         switch (action) {
           case 'change-scenario':
@@ -179,8 +629,10 @@ export function App() {
             dispatch({ type: 'change-scenario' });
             return;
           case 'try-again':
-            dispatch({ type: 'comparison-started' });
-            dispatch({ type: 'comparison-finished', outcome: { kind: 'insufficient', reason: 'scenario_calculation_failed' } });
+            // Runs the same comparison again. It used to dispatch a failure
+            // without calling the engine at all, so the button could only
+            // ever reproduce the screen it was pressed on.
+            startComparison();
             return;
           case 'change-address':
             dispatch({ type: 'change-address' });
@@ -202,20 +654,32 @@ export function App() {
       const differenceShown: DifferenceArea | null =
         session.screen === 'result' && outcome?.kind === 'comparison'
           ? {
-              cells:
+              cells: intoMapFrame(
                 positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)
                   ?.higherAreasM ?? [],
+                windowOrigin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
+                loaded.map.extent,
+              ),
               cellSizeM,
             }
           : null;
       return (
         <Shell
+          at={session.screen}
           credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
           crumbs={
             <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
-              {separator}
-              {crumb('Choose a task', () => dispatch({ type: 'task-chosen', task: 'compare' }))}
+              {session.scenarioOrigin === 'map' ? (
+                crumb('Full map', () => dispatch({ type: 'back' }))
+              ) : (
+                <>
+                  {crumb('Address search', () => dispatch({ type: 'change-address' }))}
+                  {separator}
+                  {crumb('Choose a task', () => dispatch({ type: 'task-reconsidered' }))}
+                </>
+              )}
               {separator}
               {crumb('Compare scenario', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
               {session.screen === 'result' && (
@@ -248,6 +712,7 @@ export function App() {
                   }
                   scenario={session.scenario}
                   positions={positions}
+                  measuredShare={measuredShare}
                   onRainfall={(rainfallMm) => {
                     const solved = positions.find((p) => p.rainfallMm === rainfallMm);
                     if (solved === undefined) return;
@@ -261,55 +726,18 @@ export function App() {
                 />
               ) : (
                 <ScenarioSetup
-                  address={session.address!}
+                  address={session.address}
+                  refusal={refusal}
                   scenario={session.scenario}
                   suggestedPitId={
                     session.scenario.pitId === null
-                      ? nearestInlet(loaded, session.address, scenario.drains)
+                      ? nearestInlet(loaded, session.address, scenario.supported)
                       : null
                   }
                   onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
                   onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
                   onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
-                  onRun={() => {
-                    // The scene's own cell for this asset. Never recomputed
-                    // from the map geometry: the pipeline snaps drains onto
-                    // the flow field, so a cell worked out here disagrees with
-                    // the scene for every drain in the extent.
-                    const drain = scenario.drains.find(
-                      (d) => d.assetNumber === session.scenario.pitId,
-                    );
-                    const cell = drain?.isInlet === true ? drain.cell : null;
-                    if (cell === null || session.scenario.blockage === null) {
-                      // A pit the scene does not place cannot carry a
-                      // scenario, and that is an inlet problem rather than a
-                      // crash.
-                      dispatch({ type: 'comparison-started' });
-                      dispatch({
-                        type: 'comparison-finished',
-                        outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
-                      });
-                      return;
-                    }
-
-                    dispatch({ type: 'comparison-started' });
-                    void scenario
-                      .run(cell, session.scenario.blockage, session.scenario.rainfallMm)
-                      .then((result) => {
-                        // Cleared on failure: leaving the previous run's
-                        // positions attached would let the control offer
-                        // answers to a question nobody asked.
-                        setPositions(result.status === 'successful' ? result.positions : []);
-                        if (result.status === 'successful') setCellSizeM(result.cellSizeM);
-                        dispatch({
-                          type: 'comparison-finished',
-                          outcome:
-                            result.status === 'successful'
-                              ? { kind: 'comparison', band: result.band }
-                              : { kind: 'insufficient', reason: result.reason },
-                        });
-                      });
-                  }}
+                  onRun={startComparison}
                   onReset={() => dispatch({ type: 'reset-choices' })}
                 />
               )}
@@ -348,16 +776,20 @@ export function App() {
                 session={session}
                 suggestedPitId={
                   session.scenario.pitId === null
-                    ? nearestInlet(loaded, session.address, scenario.drains)
+                    ? nearestInlet(loaded, session.address, scenario.supported)
                     : null
                 }
-                scenarioDrains={
-                  new Set(scenario.drains.filter((d) => d.isInlet).map((d) => d.assetNumber))
-                }
+                scenarioDrains={scenario.supported}
+                onRefusePit={(pitId) => {
+                  setRefusal(
+                    `Pit ${pitId}: ${UNSUPPORTED_TEXT[supportOf({ supported: scenario.supported, withoutGround: scenario.withoutGround }, pitId) === 'no-measured-ground' ? 'no-measured-ground' : 'not-an-inlet']}`,
+                  );
+                }}
                 difference={differenceShown}
-                onPickPit={(pitId) =>
-                  dispatch({ type: 'pit-selected', pitId, suggested: false })
-                }
+                onPickPit={(pitId) => {
+                  setRefusal(null);
+                  dispatch({ type: 'pit-selected', pitId, suggested: false });
+                }}
               />
             </div>
           </div>
@@ -367,35 +799,206 @@ export function App() {
 
     default:
       return (
-        <Shell
+        <MapScreen
           credits={credits}
-          crumbs={
-            <>
-              {crumb('Address search', () => dispatch({ type: 'change-address' }))}
-              {separator}
-              {crumb('Choose a task', () => dispatch({ type: 'back' }))}
-              {separator}
-              {crumb(session.task === 'full-map' ? 'Full map' : 'Explore drainage', undefined, true)}
-            </>
-          }
-        >
-          <MapView
-            map={loaded.map}
-            derived={loaded.derived}
-            trace={loaded.trace}
-            address={session.address}
-            task={session.task}
-            onBack={() => dispatch({ type: 'back' })}
-          />
-        </Shell>
+          loaded={loaded}
+          session={session}
+          dispatch={dispatch}
+          crumb={crumb}
+        />
       );
   }
 }
 
 /**
+ * The map, its frame, and the tour that points at the frame's controls.
+ *
+ * A component of its own because the tour is state, and the screen it belongs
+ * to was the default arm of a switch inside `App` — where a `useState` cannot
+ * go. The tour also has to sit outside `MapView`: its button belongs on the
+ * breadcrumb row, which is the Shell's, and its overlay covers the whole
+ * window rather than the map pane.
+ */
+function MapScreen({
+  credits,
+  loaded,
+  session,
+  dispatch,
+  crumb,
+}: {
+  readonly credits: readonly Credit[];
+  readonly loaded: Loaded;
+  readonly session: Session;
+  readonly dispatch: (event: SessionEvent) => void;
+  readonly crumb: (label: string, onClick?: () => void, current?: boolean) => React.ReactNode;
+}) {
+  const [touring, setTouring] = useState(false);
+  // Which drains the comparison can use, for the pit card's way in (AC 3.1.1).
+  const scenarioSupport = useScenarioSupport(true);
+
+  /*
+    Open it once, for somebody who has not had it.
+
+    In an effect rather than in the initial state, because it writes: the
+    first thing it does is record that the tour has been shown, so a person
+    who dismisses it immediately is not met with it again on their way back
+    in. Recorded on opening rather than on finishing, so somebody who closes
+    the tab halfway through has still been offered it.
+
+    Nothing here waits for the map. A step whose target is not on screen
+    yet degrades to a card with no spotlight -- `useTargetBox` returns null
+    and re-measures on the next resize -- and by this point `loaded` has
+    already resolved, so the controls are in the same commit as this effect.
+  */
+  useEffect(() => {
+    if (tourGate.seen()) return;
+    tourGate.remember();
+    setTouring(true);
+  }, []);
+
+  return (
+    <Shell
+      at={session.screen}
+      credits={credits}
+          servedFrom={loaded.servedFrom}
+          extentName={loaded.extentName}
+      // Inside the map, the name at the top tells somebody something they
+      // worked out by arriving. The row below carries the way back out.
+      masthead={false}
+      /*
+        The Back control names where it goes, because the map has two ways
+        in -- the homepage and the flood board -- and with two possible
+        origins a bare "Back" is a guess.
+
+        The trail beside it is one crumb now. It used to lead with a
+        clickable Home, which was doing two jobs badly: a breadcrumb says
+        where you *are*, and a person looking for the way out does not read
+        a location as an exit. The button is the exit; the crumb says where
+        they are.
+      */
+      back={{
+        label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
+        onBack: () => {
+          dispatch({ type: 'leave-map' });
+        },
+      }}
+      crumbs={crumb(
+        session.task === 'full-map' ? 'Full map' : 'Explore drainage',
+        undefined,
+        true,
+      )}
+      trailing={
+        <TourButton
+          onOpen={() => {
+            setTouring(true);
+          }}
+        />
+      }
+    >
+      <MapView
+        /*
+          Remounted on every arrival, so the map cannot open carrying a pit
+          card, a traced path or a set of chips from the last visit. It was
+          already true by accident -- React unmounts this on the way out --
+          and this makes it true on purpose. See `mapOpenings` in session.ts.
+        */
+        key={session.mapOpenings}
+        map={loaded.map}
+        derived={loaded.derived}
+        trace={loaded.trace}
+        address={session.address}
+        task={session.task}
+        mode={session.mapMode}
+        index={loaded.index}
+        onAddress={(picked) =>
+          dispatch({
+            type: 'address-moved',
+            address: {
+              id: picked.id,
+              label: picked.label,
+              eastingM: picked.e,
+              northingM: picked.n,
+            },
+          })
+        }
+        onClearAddress={() => {
+          dispatch({ type: 'address-cleared' });
+        }}
+        scenarioSupport={scenarioSupport}
+        onCompare={(pitId) => {
+          dispatch({ type: 'scenario-from-map', pitId });
+        }}
+      />
+      {touring && (
+        <Tour
+          onClose={() => {
+            setTouring(false);
+          }}
+        />
+      )}
+    </Shell>
+  );
+}
+
+/**
+ * The way back in, for anybody who has already been shown it.
+ *
+ * **This used to say the tour does not open by itself, and why.** The argument
+ * was that deciding whether this *is* a first visit means writing something to
+ * the browser and reading it back, and that a product whose position is that
+ * it holds nothing about you should not begin by storing a fact about you in
+ * order to be helpful. It is written out here rather than deleted, because the
+ * reversal is the decision worth being able to find.
+ *
+ * What changed is the weighing, not the principle. A first-time visitor
+ * arriving on a map with no basemap, four layers and a mode switch should not
+ * have to find a button to be told what they are looking at, and the thing
+ * being stored — `drainlens.tour.seen`, holding `"1"` — says only that
+ * somebody on this browser has been shown it once. No address, no identifier,
+ * no timestamp, no count. `tourGate.ts` states what is written and what is
+ * not, and `session.ts` still writes nothing at all.
+ *
+ * The button stays, because "seen once" and "understood" are different, and a
+ * tour that can only be seen once is a tour somebody will want back.
+ */
+function TourButton({ onOpen }: { readonly onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: space(2),
+        padding: `${String(space(1))}px ${String(space(3))}px`,
+        border: `1px solid ${line.base}`,
+        borderRadius: radius.base,
+        background: surface.raised,
+        color: ink.strong,
+        font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+        <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path
+          d="M5.9 6.1a2.1 2.1 0 1 1 2.5 2.1v1.2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <circle cx="8.4" cy="11.6" r="0.95" fill="currentColor" />
+      </svg>
+      Tutorial
+    </button>
+  );
+}
+
+/**
  * The map beside the scenario panel.
  *
- * AC 2.2.1.d: the selected pit and its recorded downstream path stay visible
+ * AC 2.2.1.d (Aug-27 set): the selected pit and its recorded downstream path stay visible
  * while a result is on screen. Without them the difference is highlighted over
  * a map that has forgotten which drain the person was asking about, and the
  * result reads as a statement about the whole neighbourhood.
@@ -404,6 +1007,63 @@ export function App() {
  * here anyway and this map is driven by the scenario rather than by its own
  * selection.
  */
+/**
+ * The homepage's navigation: the two places it can send you.
+ *
+ * **It used to carry three in-page anchors as well** — *What you can do*, *How
+ * it works*, *About the data* — and they are gone from 4 September. A header
+ * that mixes two kinds of control teaches neither: three of the five scrolled
+ * the page you were already on and two opened a different one, and nothing in
+ * the row said which was which. What is left is only the second kind.
+ *
+ * They also disappeared below 820px, which meant the header a person met on a
+ * laptop and the header they met on a phone were different headers. This one
+ * is the same everywhere, which is the second reason to prefer it: the narrow
+ * layout was already the honest one.
+ *
+ * The sections themselves keep their ids — they are named by the acceptance
+ * criteria and are still there to scroll to.
+ */
+function HomeNav({
+  onOpenMap,
+  onOpenHistory,
+}: {
+  readonly onOpenMap: () => void;
+  readonly onOpenHistory: () => void;
+}) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
+      <button
+        type="button"
+        onClick={onOpenHistory}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: type(text.label, { weight: weight.medium }),
+          color: ink.muted,
+        }}
+      >
+        Flood history
+      </button>
+      <button
+        type="button"
+        onClick={onOpenMap}
+        style={{
+          padding: `${String(space(2))}px ${String(space(4))}px`,
+          font: type(text.label, { weight: weight.semibold }),
+          color: ink.inverse,
+          background: ink.strong,
+          border: 'none',
+          borderRadius: radius.base,
+        }}
+      >
+        Get started →
+      </button>
+    </span>
+  );
+}
+
 function MapCanvasPane({
   loaded,
   session,
@@ -411,6 +1071,7 @@ function MapCanvasPane({
   scenarioDrains,
   difference,
   onPickPit,
+  onRefusePit,
 }: {
   readonly loaded: Loaded;
   readonly session: Session;
@@ -420,6 +1081,8 @@ function MapCanvasPane({
   /** Asset numbers the scene places as inlets. Anything else cannot run. */
   readonly scenarioDrains: ReadonlySet<string>;
   readonly onPickPit: (pitId: string) => void;
+  /** A pit that cannot be compared was tapped: say why (AC 3.1.1.d). */
+  readonly onRefusePit: (pitId: string) => void;
 }) {
   const pitId = session.scenario.pitId;
   const followed = useMemo(
@@ -437,6 +1100,8 @@ function MapCanvasPane({
       // asset number and the map does not mark leaves the person holding an
       // identifier with no way to find it — which is what a teammate hit.
       suggestedPit={pitId === null && suggestedPitId !== null ? Number(suggestedPitId) : null}
+      comparablePits={scenarioDrains}
+      openAt={session.address === null && pitId !== null ? pitPosition(loaded, pitId) : null}
       address={
         session.address === null
           ? null
@@ -451,9 +1116,18 @@ function MapCanvasPane({
         if (hit?.kind !== 'pit') return;
         const asset = String(hit.feature.asset_number ?? '');
         if (scenarioDrains.has(asset)) onPickPit(asset);
+        // It used to be ignored in silence, which reads as a map that does not
+        // respond. Saying why is AC 3.1.1.d; saying what it does not mean, e.
+        else onRefusePit(asset);
       }}
     />
   );
+}
+
+/** Where a pit is on the served map, in local metres, or null. */
+function pitPosition(loaded: Loaded, pitId: string): readonly [number, number] | null {
+  const pit = (loaded.map.layers.pit ?? []).find((p) => String(p.asset_number ?? '') === pitId);
+  return pit === undefined ? null : [pit.c[0], pit.c[1]];
 }
 
 /**
@@ -472,18 +1146,15 @@ function MapCanvasPane({
 function nearestInlet(
   loaded: Loaded,
   address: SupportedAddress | null,
-  drains: readonly SceneDrain[],
+  usable: ReadonlySet<string>,
 ): string | null {
   const pits = loaded.map.layers.pit ?? [];
-  if (address === null || pits.length === 0 || drains.length === 0) return null;
+  if (address === null || pits.length === 0 || usable.size === 0) return null;
 
   // Only what the engine will accept. Reading "is this an inlet?" off the
   // asset description instead was how a suggestion the scene cannot place
   // reached the screen, and the comparison then failed on the person rather
   // than on us.
-  const usable = new Set(
-    drains.filter((drain) => drain.isInlet).map((drain) => drain.assetNumber),
-  );
 
   let bestId: string | null = null;
   let bestDistance = Infinity;

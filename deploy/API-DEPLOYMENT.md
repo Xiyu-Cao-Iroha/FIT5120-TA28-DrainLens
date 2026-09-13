@@ -1,0 +1,484 @@
+# Deploying the DrainLens API
+
+**Live:** https://drainlens-api-205559161217.australia-southeast1.run.app/health
+
+Deployed **5 September 2026**. This file was written as a runbook before any of it was run, and it has been corrected in three places since — two PowerShell quoting traps that made commands here fail, and one claim about the instance's addressing that was stronger than what was deployed. Those corrections are in place rather than in a footnote, because a runbook that records what somebody meant to type is worse than no runbook.
+
+A second Cloud Run service, `drainlens-api`, over a Cloud SQL for PostgreSQL instance. Five `GET` routes returning the artefacts the frontend already accepts, rebuilt from rows. Same project `fit5120-504507`, same region `australia-southeast1`, same log exclusion — that last one has to be *verified*, not inherited by assumption, and step 2 is where.
+
+**The site reads four of its five artefacts from here**, and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. The footer of every screen says which source answered. See `apps/web/src/data/source.ts`.
+
+The address index is the fifth artefact and stays bundled, deliberately and permanently.
+
+---
+
+## What the first deployment measured
+
+| 5 September 2026 | |
+|---|---|
+| Revision | `drainlens-api-00001-69r`, serving 100% |
+| Image | `api:d3ce975` — the same short SHA as `main`'s head. Compared, not assumed |
+| Data | `/health` answers `{"status":"ok","pits":895,"areas":30}`. Those are the counts `apps/api/test-db/load.test.ts` asserts, so the migration job reached the database rather than the service starting against an empty one |
+| Responses | `tools/deploy/verify-api.mjs` passed **all eight checks** against the deployed URL. Every response deep-equals the published artefact |
+| **AD1** | `httpRequest.remoteIp:*` over the whole project, one hour, 150 requests in the window: **no entries**. Positive control in the same window shows `system_event`, `varlog/system`, `stdout` and `activity` writing — and **no `run.googleapis.com/requests` log at all** |
+| **Cloud SQL logs** | `postgres.log` is being written and contains only internal maintenance (`automatic analyze of ... heartbeat`, with `db=` and `user=` both empty). **No connection entries**, which is `log_connections=off` doing its job and not a query that matched nothing |
+| Failures | **0 of 150 requests** |
+
+Latency, thirty samples per route, from a laptop over a home connection to Sydney — the same caveat as the site's figures: this measures that link as much as the service.
+
+| Route | p50 | p95 | max | Body |
+|---|---|---|---|---|
+| `/health` | 31.5 ms | 35.0 ms | 343.8 ms | — |
+| `/api/flood-history` | 36.6 ms | 56.5 ms | 306.8 ms | 5.4 KB |
+| `/api/trace/kensington` | 44.7 ms | 50.0 ms | 54.6 ms | 36.8 KB |
+| `/api/derived/kensington` | 50.9 ms | 60.4 ms | 76.0 ms | 135.6 KB |
+| `/api/map/kensington` | 71.2 ms | 85.1 ms | 85.8 ms | 315.9 KB |
+
+The two maxima over 300 ms are cold starts — `--min-instances=0` means the first request after an idle period pays for the container and the connector coming up. That is the cost of not paying for an idle instance, and at this stage it is the right trade.
+
+> **`/` answers 404, and that is correct.** There is no root route: this is five `GET`s, not a website. The first thing anybody does with a new URL is open it in a browser, so it is worth saying here rather than discovering it as a fault.
+
+---
+
+## Rehearsed locally first, 5 September 2026
+
+Everything below except the four steps that need Google — the APIs, the instance, the secret and the IAM grants — was run against the image this file describes, before any of it was run against a project that charges for mistakes.
+
+| | |
+|---|---|
+| Image | `docker build -f deploy/api/Dockerfile .` — built from the repository root, 23 runtime packages resolved from the lockfile |
+| Migration job | `node apps/api/dist/migrate.js` against an empty schema: applied migration 1 and loaded all thirteen tables, output below |
+| Run twice | Second execution printed `schema  already current` and the same counts. This is the property that matters in deployment: the person running the job cannot always be sure whether somebody ran it this afternoon |
+| Service | `node apps/api/dist/server.js`, one line — `listening on 8080` — and a 200 from `/health`. The entry-point path comparison holds for `dist/*.js`, which is the bug that once made this build, start, exit zero and listen on nothing |
+| Verification | `tools/deploy/verify-api.mjs` passed all eight checks against the container |
+| **And failed when it should** | Three rows deleted from `pit` and thirty-seven links from `trace_link`: three checks went red and it exited 1. A checker that has never failed is not evidence of anything |
+
+What the rehearsal cannot tell you: whether the Cloud SQL connector works, whether the service account can read the secret, and whether the log exclusion holds for a second service. Those are steps 2, 8 and 10, and they are the reason those steps have positive controls.
+
+---
+
+## What it costs, and how to stop paying
+
+**Cloud SQL has no free tier.** The instance is charged for every hour it exists, whether or not anybody visits, and storage is charged even while it is stopped. Cloud Run and Artifact Registry are effectively free at this volume; the database is not.
+
+> **Read the pricing calculator before running step 4.** Nothing in this document is a quote. The smallest shared-core instance with 10 GB of HDD in `australia-southeast1` is the configuration below, and it is the cheapest thing that runs Postgres 16 in this project — but the number changes and this file will not notice.
+
+Two levers, in order of how much they save:
+
+```bash
+gcloud sql instances patch drainlens-db --activation-policy=NEVER --project=fit5120-504507
+```
+
+Stops the instance. Compute stops being charged; storage does not. `--activation-policy=ALWAYS` starts it again, in a minute or two.
+
+```bash
+gcloud sql instances delete drainlens-db --project=fit5120-504507
+```
+
+**Deleting it loses nothing.** Every row in this database is derived from `apps/web/public/data/*.json`, which is in the repository; the migration job rebuilds the whole thing from a checkout in one execution. That is also why the instance is created with **no backups** — a backup of a derived database is a copy of something already in git, paid for monthly.
+
+---
+
+## PowerShell rewrites arguments before gcloud sees them
+
+Both failures of the first deployment were this, and neither looked like it. The commands are correct; PowerShell changed them on the way past.
+
+**A comma makes an array.** `--database-flags=a=off,b=off,c=none` is parsed as three elements, which PowerShell then joins with spaces when it hands them to a native command. gcloud received `--database-flags=a=off b=off c=none` and answered `Failed to set log_connections: off log_disconnections=off log_statement=none is not on/off` — a message about a value nobody typed. **Wrap any argument containing a comma in single quotes.**
+
+**Inner double quotes are lost.** `gcloud` on Windows is `gcloud.cmd`, and an argument whose value contains `"` is re-parsed on the way through. A logging filter written `'resource.labels.database_id="fit5120-504507:drainlens-db"'` arrived unquoted, and the parser stopped on the colon: `syntax error at line 1, column 124, token ':'` — for a filter only 95 characters long, because gcloud prepends `timestamp>="..."` from `--freshness`, and 124 lands exactly on that colon.
+
+The fix for filters is not more quoting. It is **filters with no spaces and no quotes in them at all**, which step 10 now uses.
+
+This is the same family as *Quote the hash with single quotes* in [`deploy/README.md`](README.md), where double quotes reduced an apr1 hash to a single character and nginx accepted it. In all three cases the shell edited the value and nothing downstream could tell.
+
+**It happened a fourth time on 11 September, to this page's own rule.** The council migration's `--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace` went out unquoted on the reasoning that a token with no spaces is safe. It is not; the comma is enough on its own. gcloud stored one argument and the container went looking for a module named `migrate.js --extent city-of-melbourne --replace`. **The job deployed successfully** — that is what makes this one worth writing down twice: a mangled `--args` is not a deployment error, it is a container that starts, fails, and reports exit code 1 with nothing about quoting anywhere in the message.
+
+---
+
+## The order, and why it is this order
+
+### 1. Enable the APIs
+
+Individually, and never inferred from a sibling working.
+
+```bash
+gcloud services enable sqladmin.googleapis.com secretmanager.googleapis.com artifactregistry.googleapis.com run.googleapis.com cloudbuild.googleapis.com --project=fit5120-504507
+```
+
+### 2. Check the log exclusion covers a service that does not exist yet
+
+**Before the instance, before the image, before anything can receive a request.** AD1 says this product keeps no IP address, and Cloud Run writes `httpRequest.remoteIp` into its request log by default. An exclusion drops entries *before they are written*; one added afterwards cannot unwrite the lines already holding a visitor's address.
+
+The exclusion applied for the site in September filters on `LOG_ID(run.googleapis.com/requests)`, which names the log and not the service — so it should already cover every Cloud Run service in this project, including one created next week. **Should is not a verification.** Read it back:
+
+```bash
+gcloud logging sinks describe _Default --project=fit5120-504507 --format="yaml(exclusions)"
+```
+
+It must contain an exclusion whose filter is `LOG_ID(run.googleapis.com/requests)`, and which is not disabled. If the filter has been narrowed to a service name at some point, widen it — or add a second exclusion — before continuing.
+
+> **It must be `--add-exclusion`, not the sink's own `--log-filter`.** That mistake has already been made once in this project: `NOT LOG_ID(...)` on the sink filter stored correctly, looked right, and did not stop the logs. Two entries carrying a real client IP were written eleven minutes later. See *What went wrong* in [`deploy/README.md`](README.md).
+
+Step 10 proves it with a positive control. This step only proves the configuration exists.
+
+### 3. Decide the database is allowed to log connections, and say no
+
+Cloud SQL can log every connection, with the connecting address. For a service behind the Cloud SQL connector that address is Google's, not a resident's — but "the IP we log is not a person's" is an argument, and turning the logging off is a fact. Set the flags at creation time so there is no window in which the answer depends on a default nobody checked:
+
+```
+--database-flags=log_connections=off,log_disconnections=off,log_statement=none
+```
+
+They are in the command below. `log_statement=none` is Postgres's default; it is written out because a flag that is set explicitly can be read back, and a default cannot be distinguished from an oversight.
+
+### 4. Create the instance — this is the step that starts costing money
+
+```bash
+gcloud sql instances create drainlens-db --project=fit5120-504507 --database-version=POSTGRES_16 --edition=enterprise --tier=db-f1-micro --region=australia-southeast1 --availability-type=zonal --storage-type=HDD --storage-size=10GB --no-storage-auto-increase --no-backup '--database-flags=log_connections=off,log_disconnections=off,log_statement=none'
+```
+
+**The single quotes around `--database-flags` are not decoration** — see *PowerShell rewrites arguments before gcloud sees them* above. Without them this command fails with `off log_disconnections=off log_statement=none is not on/off`.
+
+**Postgres 16 because that is what the tests run against** — `db/docker-compose.yml` and the CI service container are both `postgres:16-alpine`. A migration that applies on 16 and not on 17 is a thing to find out in `npm run test:db`, not in a job execution.
+
+`--no-storage-auto-increase` because 8 MB of artefacts in a 10 GB volume cannot grow into a bill by accident, and a database that silently buys itself more disk is a cost nobody reviews.
+
+The instance keeps its default public IP with **no authorized networks**, which is not the same as being reachable: without an authorized network, the only way in is the Cloud SQL Auth connector, which requires IAM and TLS. Do not add an authorized network to make something work — if a connection fails, it is IAM, and step 8 grants it.
+
+```bash
+gcloud sql databases create drainlens --instance=drainlens-db --project=fit5120-504507
+```
+
+### 5 and 6. The password, and the secret it goes into — one block, because nobody should have to remember it
+
+The password is needed exactly twice: to create the user, and to build the connection string. After that the job and the service read the secret, and no human touches it again. So it is generated, used twice and discarded inside one block, and is never displayed, never written to a file that outlives the command, and never typed by anybody.
+
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $pw = ($b | ForEach-Object { $_.ToString('x2') }) -join ''; gcloud sql users create drainlens --instance=drainlens-db --password=$pw --project=fit5120-504507; $f = Join-Path $env:TEMP "dburl.txt"; [IO.File]::WriteAllText($f, "postgresql://drainlens:$pw@localhost/drainlens?host=/cloudsql/fit5120-504507:australia-southeast1:drainlens-db"); gcloud secrets create drainlens-db-url --replication-policy=automatic --data-file="$f" --project=fit5120-504507; Remove-Item $f; Remove-Variable b, pw, f
+```
+
+**The connection string is** `postgresql://drainlens:PASSWORD@localhost/drainlens?host=/cloudsql/fit5120-504507:australia-southeast1:drainlens-db`. `localhost` is a placeholder the parser requires and does not use: `host=` names a **directory**, and Cloud Run mounts the connector's unix socket there. There is no TCP connection and no port.
+
+**Hexadecimal, and that is not fussiness.** The password goes inside a URL, where a `#`, `@`, `/` or `?` silently truncates it — the same failure class as the apr1 hash that double quotes reduced to one character and that nginx then accepted. The gate looked like it was working; it was locked against everybody.
+
+**`[IO.File]::WriteAllText`, not `notepad` or `Out-File`.** Notepad may write a BOM and `Out-File` appends a newline, and either would go into the secret: `host=/cloudsql/...drainlens-db\r\n` names a directory that does not exist, and the failure reads as a connection error rather than as three stray bytes. `WriteAllText` writes UTF-8 with no BOM and no trailing newline.
+
+**The one trade in that block is `--password=$pw`.** For the seconds it runs, the password is on the gcloud process's command line, where another process on the machine could read it. What it buys is that the password is *not* in `ConsoleHost_history.txt` — PowerShell records the literal `--password=$pw`, not its value — not echoed to the screen, and not on disk. On a single laptop that is the better side of the trade: a process command line lives for seconds, and the history file survives reboots.
+
+If you would rather it were interactive, `gcloud sql users create drainlens --instance=drainlens-db --prompt-for-password` reads it from the terminal instead — but then you hold it in the clipboard to paste into the secret, which is its own exposure.
+
+Check the secret without printing it:
+
+```bash
+(gcloud secrets versions access latest --secret=drainlens-db-url --project=fit5120-504507).Length
+```
+
+**171**, exactly: 23 characters of prefix, 64 of hexadecimal password, 84 of suffix. One over is a trailing newline, three over is a BOM, short is a truncated password — all three are fixed with a new version, and none of them requires showing the value.
+
+Nothing needs to remember the password afterwards. To change it: `gcloud sql users set-password drainlens --instance=drainlens-db --prompt-for-password`, then `gcloud secrets versions add drainlens-db-url --data-file=...`. The job and the service both reference `:latest`, so a new version takes effect on the next execution and the next revision — not on the running one.
+
+### 7. Create the image repository, and build
+
+```bash
+gcloud artifacts repositories create drainlens --repository-format=docker --location=australia-southeast1 --description="DrainLens API images" --project=fit5120-504507
+```
+
+```bash
+gcloud builds submit --config=deploy/api/cloudbuild.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
+```
+
+From the repository root, on `main`, with a clean working tree — the tag is the commit, and a tag that names a commit the image was not built from is worse than no tag.
+
+**`--config`, not `--tag`.** `gcloud builds submit --tag=...` and `gcloud run deploy --source=.` both look for `./Dockerfile`, which belongs to the site. Naming `deploy/api/Dockerfile` explicitly is the only way to build a second service from this repository, and it also removes the failure this project has already shipped once: a `--source=.` that found no Dockerfile fell back to Buildpacks and built something else without erroring.
+
+### 8. Let the service account reach the database and the secret
+
+```bash
+gcloud projects add-iam-policy-binding fit5120-504507 --member=serviceAccount:205559161217-compute@developer.gserviceaccount.com --role=roles/cloudsql.client
+```
+
+```bash
+gcloud secrets add-iam-policy-binding drainlens-db-url --member=serviceAccount:205559161217-compute@developer.gserviceaccount.com --role=roles/secretmanager.secretAccessor --project=fit5120-504507
+```
+
+`205559161217` is this project's number — it is the same number in the site's Cloud Run hostname, which is how it was read rather than guessed. Confirm with `gcloud projects describe fit5120-504507 --format="value(projectNumber)"` if the default compute service account has been changed.
+
+### 9. Migrate, then serve — in that order
+
+The job and the service are **the same image**. A migration built from a different commit than the server it migrates for is a class of failure nobody can reproduce afterwards.
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node --args=apps/api/dist/migrate.js --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
+```
+
+```bash
+gcloud run jobs execute drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --wait
+```
+
+`--max-retries=0` on purpose. The load is one transaction and a retry is harmless, but a job that quietly succeeds on its third attempt hides the two failures, and the two failures are the information.
+
+Read the execution log before continuing. It prints a line per table, and the numbers are the ones `apps/api/test-db/load.test.ts` asserts. This is the output of the rehearsal below, copied rather than composed:
+
+```
+  schema                 applied 1
+  source                      8
+  extent                      1
+  artefact_envelope           4
+  pit                       895
+  pipe                      893
+  road                      220
+  street_label              163
+  derived_shape             394
+  trace_link                734
+  trace_reason                4
+  flood_area                180
+  flood_area_coverage        30
+```
+
+A second execution prints `schema  already current` and the same table counts: the migrations are skipped once recorded and the load is a truncate-and-insert.
+
+Then the service:
+
+```bash
+gcloud run deploy drainlens-api --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --port=8080 --memory=512Mi --max-instances=2 --min-instances=0 --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --allow-unauthenticated
+```
+
+**`--allow-unauthenticated` is the one line to be deliberate about**, and it is a different decision from the site's. The site is behind a password because the studio requires the deployed website to be. This is not the website: it is five `GET` routes over published council data, it holds no identity, it takes no body, and nothing links to it. Publishing it is what lets a mentor open `/health` in a browser, which is the point of deploying it at all.
+
+`--max-instances=2` is the cost ceiling that goes with that decision. An open endpoint in front of a shared-core database can be asked a great many questions by somebody who is not a mentor; two instances is the most that can be asked at once.
+
+If that trade is not wanted, deploy with `--no-allow-unauthenticated` and reach it through a proxy instead — no other step changes:
+
+```bash
+gcloud run services proxy drainlens-api --region=australia-southeast1 --project=fit5120-504507
+```
+
+### 10. Verify — and the AD1 check needs a positive control
+
+```bash
+node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-southeast1.run.app
+```
+
+That fetches all five routes and compares each response against the published artefact it is supposed to reproduce — **deeply**, not by shape. The frontend's guards accept a trace with keys missing and links whose reason was dropped; four such changes reached a passing test suite before a whole-response comparison caught them. A shape check here would find none of them either.
+
+Then the log check, which is two questions and not one. **Run the verifier first**, so the window has traffic in it — a log check over an hour in which nobody visited proves nothing whichever way it comes out.
+
+```bash
+gcloud logging read httpRequest.remoteIp:* --limit=20 --freshness=1h --project=fit5120-504507
+```
+
+Expected: **nothing**. `field:*` is the existence test, and this filter is deliberately one token with no spaces and no quotes — see *PowerShell rewrites arguments* above. It is also **stronger than scoping it to the service**: it asks whether any log entry anywhere in this project, from either Cloud Run service, carries a client address.
+
+```bash
+gcloud logging read 'resource.type="cloud_run_revision"' --limit=10 --freshness=1h --project=fit5120-504507 --format="value(logName)"
+```
+
+**Zero results from the first query proves nothing on its own.** It is the same result you get from a stale freshness window, a service nobody has visited, or a filter that is quietly wrong. This one — the positive control — has to come back non-empty before the first one means what it says. On 5 September it returned `cloudaudit/system_event`, `run/varlog/system`, `run/stdout` and `cloudaudit/activity` — and **no `run.googleapis.com/requests`**, which is the entry the exclusion drops.
+
+Do the same for the database, once:
+
+```bash
+gcloud logging read resource.type=cloudsql_database --limit=20 --freshness=1h --project=fit5120-504507
+```
+
+The instance name is not in the filter because there is one instance in this project, and adding it would put a colon inside quotes — which is the argument PowerShell destroys. **This query carries its own positive control**: `postgres.log` comes back non-empty, full of internal maintenance lines with `db=` and `user=` empty, and not one connection entry. Logging works, and connections are not in it.
+
+---
+
+## Iteration 2: serving the City of Melbourne instead of Kensington
+
+Two extents are published. **The database holds exactly one**, and changing which one is a different operation from the first deployment above — the instance already has rows in it.
+
+### The artefacts are committed, which nothing else in `/data` is
+
+`load.ts` reads files, so the files have to be in the image, and the image is built from this repository. `/data` — where `pipeline/` writes the council build — is in `.dockerignore` as well as `.gitignore`, so an artefact built there is not in the build context at all and cannot be copied out of it. The council's three files are therefore committed under **`apps/api/data/city-of-melbourne/`**, which the Dockerfile copies whole:
+
+| | |
+|---|---|
+| `map.json` | 6.7 MB — 21,113 pits, 17,242 pipes, 4,177 roads, 2,775 labels |
+| `trace.json` | 693 KB |
+| `derived.json` | 210 KB, reframed to the council's origin by `pipeline/reframe.py` |
+| *no `flood-history.json`* | That board is Greater Melbourne's, not any pilot extent's. It is read from the bundled copy whichever extent is being loaded — a second, byte-identical copy in the council directory would be two files that must stay equal with nothing to notice when they stop |
+
+1.3 MB as git objects, paid once per rebuild of the council extent. Everything else under `/data` — including the 4 GB point cloud — stays ignored.
+
+### `--replace`, and why it is not the default
+
+The two extents **overlap**: Kensington is a square kilometre inside the council, and its 895 pits are 895 of the council's 21,113 under the same `asset_number`, which is a global primary key. Loading either one into a database holding the other fails on `pit_pkey` — **in both directions**. The load deletes the extent it is *loading*, so it leaves the one that is in the way; that was measured, not reasoned about, after the reasoning got the direction wrong.
+
+So the loader asks first and refuses in a sentence that names what is in the way:
+
+```
+LoadError: the database holds kensington, which overlaps city-of-melbourne: the same
+assets would be stored twice in two coordinate frames, and the insert would fail on
+pit_pkey. Load with --replace to remove kensington first.
+```
+
+`--replace` is not the default because it deletes rows nobody named, and because the schema was written for a second *pilot area* — two extents that do not overlap should both be able to live here. This one is a containing extent, which is a different relationship. `--replace` is for a deployment that is deliberately changing which extent it serves.
+
+Failing this way is safe: migrations 002 and 003 have already been applied and recorded by the time the load refuses, so re-running with the flag prints `schema already current` and carries on.
+
+### The sequence
+
+Migrations **002** and **003** are new since the first deployment and are applied by the same job. 003 is the one that matters for the council: `pipe.ref` was a primary key because the sample had no duplicates, and council-wide **85 of 17,242 pipes carry no `ref` at all and one `ref` is used twice**.
+
+Build the image at the commit being deployed — on `develop` for Iteration 2, not `main`, which is frozen:
+
+```bash
+gcloud builds submit --config=deploy/api/cloudbuild.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
+```
+
+Point the job at the council. **`--args` is comma-delimited, so the whole flag goes in single quotes** — this is *Wrap any argument containing a comma in single quotes* from the PowerShell section above, and skipping it is the third time this project has shipped that mistake:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=1Gi --task-timeout=30m --max-retries=0
+```
+
+> **This paragraph said the opposite for one deployment**, and the deployment failed on it: *"`--args` is comma-delimited and the whole flag is one token with no spaces, which is what keeps PowerShell out of it."* Having no spaces is not what keeps PowerShell out — the comma is enough. It split the value into four elements and rejoined them with spaces, gcloud stored **one** argument, and the container went looking for a module called `migrate.js --extent city-of-melbourne --replace`:
+>
+> ```
+> Error: Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'
+> ```
+>
+> The rule was already written twenty lines up this page, next to `--database-flags=a=off,b=off,c=none`, which is the same shape and failed the same way on 5 September. It was reasoned past rather than applied.
+
+**Check the arguments before executing**, because the job deploys successfully either way — a mangled `--args` is not a deploy error, it is a container that starts and exits 1:
+
+```bash
+gcloud run jobs describe drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --format=yaml
+```
+
+Four elements under `args:`, not one:
+
+```yaml
+          - args:
+            - apps/api/dist/migrate.js
+            - --extent
+            - city-of-melbourne
+            - --replace
+```
+
+**`--memory=1Gi` and `--task-timeout=30m`, both raised.** The council map is 6.7 MB of JSON parsed into memory, and the load is 46,000 single-row inserts in one transaction; locally it takes just under a minute against a database on the same machine, and the 10-minute timeout that was ample for 895 pits is not a margin worth relying on over a socket.
+
+```bash
+gcloud run jobs execute drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --wait
+```
+
+The log to expect, copied from the rehearsal against the local database rather than composed:
+
+```
+  schema                 already current
+  extent                 city-of-melbourne
+  replaced kensington         1
+  source                      8
+  extent                      1
+  artefact_envelope           4
+  pit                     21113
+  pipe                    17242
+  road                     4177
+  street_label             2775
+  derived_shape             394
+  trace_link              12798
+  trace_reason                4
+  flood_area                180
+  flood_area_coverage        30
+```
+
+`replaced kensington` appears only when there was something to replace; a second execution omits it and prints the same table counts.
+
+> **That block is the deployed job's own log, not the rehearsal's.** It ran on 11 September as `drainlens-migrate-nsv7x`, applied migrations 2 and 3 against an instance that had only ever seen 1, replaced Kensington, and exited 0. The rehearsal's output was identical apart from `schema  already current`.
+
+Then redeploy the service on the same image, so the server and the migration that filled its database were built from one commit:
+
+```bash
+gcloud run deploy drainlens-api --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --port=8080 --memory=512Mi --max-instances=2 --min-instances=0 --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --allow-unauthenticated
+```
+
+### Going back to Kensington
+
+The same command with the extent swapped. It needs `--replace` in that direction too, for the same reason:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,kensington,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
+```
+
+### Verifying it
+
+`verify-api.mjs` takes the extent as a second argument, because the instance holds one of two and comparing against the wrong one is worse than not comparing at all:
+
+```bash
+node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-southeast1.run.app city-of-melbourne
+```
+
+It compares every response against `apps/api/data/city-of-melbourne` deeply, and the flood board against the bundled copy. **This is the check that found the one real defect in the council load**: `ref` stopped being the pipe primary key in migration 003, `queries.ts` still mapped it as `Number(r.ref)`, and `Number(null)` is `0` — so the 85 council pipes the council identified with nothing came back carrying *reference number zero*. Not missing, not flagged, indistinguishable from an asset id. Every shape-based check passed.
+
+### What the council deployment measured, 11 September 2026
+
+| | |
+|---|---|
+| Revision | `drainlens-api-00003-g7k`, serving 100% |
+| Image | `api:5156e68` — the merge commit on `develop`, compared rather than assumed. `main` is unchanged at `138a002` for the whole of Iteration 2 |
+| Migration job | `drainlens-migrate-nsv7x`, exit 0. `schema applied 2, 3`, `replaced kensington 1`, then the row counts above |
+| Data | `/health` answers `{"status":"ok","pits":21113,"areas":30}` |
+| Responses | `verify-api.mjs … city-of-melbourne` passed **all eight checks**. Every response deep-equals the committed artefact |
+| **AD1** | `httpRequest.remoteIp:*` over the whole project, one hour, 100 requests in the window: **no entries**. Positive control in the same window returns `system_event`, `varlog/system`, `stdout` and `activity` — and **no `run.googleapis.com/requests` log at all**, which is the exclusion working rather than a filter that matched nothing. Checked again because a new revision is a new chance for it to stop being true, not because anything suggested it had |
+| Failures | **0 of 100 requests** |
+
+Latency, from a laptop over a home connection to Sydney — the same caveat as every other figure on this page: it measures that link as much as the service. Sample counts differ per route because the map is now twenty times the size it was in September's table, and thirty samples of it is 208 MB of egress to learn what ten will tell you.
+
+| Route | n | p50 | p95 | max | Body |
+|---|---|---|---|---|---|
+| `/health` | 30 | 33.0 ms | 36.4 ms | 312.4 ms | — |
+| `/api/flood-history` | 30 | 36.3 ms | 41.9 ms | 53.5 ms | 5.4 KB |
+| `/api/derived/city-of-melbourne` | 15 | 55.0 ms | 66.3 ms | 66.3 ms | 162.6 KB |
+| `/api/trace/city-of-melbourne` | 15 | 191.0 ms | 247.5 ms | 247.5 ms | 693.2 KB |
+| `/api/map/city-of-melbourne` | 10 | **749.6 ms** | **1556.5 ms** | 1556.5 ms | **6.78 MB** |
+
+The single 312 ms on `/health` is a cold start, as it was in September; `--min-instances=0` means the first request after an idle period pays for the container and the connector.
+
+> **Nothing here is compressed, and at council scale that is the finding.** There is no `Content-Encoding` on any response and no compression middleware in `server.ts` — the map goes out as **6,942,917 bytes on the wire**, where the same JSON gzips to about 1.2 MB. It was never worth noticing at 316 KB. It is now the largest single cost of entering the map for anybody the API is answering, and it is **the opposite way round from the fallback**: nginx compresses the copies in the site's own container, so the offline path is the fast one. Recorded rather than fixed in the same breath, because it is a change to the service and this section is a record of what was deployed.
+>
+> **Fixed the same day, in the revision after this one.** `hono/compress` on `/api/*`, measured through the middleware against a local database holding the council:
+>
+> | route | uncompressed | gzip | |
+> |---|---|---|---|
+> | `/api/map/city-of-melbourne` | 6,942,917 B | 1,220,733 B | 5.7× |
+> | `/api/trace/city-of-melbourne` | 709,800 B | 126,950 B | 5.6× |
+> | `/api/derived/city-of-melbourne` | 166,503 B | 41,781 B | 4.0× |
+> | `/api/flood-history` | 5,526 B | 1,770 B | 3.1× |
+>
+> **`/api/*` rather than `*`, and that is not tidiness.** The middleware skips bodies under 1 KB by reading `Content-Length`, and `c.json()` sets none — so the check is skipped rather than passed, and the 39-byte `/health` body came back gzipped into 59. The route that is polled and can never benefit was the one paying. There is a test for it.
+
+### What changes on the site, and what does not
+
+Nothing about the frontend deployment. The site asks the API for `city-of-melbourne` and falls back to its own bundled `kensington` when the API is unreachable — which is the normal state between demos — and `fetchTogether` takes all three place-artefacts from one side or the other, so the two coordinate frames can never be mixed on one screen.
+
+---
+
+## What must still be true afterwards
+
+| | |
+|---|---|
+| **AD1** | No log entry from either service carries a client address, and the positive control shows that logging is happening at all |
+| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
+| **CORS names the site, not `*`** | `allowedOrigins()` lists the site and the dev server. Nothing here is secret and no request carries a credential, so `*` would leak nothing — but a list is easy to widen later and impossible to narrow once something unknown depends on it |
+| **`FORBIDDEN_WIRE_KEYS`** | Still nothing on the wire that names a person. Every route is a `GET` with no body; there is no path that could carry one |
+| **The database is derived** | Nothing is written here that is not in the repository. If that stops being true — Epic 4's drain checks would be the first — this document is wrong and `--no-backup` is wrong with it |
+| **The tag on the image** | Names the commit it was built from. Compare it against `git rev-parse --short HEAD`; do not assume it |
+
+---
+
+## What will probably go wrong first
+
+| Symptom | What it is |
+|---|---|
+| `permission denied for schema public` in the job log | Postgres 15 removed the implicit `CREATE` grant on `public`. Connect as the `postgres` user and `GRANT ALL ON SCHEMA public TO drainlens;`, then re-run the job |
+| The job succeeds, `/health` answers 404 | The service is on a revision that started before the job ran, or against a different database. `/health` refuses to report ok on an empty database on purpose — a 200 over no rows is a service that looks healthy and serves an empty map |
+| `Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'` | PowerShell split `--args` on its commas and rejoined them with spaces, so gcloud stored one argument instead of four. Single-quote the whole `--args=` flag and re-deploy the job; the image is fine and does not need rebuilding |
+| `LoadError: the database holds kensington, which overlaps city-of-melbourne` | The instance already holds the other extent. Re-run the job with `--replace` — the migrations it applied first are recorded, so the second run picks up at the load |
+| `duplicate key value violates unique constraint "pit_pkey"` | An image built before `--replace` existed. Rebuild at a commit that has it rather than deleting rows by hand |
+| `ENOENT ... /app/apps/api/data/city-of-melbourne/map.json` | The image predates the committed council artefacts, or was built from a context that excluded them. `/data` is dockerignored and `apps/api/data` deliberately is not |
+| `ENOENT ... /app/apps/web/public/data/map.json` | The image was flattened. `load.ts` resolves the artefacts relative to its own file and `migrate.ts` resolves the migrations the same way; the layout under `/app` in `deploy/api/Dockerfile` is load-bearing, and it breaks at run time rather than at build time |
+| The build says `Building using Buildpacks` | Wrong command. This one is `gcloud builds submit --config=deploy/api/cloudbuild.yaml`; `--source=.` cannot see this Dockerfile |
+| Cloud Build cannot push, or cannot write logs | Newer projects build as the compute service account, which may need `roles/artifactregistry.writer` and `roles/logging.logWriter`. The error names the missing permission; grant that one rather than a wider role |
+| A connection error naming a socket path | The service or job is missing `--set-cloudsql-instances`, or the account is missing `roles/cloudsql.client`. Do not fix it by adding an authorized network — that opens the instance to the internet to solve an IAM problem |

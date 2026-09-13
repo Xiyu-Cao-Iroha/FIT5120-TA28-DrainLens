@@ -138,6 +138,20 @@ export const ARROW_SPACING_M = 14;
 /** Below this, arrowheads are ink rather than information. */
 export const ARROW_MIN_SCALE = 0.5;
 
+/**
+ * The arrowhead, in screen pixels.
+ *
+ * Named rather than written into the path, and enlarged on 7 September for the
+ * same reason as the ones on the surface-water paths: at 8.5 by 6.4 the head
+ * was narrower than the 4-pixel stroke it sits on, so a followed path read as
+ * a green line with texture rather than as a direction. These are the numbers
+ * to change if it is still hard to read; they were three literals inside
+ * `drawArrowhead` before, which is where a size goes to stop being adjustable.
+ */
+export const ARROW_NOSE_PX = 7.5;
+export const ARROW_TAIL_PX = 5;
+export const ARROW_HALF_WIDTH_PX = 4.8;
+
 function drawArrowhead(
   context: CanvasRenderingContext2D,
   viewport: Viewport,
@@ -151,9 +165,9 @@ function drawArrowhead(
   // same flip `toScreen` applies to the position.
   context.rotate(-arrow.angle);
   context.beginPath();
-  context.moveTo(5, 0);
-  context.lineTo(-3.5, 3.2);
-  context.lineTo(-3.5, -3.2);
+  context.moveTo(ARROW_NOSE_PX, 0);
+  context.lineTo(-ARROW_TAIL_PX, ARROW_HALF_WIDTH_PX);
+  context.lineTo(-ARROW_TAIL_PX, -ARROW_HALF_WIDTH_PX);
   context.closePath();
   context.fillStyle = palette.arrow;
   context.fill();

@@ -10,7 +10,7 @@
  * That decides the shape of this module. A cross-section is a *vertical*
  * drawing, and the one axis it exists to show is the one we have no data for.
  * So the vertical dimension here is presentation and nothing else, and it says
- * so in the drawing rather than in a caption somewhere: AC 1.3.1.c asks that
+ * so in the drawing rather than in a caption somewhere: AC 1.1.7.d asks that
  * recorded information be distinguishable from simplified presentation, and
  * the honest split is that **everything horizontal is recorded and everything
  * vertical is invented**.
@@ -21,7 +21,8 @@
  * - each pipe's nominal diameter, for 98.9% of them
  * - each pipe's material, for all of them
  *
- * What it must never assert (AD6, restated as AC 1.3.1.e): anything about
+ * What it must never assert (AD6, which the 3 September revision no longer
+ * restates as a criterion of its own): anything about
  * capacity, about whether a pipe is adequate, or about a blockage underground.
  * A diameter is a recorded dimension. It is not a flow rate, and the step from
  * one to the other needs a hydraulic model this project does not have and has
@@ -40,9 +41,75 @@ export interface SectionPipe {
   readonly direction: 'into-this-pit' | 'out-of-this-pit';
 }
 
+/**
+ * Whether the record says surface water enters at this pit.
+ *
+ * **The drawing needs this and the record does not always answer it.** A
+ * teammate's sketch put an arrow of water running off the street into the pit,
+ * which is what a grated inlet does — and 126 of the 895 pits here are
+ * recorded as `Junction` and 41 as `System Node`, which are joins in the
+ * network rather than ways in. Drawing that arrow on one of those states
+ * something the record contradicts.
+ *
+ * Three states rather than two, because `Lane Type` (217 pits), `Not Known`,
+ * `Other`, `Submerged` and the 22 with nothing recorded do not say either
+ * way, and reading silence as a grate would be inventing the answer for a
+ * quarter of the map.
+ */
+export type SurfaceEntry = 'recorded-inlet' | 'not-an-inlet' | 'not-recorded';
+
+/** Said on the figure, so the arrow's absence is never left to be guessed. */
+export const SURFACE_ENTRY_NOTE: Record<SurfaceEntry, string> = {
+  'recorded-inlet': 'Water runs off the street and in through the grate.',
+  'not-an-inlet':
+    'The record calls this a join in the network rather than a way in, so no surface inflow is drawn: water arrives through the pipes.',
+  'not-recorded':
+    'The record does not say whether surface water enters here, so no surface inflow is drawn.',
+};
+
+/**
+ * The one sentence the map's pit card leads with.
+ *
+ * It said "This pit collects surface water from the street" for every pit,
+ * including the 126 recorded as junctions and the 41 recorded as system
+ * nodes. That was a claim about a quarter of the map that the record does not
+ * make, and it was invisible until the drawing had to decide whether to put an
+ * arrow of water on the street above the pit -- which is the useful thing
+ * about drawing something: it forces a question the prose could keep avoiding.
+ *
+ * Kept beside `SURFACE_ENTRY_NOTE` so the card and the figure cannot come to
+ * disagree about the same pit.
+ */
+export const PIT_SUMMARY: Record<SurfaceEntry, string> = {
+  'recorded-inlet':
+    'This pit collects surface water from the street and connects it to the recorded drainage network.',
+  'not-an-inlet':
+    'The record calls this a join in the drainage network rather than a way into it: water reaches it through the pipes rather than off the street.',
+  'not-recorded':
+    'This pit is part of the recorded drainage network. The record does not say whether surface water enters here.',
+};
+
+/**
+ * Read from the recorded type, and only where the words plainly say so.
+ *
+ * Matching on 'grated', 'side entry' and 'inlet' covers every type in this
+ * extent that names a way in. Nothing is inferred from a type that is merely
+ * unfamiliar -- 'Lane Type' is a location, not a grate, and guessing it either
+ * way would put 217 pits into a claim the council did not make.
+ */
+export function surfaceEntryOf(pit: Pit): SurfaceEntry {
+  const type = text(pit.object_type_lupvalue)?.toLowerCase();
+  if (type === undefined || type === null) return 'not-recorded';
+  if (/grated|side entry|inlet|gsep|kerbside/.test(type)) return 'recorded-inlet';
+  if (/junction|system node/.test(type)) return 'not-an-inlet';
+  return 'not-recorded';
+}
+
 export interface CrossSection {
   readonly kind: 'available';
   readonly assetNumber: string;
+  /** Whether to draw water arriving from the street. See `SurfaceEntry`. */
+  readonly surfaceEntry: SurfaceEntry;
   readonly description: string | null;
   readonly incoming: readonly SectionPipe[];
   readonly outgoing: readonly SectionPipe[];
@@ -52,7 +119,7 @@ export interface CrossSection {
 
 export interface SectionUnavailable {
   readonly kind: 'unavailable';
-  /** Which required information is missing — AC 1.3.2.b. */
+  /** Which required information is missing — AC 1.1.7.f. */
   readonly reasons: readonly string[];
 }
 
@@ -68,7 +135,7 @@ export type SectionOutcome = CrossSection | SectionUnavailable;
 export const DEPTH_IS_ABSENT =
   'No pipe depth or invert level is recorded for any pit in this area, so the vertical positions in this drawing are illustrative only.';
 
-/** AC 1.3.1.e, as a sentence rather than only as an omission. */
+/** AD6, as a sentence rather than only as an omission. */
 export const NO_CAPACITY_CLAIM =
   'A recorded diameter is a dimension, not a capacity. This drawing does not say whether a pipe is large enough, whether it is blocked below ground, or how much it can carry.';
 
@@ -99,6 +166,7 @@ const describe = (pipe: SectionPipe): string =>
  */
 export function sectionFor(artefact: MapArtefact, pit: Pit): SectionOutcome {
   const asset = text(pit.asset_number);
+  const surfaceEntry = surfaceEntryOf(pit);
   if (asset === null) {
     return {
       kind: 'unavailable',
@@ -154,6 +222,7 @@ export function sectionFor(artefact: MapArtefact, pit: Pit): SectionOutcome {
   return {
     kind: 'available',
     assetNumber: asset,
+    surfaceEntry,
     description: text(pit.asset_description),
     incoming,
     outgoing,
@@ -174,7 +243,7 @@ export function summarise(pipe: SectionPipe): string {
  * Scaled against the widest pipe *in this section* rather than against a fixed
  * maximum, so the comparison a reader makes is between pipes they can see. A
  * pipe with no recorded diameter gets the minimum and is labelled, never an
- * average of its neighbours — filling it in is AC 1.3.2.c.
+ * average of its neighbours — filling it in is what AC 1.1.7.f forbids.
  */
 export function relativeWidth(pipe: SectionPipe, all: readonly SectionPipe[]): number {
   if (pipe.diameterMm === null) return 0;

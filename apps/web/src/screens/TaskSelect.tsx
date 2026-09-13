@@ -1,14 +1,20 @@
 /**
- * Choosing what to look at.
+ * Choosing what to look at, on the way in from an address.
  *
- * The screen exists because the two guided tasks answer different questions
- * and want different layers on by default. Asking first is what lets the
- * follow view open with two layers and one instruction instead of everything
- * at once, which is AC 1.1.2.
+ * This is the older of the two routes into the map and it is no longer the
+ * main one. Somebody arriving at the homepage picks a mode and goes straight
+ * there (AC 1.1.2); this screen is what somebody sees who started by naming
+ * an address instead, and it survives because the guided task is a different
+ * offer from the map: it opens with fewer modes on and one instruction, so
+ * the first thing on screen is a next step rather than everything at once.
  *
- * The third option is deliberately not a task. Somebody who wants the whole
+ * The 3 September revision does not name the guided task in any criterion.
+ * It is kept because it costs one screen and answers the question a resident
+ * actually arrives with, not because a criterion requires it.
+ *
+ * The second option is deliberately not a task. Somebody who wants the whole
  * map should be able to have it, and should be told that it comes without the
- * guidance the other two carry.
+ * guidance the other one carries.
  */
 
 import { useState } from 'react';
@@ -110,7 +116,24 @@ export interface TaskSelectProps {
   readonly onChangeAddress: () => void;
 }
 
-const GUIDED: readonly {
+/**
+ * The guided tasks on offer.
+ *
+ * The drain-blockage comparison is the second of these again. AC 1.1.1
+ * required it to be absent from the Iteration 1 interface, so the entry was
+ * removed for exactly one iteration while `Task`, the reducer, both screens
+ * and all of their tests stayed where they were. Iteration 2's AC 3.1.1 asks
+ * for it back, and it is the same three sentences it carried before, taken
+ * out of the commit that removed them rather than written again: what the
+ * screen offers should not have drifted while it was switched off.
+ *
+ * **It is one of two ways in.** AC 3.1.1 opens the explorer from the map, and
+ * since 13 September a drain's card on the full map offers the comparison
+ * where one can be calculated and says why not where it cannot
+ * (`scenario-from-map` in session.ts). This route, by address, came back
+ * first because it already ran end to end.
+ */
+export const GUIDED: readonly {
   readonly task: Task;
   readonly title: string;
   readonly body: string;
@@ -181,7 +204,7 @@ export function TaskSelect({ address, onChoose, onChangeAddress }: TaskSelectPro
         What would you like to understand?
       </h1>
       <p style={{ margin: `0 0 ${String(space(7))}px`, color: ink.muted, maxWidth: 620 }}>
-        Choose a task to see the most relevant information first. You can change tasks or open
+        Choose a task to see the most relevant information first. You can switch modes or open
         other map layers at any time.
       </p>
 

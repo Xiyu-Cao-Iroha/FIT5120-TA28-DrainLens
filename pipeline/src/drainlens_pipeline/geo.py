@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Final, Iterator
+from typing import Final, Iterator, Sequence
 
 # --- GDA94 / MGA Zone 55 -------------------------------------------------
 _A: Final = 6378137.0
@@ -188,3 +188,96 @@ DEMONSTRATION_ADDRESS: Final = "46 Gatehouse Drive, Kensington"
 #: Used if the primary address disappoints on the real terrain: 71 inlets within
 #: 150 m, the nearest 3 m away, an 18-hop trace.
 RESERVE_ADDRESS: Final = "13 Neale Street, Kensington"
+
+#: Everywhere the City of Melbourne publishes a drainage record.
+#:
+#: **Measured from the council-wide graph rather than drawn around the LGA
+#: boundary**, which is the same method that chose Kensington and for the same
+#: reason: the extent that matters is where the *data* is, and an administrative
+#: outline includes ground nobody has recorded a pit on. All 21,113 pits in
+#: ``data/graph/drainage-graph.json`` carry a position, and they span
+#: 7,971 m east to west and 8,237 m north to south.
+#:
+#: Rounded outward onto the point cloud's own 500 m tile grid, because a future
+#: terrain build has to line up with those tiles and an extent that straddles
+#: them would make every tile a partial one. That gives 8,500 x 9,000 m.
+#:
+#: **It is 76.5 km2 of box holding 65.7 km2 of data, and the gap is real.**
+#: Only 56 of the 72 square kilometres in it contain any pit at all -- the
+#: Yarra, the parks, and land the council does not drain. A map drawn over this
+#: extent will have empty quarters, and they are empty because nothing is
+#: recorded there rather than because anything failed.
+#:
+#: Density is not uniform either: the median occupied square kilometre holds
+#: 225 pits and the densest holds **1,905**. Kensington's 895 sits between them.
+#: Anything that draws every pit at once needs to know that before it is asked
+#: to draw the CBD.
+CITY_OF_MELBOURNE: Final = Extent(
+    name="city-of-melbourne",
+    min_e=315000.0,
+    min_n=5808500.0,
+    max_e=323500.0,
+    max_n=5817500.0,
+)
+
+#: The central city: the whole Hoddle Grid, on the point cloud's tile grid.
+#:
+#: **A second terrain extent, not a second pilot.** The map and the trace stay
+#: council-wide; what this adds is measured ground — and so water paths, low
+#: points and the data-quality hatching — under the CBD as well as Kensington.
+#:
+#: Measured from the council's own street centrelines rather than drawn: the
+#: grid's corners sit at Spencer/La Trobe (319,126 E), Spencer/Flinders
+#: (5,811,968 N), Spring/Flinders (321,728 E) and Spring/La Trobe
+#: (5,813,602 N). Rounded outward onto the 500 m tiles that gives 3 x 2.5 km,
+#: all 30 of whose tiles are in the archive. A 2 x 2 km guess made before
+#: measuring cut off the Flinders Street edge.
+#:
+#: **Expect most of it to be hatched.** `docs/DEMO-EXTENT.md` measured the CBD
+#: at 11–17% open cells: the camera sees roofs, and the ground between towers
+#: is interpolated. That is why Kensington was the pilot, and it is the thing
+#: the unavailable layer exists to say.
+MELBOURNE_CBD: Final = Extent(
+    name="melbourne-cbd",
+    min_e=319000.0,
+    min_n=5811500.0,
+    max_e=322000.0,
+    max_n=5814000.0,
+)
+
+#: Every extent that can be built, by the name it is published under.
+#:
+#: One registry rather than a constant per builder. Four entry points each
+#: naming their own default is four places to forget, and the artefacts have to
+#: agree about what ``kensington`` means or the frontend fetches one extent's
+#: pits against another's roads.
+EXTENTS: Final[dict[str, Extent]] = {
+    DEMONSTRATION_EXTENT.name: DEMONSTRATION_EXTENT,
+    CITY_OF_MELBOURNE.name: CITY_OF_MELBOURNE,
+    MELBOURNE_CBD.name: MELBOURNE_CBD,
+}
+
+
+def resolve_extent(name: str | None, bounds: Sequence[float] | None = None) -> Extent:
+    """The extent a builder was asked for, by name or by raw MGA55 bounds.
+
+    Shared by every artefact builder so the four of them cannot come to spell
+    the same extent differently. ``name`` wins when both are given, because a
+    published name is a claim the artefacts have to agree on and four numbers
+    on a command line are a one-off.
+
+    An unknown name raises rather than falling back to the demonstration
+    extent. A build that quietly produced Kensington when it was asked for the
+    council is a build whose output nobody can tell apart from the right one.
+    """
+    if name is not None:
+        try:
+            return EXTENTS[name]
+        except KeyError:
+            known = ", ".join(sorted(EXTENTS))
+            raise SystemExit(f"unknown extent {name!r}; known extents are {known}") from None
+    if bounds is not None:
+        if len(bounds) != 4:
+            raise SystemExit("--bounds takes four numbers: MIN_E MIN_N MAX_E MAX_N")
+        return Extent("custom", *bounds)
+    return DEMONSTRATION_EXTENT

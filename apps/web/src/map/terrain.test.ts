@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BARRIER_FLOOR_M,
+  RAMP_HIGH_HEX,
+  RAMP_LOW_HEX,
   TERRAIN_ALPHA,
   TerrainError,
   drawTerrain,
@@ -327,5 +329,25 @@ describe('the terrain survives the layers drawn over it', () => {
       (c) => c.op === 'fillRect' && Number(c.args[2]) >= viewport.widthPx,
     );
     expect(covering.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the ramp the legend draws', () => {
+  it('publishes the same two ends the canvas paints', () => {
+    // The legend used to carry its own hex literals. A key whose colours are a
+    // copy of the map's is one that can quietly stop matching it, so both now
+    // read these.
+    expect(RAMP_LOW_HEX).toBe('#6c8c9e');
+    expect(RAMP_HIGH_HEX).toBe('#e2d4b2');
+  });
+
+  it('agrees with what shade() returns at each end', () => {
+    const low = shade(0, 0, 10);
+    const high = shade(10, 0, 10);
+    const asHex = (c: readonly [number, number, number]) =>
+      `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+
+    expect(asHex(low)).toBe(RAMP_LOW_HEX);
+    expect(asHex(high)).toBe(RAMP_HIGH_HEX);
   });
 });

@@ -26,14 +26,25 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/derived.json` | 183 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
 | `/data/addresses.json` | 678 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
+| `/data/flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` | Recorded flood incidents by named area, and what a count is |
 | `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
-| `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
+| `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Kensington's ground surface, now read only by the map's *Ground surface* layer |
+| `/data/scene-tiles/index.json` | 176 KB | `drainlens_pipeline.scene_tiles` | Which 500 m tiles exist; for every inlet, the window it is calculated in |
+| `/data/scene-tiles/Tile_*/` | ~300 KB each, 64 MB in all | `drainlens_pipeline.scene_tiles` | Pre-gzipped elevation, flow, depressions, rim depth, measured; `tile.json` with the depressions and drains in it |
 
 **Coordinates in every artefact are metres east and north of the extent's south-west corner**, to a decimetre. Not latitude and longitude. The projection was done at build time, so no projection runs in the browser and there is no second place for the map and the model to disagree about where a pit is.
 
 ### What the backend must do about these
 
-Serve them, gzipped, with a cache policy that lets a version be replaced. Nothing else. There is no endpoint behind them and no request to authorise.
+Serve them, gzipped, with a cache policy that lets a version be replaced. There is still no endpoint that takes anything from a person and nothing to authorise.
+
+> **This changed on 5 September 2026, and the change is smaller than it sounds.** Four of the five JSON artefacts — `map`, `derived`, `trace` and `flood-history` — are now read from the API over the database, in the same shapes, checked by the same guards. What the browser asks for is an extent id and an area board; what it sends is nothing.
+>
+> **Each one falls back to the copy in the site's own container** if the API cannot answer, and the footer says which source answered. That is not defensiveness for its own sake: the Cloud SQL instance behind the API is expected to be *stopped between demonstrations to save money*, so "the API is unavailable" is a planned state rather than an incident, and a site that went blank in it would be a worse product than one that never used its database. `apps/web/src/data/source.ts` holds the rule and its tests.
+>
+> **The address index is the exception and stays bundled.** The landing page tells a resident the search runs in their browser and that nothing about the address is sent anywhere. It is fetched directly in `App.tsx` rather than through `fetchArtefact`, so no later edit to the fallback can route it through a server by accident.
+>
+> The derivation story is unchanged: the pipeline computes, the database stores, the API reassembles. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md).
 
 They are **versioned build products**, not a database. When the extent changes, the pipeline is re-run and the files are replaced wholesale. A backend that tried to assemble these per request would be rebuilding a pipeline that already exists and can be checked offline.
 
@@ -130,6 +141,10 @@ Listed because each looks like a natural thing to move, and each would break som
 
 **All navigation state.** Address, chosen task and scenario inputs live in one object for the life of the tab: not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie` and plays a whole session.
 
+**One exception, and it is the only one: `drainlens.tour.seen`.** Since 5 September 2026 the map tour opens by itself for somebody who has not been shown it, which needs one `localStorage` key holding the string `"1"`. It records that a tour was shown once on this browser and nothing else — no address, no identifier, no timestamp, no count, no record of what was looked at. `apps/web/src/ui/tourGate.ts` is the only code that reads or writes it, and `tourGate.test.ts` asserts the value is exactly that one character, so a later addition of a step number or a date fails a test rather than passing review.
+
+> **This reverses a decision, deliberately.** The tour originally had no stored state at all, on the argument that a product whose position is that it holds nothing about you should not start by writing a fact about you in order to be helpful. What changed is the weighing: a first-time visitor should not have to find a button to be told what an unlabelled map is, and a tour that reopens on every visit is a larger imposition than one boolean. The principle is unchanged — the session reducer still writes to nothing, and the address rule above is untouched and still enforced by its own test.
+
 ---
 
 ## Shared vocabulary
@@ -167,7 +182,7 @@ Every value the interface displays carries a **basis** — `packages/schema/src/
 | `assumed` | A model value where no record exists — the capture fraction, for one |
 | `inferred` | An indicative relationship read from available records |
 
-The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source.
+The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source, and `assertFloodHistory` goes further: it refuses one that names no reporting period, no geographic unit, or no sentence saying what a count is. A ranking of suburbs with nothing qualifying it is the one shape that page must never take, so a missing *sentence* fails the load exactly as a missing number does.
 
 For drain checks specifically: a stored check is `sourceProvided` when a resident confirmed it, and the `wasModelProposed` flag is what lets a later reader tell how much of the dataset began as a machine's suggestion.
 

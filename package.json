@@ -2,7 +2,7 @@
   "name": "drainlens",
   "private": true,
   "version": "0.1.0",
-  "description": "DrainLens — stormwater flood risk for Greater Melbourne residents. FIT5120 S2 2026, TA28.",
+  "description": "DrainLens \u2014 stormwater flood risk for Greater Melbourne residents. FIT5120 S2 2026, TA28.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --build --force",
-    "check": "npm run typecheck && npm run coverage"
+    "check": "npm run typecheck && npm run coverage",
+    "test:db": "vitest run --config vitest.db.config.ts"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

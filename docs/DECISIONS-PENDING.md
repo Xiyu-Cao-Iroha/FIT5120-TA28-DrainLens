@@ -96,13 +96,17 @@ Blocking a hundred drains — far more than any believable scenario — raises w
 
 **Still needs the team:** whether the demonstration leads with where water collects (C) or with the comparison. That is a rehearsal decision, not a code one.
 
+**Re-measured 13 September, and the finding stands.** Two things changed under it. The engine now receives each hollow's rim depth instead of spreading water evenly, and the comparison runs over a one-kilometre window around any inlet on the council map rather than only in Kensington. Across every Kensington inlet at 20, 40 and 60 mm, **three inlets** show a position higher than baseline, with rim depth or without it, at different rainfall amounts. Through the council's one-kilometre windows, two Kensington inlets do, and two in a seeded 3% sample of the council's inlets. Every other successful run reads *No clear change*, and the mass-balance and monotonicity checks refused none. The tables are in [ALGORITHMS.md](./ALGORITHMS.md). The screen now says *No clear change*, the AC 3.1.3.e wording, rather than *No clear difference*.
+
 ---
 
 ## 2 · The street cross-section — **DECIDED: built**
 
 US 1.3 is **eight criteria and nothing is built**. It is the largest remaining gap.
 
-The complication is that most of the work is not the drawing. **Pit depth is missing for 95.4% of the council's record**, and what survives is internally inconsistent, so for almost every location the honest screen is AC 1.3.2 — *"a reliable cross-section cannot be provided here, and this is what is missing"*.
+The complication is that most of the work is not the drawing. **Pit depth is missing for 95.4% of the council's record**, and what survives is internally inconsistent, so for almost every location the honest screen is the unavailable one — *"a reliable cross-section cannot be provided here, and this is what is missing"*.
+
+> **Resolved 29 August, and re-scoped 3 September.** The cross-section was built: 726 of 895 pits get a drawing, the other 169 get the unavailable screen. The 3 September revision then dropped it as a criterion of its own — it is now a *relevant next action* under AC 1.1.7.e, and **AC 1.3.1 and 1.3.2 now mean terrain and low areas**. The numbers in the paragraph above are the 27 August set.
 
 Three ways to go:
 
@@ -128,13 +132,13 @@ The remaining time is almost entirely `test_terrain.py`, where nineteen tests ea
 | **Restate the gate** | Say the five-second rule applies to the suite CI blocks on, and record the Python figure separately. Honest, and arguably what was always meant. |
 | **Accept the breach** | Leave it recorded as a breach. It is in the README now. |
 
-**Decided: record it rather than hide it.** The README and the gates table now carry both machines, with the cause named. The figure was wrong twice before it was right: "55 s" had been taken with `--no-cov`, so the recorded breach was about half the real one; and the 105 s that replaced it was this laptop's clock reported as CI's. **The Node figure is the one to watch now** — about 5 s on the runner is at the gate, and CI times nothing, so it will be crossed silently. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
+**Decided: record it rather than hide it.** The README and the gates table now carry both machines, with the cause named. The figure was wrong twice before it was right: "55 s" had been taken with `--no-cov`, so the recorded breach was about half the real one; and the 105 s that replaced it was this laptop's clock reported as CI's. **The Node figure was the one to watch, and on 5 September it went over**: 6 s on the runner, median of six samples, at 588 tests across 30 files. It was crossed silently, exactly as this paragraph predicted — CI times nothing, so nothing failed, and it was found by a deliberate re-measurement two days after a note in the README had declared the risk overstated. Splitting `test_terrain.py` behind a separate script was rejected: a slow suite everybody runs is worth more than a fast one that skips the terrain, and hiding the number would be the one option that is not honest. **Reopen this if a marker reads the KPI table as a failure rather than as a disclosure.**
 
 ---
 
 ## 4 · Deployment — **DONE: deployed and verified 31 August**
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, fourteen static files; a first visit costs 1.36 MB over the wire. Every command was run by the user; nothing was executed from the assistant's machine.
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, nginx, twenty static files, behind a password gate since 3 September and last deployed **5 September**. Re-measured that day against the live site: **1.03 MB over the wire, p95 217.5 ms, 0 of 1,000 requests failed**. The 1.36 MB in the paragraphs below is the 31 August figure and is left as the dated record it is — see [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md). Every command was run by the user; nothing was executed from the assistant's machine.
 
 **Cloud Storage + CDN was abandoned mid-way.** It needs a domain for a certificate and there is none, and the app's paths are absolute from `/`, so a bucket sub-path cannot serve it either. Firebase Hosting, the obvious alternative, had already been **rejected by the teacher** when the first System Architecture proposed it. Cloud Run is what survives all three constraints.
 
@@ -194,3 +198,36 @@ The gates table has four rows with a dash where a status belongs, and these are 
 **One thing worth a conversation rather than a decision:** whether the demonstration leads with *where water collects* or with the comparison. The comparison now explains itself when it finds nothing, so either order is defensible.
 
 **Five are done** and are recorded above with reasoning. Reopen any of them — particularly §3 if the KPI table reads badly, and §6 if the deck was meant to be versioned.
+
+---
+
+## 8 · Where the measured ground stops, on a map that no longer stops there — **DECIDED 13 September: measure the rest**
+
+> **What was done.** None of the three options below. The ground was measured for the whole council instead: every tile the City of Melbourne 2018 point cloud archive has, 211 of the extent's 306 (#125 for the central city, #127 for the council). Water flow, Low areas and *Not enough ground measured* are drawn wherever that ground exists. **The other 95 tiles are not in the archive**, and not one of the council's 21,113 pits or 17,242 pipes lies in them, so the measured ground covers everywhere the drainage record does. The artefact names the missing tiles and says nothing is claimed there, and `tools/data/check-derived.mjs` fails CI if any shape has a point inside one. The comparison followed (#130): it runs in the kilometre around any of the 9,239 inlets, and says how much of that window's ground was measured.
+>
+> The text below is the problem as it stood on 11 September, kept because it is why the ground was extended rather than outlined.
+
+The recorded network now covers the City of Melbourne. The terrain does not, and cannot be made to for free: the ground surface is 6.6 million points over **one square kilometre of Kensington**, and the derived layers — surface-water paths, low points, the data-quality hatching — are calculated from it.
+
+So on the council map, **Water flow and Low areas have marks in 1 km² of 76.5 km² and nothing anywhere else.**
+
+### What is already honest, and what is not
+
+The data does not lie. `pipeline/reframe.py` writes a `covers` sentence into the artefact, the lock notice says *"that ground was measured for one square kilometre of Kensington — everywhere else on this map, nothing is claimed about where water goes"*, and `sections.test.ts` fails if that sentence goes missing.
+
+**The map itself says nothing.** Somebody who turns on Water flow over Docklands sees empty ground, and empty ground is exactly what this product spends its whole vocabulary distinguishing:
+
+| What they see | What it could mean |
+|---|---|
+| No water paths | The calculated surface says water does not run here |
+| No water paths | **Nobody measured this ground** |
+
+Those are different statements and the map currently makes them look identical. The `unavailable` layer — *Not enough ground measured* — exists for precisely this distinction and is itself derived from the Kensington scene, so outside that square there is not even a hatch to draw.
+
+### The options
+
+1. **Draw the measured square as an outline on the council map**, labelled, whenever a derived layer is on. Cheapest, and it names the boundary rather than implying one.
+2. **Extend the hatching to everything outside the measured square.** Most consistent with the existing vocabulary — the hatch already means "not enough ground measured" — but 75.5 km² of hatch is a lot of texture, and it would dominate a map whose subject is the drainage.
+3. **Grey the derived chips outside the square**, so they cannot be turned on where there is nothing to show. Prevents the confusion by removing the control, which this repository has argued against before: a control that vanishes reads as a control that was never there.
+
+**Deferred by the design owner on 11 September to 13 September.** It is recorded here rather than left in a conversation because the map shipping without it is the one thing in this expansion that can mislead somebody, and a deferral that nobody wrote down is indistinguishable from an oversight.

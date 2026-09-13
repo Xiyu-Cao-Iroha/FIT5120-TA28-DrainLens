@@ -8,6 +8,8 @@ This document exists for one purpose: help any member of the team, asked to open
 
 **Read section 2 before anything else.** It is the question we are most likely to answer badly.
 
+> **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+
 ---
 
 ## 1 · The system in sixty seconds
@@ -315,9 +317,9 @@ So the section splits itself, and says so inside the figure rather than in a cap
 
 > **Everything horizontal is recorded** — which pipes connect, on which side, their diameter and material. **Everything vertical is drawn.** The pipes are spaced evenly because the record gives no depth to space them by, and the vertical axis is labelled *depth not recorded — spacing illustrative*.
 
-**726 of 895 pits** get a drawing; the other **169** get AC 1.3.2, which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
+**726 of 895 pits** get a drawing; the other **169** get the unavailable state (AC 1.1.7.f), which says the record connects no pipe here **and that this is a gap in the record rather than evidence that no pipe exists**. The two are indistinguishable from the data, and only one of them is a claim about the world.
 
-A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is AC 1.3.2.c, an unsupported assumption dressed as a measurement.
+A pipe with no recorded diameter is drawn at the minimum and labelled, never at the average of its neighbours — that is what AC 1.1.7.f forbids, an unsupported assumption dressed as a measurement.
 
 **The line to have ready if asked about capacity:** a recorded diameter is a dimension, not a capacity. Going from one to the other needs a hydraulic model this project decided not to build (AD6), and the drawing says so on screen.
 
@@ -382,7 +384,7 @@ The mentor may ask "why did you choose X". Each of these has a rejected alternat
 | Choice | Instead of | Why |
 |---|---|---|
 | Canvas | MapLibre / Leaflet | No basemap, no layer composition, already projected. A library would own the render loop and add a second coordinate frame. |
-| Static artefacts | REST API + database | AD1. No endpoint that receives an address can leak one. |
+| Static artefacts | REST API + database | AD1. No endpoint that receives an address can leak one. **Revisited 5 September** — that reason supports a narrower conclusion than it was used for, and a database is planned for Iteration 2. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md). The address index still does not move. |
 | Web Worker | Main thread, or a server | A million cells solved twice per position; a frozen map reads as a crash. Server-side would break reproducibility (AC 2.2). |
 | npm workspaces + project references | Separate repos, or one flat package | The schema is shared by three consumers; TypeScript project references make a breaking change a build failure rather than a runtime surprise. |
 | Own SMRF in numpy | PDAL | PDAL would not install on the team's machines. Eighty lines, and we understand every one. |
@@ -410,19 +412,34 @@ What the mentor can check in the repository, and what lives outside it.
 | Coverage gates | `vitest.config.ts`, `pyproject.toml` | 88% overall, 90% for judgement-carrying modules |
 | Commit messages | prose explaining *why*, not what | see `git log` |
 
-### Numbers, as measured on 1 September 2026
+### Numbers
 
-| Metric | Value |
-|---|---|
-| TypeScript tests | **472**, 23 files, **3.6 s** here · **5 s on the CI runner, three samples** |
-| Python tests | **341**, **105 s** here · **51–67 s on the CI runner** — over the 5 s gate either way, see below |
-| TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions |
-| Python coverage | **91.05%** |
-| Source lines, excluding tests | **12,085** across 58 files — 13,482 TypeScript and 7,166 Python in total, of which tests are 8,563 |
+Two columns, because the sheet is a record of the 1 September walkthrough and the repository has moved since. The right column is re-measured; nothing is carried across on the assumption that it still holds.
+
+| Metric | 1 September | 3 September | 5 September |
+|---|---|---|---|
+| TypeScript tests | **472**, 23 files | **565**, 28 files | **588**, 30 files |
+|   with coverage | **3.6 s** here · **5 s** on the runner | **4.9–5.2 s** here · **5 s** on the runner | **3.2–3.5 s** here · **6 s** on the runner ✗ |
+| Python tests | **341** | **375**, 17 files | **377**, 17 files |
+|   with coverage | **105 s** here · **51–67 s** on the runner | **74 s** here · **67 s** on the runner | **62 s** here without coverage · **68 s** on the runner ✗ |
+| TypeScript coverage | **92.75%** statements · 93.6% branches · 95.6% functions | **93.4%** · 93.84% · 96.02% | **93.76%** statements · 93.78% branches · 96.2% functions |
+| Python coverage | **91.05%** | **91.79%** | **91.79%** |
+| Source lines, excluding tests | **12,085** across 58 files | **16,869** across 71 files | **18,460** across 75 files |
+| Test lines | – | 6,309, measured wrongly – see below | **10,399** across 47 files (6,631 TypeScript · 3,768 Python) |
+
+> **The runner figures are read from the workflow's own step timing, not from a stopwatch here**, which is the distinction this sheet got wrong once and had to correct twice. They are whole seconds, so 6 s means 5.5–6.5. The 5 September figure is the median of six runs: 5, 6, 6, 6, 6, 7.
+>
+> **The TypeScript suite went over the gate on 5 September, and the note that stood here on 3 September was wrong.** It said the root README's warning — *"a dozen more test files would put it over"* — had been shown to be pessimistic, because five files and ninety-three tests had not moved the runner off 5 s. Two files and twenty-three tests later it is 6 s. The warning was not pessimistic; it was early, and the measurement written to correct it was taken at the last moment it still held. Re-measuring found both the crossing and the bad correction, which is the argument for doing it rather than for trusting the last answer.
+>
+> **The 3 September test-line figure was measured wrongly**, and is named in the table as what it was. *"23,178 in total, of which tests are 6,309"* added a TypeScript-only test count to a TypeScript-and-Python source total. On one scope the tests are 10,399 lines. Every line figure here counts `.ts`, `.tsx`, `.py` and `.mjs` under `apps`, `packages`, `pipeline` and `tools`, excluding build output, virtual environments and published data.
+>
+> **What has not changed is why it is cheap to add tests and dear to add files.** Locally the tests themselves take 0.7 s of a 3.3 s run; the rest is start-up, transform and instrumentation. That is the shape of the fix, if this is ever worth fixing.
+>
+> **The older note, kept because it was the reasoning at the time:** the TypeScript suite did not get slower, despite 93 more tests in 5 more files. Almost all of its cost is start-up, transform and instrumentation, which is why adding tests to existing files is nearly free and adding files is not. The warning that stood in the root README — *"a dozen more test files would put it over"* — was pessimistic, and re-measuring is the only way that was ever going to be found out.
 
 Both suites pass and both are above their **coverage** gate. The **runtime** gate is a different story and it is better to raise it than be shown it:
 
-> The Node suite runs in 3.6 s with coverage here and **about 5 s on the CI runner, which is at the gate rather than inside it**. The Python suite takes 105 s here and 51–67 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
+> The Node suite runs in 3.2–3.5 s with coverage here and **6 s on the CI runner as of 5 September, which is over the gate rather than at it**. The Python suite takes 105 s here and 51–67 s on the runner — locally that is 71 s of tests and 34 s of coverage instrumentation, and the coverage half went unmeasured until a self-audit, so this figure was previously written down as 55 s. Down from 88 s: the worst offender was a 20,000-vertex zigzag through Douglas–Peucker — that algorithm's pathological worst case, and quadratic in the length — which took 32.7 s to prove something the recursion limit proves in under half a second. What remains is **65 of the 71 seconds in `test_terrain.py`** building real grids — everything else runs in six — which is inherent to what those tests check. Both CI jobs gate a pull request and both pass — what CI does not check is *runtime*, which is why this breach could sit unnoticed and then be written down at half its size. The rule is the team's own and we are not quietly exempting the slow half.
 
 Interaction criteria: **77 of 77 met**, each checked against the code on 29 August rather than assumed from a task list. [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md) records how each was checked. What remains is the definition of done — mobile layouts, Playwright, deployment — not the criteria.
 
