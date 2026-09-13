@@ -34,6 +34,7 @@ import { ink, line, radius, shadow, space, surface, text, type, weight } from '.
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import { UNSUPPORTED_TEXT, supportOf, useScenarioSupport } from './scenario/support.js';
+import { BOARD_CHANGES_NOTICE, FLOOD_CHANGES_NOTICE, creditsForSources } from './ui/attribution.js';
 import type { SolvedPosition } from './scenario/worker.js';
 import {
   INITIAL_SESSION,
@@ -330,9 +331,12 @@ export function App() {
       return (
         <Shell
           at={session.screen}
-          credits={credits}
-          servedFrom={loaded.servedFrom}
-          extentName={loaded.extentName}
+          credits={
+            areas.data === null
+              ? []
+              : creditsForSources([areas.data.scope.source, areas.data.scope.geographySource, areas.data.population.source])
+          }
+          creditNotice={FLOOD_CHANGES_NOTICE}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -373,9 +377,9 @@ export function App() {
       return (
         <Shell
           at={session.screen}
-          credits={credits}
+          credits={creditsForSources([loaded.history.source, loaded.history.geographySource])}
+          creditNotice={BOARD_CHANGES_NOTICE}
           servedFrom={loaded.servedFrom}
-          extentName={loaded.extentName}
           back={{
             label: 'Home',
             onBack: () => {

@@ -225,6 +225,15 @@ export function legendFor(mode: MapMode): readonly LegendEntry[] {
   });
 
   if (mode === 'activity') {
+    // Two areas have a published total of zero because every region in them
+    // was withheld. They draw as an unfilled floor ring, which had no entry.
+    bands.push({
+      label: '0+ — nothing published, every count inside withheld',
+      fill: null,
+      stroke: FLOOR_RING,
+      dashed: false,
+      ringed: true,
+    });
     bands.push({
       label: 'No recorded activity',
       fill: null,

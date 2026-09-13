@@ -14,7 +14,7 @@ import { type ReactNode, useEffect, useRef } from 'react';
 import {
   CHANGES_NOTICE,
   type Credit,
-  LICENCE_URL,
+  licenceUrl,
   describeDatasets,
 } from './attribution.js';
 import {
@@ -122,6 +122,8 @@ export interface ShellProps {
    * requires the credit to be visible wherever the work is.
    */
   readonly credits?: readonly Credit[];
+  /** What was changed from the sources, for the credit. Defaults to the drainage map's. */
+  readonly creditNotice?: string;
   /**
    * Where the artefacts on this screen came from: the API over the database,
    * the copies bundled with the site, or some of each.
@@ -143,6 +145,7 @@ export function Shell({
   trailing,
   masthead = true,
   credits,
+  creditNotice,
   servedFrom,
   extentName,
   at,
@@ -288,7 +291,7 @@ export function Shell({
       </main>
 
       {credits !== undefined && credits.length > 0 && (
-        <Attribution credits={credits} servedFrom={servedFrom} extentName={extentName} />
+        <Attribution credits={credits} servedFrom={servedFrom} extentName={extentName} notice={creditNotice ?? CHANGES_NOTICE} />
       )}
     </div>
   );
@@ -327,8 +330,10 @@ function Attribution({
   credits,
   servedFrom,
   extentName,
+  notice,
 }: {
   readonly credits: readonly Credit[];
+  readonly notice: string;
   // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
   // treats those as different, and the caller always passes the key.
   readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
@@ -349,7 +354,7 @@ function Attribution({
         <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
           {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
           <a
-            href={LICENCE_URL}
+            href={licenceUrl(credit.licence)}
             target="_blank"
             rel="license noreferrer"
             style={{ color: ink.muted, textDecorationColor: line.strong }}
@@ -359,7 +364,7 @@ function Attribution({
           {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
         </span>
       ))}
-      <span>{CHANGES_NOTICE}</span>
+      <span>{notice}</span>
       {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
       {extentName !== undefined && AREA[extentName] !== undefined && (
         <span> {AREA[extentName]}</span>

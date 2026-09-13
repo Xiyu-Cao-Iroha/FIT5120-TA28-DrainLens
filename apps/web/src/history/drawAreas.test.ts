@@ -222,7 +222,14 @@ describe('the legend', () => {
   it('has one band entry per break, and each carries its numbers', () => {
     // AC 4.1.2.d. A band named without its range is a judgement with the
     // workings hidden.
-    expect(legendFor('activity')).toHaveLength(4 + 2);
+    // Four bands, the floor ring, the withheld zero, and no recorded activity.
+    expect(legendFor('activity')).toHaveLength(4 + 3);
+    // The two areas published as zero because everything in them was withheld
+    // draw as an unfilled floor ring, and had no legend entry for it.
+    const withheldZero = legendFor('activity').find((e) => e.label.startsWith('0+'));
+    expect(withheldZero?.fill).toBeNull();
+    expect(withheldZero?.ringed).toBe(true);
+    expect(fillFor(area({ total: 0, complete: false, suppressedRegions: 1 }), 'activity', 'minimum')).toBeNull();
     expect(legendFor('severity')).toHaveLength(3 + 2);
     for (const entry of legendFor('severity').slice(0, 3)) {
       expect(entry.label).toMatch(/[\d.]/);

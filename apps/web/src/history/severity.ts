@@ -39,6 +39,10 @@ export interface ScopeAreas {
   readonly artefact: 'sa2-areas';
   readonly note: string;
   readonly incidentType: string;
+  /** Who recorded the dispatches, for the evidence panel and the credit. */
+  readonly source: { readonly dataset: string; readonly publisher: string; readonly licence: string; readonly dataset_id?: string };
+  /** Who drew the boundaries the areas are named by. */
+  readonly geographySource?: { readonly dataset: string; readonly publisher: string; readonly licence: string; readonly dataset_id?: string };
   readonly reportingPeriod: { readonly start: string; readonly end: string; readonly years: readonly string[] };
   readonly geography: { readonly unit: string; readonly standard: string; readonly scope: string };
   readonly areas: readonly ScopeArea[];
@@ -50,7 +54,7 @@ export interface PopulationArtefact {
   readonly asAt: readonly string[];
   readonly denominator: string;
   readonly minimumResidents: number;
-  readonly source: { readonly dataset: string; readonly publisher: string };
+  readonly source: { readonly dataset: string; readonly publisher: string; readonly licence?: string; readonly dataset_id?: string };
   readonly areas: readonly { readonly code: string; readonly name: string; readonly persons: readonly number[] }[];
 }
 
@@ -73,6 +77,12 @@ export function assertScopeAreas(value: unknown): asserts value is ScopeAreas {
   if (typeof a.note !== 'string' || a.note === '') fail('does not say what a count is');
   if (typeof a.incidentType !== 'string' || a.incidentType === '') {
     fail('does not say which incident type it counts');
+  }
+  // The map names its source in the evidence panel and in the credit; CC BY
+  // requires the second, and a map that cannot say who recorded the counts
+  // should not draw them.
+  if (!a.source || typeof a.source.publisher !== 'string' || typeof a.source.licence !== 'string') {
+    fail('does not say who recorded the counts or under what licence');
   }
   const period = a.reportingPeriod;
   if (!period || !Array.isArray(period.years) || period.years.length === 0) {
@@ -318,9 +328,11 @@ export const ACTIVITY_BREAKS: readonly Break[] = [
  * band name without its numbers is a judgement with the workings hidden.
  */
 export const SEVERITY_BREAKS: readonly Break[] = [
-  { from: 0, to: 1.3, label: 'Lower — under 1.3' },
-  { from: 1.3, to: 3, label: 'Moderate — 1.3 to 3.0' },
-  { from: 3, to: null, label: 'Higher — over 3.0' },
+  // "up to" and "above", because `bandOf` puts a boundary value in the lower
+  // band: a rate of exactly 1.3 is Lower, and the legend said "under 1.3".
+  { from: 0, to: 1.3, label: 'Lower — up to 1.3' },
+  { from: 1.3, to: 3, label: 'Moderate — above 1.3, up to 3.0' },
+  { from: 3, to: null, label: 'Higher — above 3.0' },
 ];
 
 export const breaksFor = (mode: MapMode): readonly Break[] =>
