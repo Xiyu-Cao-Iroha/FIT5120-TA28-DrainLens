@@ -53,6 +53,11 @@ export const TOTAL_RAINFALL = 'Total rainfall';
 export const FLOOD = {
   callouts: 'Recorded SES flood call-outs',
   rate: 'SES flood call-outs per 1,000 residents',
+  /** The unit written beside a count, once the heading has said whose call-outs. */
+  unit: 'call-outs',
+  unitOne: 'call-out',
+  /** The unit written beside a rate. */
+  rateUnit: 'call-outs per 1,000 residents',
 } as const;
 
 /** Words the review asked to be gone from what a resident reads. */

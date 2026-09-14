@@ -97,11 +97,10 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
     recorded behaviour rather than a bug. What was a bug was the guide asking
     somebody to press a thing it had a button sitting on top of.
 
-    Three things moved, none of which is "open somewhere other than the
-    address":
+    Two things moved, none of which is "open somewhere other than the
+    address", and the map can now be dragged, so a pit under the zoom pair is
+    one drag from being pressable:
 
-    - `locked` below takes the zoom and recentre buttons away, because the
-      guide never asks for either. The corner is the pit's again.
     - The homepage's example address is 46 Gatehouse Drive, 307 m from the
       nearest boundary, whose teaching pit is 24 m away with 22 pipes below it.
       32 Altona Street was the worst address in the index for this and was the
@@ -189,17 +188,16 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
           // beside the map is already saying.
           legend={false}
           /*
-            The view is held where it opened.
+            The view moves: drag, wheel, and the zoom pair in the corner.
 
-            Every step says select *this* — a chip, the ringed pit, the button
-            on its card — and a reader who has dragged the map somewhere else
-            is being asked for something no longer on screen, with nothing
-            saying why. It also gives the corner back: the zoom and recentre
-            buttons stack in the bottom right, which is exactly where an
-            address near the edge of the extent puts its pit, and they were
-            covering the thing being pointed at.
+            It used to be held where it opened, on the reasoning that a reader
+            who dragged away would be asked for something no longer on screen.
+            The review of 14 September found the opposite problem: a small map
+            that cannot be moved reads as a picture of a map, and people tried
+            to drag it and zoom it and concluded it was broken. The way back is
+            the recentre button over the zoom pair, which returns to the
+            address and so to the ringed pit beside it.
           */
-          locked
           // The compass card is bigger than this frame can carry; the pin stays.
           addressCard={false}
           /*

@@ -302,3 +302,32 @@ button:disabled {
     animation-duration: 4s;
   }
 }
+
+/*
+ * The chooser's landscape: the city, the river and a wet kerb, under a wash.
+ *
+ * The wash is heaviest where the words are and lifts towards the bottom, so the
+ * picture shows under the cards and below them rather than behind the heading.
+ * The heading and the line under it sit on at least 0.9 of the page colour, and
+ * the cards are opaque, so no text on this screen is read against the painting
+ * itself. The captions under the cards get their own pale chip for the same
+ * reason: at that height the wash is already thinning over the trees.
+ */
+.choose__backdrop {
+  min-height: 100%;
+  background-color: #f5f8f7;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(245, 248, 247, 0.94) 0%,
+      rgba(245, 248, 247, 0.88) 38%,
+      rgba(245, 248, 247, 0.5) 72%,
+      rgba(245, 248, 247, 0.12) 100%
+    ),
+    url('/choose-landscape.webp');
+  background-size: cover;
+  /* The skyline is in the upper third and the grate in the lower left; centring
+     low keeps both when `cover` crops a tall window's sides. */
+  background-position: 40% 70%;
+  background-repeat: no-repeat;
+}

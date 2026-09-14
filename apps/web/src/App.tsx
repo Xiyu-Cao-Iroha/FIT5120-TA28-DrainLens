@@ -193,7 +193,13 @@ export function App() {
   );
   // The flood map's three artefacts, 83 KB, fetched when the map is opened
   // and not on the way past. Same argument as the scenario scene.
-  const areas = useAreas(session.screen === 'flood-map');
+  //
+  // The flood history board asks for the same load when a reader first wants
+  // its ranking per 1,000 residents, and not merely for being opened. One hook
+  // here rather than one per screen, so the board and the map share a single
+  // fetch whichever is reached first.
+  const [boardWantsAreas, setBoardWantsAreas] = useState(false);
+  const areas = useAreas(session.screen === 'flood-map' || (session.screen === 'history' && boardWantsAreas));
   // Every position the last run solved. The rainfall control on the result
   // reads these, so changing the amount cannot start a second calculation and
   // therefore cannot return a different answer for the same inputs (AC 2.2).
@@ -373,7 +379,13 @@ export function App() {
       return (
         <Shell
           at={session.screen}
-          credits={creditsForSources([loaded.history.source, loaded.history.geographySource])}
+          credits={creditsForSources([
+            loaded.history.source,
+            loaded.history.geographySource,
+            // The rate divides by the ABS's population, so once it can be on
+            // screen the ABS is credited beside the SES.
+            areas.data === null ? undefined : areas.data.population.source,
+          ])}
           creditNotice={BOARD_CHANGES_NOTICE}
           back={{
             label: 'Home',
@@ -385,6 +397,10 @@ export function App() {
         >
           <FloodHistory
             artefact={loaded.history}
+            areas={areas}
+            onNeedAreas={() => {
+              setBoardWantsAreas(true);
+            }}
             onOpenAreas={() => {
               dispatch({ type: 'flood-map-opened' });
             }}

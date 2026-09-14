@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import type { MapArtefact } from './artefact.js';
 import { DAY, LABEL_MIN_SCALE, PIN_DROP, PIN_HEAD_R, PIT_MIN_SCALE, drawMap } from './draw.js';
 import { ICON_MIN_SCALE } from './pitIcon.js';
+import { PLACE_FULL_SCALE, PLACE_HIDDEN_SCALE, tracked } from './places.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
@@ -197,7 +198,9 @@ describe('what is left out', () => {
   it('hides street names before they become noise', () => {
     const context = recorder();
     drawMap(context, FULL, view(LABEL_MIN_SCALE - 0.01));
-    expect(context.calls.some((call) => call.op === 'fillText')).toBe(false);
+    // By text, not by any `fillText`: at this scale the suburb name is still
+    // fading out over the same extent, and that is not a street name.
+    expect(context.calls.some((call) => call.op === 'fillText' && call.args[0] === 'Neale Street')).toBe(false);
   });
 
   it('shows both again once there is room', () => {
@@ -235,6 +238,61 @@ describe('what is left out', () => {
     const fill = context.calls.findIndex((call) => call.op === 'fillText');
     expect(stroke).toBeGreaterThan(-1);
     expect(stroke).toBeLessThan(fill);
+  });
+});
+
+describe('suburb names', () => {
+  const KENSINGTON_NAME = tracked('Kensington');
+  const named = (context: ReturnType<typeof recorder>, op: 'fillText' | 'strokeText') =>
+    context.calls.findIndex((call) => call.op === op && call.args[0] === KENSINGTON_NAME);
+
+  it('names the suburb when the map is zoomed out', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(PLACE_FULL_SCALE));
+    expect(named(context, 'fillText')).toBeGreaterThan(-1);
+  });
+
+  it('writes it where Kensington is in this extent, not in the council frame', () => {
+    // The bundled artefact's corner is 316,500 / 5,814,500. The same anchor
+    // read as council-frame metres would land 1.5 km west and 6 km south.
+    const context = recorder();
+    const at = view(PLACE_FULL_SCALE);
+    drawMap(context, FULL, at);
+    const call = context.calls[named(context, 'fillText')]!;
+    const [x, y] = toScreen(at, [317280 - 316500, 5814994 - 5814500]);
+    expect(call.args[1]).toBeCloseTo(x);
+    expect(call.args[2]).toBeCloseTo(y);
+  });
+
+  it('draws no suburb name at street scale', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(PLACE_HIDDEN_SCALE));
+    expect(named(context, 'fillText')).toBe(-1);
+  });
+
+  it('draws them on top of the network, and under the street names', () => {
+    const context = recorder();
+    // Where both are on screen: the suburb name is fading, the streets are in.
+    drawMap(context, FULL, view(LABEL_MIN_SCALE));
+    const pit = context.calls.map((call) => call.op === 'arc').lastIndexOf(true);
+    const suburb = named(context, 'fillText');
+    const street = context.calls.findIndex((call) => call.op === 'fillText' && call.args[0] === 'Neale Street');
+    expect(suburb).toBeGreaterThan(pit);
+    expect(street).toBeGreaterThan(suburb);
+  });
+
+  it('puts a halo behind the name, and leaves no transparency behind it', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(LABEL_MIN_SCALE));
+    const stroke = named(context, 'strokeText');
+    expect(stroke).toBeGreaterThan(-1);
+    expect(stroke).toBeLessThan(named(context, 'fillText'));
+    // Faded with `globalAlpha` inside save/restore: a fade that leaked out
+    // would dim the street names and the address pin drawn after it.
+    const restore = context.calls.findIndex((call, index) => index > stroke && call.op === 'restore');
+    const street = context.calls.findIndex((call) => call.op === 'fillText' && call.args[0] === 'Neale Street');
+    expect(restore).toBeGreaterThan(stroke);
+    expect(restore).toBeLessThan(street);
   });
 });
 
