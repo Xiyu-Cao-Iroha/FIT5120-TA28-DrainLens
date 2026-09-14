@@ -388,25 +388,24 @@ python -m drainlens_pipeline.scene_tiles --terrain ../data/terrain-council --map
 
 The Kensington scene in `apps/web/public/data/scene/` is no longer read by the site: the comparison reads `scene-tiles/`, and since 14 September the Terrain layer reads `terrain/` (below).
 
-## The map's Terrain layer — `terrain_display`
+## The map's Terrain layer, council-wide — `terrain_tiles`
 
 ```bash
-python -m drainlens_pipeline.terrain_display --terrain ../data/terrain --out ../apps/web/public/data/terrain
+python -m drainlens_pipeline.terrain_tiles --terrain ../data/terrain-council --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/web/public/data/terrain-tiles
 ```
 
-Four seconds. Writes what the Terrain layer draws and nothing the engine reads — Terrain V1.1 from the terrain handover:
+About six minutes. Terrain V1.1 from the terrain handover, for all 211 measured 500 m tiles of the City of Melbourne, **coloured at build time and shipped as images**:
 
-- **`ground.bin`**: the **raw** ground surface, centimetres AHD. The scene's `elevation.bin` is the conditioned routing surface — every hollow filled flat, every building raised 100 m — and the layer used to undo that for display, which could not undo the filling.
-- **`buildings.bin`**: the footprint mask, one bit per cell, so buildings are drawn as buildings.
-- **`shade.bin`**: a multi-directional hillshade (altitude 45°, vertical exaggeration 3.2, azimuths 315° × 0.55, 270° × 0.18, 360° × 0.18, 225° × 0.09), stretched between its 1st and 99th percentile over open ground, and pulled towards neutral where less than 35% of the surrounding 25 m was measured (down to 40% strength). The azimuth weights and the strength are the handover's trial values, to be checked on flat ground, a slope and a valley.
+- **`Tile_*/colour.webp`**: the raw ground on the fixed AHD ramp (0, 1, 2, 3, 4, 5, 10, 20, 40 m, interpolated in OKLab — the same nodes as `apps/web/src/map/terrain.ts`), buildings in `#ceccc8`.
+- **`Tile_*/shade.webp`**: the hillshade as a multiply factor in [0.81, 1.00] (altitude 45°, vertical exaggeration 3.2, azimuths 315° × 0.55, 270° × 0.18, 360° × 0.18, 225° × 0.09), stretched between one 1st and 99th percentile for the whole council, and weakened to 40% where less than 35% of the surrounding 25 m was measured. White on buildings. The azimuth weights and the strength are the handover's trial values.
+- **`Tile_*/marks.json`**: the tile's contours (whole metres over the ground smoothed at 2 m; closed rings under 25 m dropped; simplified to 0.5 m; stored as half-metre integer steps) and spot-height candidates (up to three per fixed 80 m square, not on buildings or roads, at least 35% measured in 15 m).
+- **`overview-colour.webp`, `overview-shade.webp`**: the whole extent at 4 m a pixel, transparent where the archive has no tile, with its own vertical exaggeration (8) and stretch. The map draws it below 0.5 px/m and under any tile still loading.
 
-2 MB, 125 KB and 1 MB; 1.74 MB gzipped.
+Each tile is computed on a block with 100 cells of ground around it, so gradients, smoothing and contours agree across seams; a neighbour the archive does not have is filled from the nearest measured ground for the margin and nothing is drawn there. WebP at quality 85 moves colours by a few units. `tools/data/check-terrain-tiles.mjs` holds the pack against its index and against the scenario pack's tiles in CI.
 
-```bash
-python -m drainlens_pipeline.terrain_marks --terrain ../data/terrain --map ../apps/web/public/data/map.json --out ../apps/web/public/data/terrain
-```
+**The CBD's ground is not clean.** Around the tallest buildings the council ground surface reaches 50 to 110 m AHD outside the footprints, where the ground filter kept structure; the ramp clamps it at 40 m and contours there are dense. That is the terrain build's to fix, not the display's to hide.
 
-Three seconds. **Contours** (`terrain-contours.json`, 199 KB, 65 KB gzipped): marching squares at whole metres over the raw ground smoothed with a 2 m Gaussian, lines under 25 m dropped, simplified to 0.5 m — 304 lines, 36 at 5 m. **Spot heights** (`spot-heights.json`, 30 KB): up to three candidates per fixed 80 m square, the low, middle and high third of ground that is not a building, not a road, and at least 35% measured in 15 m (eroded 5 × 5); the most-measured cell in each third, rounded to 0.5 m, with stable ids — 357 candidates over 166 squares. The handover's own candidate file covers the same 166 squares, 257 ids match, their positions are a median 0.7 m apart, and the lowest heights agree within 0.5 m in 162 of the 166.
+`terrain_display` and `terrain_marks` still build the same layer for a single extent, and `terrain_marks.spot_heights` is what the tiles call per block; the site no longer reads their single-extent output.
 
 ## Which way the ground falls around each address — `address_ground`
 

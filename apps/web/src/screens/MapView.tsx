@@ -53,8 +53,7 @@ import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
-import { type PaintedTerrain, loadTerrain, rasterise } from '../map/terrain.js';
-import { loadTerrainMarks } from '../map/terrainMarks.js';
+import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import {
@@ -230,7 +229,8 @@ export function MapView({
    */
   const [minimised, setMinimised] = useState(false);
   const [following, setFollowing] = useState<string | null>(null);
-  const [terrain, setTerrain] = useState<PaintedTerrain | null>(null);
+  const [terrain, setTerrain] = useState<TerrainTiles | null>(null);
+  const [terrainVersion, setTerrainVersion] = useState(0);
   // The transform the canvas drew with, reported upward so a callout can be
   // put at a feature rather than beside the map.
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -245,26 +245,16 @@ export function MapView({
     setFollowing(null);
   }, [address, addressCard]);
 
-  // Painted once, then reused for every pan and zoom. A failure here leaves
-  // the layer off rather than breaking the map: the terrain is context, and
-  // the recorded network is what the person came for.
+  // The index and the council overview, once; tiles arrive as the map is
+  // looked at. A failure leaves the layer off rather than breaking the map: the
+  // terrain is context, and the recorded network is what the person came for.
   useEffect(() => {
     let live = true;
-    // The contours and spot heights are optional to the layer: if they fail to
-    // load the ground is still drawn, just without its numbers.
-    const marks = loadTerrainMarks('/data/terrain').catch(() => undefined);
-    loadTerrain('/data/terrain')
-      .then((raster) =>
-        rasterise(raster, (w, h) => {
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          return canvas;
-        }),
-      )
-      .then(async (painted) => {
-        const loaded = await marks;
-        if (live) setTerrain(loaded === undefined ? painted : { ...painted, marks: loaded });
+    loadTerrainTiles('/data/terrain-tiles', () => {
+      if (live) setTerrainVersion((v) => v + 1);
+    })
+      .then((tiles) => {
+        if (live) setTerrain(tiles);
       })
       .catch(() => {
         if (live) setTerrain(null);
@@ -410,6 +400,7 @@ export function MapView({
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         locked={locked}
         terrain={layers.terrain ? terrain : null}
+        terrainVersion={terrainVersion}
         showPits={pitsDrawn}
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}

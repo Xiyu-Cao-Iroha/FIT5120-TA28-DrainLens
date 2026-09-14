@@ -80,7 +80,7 @@ class TerrainDisplayError(SceneError):
     pass
 
 
-def hillshade(ground: np.ndarray, *, cell_m: float = 1.0) -> np.ndarray:
+def hillshade(ground: np.ndarray, *, cell_m: float = 1.0, exaggeration: float = VERTICAL_EXAGGERATION) -> np.ndarray:
     """Multi-directional hillshade in [0, 1], rows running north to south.
 
     The normal of each cell is built from central differences, exaggerated
@@ -89,7 +89,7 @@ def hillshade(ground: np.ndarray, *, cell_m: float = 1.0) -> np.ndarray:
     """
     if ground.ndim != 2:
         raise TerrainDisplayError(f"the ground surface is {ground.ndim}-dimensional")
-    surface = ground.astype(np.float64) * VERTICAL_EXAGGERATION
+    surface = ground.astype(np.float64) * exaggeration
     # Row 0 is the northern edge, so northing increases towards row 0.
     rise_south, rise_east = np.gradient(surface, cell_m)
     rise_north = -rise_south

@@ -16,8 +16,6 @@
 import type { TerrainExtent } from './terrain.js';
 import { type Local, type Viewport, toScreen } from './viewport.js';
 
-export class TerrainMarksError extends Error {}
-
 export interface ContourLine {
   /** Metres AHD. */
   readonly m: number;
@@ -59,59 +57,6 @@ export const SPOT_MAX = 5;
 export const CONTOUR_LABEL_MAX = 2;
 export const CONTOUR_LABEL_SPACING_PX = 175;
 export const CONTOUR_LABEL_SPOT_CLEARANCE_PX = 46;
-
-function isExtent(value: unknown): value is TerrainExtent {
-  const e = value as Partial<TerrainExtent> | null;
-  return (
-    e !== null &&
-    typeof e === 'object' &&
-    Number.isFinite(e.min_e) &&
-    Number.isFinite(e.min_n) &&
-    (e.width_m ?? 0) > 0 &&
-    (e.height_m ?? 0) > 0
-  );
-}
-
-/** Both artefacts, checked, or an error naming what is wrong. */
-export async function loadTerrainMarks(
-  base: string,
-  fetchJson: (url: string) => Promise<unknown> = (url) => fetch(url).then((r) => r.json()),
-): Promise<TerrainMarks> {
-  const [lines, spots] = (await Promise.all([
-    fetchJson(`${base}/terrain-contours.json`),
-    fetchJson(`${base}/spot-heights.json`),
-  ])) as [
-    { artefact?: string; extent?: unknown; lines?: unknown },
-    { artefact?: string; extent?: unknown; points?: unknown },
-  ];
-  if (lines.artefact !== 'terrain-contours' || !Array.isArray(lines.lines)) {
-    throw new TerrainMarksError('the contours artefact is not one');
-  }
-  if (spots.artefact !== 'spot-heights' || !Array.isArray(spots.points)) {
-    throw new TerrainMarksError('the spot-heights artefact is not one');
-  }
-  if (!isExtent(lines.extent) || !isExtent(spots.extent)) {
-    throw new TerrainMarksError('the contours or spot heights do not say where they are');
-  }
-  if (lines.extent.min_e !== spots.extent.min_e || lines.extent.min_n !== spots.extent.min_n) {
-    throw new TerrainMarksError('the contours and spot heights are in different frames');
-  }
-  for (const line of lines.lines as ContourLine[]) {
-    if (!Number.isFinite(line.m) || !Array.isArray(line.c) || line.c.length < 2) {
-      throw new TerrainMarksError('a contour has no level or fewer than two points');
-    }
-  }
-  for (const spot of spots.points as SpotHeight[]) {
-    if (typeof spot.id !== 'string' || !Number.isFinite(spot.e) || !Number.isFinite(spot.n) || !Number.isFinite(spot.heightM)) {
-      throw new TerrainMarksError('a spot height has no id, position or height');
-    }
-  }
-  return {
-    contours: lines.lines as ContourLine[],
-    spots: spots.points as SpotHeight[],
-    extent: lines.extent,
-  };
-}
 
 /** Terrain metres to screen pixels, through the offset into the map's frame. */
 export function projector(
