@@ -3,11 +3,11 @@
  *
  * Four things here are load-bearing rather than cosmetic.
  *
- * The privacy line is a promise the code keeps — the index is local, the
- * search never takes a network, and the address is held in memory for the tab
- * and written nowhere. It is stated on the screen because a person deciding
- * whether to type their own address deserves to know before they type it, not
- * in a policy they will not open.
+ * The privacy promise is one the code keeps — the index is local, the search
+ * never takes a network, and the address is held in memory for the tab and
+ * written nowhere. It used to be restated under the search box as well; the
+ * review of 15 September cut that copy as a repeat of what the homepage's
+ * *How to use the map* already says before anybody reaches this screen.
  *
  * An address we cannot resolve is never quietly swapped for one we can. The
  * three outcomes stay distinct all the way to the screen.
@@ -17,7 +17,7 @@
  * offer the honest answer is also a dead end, and a dead end on the first
  * screen is where somebody leaves.
  *
- * And the two lists at the bottom are why this page is not empty. It briefly
+ * And the two lists, folded under *More information*, are why this page is not empty. It briefly
  * carried a rendering of the pilot square kilometre instead, which is worth
  * recording as a mistake: the instrument's palette is tuned to read discrete
  * facts against terrain, so as a picture it is dense, multi-hued and
@@ -53,9 +53,6 @@ import {
   type,
   weight,
 } from '../ui/theme.js';
-
-export const PRIVACY_LINE =
-  'No account is needed. Your search stays on this device and is not saved.';
 
 /**
  * What the product does, and what it refuses to do, before anybody types.
@@ -105,36 +102,6 @@ type Problem =
   | { readonly kind: 'outside-pilot'; readonly typed: string }
   | { readonly kind: 'not-an-address'; readonly typed: string }
   | null;
-
-/** The privacy line's mark, drawn because the shipped subset has no shield. */
-function ShieldMark() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 16 16"
-      aria-hidden
-      focusable="false"
-      style={{ flexShrink: 0, marginTop: 2 }}
-    >
-      <path
-        d="M8 1.6 13.2 3.4v4.3c0 3.2-2.1 5.7-5.2 6.7-3.1-1-5.2-3.5-5.2-6.7V3.4Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m5.7 8.1 1.6 1.6 3-3.4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 export function Landing({
   index,
@@ -344,37 +311,38 @@ export function Landing({
           </p>
         )}
 
-        <p
-          style={{
-            display: 'flex',
-            gap: space(2),
-            alignItems: 'flex-start',
-            margin: `${String(space(4))}px 0 0`,
-            paddingTop: space(4),
-            borderTop: `1px solid ${line.hair}`,
-            font: type(text.small, { leading: 1.5 }),
-            color: ink.subtle,
-          }}
-        >
-          <ShieldMark />
-          <span>{PRIVACY_LINE}</span>
-        </p>
-
         {problem !== null && <UnsupportedNotice problem={problem} index={index} />}
         {fixtureNote !== undefined && <FixtureNotice note={fixtureNote} />}
       </form>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: space(8),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(255px, 1fr))',
-          marginTop: space(12),
-        }}
-      >
-        <Claims title="What this shows" items={SHOWS} tone="brand" />
-        <Claims title="What it does not" items={DOES_NOT} tone="quiet" />
-      </div>
+      {/*
+        Folded, from the review of 15 September: the two lists sat open under
+        the search box and made the one thing this screen asks for -- an
+        address -- the smallest thing on it. They are still one press away,
+        and the summary says what is inside.
+      */}
+      <details className="landing__more" style={{ marginTop: space(10) }}>
+        <summary
+          style={{
+            cursor: 'pointer',
+            font: type(text.label, { weight: weight.semibold }),
+            color: ink.strong,
+          }}
+        >
+          More information
+        </summary>
+        <div
+          style={{
+            display: 'grid',
+            gap: space(8),
+            gridTemplateColumns: 'repeat(auto-fit, minmax(255px, 1fr))',
+            marginTop: space(5),
+          }}
+        >
+          <Claims title="What this shows" items={SHOWS} tone="brand" />
+          <Claims title="What it does not" items={DOES_NOT} tone="quiet" />
+        </div>
+      </details>
     </div>
   );
 }
@@ -553,11 +521,18 @@ function UnsupportedNotice({
  * The way-out buttons, in the chooser's own style so the two screens read as
  * one flow rather than as two pages that happen to follow each other.
  */
+/**
+ * Back and Home, shaped as buttons.
+ *
+ * They were bare words in the corners, and in the review of 15 September
+ * nobody read them as controls. The chooser's two controls use the same shape.
+ */
 const quiet = {
-  border: 'none',
-  background: 'none',
-  padding: space(2),
-  font: type(text.lead, { weight: weight.semibold }),
+  border: `1px solid ${line.strong}`,
+  borderRadius: radius.base,
+  background: surface.raised,
+  padding: `${String(space(2))}px ${String(space(4))}px`,
+  font: type(text.label, { weight: weight.semibold }),
   color: ink.strong,
   cursor: 'pointer',
 } as const;

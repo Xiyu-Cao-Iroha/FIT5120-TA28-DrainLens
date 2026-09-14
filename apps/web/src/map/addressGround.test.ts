@@ -8,9 +8,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { labelsFor, layoutLabels, notesFor } from './AddressInsight.js';
+import { type PlacedLabel, figureFor, layoutFigure, notesFor } from './AddressInsight.js';
 import {
   AddressGroundError,
+  type GroundTrend,
   assertAddressGround,
   describeAddress,
   describeGround,
@@ -18,7 +19,7 @@ import {
   loadAddressGround,
   trendOf,
 } from './addressGround.js';
-import type { WaterNearby } from './nearby.js';
+import { COMPASS_ANGLE, type NearbyThing, type WaterNearby } from './nearby.js';
 
 const artefact = {
   artefact: 'address-ground' as const,
@@ -115,37 +116,198 @@ describe('what the figure writes when it has nothing to point at', () => {
   });
 });
 
+/**
+ * The figure's geometry, worked out here from how `AddressInsight` draws each
+ * mark rather than borrowed from the layout, so a layout that misjudged a mark's
+ * size would fail these instead of agreeing with itself.
+ */
 describe('where the figure puts its labels', () => {
-  const box = (l: ReturnType<typeof layoutLabels>[number]) => {
+  interface Box {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+  }
+  // The ring is 34 px round, centred at x 160; the layout decides its y.
+  const CX = 160;
+  const RING = 34;
+  const toward = (cy: number, degrees: number, radius: number) => {
+    const r = (degrees * Math.PI) / 180;
+    return [CX + Math.cos(r) * radius, cy - Math.sin(r) * radius] as const;
+  };
+  const around = (points: readonly (readonly [number, number])[], grow: number): Box => ({
+    left: Math.min(...points.map((p) => p[0])) - grow,
+    right: Math.max(...points.map((p) => p[0])) + grow,
+    top: Math.min(...points.map((p) => p[1])) - grow,
+    bottom: Math.max(...points.map((p) => p[1])) + grow,
+  });
+
+  const box = (l: PlacedLabel): Box => {
     const width = Math.max(...l.lines.map((t) => t.length)) * 5.8;
     const left = l.anchor === 'end' ? l.x - width : l.anchor === 'middle' ? l.x - width / 2 : l.x;
     return { left, right: left + width, top: l.y - 9, bottom: l.y + 13 };
   };
+  /** The arrowhead from radius 32 to its tip at 42, 10 px across. */
+  const arrowBox = (cy: number, degrees: number) => {
+    const [bx, by] = toward(cy, degrees, 32);
+    const r = (degrees * Math.PI) / 180;
+    const [px, py] = [-Math.sin(r) * 5, -Math.cos(r) * 5];
+    return around([toward(cy, degrees, 42), [bx + px, by + py], [bx - px, by - py]], 0);
+  };
+  /** The path's bar across the ring, 12 px long with a 1.5 px round cap. */
+  const barBox = (cy: number, degrees: number) => {
+    const r = ((degrees + 90) * Math.PI) / 180;
+    const [ex, ey] = toward(cy, degrees, RING);
+    return around([[ex + Math.cos(r) * 6, ey - Math.sin(r) * 6], [ex - Math.cos(r) * 6, ey + Math.sin(r) * 6]], 1.5);
+  };
+  /** The low area's oval, 16 by 10 px along its line, traced round its outline. */
+  const ovalBox = (cy: number, degrees: number) => {
+    const r = (degrees * Math.PI) / 180;
+    const [ex, ey] = toward(cy, degrees, RING);
+    const outline = Array.from({ length: 144 }, (_, i) => {
+      const t = (i / 144) * 2 * Math.PI;
+      const [u, v] = [8 * Math.cos(t), 5 * Math.sin(t)];
+      return [ex + u * Math.cos(r) - v * Math.sin(r), ey - (u * Math.sin(r) + v * Math.cos(r))] as const;
+    });
+    return around(outline, 0.75);
+  };
+  /** The N: an 11 px bold capital on its baseline. */
+  const northBox = (y: number): Box => ({ left: CX - 4, right: CX + 4, top: y - 8, bottom: y });
+  const centreBox = (cy: number): Box => ({ left: CX - 5.5, right: CX + 5.5, top: cy - 5.5, bottom: cy + 5.5 });
+
+  const apart = (a: Box, b: Box) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+  /** How far a box is from the ring's centre at its nearest point. */
+  const reach = (b: Box, cy: number) => Math.hypot(Math.max(b.left - CX, 0, CX - b.right), Math.max(b.top - cy, 0, cy - b.bottom));
+
+  /**
+   * Lay out a figure and list everything wrong with it: a label on the ring,
+   * the centre, the N, a mark or another label, or anything outside the figure.
+   * A list rather than an `expect` per box keeps the sweep quick and its failure
+   * readable.
+   */
+  const check = (ground: GroundTrend | null, near: WaterNearby | null) => {
+    const figure = figureFor(ground, near);
+    const { cy } = figure;
+    const glyphs: { name: string; box: Box }[] = [];
+    if (ground?.kind === 'falls') glyphs.push({ name: 'arrowhead', box: arrowBox(cy, COMPASS_ANGLE[ground.bearing]) });
+    if (near?.channel?.kind === 'direction') glyphs.push({ name: 'path bar', box: barBox(cy, near.channel.angleDeg) });
+    if (near?.low?.kind === 'direction') glyphs.push({ name: 'low oval', box: ovalBox(cy, near.low.angleDeg) });
+    const north = northBox(figure.northY);
+    const boxes = figure.labels.map((l) => ({ key: l.key, box: box(l) }));
+
+    const problems: string[] = [];
+    const inside = (name: string, b: Box) => {
+      if (b.left < 3.9 || b.right > 316.1) problems.push(`${name} off the side`);
+      if (b.top < 0) problems.push(`${name} off the top`);
+      if (b.bottom > figure.drawingBottom) problems.push(`${name} into the notes`);
+    };
+    inside('N', north);
+    for (const glyph of glyphs) {
+      if (!apart(north, glyph.box)) problems.push(`N under the ${glyph.name}`);
+      inside(glyph.name, glyph.box);
+    }
+    boxes.forEach(({ key, box: b }, i) => {
+      const name = `label ${key}`;
+      if (reach(b, cy) < RING + 1) problems.push(`${name} on the ring`);
+      if (!apart(b, centreBox(cy))) problems.push(`${name} on the centre`);
+      if (!apart(b, north)) problems.push(`${name} on the N`);
+      for (const glyph of glyphs) if (!apart(b, glyph.box)) problems.push(`${name} on the ${glyph.name}`);
+      for (const other of boxes.slice(i + 1)) if (!apart(b, other.box)) problems.push(`${name} on label ${other.key}`);
+      inside(name, b);
+    });
+    const context = problems.length === 0 ? [] : [JSON.stringify({ ground, near })];
+    return { figure, boxes, problems: problems.length === 0 ? problems : [...problems, ...context] };
+  };
 
   it('keeps two labels pointing the same way from printing over each other', () => {
     // 53 Altona Street: the ground falls west and the nearest path is west.
-    const labels = labelsFor(
+    const { figure, problems } = check(
       { kind: 'falls', bearing: 'west', fallM: 6 },
       { channel: { kind: 'direction', distanceM: 20, bearing: 'west', angleDeg: 178 }, low: null },
     );
-    const [a, b] = labels.map(box);
-    expect(a!.bottom <= b!.top || b!.bottom <= a!.top || a!.right <= b!.left || b!.right <= a!.left).toBe(true);
+    expect(problems).toEqual([]);
+    expect(figure.labels).toHaveLength(2);
+    // Nothing needed more room, so the figure keeps its usual size.
+    expect(figure.drawingBottom).toBe(138);
   });
 
-  it('keeps a label pointing north off the N above the ring', () => {
-    const [label] = layoutLabels([{ key: 'k', degrees: 95, lines: ['low area', 'about 40 m away'] }]);
-    const b = box(label!);
-    // The N sits at x 160, y 15 to 30 in the figure.
-    expect(b.right <= 152 || b.left >= 168 || b.bottom <= 15 || b.top >= 30).toBe(true);
+  it('keeps a label pointing north off the N above the ring, and the N out from under the oval', () => {
+    const figure = layoutFigure([{ key: 'k', degrees: 95, mark: 'oval', lines: ['low area', 'about 40 m away'] }]);
+    const north = northBox(figure.northY);
+    expect(apart(box(figure.labels[0]!), north)).toBe(true);
+    expect(apart(ovalBox(figure.cy, 95), north)).toBe(true);
   });
 
-  it('keeps every label inside the figure, whichever way it points', () => {
-    for (let degrees = 0; degrees < 360; degrees += 15) {
-      for (const label of layoutLabels([{ key: 'k', degrees, lines: ['ground falls', '≈ 3.5 m over 150 m'] }])) {
-        const b = box(label);
-        expect(b.left).toBeGreaterThanOrEqual(3.9);
-        expect(b.right).toBeLessThanOrEqual(316.1);
+  it('keeps 5 Darcy Lane’s low-area label off the address dot, the arrow and the N', () => {
+    // The ground falls west; a low area about 30 m away, just west of north.
+    for (const angleDeg of [92, 95, 100, 105]) {
+      const { boxes, figure, problems } = check(
+        { kind: 'falls', bearing: 'west', fallM: 15 },
+        { channel: null, low: { kind: 'direction', distanceM: 30, bearing: 'north', angleDeg } },
+      );
+      expect(problems).toEqual([]);
+      // Still on the side the oval is: above the address, and not across on the east.
+      const low = boxes.find((b) => b.key === 'low')!.box;
+      expect(low.bottom).toBeLessThanOrEqual(figure.cy - RING / 2);
+      expect(low.left).toBeLessThan(CX);
+    }
+  });
+
+  it('keeps 2 Mctaggart Street’s two northern labels outside the ring and apart', () => {
+    // The ground falls north-west; a low area about 20 m north, a water path about 130 m roughly north.
+    for (const [low, path] of [
+      [90, 90],
+      [92, 84],
+      [88, 96],
+      [95, 75],
+      [80, 105],
+    ] as const) {
+      const { boxes, figure, problems } = check(
+        { kind: 'falls', bearing: 'north-west', fallM: 9.5 },
+        {
+          channel: { kind: 'direction', distanceM: 130, bearing: 'north', angleDeg: path },
+          low: { kind: 'direction', distanceM: 20, bearing: 'north', angleDeg: low },
+        },
+      );
+      expect(problems).toEqual([]);
+      expect(boxes).toHaveLength(3);
+      // Both northern labels above the address, not pushed round underneath it.
+      for (const key of ['path', 'low']) expect(boxes.find((b) => b.key === key)!.box.bottom).toBeLessThan(figure.cy);
+    }
+  });
+
+  it('keeps every label off every mark, the N and each other, and inside the figure, in every arrangement', () => {
+    const grounds: (GroundTrend | null)[] = [
+      null,
+      { kind: 'unclear' },
+      { kind: 'edge' },
+      ...(Object.keys(COMPASS_ANGLE) as (keyof typeof COMPASS_ANGLE)[]).map(
+        (bearing): GroundTrend => ({ kind: 'falls', bearing, fallM: 15 }),
+      ),
+    ];
+    const angles = Array.from({ length: 12 }, (_, i) => i * 30);
+    const channels: NearbyThing[] = [
+      { kind: 'very-near' },
+      ...angles.map((angleDeg): NearbyThing => ({ kind: 'direction', distanceM: 130, bearing: 'north', angleDeg })),
+    ];
+    const lows: NearbyThing[] = [
+      { kind: 'inside' },
+      { kind: 'very-near' },
+      ...angles.map((angleDeg): NearbyThing => ({ kind: 'direction', distanceM: 130, bearing: 'north', angleDeg })),
+    ];
+    let tallest = 0;
+    const problems: string[] = [];
+    for (const ground of grounds) {
+      for (const channel of [null, ...channels]) {
+        for (const low of [null, ...lows]) {
+          const result = check(ground, channel === null && low === null ? null : { channel, low });
+          problems.push(...result.problems);
+          tallest = Math.max(tallest, result.figure.drawingBottom);
+        }
       }
     }
+    expect(problems).toEqual([]);
+    // Growing is allowed, but not without limit: two extra label heights at most.
+    expect(tallest).toBeLessThanOrEqual(138 + 2 * 25);
   });
 });

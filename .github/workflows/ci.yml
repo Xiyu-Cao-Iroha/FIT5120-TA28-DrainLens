@@ -75,6 +75,12 @@ jobs:
       - name: Check the council derived layers against the bundled copy
         run: node tools/data/check-derived.mjs
 
+      # The warning signs and the low areas they mark are two files from one
+      # terrain run. Rebuild one alone and a sign lands on ground with no low
+      # area under it.
+      - name: Check the low-area warnings against the low areas they mark
+        run: node tools/data/check-warnings.mjs
+
       # The comparison fetches four tiles by name for whichever drain is
       # chosen, so a missing tile is one street's comparison failing on the
       # site while every other street works.

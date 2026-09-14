@@ -16,9 +16,18 @@
  *
  * *Skip to Full map* is the way past all of it, and it goes through the
  * notice rather than around it — see `LockedMap`.
+ *
+ * **The fifth card is the blocked-drain comparison, and it is not a guide**
+ * (review 2, item 6). It sits in the same row, drawn the same way, because
+ * somebody choosing what to explore first should see every way in on one
+ * screen. It is not in `SECTIONS`, has no entry in `Learned` and is never
+ * counted in *N guides completed*: pressing it asks for an address and opens
+ * the comparison, exactly as the homepage's button does.
  */
 
-import type { MapMode } from '../map/modes.js';
+import type { ReactNode } from 'react';
+
+import { COMPARE_ACCENT, COMPARE_CARD, CompareThumb } from './BlockedDrain.js';
 import { PATHS, PathThumb } from './Home.js';
 import { SECTIONS, type Learned, type SectionId, countLearned } from '../tutorial/sections.js';
 import { FULL_MAP } from '../ui/terms.js';
@@ -40,11 +49,13 @@ export interface ChooseProps {
   /** The sections with a guide written. The rest cannot be started yet. */
   readonly guided: readonly SectionId[];
   readonly onStart: (section: SectionId) => void;
+  /** The comparison: an address first, then the setup. Not a guide. */
+  readonly onCompare: () => void;
   readonly onSkip: () => void;
   readonly onBack: () => void;
 }
 
-export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps) {
+export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: ChooseProps) {
   const done = countLearned(learned);
 
   return (
@@ -67,10 +78,10 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
             marginBottom: space(10),
           }}
         >
-          <button type="button" onClick={onBack} style={quiet}>
+          <button type="button" onClick={onBack} style={secondary}>
             ← Back
           </button>
-          <button type="button" onClick={onSkip} style={quiet}>
+          <button type="button" onClick={onSkip} style={secondary}>
             Skip to {FULL_MAP} →
           </button>
         </div>
@@ -104,24 +115,46 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: space(6),
+            // 200 rather than 230 so the five fit one row at the column's
+            // 1180 px; at 230 the fifth wrapped and sat alone under the first.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: space(5),
           }}
         >
-          {PATHS.map((path) => (
-            <Card
-              key={path.mode}
-              mode={path.mode}
-              title={path.title}
-              body={path.body}
-              accent={path.accent}
-              done={learned[path.mode]}
-              ready={guided.includes(path.mode)}
-              onStart={() => {
-                onStart(path.mode);
-              }}
-            />
-          ))}
+          {PATHS.map((path) => {
+            const ready = guided.includes(path.mode);
+            return (
+              <Card
+                key={path.mode}
+                thumb={<PathThumb mode={path.mode} />}
+                title={path.title}
+                body={path.body}
+                accent={path.accent}
+                done={learned[path.mode]}
+                ready={ready}
+                status={ready ? SECTIONS[path.mode].locked : 'Terrain guide coming soon'}
+                caption={SECTIONS[path.mode].label}
+                onStart={() => {
+                  onStart(path.mode);
+                }}
+              />
+            );
+          })}
+          {/*
+            Never `done`: there is nothing to finish, and a tick on it would
+            read as a fifth guide completed.
+          */}
+          <Card
+            thumb={<CompareThumb />}
+            title={COMPARE_CARD.title}
+            body={COMPARE_CARD.body}
+            accent={COMPARE_ACCENT}
+            done={false}
+            ready
+            status="Start comparison"
+            caption={COMPARE_CARD.caption}
+            onStart={onCompare}
+          />
         </div>
       </div>
     </div>
@@ -129,35 +162,37 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
 }
 
 function Card({
-  mode,
+  thumb,
   title,
   body,
   accent,
   done,
   ready,
+  status,
+  caption,
   onStart,
 }: {
-  readonly mode: MapMode;
+  readonly thumb: ReactNode;
   readonly title: string;
   readonly body: string;
   readonly accent: string;
   readonly done: boolean;
   readonly ready: boolean;
+  /** Over the picture while the card is not done: what pressing it does. */
+  readonly status: string;
+  /** The chip under the card. */
+  readonly caption: string;
   readonly onStart: () => void;
 }) {
-  const status = ready ? SECTIONS[mode].locked : 'Terrain guide coming soon';
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(3) }}>
       <button
         type="button"
         onClick={ready ? onStart : undefined}
         disabled={!ready}
-        aria-label={
-          done
-            ? `${title}. Guide completed.`
-            : `${title}. ${status}.`
-        }
+        // A title that is a question keeps its question mark rather than
+        // gaining a full stop after it.
+        aria-label={`${title}${/[.?!]$/.test(title) ? '' : '.'} ${done ? 'Guide completed' : status}.`}
         style={{
           position: 'relative',
           display: 'block',
@@ -181,7 +216,7 @@ function Card({
           its own caption. One container, one box.
         */}
         <span style={{ position: 'relative', display: 'block' }}>
-          <PathThumb mode={mode} />
+          {thumb}
           {!done && (
             <span
               aria-hidden
@@ -241,17 +276,26 @@ function Card({
         }}
       >
         {done ? '✓ ' : ''}
-        {SECTIONS[mode].label}
+        {caption}
       </span>
     </div>
   );
 }
 
-const quiet = {
-  border: 'none',
-  background: 'none',
-  padding: space(2),
-  font: type(text.lead, { weight: weight.semibold }),
+/**
+ * The two ways off this screen, shaped as buttons (review 2, item 9).
+ *
+ * They were bare text over the landscape, and a line of words at the top of a
+ * painting does not read as something to press. The site's secondary button:
+ * the same border, radius, fill and padding as the address screen's Back and
+ * Home, so the controls that leave a screen look alike on every screen.
+ */
+const secondary = {
+  border: `1px solid ${line.strong}`,
+  borderRadius: radius.base,
+  background: surface.raised,
+  padding: `${String(space(2))}px ${String(space(4))}px`,
+  font: type(text.label, { weight: weight.semibold }),
   color: ink.strong,
   cursor: 'pointer',
 } as const;

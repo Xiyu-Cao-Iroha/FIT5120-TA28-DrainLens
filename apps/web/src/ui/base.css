@@ -170,15 +170,112 @@ button:disabled {
  * number worth checking is the worst one.
  */
 .home__hero-photo {
+  background-image: linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%);
+}
+
+/*
+ * The photograph behind the page, from the hero down to "How to use the map".
+ *
+ * Review 2, item 10: the picture used to be the hero's background and ended
+ * with the first screen. It now stays put while the page scrolls over it, down
+ * to the end of the comparison section, and the page returns to its own ground
+ * after that.
+ *
+ * **Not `background-attachment: fixed`.** The page does not scroll the window;
+ * the Shell's `<main>` does, and `fixed` is measured against the viewport,
+ * ignored on iOS Safari and repainted on every scroll frame inside an overflow
+ * container. So the picture is an element:
+ *
+ * - `.home__backdrop` wraps the four sections and is the stacking context the
+ *   picture is kept inside, so `z-index: -1` puts it under their content and
+ *   not under the page.
+ * - `.home__backdrop-layer` is exactly as tall as the four sections, which is
+ *   what stops the picture: a sticky box cannot leave its containing block.
+ * - `.home__backdrop-photo` is sticky at the top of `<main>`'s scrollport, one
+ *   screen tall. `100vh` is taller than `<main>` by the header and the footer,
+ *   so the last ~150 px of the wrapper scroll the picture with it — the edge
+ *   meets "How to use the map" rather than floating over it.
+ *
+ * Nothing moves by itself. Sticky is the browser holding an element still, not
+ * an animation, so there is nothing for `prefers-reduced-motion` to switch off.
+ */
+.home__backdrop {
+  position: relative;
+  isolation: isolate;
   background-color: #0c141c;
-  background-image:
-    linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%),
-    url('/hero-street.webp');
+}
+
+.home__backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.home__backdrop-photo {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background-image: url('/hero-street.webp');
   background-size: cover;
   /* Low and right: that is where the grate and the running water are, and
      `cover` crops whichever axis is long. */
   background-position: 70% 65%;
   background-repeat: no-repeat;
+}
+
+/*
+ * The sections over the photograph after the hero.
+ *
+ * A flat 0.78 — the hero's narrow scrim — because here the text can land over
+ * any part of the picture as the page scrolls, so it was measured against the
+ * brightest pixel in the whole photograph, which is pure white: under this
+ * scrim it becomes rgb(65, 72, 78), on which white measures 9.30, the lead
+ * 7.61, the quiet line 6.38 and the eyebrow's mint 6.28. Every card on these
+ * sections is opaque white, so nothing else is read against the picture.
+ */
+.home__on-photo {
+  background-color: rgba(12, 20, 28, 0.78);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* The flood section's two blocks: ranking and map. Stacked until there is room. */
+.home__split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* A feature section: the figure and the words. Figure first on a phone too. */
+.home__feature {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+/*
+ * A row of the homepage's top five: rank, name, count on one line and the bar
+ * under the name. Narrow, the bar gets its own line rather than squeezing the
+ * name to one word a line.
+ */
+.home__rank {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  grid-template-areas:
+    'rank name count'
+    '. bar bar';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+@media (min-width: 560px) {
+  .home__rank {
+    grid-template-columns: 20px minmax(96px, 0.9fr) 1.2fr auto;
+    grid-template-areas: 'rank name bar count';
+  }
 }
 
 .home__hero {
@@ -208,14 +305,24 @@ button:disabled {
      text column — it is still 0.72, where the same worst pixel becomes
      rgb(68, 75, 81) and the four colours measure 8.86, 7.24, 6.08 and 5.44. */
   .home__hero-photo {
-    background-image:
-      linear-gradient(
-        100deg,
-        rgba(12, 20, 28, 0.84) 0%,
-        rgba(12, 20, 28, 0.72) 52%,
-        rgba(12, 20, 28, 0.34) 100%
-      ),
-      url('/hero-street.webp');
+    background-image: linear-gradient(
+      100deg,
+      rgba(12, 20, 28, 0.84) 0%,
+      rgba(12, 20, 28, 0.72) 52%,
+      rgba(12, 20, 28, 0.34) 100%
+    );
+  }
+
+  /* The ranking a little wider than the map: the picture is 4:3, and at equal
+     widths it made its card a row and a half taller than the ranking beside it. */
+  .home__split {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 24px;
+  }
+
+  .home__feature {
+    grid-template-columns: 1fr minmax(320px, 44%);
+    gap: 56px;
   }
 
   .home__hero {

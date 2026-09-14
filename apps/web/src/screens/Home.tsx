@@ -31,6 +31,13 @@
  * answers a question about the past across Greater Melbourne; the other four
  * answer questions about the ground in the City of Melbourne. Putting it in
  * the same row would suggest the map can show it, which the map cannot.
+ *
+ * **From 15 September both are sections of their own** (pair-programming
+ * review 2, items 5 and 6). The flood history is a ranking beside a picture of
+ * the area map, and the picture opens that map; the comparison is a feature
+ * with a figure, like the hero, and its button goes straight to the address
+ * search. The street photograph behind the hero now stays behind the page
+ * down to *How to use the map* — see `.home__backdrop` in `ui/base.css`.
  */
 
 import { useState } from 'react';
@@ -40,14 +47,17 @@ import {
   type FloodHistoryArtefact,
   barScale,
   defaultView,
-  periodLabel,
+  yearRange,
 } from '../history/artefact.js';
+import { HATCH_ON_LIGHT, RAMPS } from '../history/drawAreas.js';
+import { ACTIVITY_BREAKS } from '../history/severity.js';
+import { BlockedDrainFigure } from './BlockedDrain.js';
 import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
 import { CoverageBadge } from '../ui/Shell.js';
-import { COVERAGE, FULL_MAP, LAYER, TOTAL_RAINFALL } from '../ui/terms.js';
+import { COVERAGE, FLOOD, FULL_MAP, LAYER, TOTAL_RAINFALL } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -65,6 +75,8 @@ import {
 
 export const SECTIONS = {
   paths: 'home-paths',
+  flood: 'home-flood',
+  compare: 'home-compare',
   flow: 'home-flow',
   limits: 'home-limits',
 } as const;
@@ -159,11 +171,13 @@ export interface HomeProps {
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
   readonly onOpenHistory: () => void;
+  /** The flood area map, from the picture of it. */
+  readonly onOpenFloodMap: () => void;
   /** Asks for an address, then opens the comparison — AC 3.1.1. */
   readonly onCompare: () => void;
 }
 
-export function Home({ history, onOpenMap, onOpenHistory, onCompare }: HomeProps) {
+export function Home({ history, onOpenMap, onOpenHistory, onOpenFloodMap, onCompare }: HomeProps) {
   return (
     /*
       `height: 100%` is what lets the hero's `minHeight: 100%` mean the first
@@ -174,21 +188,33 @@ export function Home({ history, onOpenMap, onOpenHistory, onCompare }: HomeProps
     */
     <div style={{ height: '100%' }}>
       {/*
-        The hero's button is called, not forwarded. Its `onClick` hands the
-        click event to whatever it is given, and an event arriving where a mode
-        is expected is a mode nobody chose.
+        The photograph, behind everything down to `Flow`. One layer inside
+        this wrapper rather than a background on each section, so it is one
+        picture the sections scroll over and not four crops of it that jump at
+        every section edge. Why it is built this way is in `ui/base.css`.
       */}
-      <Hero
-        onOpenMap={() => {
-          onOpenMap();
-        }}
-      />
-      <Paths
-        onOpenMap={onOpenMap}
-        onOpenHistory={onOpenHistory}
-        onCompare={onCompare}
-        history={history}
-      />
+      <div className="home__backdrop">
+        <div className="home__backdrop-layer" aria-hidden>
+          <div className="home__backdrop-photo" />
+        </div>
+        {/*
+          The hero's button is called, not forwarded. Its `onClick` hands the
+          click event to whatever it is given, and an event arriving where a
+          mode is expected is a mode nobody chose.
+        */}
+        <Hero
+          onOpenMap={() => {
+            onOpenMap();
+          }}
+        />
+        <Paths onOpenMap={onOpenMap} />
+        <FloodSection
+          history={history}
+          onOpenHistory={onOpenHistory}
+          onOpenFloodMap={onOpenFloodMap}
+        />
+        <CompareSection onCompare={onCompare} />
+      </div>
       <Flow />
       <Limits />
       <ClosingNote />
@@ -202,22 +228,33 @@ function Band({
   id,
 }: {
   readonly children: React.ReactNode;
-  readonly tone?: 'page' | 'raised' | 'tint';
+  /** `photo` sits over the backdrop: a scrim, not a surface. See `.home__on-photo`. */
+  readonly tone?: 'page' | 'raised' | 'tint' | 'photo';
   readonly id?: string;
 }) {
+  const inner = (
+    <div
+      style={{
+        maxWidth: 1080,
+        margin: '0 auto',
+        padding: `${String(space(16))}px ${String(space(6))}px`,
+      }}
+    >
+      {children}
+    </div>
+  );
+  if (tone === 'photo') {
+    return (
+      <section id={id} className="home__on-photo">
+        {inner}
+      </section>
+    );
+  }
   const background =
     tone === 'raised' ? surface.raised : tone === 'tint' ? surface.sunken : surface.page;
   return (
     <section id={id} style={{ background, borderTop: `1px solid ${line.hair}` }}>
-      <div
-        style={{
-          maxWidth: 1080,
-          margin: '0 auto',
-          padding: `${String(space(16))}px ${String(space(6))}px`,
-        }}
-      >
-        {children}
-      </div>
+      {inner}
     </section>
   );
 }
@@ -226,22 +263,25 @@ function SectionHeading({
   eyebrow,
   title,
   body,
+  onPhoto = false,
 }: {
   readonly eyebrow?: string;
   readonly title: string;
   readonly body?: string;
+  /** Over the backdrop's scrim, in the colours measured against it. */
+  readonly onPhoto?: boolean;
 }) {
   return (
     <>
-      {eyebrow !== undefined && <Eyebrow>{eyebrow}</Eyebrow>}
+      {eyebrow !== undefined && <Eyebrow onPhoto={onPhoto}>{eyebrow}</Eyebrow>}
       <h2
         className="home__section-title"
         style={{
           // The body carries the gap to the content below; without one, the
           // heading has to.
           margin: `${String(space(3))}px 0 ${String(body === undefined ? space(10) : space(3))}px`,
-          color: ink.strong,
-          maxWidth: 620,
+          color: onPhoto ? ON_PHOTO.title : ink.strong,
+          maxWidth: 720,
         }}
       >
         {title}
@@ -252,7 +292,7 @@ function SectionHeading({
             margin: `0 0 ${String(space(10))}px`,
             maxWidth: 620,
             font: type(text.body, { leading: 1.6 }),
-            color: ink.muted,
+            color: onPhoto ? ON_PHOTO.lead : ink.muted,
           }}
         >
           {body}
@@ -262,7 +302,13 @@ function SectionHeading({
   );
 }
 
-function Eyebrow({ children }: { readonly children: React.ReactNode }) {
+function Eyebrow({
+  children,
+  onPhoto = false,
+}: {
+  readonly children: React.ReactNode;
+  readonly onPhoto?: boolean;
+}) {
   return (
     <span
       style={{
@@ -272,10 +318,13 @@ function Eyebrow({ children }: { readonly children: React.ReactNode }) {
         font: type(text.micro, { weight: weight.semibold }),
         letterSpacing: tracking.caps,
         textTransform: 'uppercase',
-        color: brand.ink,
+        color: onPhoto ? ON_PHOTO.eyebrow : brand.ink,
       }}
     >
-      <span aria-hidden style={{ width: 18, height: 2, background: brand.base }} />
+      <span
+        aria-hidden
+        style={{ width: 18, height: 2, background: onPhoto ? ON_PHOTO.eyebrow : brand.base }}
+      />
       {children}
     </span>
   );
@@ -348,20 +397,27 @@ function TickMark() {
  * real cost and is written down rather than absorbed. Resized from the source
  * rather than shipped at 2.6 MB, and not upscaled past the 1860 px it came at.
  *
- * The picture and the scrim over it live in `ui/base.css` as
- * `.home__hero-photo`, because how dark the scrim has to be depends on whether
- * the text has a column of its own — which is a layout question and belongs
- * where the other layout question on this page is already answered.
+ * The picture lives in `ui/base.css` as `.home__backdrop-photo`, behind this
+ * section and the three after it, and the hero's scrim as `.home__hero-photo`,
+ * because how dark the scrim has to be depends on whether the text has a
+ * column of its own — which is a layout question and belongs where the other
+ * layout question on this page is already answered.
  *
- * **These three colours are the ones measured against it**, against the
+ * **These colours are the ones measured against it**, against the
  * brightest pixel under the text rather than the average, because a
  * photograph's contrast changes with every pixel and the only number worth
  * checking is the worst one.
+ *
+ * Below the hero, text can land over any part of the picture as the page
+ * scrolls, so those sections were measured against the brightest pixel in the
+ * whole photograph — pure white — under their flat 0.78 scrim: white 9.30, the
+ * lead 7.61, the quiet line 6.38 and the eyebrow's mint 6.28.
  */
 const ON_PHOTO = {
   title: '#ffffff',
   lead: '#e4e9ec',
   quiet: '#cfd7dc',
+  eyebrow: '#a7e0cb',
 } as const;
 
 function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
@@ -699,6 +755,10 @@ function PathCard({
  * because nine of the thirty areas contain a count the publisher withheld, and
  * a floor shown as an exact figure is a wrong number rather than a rounded one.
  *
+ * **The unit is written beside every number** from 15 September. A bare 209
+ * next to a suburb's name is a score, and the thing it counts is the whole
+ * qualification.
+ *
  * It is a preview, not a second board: no per-year sparkline, no tie flags, no
  * *what a count means*. Those are on the page this links to, which is one
  * press away and says all of it.
@@ -709,33 +769,21 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
   if (top.length === 0) return null;
 
   return (
-    <div style={{ marginTop: space(5) }}>
-      <ol
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          background: surface.raised,
-          border: `1px solid ${line.base}`,
-          borderRadius: radius.large,
-          overflow: 'hidden',
-        }}
-      >
+    <div>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {top.map((area) => (
           <li
             key={area.name}
+            className="home__rank"
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'auto minmax(96px, 0.9fr) 1.6fr auto',
-              alignItems: 'center',
-              gap: space(3),
-              padding: `${String(space(3))}px ${String(space(4))}px`,
+              padding: `${String(space(3))}px 0`,
               borderTop: area.rank === 1 ? 'none' : `1px solid ${line.hair}`,
             }}
           >
             <span
               aria-hidden
               style={{
+                gridArea: 'rank',
                 width: 20,
                 textAlign: 'right',
                 font: type(text.small, { weight: weight.semibold }),
@@ -747,6 +795,7 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
             </span>
             <span
               style={{
+                gridArea: 'name',
                 font: type(text.label, { weight: weight.semibold, leading: 1.3 }),
                 color: ink.strong,
               }}
@@ -756,6 +805,7 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
             <span
               aria-hidden
               style={{
+                gridArea: 'bar',
                 height: 8,
                 borderRadius: radius.pill,
                 background: surface.sunken,
@@ -772,18 +822,27 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
                 }}
               />
             </span>
-            <strong
+            <span
               style={{
-                minWidth: 40,
+                gridArea: 'count',
                 textAlign: 'right',
-                font: type(text.label, { weight: weight.semibold }),
-                color: ink.strong,
-                fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+                font: type(text.small, { leading: 1.3 }),
+                color: ink.subtle,
               }}
             >
-              {area.total.toLocaleString()}
-              {!area.complete && <span style={{ color: ink.subtle }}>+</span>}
-            </strong>
+              <strong
+                style={{
+                  font: type(text.label, { weight: weight.semibold }),
+                  color: ink.strong,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {area.total.toLocaleString()}
+                {!area.complete && <span style={{ color: ink.subtle }}>+</span>}
+              </strong>{' '}
+              {area.total === 1 ? FLOOD.unitOne : FLOOD.unit}
+            </span>
           </li>
         ))}
       </ol>
@@ -794,28 +853,18 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
           color: ink.subtle,
         }}
       >
-        {artefact.incidentType} incidents recorded by {artefact.source.publisher}, {periodLabel(artefact)},
-        by statistical area across {artefact.geography.scope}. <strong>+</strong> means the
-        exact count was not published, so the total is at least the number shown.
+        Recorded by {artefact.source.publisher}. <strong>+</strong> means the exact count was not
+        published, so the total is at least the number shown.
       </p>
     </div>
   );
 }
 
-function Paths({
-  onOpenMap,
-  onOpenHistory,
-  onCompare,
-  history,
-}: {
-  readonly onOpenMap: (mode?: MapMode) => void;
-  readonly onOpenHistory: () => void;
-  readonly onCompare: () => void;
-  readonly history: FloodHistoryArtefact;
-}) {
+function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) {
   return (
-    <Band tone="raised" id={SECTIONS.paths}>
+    <Band tone="photo" id={SECTIONS.paths}>
       <SectionHeading
+        onPhoto
         eyebrow="What you can explore"
         title="Four ways to understand your area"
         body="Choose a topic to open the map. You can change layers at any time."
@@ -839,135 +888,11 @@ function Paths({
       </div>
 
       {/*
-        The fifth kind of information AC 1.1.1.b names, and the only one that
-        is not a map layer. It gets a band of its own rather than a fifth card
-        because a card in that row would say "this opens the map too", and the
-        difference between the past across a city and the ground in one
-        council area is the thing most worth not blurring.
-      */}
-      <article
-        style={{
-          marginTop: space(6),
-          padding: space(5),
-          background: brand.wash,
-          border: `1px solid ${brand.tint}`,
-          borderRadius: radius.large,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            gap: space(5),
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span style={{ flex: '1 1 320px' }}>
-            <h3
-              style={{
-                margin: `0 0 ${String(space(2))}px`,
-                font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-                letterSpacing: tracking.title,
-                color: ink.strong,
-              }}
-            >
-              Recorded flood incidents across {history.geography.scope}
-            </h3>
-            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-              See which {history.geography.scope} areas had the most SES flood call-outs from{' '}
-              {periodLabel(history)}. These counts show past call-outs, not flood depth, damage or
-              future risk.
-            </p>
-          </span>
-          <button
-            type="button"
-            onClick={onOpenHistory}
-            style={{
-              padding: `${String(space(3))}px ${String(space(5))}px`,
-              border: 'none',
-              borderRadius: radius.base,
-              background: brand.base,
-              color: ink.inverse,
-              font: type(text.label, { weight: weight.semibold }),
-            }}
-          >
-            See flood history →
-          </button>
-        </div>
-
-        <FloodPreview artefact={history} />
-      </article>
-
-      {/*
-        The comparison, offered again after one iteration off. Quieter than the
-        flood band above it: that one is a finished thing to read, and this one
-        is a calculation somebody has to set up and whose most likely honest
-        answer is that blocking one drain changed nothing anybody would notice.
-
-        The words below say what it compares against and what it is not, in
-        that order, because the second is the part a person will otherwise
-        supply for themselves. AC 3.1.2.d and 3.1.2.e put the same distinction
-        on the controls; this is the version that has to survive being read
-        once, quickly, by somebody deciding whether to press it.
-      */}
-      <article
-        style={{
-          marginTop: space(6),
-          padding: space(5),
-          background: surface.raised,
-          border: `1px solid ${line.base}`,
-          borderRadius: radius.large,
-          display: 'flex',
-          gap: space(5),
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <span style={{ flex: '1 1 320px' }}>
-          <h3
-            style={{
-              margin: `0 0 ${String(space(2))}px`,
-              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-              letterSpacing: tracking.title,
-              color: ink.strong,
-            }}
-          >
-            What changes if a drain is blocked
-          </h3>
-          <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-            Choose a nearby drain and compare two settings under the same{' '}
-            {TOTAL_RAINFALL.toLowerCase()}: clear and blocked. This is a model comparison, not an
-            observation or forecast.
-          </p>
-        </span>
-        <button
-          type="button"
-          onClick={onCompare}
-          style={{
-            padding: `${String(space(3))}px ${String(space(5))}px`,
-            border: `1px solid ${line.strong}`,
-            borderRadius: radius.base,
-            background: surface.raised,
-            color: brand.ink,
-            font: type(text.label, { weight: weight.semibold }),
-          }}
-        >
-          Set up a comparison →
-        </button>
-      </article>
-
-      {/*
         The unnarrowed way in, kept quieter than the four. Somebody who already
         knows what the map holds should not have to pick a question first, but
         it is the wrong first suggestion for somebody who does not.
       */}
-      <p
-        style={{
-          margin: `${String(space(5))}px 0 0`,
-          font: type(text.label, { leading: 1.6 }),
-          color: ink.muted,
-        }}
-      >
+      <p style={{ margin: `${String(space(5))}px 0 0` }}>
         <button
           type="button"
           onClick={() => {
@@ -978,12 +903,277 @@ function Paths({
             border: 'none',
             padding: 0,
             font: type(text.label, { weight: weight.semibold }),
-            color: brand.ink,
+            color: ON_PHOTO.title,
+            textDecoration: 'underline',
+            textUnderlineOffset: 3,
           }}
         >
           Open the {FULL_MAP.toLowerCase()} →
         </button>
       </p>
+    </Band>
+  );
+}
+
+/**
+ * Which areas had the most flood call-outs: the ranking, and the map beside it.
+ *
+ * **The fifth kind of information AC 1.1.1.b names, and the only one that is
+ * not a map layer.** It keeps a section of its own rather than a fifth card
+ * among the four, because a card in that row would say "this opens the map
+ * too", and the difference between the past across a city and the ground in
+ * one council area is the thing most worth not blurring.
+ *
+ * **The picture is the flood area map, drawn from its own data.** A WebP
+ * rendered by `pipeline/…/flood_thumbnail.py` from `sa2-points.json`,
+ * `sa2-areas.json` and `population.json` with the map's own breaks and ramp —
+ * which a test holds to `severity.ts` and `drawAreas.ts`, and which another
+ * test re-renders and compares with the committed file. Drawn here at runtime
+ * it would cost the homepage 220 KB of area data for a thumbnail; the file is
+ * 52 KB and the areas are still fetched only when the map is opened.
+ *
+ * The legend is HTML rather than part of the picture, so it can be read aloud
+ * and cannot be cropped.
+ */
+function FloodSection({
+  history,
+  onOpenHistory,
+  onOpenFloodMap,
+}: {
+  readonly history: FloodHistoryArtefact;
+  readonly onOpenHistory: () => void;
+  readonly onOpenFloodMap: () => void;
+}) {
+  const period = yearRange(history.reportingPeriod.years);
+  return (
+    <Band tone="photo" id={SECTIONS.flood}>
+      <SectionHeading
+        onPhoto
+        eyebrow="Flood history"
+        title="Which area is under most flood incidents? Get to know here!"
+        body={`SES flood call-outs by area across ${history.geography.scope}, ${period}. They count past call-outs, not flood depth, damage or future risk.`}
+      />
+      <div className="home__split">
+        <article style={{ ...floodCard, padding: space(5) }}>
+          <h3 style={cardTitle}>Most call-outs, top five areas</h3>
+          <FloodPreview artefact={history} />
+          <div style={{ marginTop: 'auto', paddingTop: space(5) }}>
+            <PrimaryButton label="See flood history →" onPress={onOpenHistory} />
+          </div>
+        </article>
+
+        <FloodMapCard
+          period={period}
+          scope={history.geography.scope}
+          onOpen={onOpenFloodMap}
+        />
+      </div>
+    </Band>
+  );
+}
+
+const floodCard = {
+  display: 'flex',
+  flexDirection: 'column',
+  background: surface.raised,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.large,
+  boxShadow: shadow.resting,
+} as const;
+
+const cardTitle = {
+  margin: `0 0 ${String(space(3))}px`,
+  font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
+  letterSpacing: tracking.title,
+  color: ink.strong,
+} as const;
+
+/**
+ * The picture of the area map, as one button.
+ *
+ * The whole card is the target, for the reason `PathCard` gives: somebody
+ * pointing at a map and pressing is doing the obvious thing. The affordance is
+ * still written out, because a picture that happens to be pressable is not
+ * something anyone discovers by looking at it.
+ */
+function FloodMapCard({
+  period,
+  scope,
+  onOpen,
+}: {
+  readonly period: string;
+  readonly scope: string;
+  readonly onOpen: () => void;
+}) {
+  const [raised, setRaised] = useState(false);
+  const bands = ACTIVITY_BREAKS.map((band, index) => ({
+    label: band.label,
+    fill: RAMPS.activity[index] ?? line.base,
+  }));
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      // One sentence rather than everything inside read out in a row: the
+      // legend is a key to colours, which a screen reader has no use for.
+      aria-label={`Open the area map: ${scope} areas shaded by recorded SES flood call-outs, ${period}`}
+      onMouseEnter={() => {
+        setRaised(true);
+      }}
+      onMouseLeave={() => {
+        setRaised(false);
+      }}
+      onFocus={() => {
+        setRaised(true);
+      }}
+      onBlur={() => {
+        setRaised(false);
+      }}
+      style={{
+        ...floodCard,
+        overflow: 'hidden',
+        padding: 0,
+        textAlign: 'left',
+        font: 'inherit',
+        color: 'inherit',
+        borderColor: raised ? brand.base : line.base,
+        boxShadow: raised ? shadow.lifted : shadow.resting,
+        transition: 'box-shadow 120ms ease, border-color 120ms ease',
+      }}
+    >
+      <img
+        src="/flood-areas-thumb.webp"
+        alt=""
+        width={960}
+        height={720}
+        loading="lazy"
+        decoding="async"
+        style={{
+          display: 'block',
+          width: '100%',
+          height: 'auto',
+          aspectRatio: '4 / 3',
+          objectFit: 'cover',
+          background: '#e3e8ec',
+          borderBottom: `1px solid ${line.hair}`,
+        }}
+      />
+      <span style={{ display: 'block', padding: space(5), flex: 1 }}>
+        <span style={{ ...cardTitle, display: 'block', margin: `0 0 ${String(space(2))}px` }}>
+          The flood area map
+        </span>
+        <span
+          style={{
+            display: 'block',
+            marginBottom: space(2),
+            font: type(text.small, { weight: weight.semibold, leading: 1.4 }),
+            color: ink.base,
+          }}
+        >
+          {FLOOD.callouts}, {period}
+        </span>
+        <span
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: `${String(space(1))}px ${String(space(3))}px`,
+            font: type(text.small, { leading: 1.4 }),
+            color: ink.muted,
+          }}
+        >
+          {bands.map((band) => (
+            <span key={band.label} style={legendItem}>
+              <span aria-hidden style={{ ...swatch, background: band.fill }} />
+              {band.label}
+            </span>
+          ))}
+          <span style={legendItem}>
+            <span
+              aria-hidden
+              style={{
+                ...swatch,
+                background: `repeating-linear-gradient(135deg, ${HATCH_ON_LIGHT} 0 1.5px, ${RAMPS.activity[1] ?? line.base} 1.5px 4px)`,
+              }}
+            />
+            Minimum total (+)
+          </span>
+        </span>
+        <span
+          style={{
+            display: 'block',
+            marginTop: space(4),
+            font: type(text.label, { weight: weight.semibold }),
+            color: brand.ink,
+          }}
+        >
+          Open the area map →
+        </span>
+      </span>
+    </button>
+  );
+}
+
+const legendItem = { display: 'inline-flex', alignItems: 'center', gap: space(1) + 2 } as const;
+const swatch = {
+  flexShrink: 0,
+  width: 14,
+  height: 10,
+  borderRadius: 2,
+  boxShadow: 'inset 0 0 0 1px rgba(23, 36, 46, 0.12)',
+} as const;
+
+/**
+ * The comparison, as a feature: a figure and the words beside it.
+ *
+ * **Its button goes straight to the address search** (review 2, item 6). It
+ * used to say *Set up a comparison*, which promised the setup and delivered an
+ * address field; the label now says the step it opens, and the line under it
+ * says what follows. The session carries the task through the address screen
+ * — `task-wanted` in `session.ts` — so choosing an address lands on the setup.
+ *
+ * The words say what it compares against and what it is not, in that order,
+ * because the second is the part a person will otherwise supply for
+ * themselves. AC 3.1.2.d and 3.1.2.e put the same distinction on the controls;
+ * this is the version that has to survive being read once, quickly, by
+ * somebody deciding whether to press it.
+ */
+function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
+  return (
+    <Band tone="photo" id={SECTIONS.compare}>
+      <div className="home__feature">
+        <BlockedDrainFigure />
+        <div>
+          <Eyebrow onPhoto>What-if comparison</Eyebrow>
+          <h2
+            className="home__section-title"
+            style={{ margin: `${String(space(3))}px 0`, color: ON_PHOTO.title }}
+          >
+            What happens if a drain is blocked? Do Assumptions here!
+          </h2>
+          <p
+            style={{
+              margin: `0 0 ${String(space(6))}px`,
+              maxWidth: 480,
+              font: type(text.body, { leading: 1.6 }),
+              color: ON_PHOTO.lead,
+            }}
+          >
+            Choose a nearby drain and compare two settings under the same{' '}
+            {TOTAL_RAINFALL.toLowerCase()}: clear and blocked. This is a model comparison, not an
+            observation or forecast.
+          </p>
+          <PrimaryButton label="Search an address to start →" onPress={onCompare} />
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              font: type(text.small, { leading: 1.5 }),
+              color: ON_PHOTO.quiet,
+            }}
+          >
+            After you choose an address, you pick the drain, how blocked it is and the rainfall.
+          </p>
+        </div>
+      </div>
     </Band>
   );
 }

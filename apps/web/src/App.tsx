@@ -312,15 +312,20 @@ export function App() {
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
             }}
+            // The same event the board's "Open the area map" dispatches, so
+            // the picture of the map and the board's button open one screen.
+            onOpenFloodMap={() => {
+              dispatch({ type: 'flood-map-opened' });
+            }}
             /*
               The one card here that dispatches rather than describes, and for
               the opposite reason to the four above it: they all arrive at the
-              same chooser, and this arrives somewhere the chooser cannot
-              reach. It needs an address, so the reducer sends it to the
+              same chooser, and this arrives somewhere the chooser only reaches
+              the same way. It needs an address, so the reducer sends it to the
               address screen and remembers what it was for.
             */
             onCompare={() => {
-              dispatch({ type: 'task-wanted', task: 'compare' });
+              dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
             }}
           />
         </Shell>
@@ -456,6 +461,11 @@ export function App() {
             guided={GUIDED_SECTIONS}
             onStart={(section) => {
               dispatch({ type: 'guide-chosen', section });
+            }}
+            // Not a guide: the address search, then the comparison, and Back
+            // from the address returns here.
+            onCompare={() => {
+              dispatch({ type: 'task-wanted', task: 'compare', from: 'choose' });
             }}
             onSkip={() => {
               dispatch({ type: 'map-opened', from: 'home' });

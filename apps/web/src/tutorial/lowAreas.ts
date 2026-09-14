@@ -21,6 +21,15 @@
  * The 0.25 m floor in step two is the reason there are not thousands: the
  * ground surface is quoted at about 25 cm accuracy and the median untrimmed
  * hollow is 5 cm, which is the surface's own noise.
+ *
+ * **The warning sign comes straight after the shapes**, while the reader is
+ * still looking at blue, because it is a mark on those shapes and means
+ * nothing without them. A `read` step rather than a `do`: the guide opens
+ * 300 m across on 46 Gatehouse Drive, and the nearest sign is on the large low
+ * area 161 m east and 91 m north of it -- just outside that view. A step that
+ * waited for a press on it would wait for a drag the reader was never asked
+ * to make, so the step says to make it instead. Kensington has 11 signs; see
+ * `map/warnings.ts` for which hollows get one and from what zoom.
  */
 
 import { FULL_MAP, LAYER } from '../ui/terms.js';
@@ -39,6 +48,12 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
     id: 'hollows-shown',
     prompt:
       'Each blue shape is a calculated dip at least 25 cm below its estimated outlet level. Water may collect there. Shallower changes are not shown because they are within the uncertainty of the ground-height data.',
+  },
+  {
+    kind: 'read',
+    id: 'deep-hollow-sign',
+    prompt:
+      'Where a low area is especially deep, a warning sign marks its deepest point once the map is zoomed in. Select the sign to read what it means. If none is in view, drag the map to look nearby.',
   },
   {
     kind: 'do',
@@ -76,11 +91,11 @@ export const LOW_AREAS_DONE: Lesson['finished'] = {
 export const LOW_AREAS: Lesson = {
   steps: LOW_AREAS_STEPS,
   finished: LOW_AREAS_DONE,
-  // Low areas, then Likely water paths at step 2, then Drain pits at step 4.
+  // Low areas, then Likely water paths at step 3, then Drain pits at step 5.
   chips: unlockingChips([
     { key: 'lowPoint', at: 0, on: (now) => now.lowPoints },
-    { key: 'channel', at: 2, on: (now) => now.channel },
-    { key: 'pit', at: 4, on: (now) => now.pits },
+    { key: 'channel', at: 3, on: (now) => now.channel },
+    { key: 'pit', at: 5, on: (now) => now.pits },
   ]),
   teachingPit: false,
 };

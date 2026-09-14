@@ -54,6 +54,13 @@ import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
+import {
+  WARNING_BODY,
+  WARNING_TITLE,
+  type WarningPoint,
+  loadWarnings,
+  warningsVisible,
+} from '../map/warnings.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import {
@@ -240,6 +247,7 @@ export function MapView({
     // answer the old one beside the new mark.
     setHit(null);
     setFollowing(null);
+    setWarning(null);
   }, [address, addressCard]);
 
   // The index and the council overview, once; tiles arrive as the map is
@@ -260,6 +268,36 @@ export function MapView({
       live = false;
     };
   }, []);
+
+  /*
+    The signs on especially deep low areas, for the extent that was served.
+
+    Keyed on the map's extent rather than loaded once like the ground index,
+    because the points are in the map's own frame: the council's file drawn
+    over the Kensington fallback would put every sign a kilometre and a half
+    from its hollow. `loadWarnings` refuses a file for another extent, and a
+    failure leaves the signs off -- the low areas still draw, which is what
+    the layer is.
+  */
+  const [warningPoints, setWarningPoints] = useState<readonly WarningPoint[] | null>(null);
+  /** The sign whose card is open. One card on the map at a time, as ever. */
+  const [warning, setWarning] = useState<WarningPoint | null>(null);
+  const { name: extentName, width_m: extentWidth, height_m: extentHeight } = map.extent;
+  useEffect(() => {
+    let live = true;
+    setWarningPoints(null);
+    setWarning(null);
+    loadWarnings({ name: extentName, width_m: extentWidth, height_m: extentHeight })
+      .then((artefact) => {
+        if (live) setWarningPoints(artefact.points);
+      })
+      .catch(() => {
+        if (live) setWarningPoints(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [extentName, extentWidth, extentHeight]);
 
   // Which way the ground falls around each address, precomputed. Loaded once;
   // if it cannot be, the card still says what is near and says nothing about
@@ -319,6 +357,8 @@ export function MapView({
       setHit(null);
       setFollowing(null);
     }
+    // The sign goes with the layer it belongs to, for the same reason.
+    if (key === 'lowPoint' && layers.lowPoint) setWarning(null);
     if (key === 'pipe' && layers.pipe) {
       // The trace is drawn as pipes, so it goes with them even when what is
       // selected is the pit at the top of it.
@@ -401,6 +441,15 @@ export function MapView({
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
+        warnings={layers.lowPoint ? warningPoints : null}
+        onWarningPress={(sign) => {
+          // Pressing a sign lets go of whatever else was open: two cards on
+          // one map is one too many.
+          setHit(null);
+          setFollowing(null);
+          setMinimised(false);
+          setWarning(sign);
+        }}
         onViewport={setViewport}
         onAddressPress={() => {
           // The pin is the way back to the address card after it has been
@@ -410,10 +459,12 @@ export function MapView({
           setHit(null);
           setFollowing(null);
           setMinimised(false);
+          setWarning(null);
           setAddressCardOpen(true);
         }}
         onSelect={(next) => {
           setHit(next);
+          setWarning(null);
           setMinimised(false);
           // Selecting something else abandons the path. Leaving it drawn
           // would attach the previous answer to the new question.
@@ -613,6 +664,32 @@ export function MapView({
       )}
 
       {/*
+        The warning sign's card: the requested sentence and nothing else.
+
+        No basis badge and no caveat, on purpose. It is advice about a place,
+        asked for in exactly these words, and what the low areas are and are
+        not is said beside the layer already. Hidden with the sign when the map
+        zooms out past it, and back when it zooms in again, like a pit's card
+        whose pit has left the screen.
+      */}
+      {panel &&
+        viewport !== null &&
+        warning !== null &&
+        warningsVisible(layers.lowPoint, viewport.scale) &&
+        onScreen(warning.c, viewport) && (
+        <MapCallout
+          at={toScreen(viewport, warning.c)}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title={WARNING_TITLE}
+          onClose={() => {
+            setWarning(null);
+          }}
+        >
+          {WARNING_BODY}
+        </MapCallout>
+      )}
+
+      {/*
         The address callout, and the mentor's *"even a small popup"* for the
         pin. It carries what the panel used to say about the address — AC
         1.1.9.c — and the derived sentence keeps its own badge rather than
@@ -627,6 +704,7 @@ export function MapView({
         viewport !== null &&
         address !== null &&
         hit === null &&
+        warning === null &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
