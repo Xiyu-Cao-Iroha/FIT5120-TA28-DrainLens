@@ -161,8 +161,6 @@ export interface MapViewProps {
   readonly addressCard?: boolean | undefined;
   /** How wide the opening view is, in metres. See `MapCanvas`. */
   readonly openAcrossM?: number | undefined;
-  /** Hold the view where it opened: no pan, no zoom. See `MapCanvas`. */
-  readonly locked?: boolean | undefined;
   /**
    * The map legend, off in the guide.
    *
@@ -207,7 +205,6 @@ export function MapView({
   onMapNow,
   addressCard = true,
   openAcrossM,
-  locked = false,
   legend = true,
   scenarioSupport = null,
   onCompare,
@@ -398,7 +395,6 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
-        locked={locked}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={pitsDrawn}

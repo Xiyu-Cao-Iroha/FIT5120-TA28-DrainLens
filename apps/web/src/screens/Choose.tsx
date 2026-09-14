@@ -48,77 +48,81 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
   const done = countLearned(learned);
 
   return (
-    <div
-      style={{
-        maxWidth: 1180,
-        margin: '0 auto',
-        padding: `${String(space(8))}px ${String(space(6))}px ${String(space(14))}px`,
-      }}
-    >
+    // Full-bleed, so the landscape reaches the edges of the window rather than
+    // the edges of the column. See `.choose__backdrop` for the wash over it.
+    <div className="choose__backdrop">
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: space(4),
-          marginBottom: space(10),
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: `${String(space(8))}px ${String(space(6))}px ${String(space(14))}px`,
         }}
       >
-        <button type="button" onClick={onBack} style={quiet}>
-          ← Back
-        </button>
-        <button type="button" onClick={onSkip} style={quiet}>
-          Skip to {FULL_MAP} →
-        </button>
-      </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: space(4),
+            marginBottom: space(10),
+          }}
+        >
+          <button type="button" onClick={onBack} style={quiet}>
+            ← Back
+          </button>
+          <button type="button" onClick={onSkip} style={quiet}>
+            Skip to {FULL_MAP} →
+          </button>
+        </div>
 
-      <h1
-        style={{
-          margin: `0 0 ${String(space(3))}px`,
-          textAlign: 'center',
-          font: type(text.display, { weight: weight.semibold, leading: 1.2 }),
-          letterSpacing: tracking.display,
-          color: ink.strong,
-        }}
-      >
-        What do you want to explore first?
-      </h1>
+        <h1
+          style={{
+            margin: `0 0 ${String(space(3))}px`,
+            textAlign: 'center',
+            font: type(text.display, { weight: weight.semibold, leading: 1.2 }),
+            letterSpacing: tracking.display,
+            color: ink.strong,
+          }}
+        >
+          What do you want to explore first?
+        </h1>
 
-      <p
-        style={{
-          margin: `0 auto ${String(space(12))}px`,
-          maxWidth: 640,
-          textAlign: 'center',
-          font: type(text.body, { leading: 1.6 }),
-          color: ink.muted,
-        }}
-      >
-        {done === 0
-          ? `Each guide takes about two minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
-          : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${FULL_MAP.toLowerCase()}.`}
-      </p>
+        <p
+          style={{
+            margin: `0 auto ${String(space(12))}px`,
+            maxWidth: 640,
+            textAlign: 'center',
+            font: type(text.body, { leading: 1.6 }),
+            color: ink.muted,
+          }}
+        >
+          {done === 0
+            ? `Each guide takes about two minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
+            : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${FULL_MAP.toLowerCase()}.`}
+        </p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-          gap: space(6),
-        }}
-      >
-        {PATHS.map((path) => (
-          <Card
-            key={path.mode}
-            mode={path.mode}
-            title={path.title}
-            body={path.body}
-            accent={path.accent}
-            done={learned[path.mode]}
-            ready={guided.includes(path.mode)}
-            onStart={() => {
-              onStart(path.mode);
-            }}
-          />
-        ))}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: space(6),
+          }}
+        >
+          {PATHS.map((path) => (
+            <Card
+              key={path.mode}
+              mode={path.mode}
+              title={path.title}
+              body={path.body}
+              accent={path.accent}
+              done={learned[path.mode]}
+              ready={guided.includes(path.mode)}
+              onStart={() => {
+                onStart(path.mode);
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -226,6 +230,11 @@ function Card({
 
       <span
         style={{
+          alignSelf: 'center',
+          padding: `${String(space(1))}px ${String(space(3))}px`,
+          borderRadius: radius.pill,
+          // Over the landscape, not the page: see `.choose__backdrop`.
+          background: 'rgba(245, 248, 247, 0.9)',
           font: type(text.label, { weight: weight.medium }),
           color: done ? '#1a5d4d' : ink.base,
           textAlign: 'center',

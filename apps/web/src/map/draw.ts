@@ -12,6 +12,7 @@
 import type { LineFeature, MapArtefact, Pipe, Pit, PolygonFeature, Road, StreetName } from './artefact.js';
 import { type Local, type Viewport, toScreen, visibleBounds } from './viewport.js';
 import { ICON_MIN_SCALE, drawPitIcon } from './pitIcon.js';
+import { type Frame, type PlaceCandidate, placeNames, placeOpacity, placesIn, tracked } from './places.js';
 
 export interface Palette {
   readonly ground: string;
@@ -35,6 +36,9 @@ export interface Palette {
   readonly comparable: string;
   readonly label: string;
   readonly labelHalo: string;
+  /** Suburb names: darker than a street name, because they are read from further out. */
+  readonly place: string;
+  readonly placeHalo: string;
   readonly address: string;
   readonly addressHalo: string;
 }
@@ -58,6 +62,10 @@ export const DAY: Palette = {
   suggested: '#b4690e',
   label: '#5b6b7a',
   labelHalo: '#ffffff',
+  // Near-black ink rather than the street grey. At the overview the names sit
+  // over thousands of dark pipes, and grey over that is a smudge.
+  place: '#253241',
+  placeHalo: '#ffffff',
   // Warm, and shared with no layer. The address is the person's own
   // location, not a recorded asset, and a marker that borrowed the pit
   // colour would put their house into the drainage network.
@@ -396,6 +404,60 @@ function drawStreetNames(
   }
 }
 
+/**
+ * The suburb names' type: the street names' size, heavier, and set in spaced
+ * capitals by `tracked`. Not bigger, because the capitals and the spacing
+ * already make each name twice as wide, and width is what collides.
+ */
+export const PLACE_FONT = '700 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+
+/**
+ * Suburb names, for the zoom at which the map is a city rather than a street.
+ *
+ * Over the drainage network, because at the council overview there are
+ * seventeen thousand pipes and a name drawn under them is not read. Under the
+ * street names, which take over as these fade — see `PLACE_HIDDEN_SCALE`.
+ *
+ * Over the pits too, which is cheaper than it sounds. Pits are not drawn below
+ * `PIT_MIN_SCALE`, which is exactly where these begin to fade, so the two only
+ * share the screen while the names are on their way out — and it is fourteen
+ * short names across a whole council, not a label on every block.
+ */
+function drawPlaceNames(
+  context: CanvasRenderingContext2D,
+  viewport: Viewport,
+  extent: Frame,
+  palette: Palette,
+): void {
+  const opacity = placeOpacity(viewport.scale);
+  if (opacity <= 0) return;
+  const inExtent = placesIn(extent);
+  if (inExtent.length === 0) return;
+
+  context.save();
+  context.font = PLACE_FONT;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+
+  const candidates: PlaceCandidate[] = inExtent.map(({ place, at }) => {
+    const text = tracked(place.name);
+    const [x, y] = toScreen(viewport, at);
+    return { text, x, y, widthPx: context.measureText(text).width, rank: place.rank };
+  });
+
+  context.globalAlpha = opacity;
+  // Round joins, or the halo grows spikes at the points of M, N and W.
+  context.lineJoin = 'round';
+  context.lineWidth = 3.5;
+  context.strokeStyle = palette.placeHalo;
+  context.fillStyle = palette.place;
+  for (const label of placeNames(candidates, viewport)) {
+    context.strokeText(label.text, label.x, label.y);
+    context.fillText(label.text, label.x, label.y);
+  }
+  context.restore();
+}
+
 export interface DrawOptions {
   readonly palette?: Palette;
   readonly selectedPit?: number | null;
@@ -599,6 +661,7 @@ export function drawMap(
       options.comparablePits ?? null,
     );
   }
+  drawPlaceNames(context, viewport, artefact.extent, palette);
   if (viewport.scale >= LABEL_MIN_SCALE) {
     drawStreetNames(context, viewport, artefact.layers['street-name'] ?? [], palette, seen);
   }
