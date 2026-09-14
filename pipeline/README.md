@@ -25,7 +25,7 @@ py -m venv .venv                      # python3 -m venv .venv on macOS/Linux
 
 Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `stormwater-pits`, both CC BY, last modified 26 February 2023).
 
-**Full-size intermediates are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 183 KB of derived layers, 37 KB of trace topology, and 1.28 MB of scene arrays.
+**Full-size intermediates are not committed.** They are build products, they are large, and rebuilding them during a sprint would add several megabytes to the history each time. `/data` is ignored — it holds the 4.33 GB point cloud tiles and the council-wide graph. The **clipped copies for the demonstration extent are committed**, under `apps/web/public/data/`, so the frontend runs from a clone with no Python toolchain: 318 KB of map geometry, 170 KB of derived layers, 37 KB of trace topology, and 7.3 MB of scene arrays (1.37 MB gzipped) that the site no longer reads — see `scene_tiles` below.
 
 **The council extent is committed too, and separately, under `apps/api/data/city-of-melbourne/`.** Not because it is small — 6.7 MB of map, 693 KB of trace, 7.6 MB of derived layers — but because it is the API image that reads it, `/data` is in `.dockerignore` as well as `.gitignore`, and an artefact that is not in the build context cannot be copied into the image. The migration job would then apply its schema changes and load Kensington into a database that was asked for a council. Rebuild it with:
 
@@ -271,7 +271,7 @@ Comparing our per-cell D8 directions to their line bearings gives agreement *wor
 | top 0.5% of accumulation | 24.0 m | 51.3% | 30.3% |
 | top 1% | 10.0 m | 75.7% | 53.5% |
 
-So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them.
+So there is real agreement — our channels sit closer to their routes than chance — but a 1.7× lift and a 24 m median offset is "the same street, a different centreline", not a match. **This is weaker evidence than the 92.2% footprint cross-check and should not be quoted alongside it.** The interface must label surface-water paths `System-derived` and must not imply the City has endorsed them. (Since 14 September that label reads *Calculated by DrainLens*, and the layer is *Likely water paths*.)
 
 ## Recorded flood incidents — `flood_history`
 
@@ -306,7 +306,9 @@ subset.
 `--areas` writes a second file: every SA2 inside Greater Melbourne, by
 `SA2_MAINCODE_2011` and name, **with the dispatches recorded in it** — total,
 the yearly series, the regions inside it and whether any of their counts were
-withheld. Nothing in the product reads it yet.
+withheld. Nothing in the product read it when this was written; the flood map
+and the board's ranking per 1,000 residents now read the copy in
+`apps/web/public/data/`.
 
 **It is a second file rather than a longer first one, and the reason is a
 criterion.** AC 2.2.1.b caps the board at thirty locations, and Iteration 1
@@ -333,7 +335,10 @@ refuses a list where one name carries two codes for exactly that reason.
 
 ## Resident population — `population`
 
-The Severity Score's denominator, and the one stage that reads an `.xls`.
+The denominator of the rate, and the one stage that reads an `.xls`. The rate
+is defined in [SEVERITY-SCORE.md](../docs/SEVERITY-SCORE.md) as the Severity
+Score; since 14 September the site calls it *SES flood call-outs per 1,000
+residents*, and the model's identifiers keep the old name.
 
 ```bash
 ./.venv/Scripts/python.exe -m drainlens_pipeline.population   --estimates ../data/population/erp-sa2-2005-2015.xls   --areas     ../data/population/sa2-areas.json   --out       ../apps/web/public/data/population.json
@@ -360,9 +365,9 @@ estimates cover all 281 areas — by the code and by the name, agreeing on every
 one, with nothing left over on either side. What that settles, what year the
 denominator is, and why over a quarter of the areas have a total that is a
 floor rather than an exact value is in
-[POPULATION-DATA.md](../docs/POPULATION-DATA.md). **No stage here reads that
-workbook yet**; the match was measured before a stage was written, which is the
-order this repository takes sources in.
+[POPULATION-DATA.md](../docs/POPULATION-DATA.md). **The match was measured
+before any stage read that workbook** — `population` above came afterwards —
+which is the order this repository takes sources in.
 
 `fetch` checks that each download is an archive holding the file it should,
 because **data.vic's own catalogue link for this dataset is dead** and serves a
@@ -372,6 +377,33 @@ Assert the content, not the status code.
 What the data does and does not support — the reporting period, why Flood
 alone, why Greater Melbourne, and the four limitations the page has to carry
 — is in [FLOOD-HISTORY-DATA.md](../docs/FLOOD-HISTORY-DATA.md).
+
+## Where each area is drawn — `area_points`
+
+```bash
+python -m drainlens_pipeline.area_points --mid ../data/boundaries/SA2_2011_AUST.mid --mif ../data/boundaries/SA2_2011_AUST.mif --out ../apps/web/public/data/sa2-points.json
+```
+
+Six seconds. The flood map's geometry: every one of the 281 Greater Melbourne
+SA2s as its own boundary, simplified to 25 m (**19,682 vertices, 177 KB**), and
+one point inside it where the name is written — in metres from the extent's
+corner, like every other artefact here, so the map needs no projection.
+Rebuilt on 14 September from the files in `data/boundaries/`, the output is
+byte-identical to the committed copy.
+
+**Version 2 draws shapes; version 1 drew dots.** A map of Greater Melbourne
+made of 281 floating points had nothing on it to say where the bay or the city
+was. **The source is the 121 MB MapInfo `.mif`**, which is text and needs no
+new dependency; the raw boundaries stay in the git-ignored `data/`.
+
+**A centroid is not always inside its own area.** Abbotsford and Strathmore,
+both cut into crescents by a river, have theirs in a neighbour, so a point
+falls back to one on the surface and the build refuses any name outside its own
+ring. Each ring is simplified on its own, so neighbours can disagree along a
+shared edge by up to twice the tolerance; the flood map caps its zoom at
+0.05 px/m (`MAX_AREA_SCALE` in `apps/web/src/history/drawAreas.ts`) rather than
+show that. `tools/data/check-areas.mjs` holds the 281 shapes against the other
+area artefacts in CI, with each name point inside its own shape.
 
 ## The scenario engine's terrain, council-wide — `scene_tiles`
 
@@ -386,7 +418,7 @@ python -m drainlens_pipeline.scene_tiles --terrain ../data/terrain-council --map
 - **The window is chosen so the drain sits in its middle quarter** where the four tiles exist: at least 250 m of ground on every side before water leaves.
 - **Pre-gzipped**, decompressed in the worker, and served by nginx as `application/gzip` so it is not compressed twice.
 
-The Kensington scene in `apps/web/public/data/scene/` is no longer read by the site: the comparison reads `scene-tiles/`, and since 14 September the Terrain layer reads `terrain/` (below).
+The Kensington scene in `apps/web/public/data/scene/` is no longer read by the site: the comparison reads `scene-tiles/`, and the Terrain layer reads `terrain-tiles/` (below). `terrain/` now holds only `address-ground.json`.
 
 ## The map's Terrain layer, council-wide — `terrain_tiles`
 
@@ -394,7 +426,7 @@ The Kensington scene in `apps/web/public/data/scene/` is no longer read by the s
 python -m drainlens_pipeline.terrain_tiles --terrain ../data/terrain-council --map ../apps/api/data/city-of-melbourne/map.json --out ../apps/web/public/data/terrain-tiles
 ```
 
-About six minutes. Terrain V1.1 from the terrain handover, for all 211 measured 500 m tiles of the City of Melbourne, **coloured at build time and shipped as images**:
+About six minutes. Terrain V1.1 from the terrain handover — the layer the map names *Ground height* — for all 211 measured 500 m tiles of the City of Melbourne, **coloured at build time and shipped as images**:
 
 - **`Tile_*/colour.webp`**: the raw ground on the fixed AHD ramp (0, 1, 2, 3, 4, 5, 10, 20, 40 m, interpolated in OKLab — the same nodes as `apps/web/src/map/terrain.ts`), buildings in `#ceccc8`.
 - **`Tile_*/shade.webp`**: the hillshade as a multiply factor in [0.81, 1.00] (altitude 45°, vertical exaggeration 3.2, azimuths 315° × 0.55, 270° × 0.18, 360° × 0.18, 225° × 0.09), stretched between one 1st and 99th percentile for the whole council, and weakened to 40% where less than 35% of the surrounding 25 m was measured. White on buildings. The azimuth weights and the strength are the handover's trial values.
@@ -405,7 +437,7 @@ Each tile is computed on a block with 100 cells of ground around it, so gradient
 
 **The CBD's ground is not clean.** Around the tallest buildings the council ground surface reaches 50 to 110 m AHD outside the footprints, where the ground filter kept structure; the ramp clamps it at 40 m and contours there are dense. That is the terrain build's to fix, not the display's to hide.
 
-`terrain_display` and `terrain_marks` still build the same layer for a single extent, and `terrain_marks.spot_heights` is what the tiles call per block; the site no longer reads their single-extent output.
+`terrain_display` and `terrain_marks` still build the same layer for a single extent, and `terrain_marks.spot_heights` is what the tiles call per block; the site no longer reads their single-extent output. **Their `--out` still defaults to `apps/web/public/data/terrain/`**, so running either with no arguments puts the removed files — `ground.bin`, `buildings.bin`, `shade.bin`, `terrain.json`, `terrain-contours.json`, `spot-heights.json` — back beside `address-ground.json`, where nothing reads them. Give them a directory under `data/` instead.
 
 ## Which way the ground falls around each address — `address_ground`
 
@@ -420,6 +452,8 @@ Compared with the handover's own `address-insight.sample.json`, matched by id: t
 ## Built since this file was first written
 
 Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), an address index (`addresses`) with a fixture standing in for it, the recorded flood incidents (`flood_history`), and `reframe` — which moves an artefact from one extent's coordinate frame into another's, and is how the Kensington derived layers were placed on the council map.
+
+By 14 September also: the population denominator (`population`), the flood map's area shapes (`area_points`), the council-wide scenario tiles (`scene_tiles`), the Terrain layer in single-extent (`terrain_display`, `terrain_marks`) and council-wide tiled form (`terrain_tiles`), and the fall of the ground at each address (`address_ground`). Each is described above.
 
 **The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
 

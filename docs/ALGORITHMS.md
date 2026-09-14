@@ -8,13 +8,13 @@ hollows, and the browser routes rainfall over both. This document walks that
 chain and names the file and function at each step, so a question about any
 claim on screen has somewhere to land.
 
-> **The last link in this chain is not currently on screen.** The surface, the
-> flow field and the hollows are — they are what the map draws as terrain,
-> water flow and low areas. The rainfall routing on top of them belongs to the
-> drain-blockage comparison, which AC 1.1.1 requires to be absent from the
-> Iteration 1 interface. The engine, its tests and this description are all
-> intact and unchanged; what is missing is a way to reach it. See
-> [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+> **Every link in this chain is on screen again.** The surface, the flow field
+> and the hollows are what the map draws as *Ground height*, *Likely water
+> paths* and *Low areas*. The rainfall routing on top of them belongs to the
+> drain-blockage comparison, which AC 1.1.1 required to be absent from the
+> Iteration 1 interface ([ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md));
+> the engine and its tests stayed intact through that, and since 12 September
+> the comparison is offered again as *Blocked drain comparison*.
 
 **What it defers.** [pipeline/README.md](../pipeline/README.md) is the authority
 on the ground filter — the SMRF window, the building-footprint cross-check, and
@@ -46,6 +46,7 @@ point cloud → bare-earth surface → ┬→ conditioned surface → D8 flow fi
 | Find hollows | the **raw** bare-earth surface | filling is what a hollow is measured *against*; a filled surface has none left to find |
 | Route water | a **conditioned** surface | raw ground has pits and flats that trap water and stall the routing |
 | Draw the blue lines | accumulation over the conditioned surface | it is a picture of the same routing, not a second opinion |
+| Colour the ground, and say which way it falls at an address | the **raw** surface | the conditioned one has its hollows filled and its buildings raised 100 m; coloured, it would hide the low areas drawn over it |
 
 [`condition()`](../pipeline/src/drainlens_pipeline/hydrology.py) says this in its
 own docstring: *"Never hand the result to `find_depressions`. That is the
@@ -120,9 +121,37 @@ convergence.
 
 Cells above the **99.5th percentile** of accumulation are called channel, traced
 from each head downstream, and simplified with Douglas–Peucker at a 1 m
-tolerance. These are the *Likely surface water paths* layer, labelled
-**System-derived** on screen — they are not a council dataset and the interface
-never implies they are.
+tolerance. These are the *Likely water paths* layer, labelled
+**Calculated by DrainLens** on screen — they are not a council dataset and the
+interface never implies they are. (Until 14 September the button read *Water
+flow*, the legend *Likely surface water paths* and the label *System-derived
+result*.)
+
+**The arrows on those lines point the way the water goes, and that was
+checked on the whole of both artefacts, not a sample.** Douglas–Peucker drops
+vertices and never reorders them, so each vertex of a path should be reachable
+from the one before it by following the flow field. On 14 September every
+vertex of all 38 Kensington paths and all 990 council paths was, against
+`flow-direction.npy` from the terrain build each came from; the same walk
+over the paths reversed failed on every one. `test_never_runs_uphill` in
+`pipeline/tests/test_derived.py` holds the property for new builds.
+
+### Which way the ground falls at an address — `address_ground.py`
+
+Not part of the water chain, and deliberately so. For each of the 4,089
+addresses a plane is fitted to the **raw** ground within `FIT_RADIUS_M = 75` m,
+weighted 0 on buildings, 0.35 on interpolated open ground and 1 on measured.
+The plane's downhill direction is given as one of eight compass points only
+when the fall across 150 m is at least 0.5 m, R² is at least 0.30, at least
+35% of the weight is measured, and the 75 m and 100 m fits agree within 22.5°
+— the width of an octant. Otherwise the answer is *unclear*, or *edge* where
+the disc runs off the measured ground: 1,982 falls, 1,640 unclear and 467 edge
+in `apps/web/public/data/terrain/address-ground.json`.
+
+It is a trend over an area about 150 m across, not a path water takes; the
+module's docstring records why the two answer different questions.
+[pipeline/README.md](../pipeline/README.md) has the comparison with the terrain
+handover's sample.
 
 ---
 
@@ -203,6 +232,13 @@ chosen blockage, once with every drain clear. The output is the set of cells
 where the blocked run holds more than the baseline by more than
 `noticeableVolumeM3 = 0.05` m³. Absolute depth is never reported — AD7, and the
 result screen says so in its own words.
+
+**The two bands keep their identifiers and changed their words.** In code they
+are still `higher-than-baseline` and `no-clear-change`; since 14 September the
+screen calls them *More water than with a clear drain* and *No clear
+difference* (`apps/web/src/scenario/outcome.ts`). The measurements below are
+dated records and use the words of their day: *higher than baseline* is the
+first band and *no clear change* the second.
 
 ---
 

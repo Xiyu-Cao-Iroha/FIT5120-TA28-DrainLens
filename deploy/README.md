@@ -2,11 +2,13 @@
 
 **Live:** https://drainlens-205559161217.australia-southeast1.run.app — **Iteration 1, and holding there.** From 10 September 2026 this URL is the *published iteration* rather than the newest good code: it serves `iteration-1-frozen`, and Iteration 2 goes to `drainlens-dev` until it is finished. See [Preserving each iteration](#preserving-each-iteration).
 
-**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four of its five artefacts from it**, falling back to the copies in this container when it cannot answer — so a change to the API does not need the site redeployed, and the API being stopped does not take the site down.
+**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four artefacts from it** — the map, the derived layers, the drainage graph and the flood board — falling back to the copies in this container when it cannot answer, so a change to the API does not need the site redeployed, and the API being stopped does not take the site down. Everything else the site reads comes only from this container.
 
-Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty-four static files** — fifteen artefacts, the hero photograph, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. This container runs no application server of its own: everything it serves is a build product, and the scenario engine — when it is reachable at all — runs in the browser. Since 5 September the *browser* also reads four of those artefacts from the API instead, and the files here are what it falls back to.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving what `apps/web/public` holds plus `index.html` and the hashed bundles. **On `develop` on 14 September that is 1,927 public files**, not the two dozen this line counted until 12 September, because the council's two tile packs are static files too: **1,267 under `data/scene-tiles/`** (211 scenario tiles of five gzipped arrays and a `tile.json` each, and an index naming the 9,239 drains that have a calculation window) and **636 under `data/terrain-tiles/`** (211 terrain tiles of a colour image, a shade image and `marks.json`, an index, and the two overview images). The rest are nine top-level JSON artefacts, `data/terrain/address-ground.json`, the seven files of `data/scene/`, two photographs, the self-hosted font with its licence and README, `quality.html` and `robots.txt`. This container runs no application server of its own: everything it serves is a build product, and the scenario engine runs in the browser.
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
+
+> **That paragraph is the Iteration 1 build the root still serves, and `develop` has moved on from it** (14 September 2026, read from the source rather than a network panel). The homepage still takes the same five JSON artefacts. The map no longer reads `data/scene/` at all: it takes the terrain index and the two 4 m overview images (373 KB and 397 KB), then 500 m tiles as the view reaches half a pixel per metre, and `address-ground.json` (467 KB). The flood map, and the board's per-1,000-residents ranking, add `sa2-areas`, `population`, `sa2-points` and `flood-events`. The comparison is reachable again and reads `data/scene-tiles/`. **So the seven files of `data/scene/`, 7.3 MB, are read by nothing on `develop`** — still published, and a candidate for removal rather than a thing to measure.
 
 Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. **That last one is the last.** Iteration 1 was frozen on 8 September and Iteration 2 began on 10 September, so this service is not redeployed again until Iteration 2 is complete. Everything below was run, not planned, and every command was run by the team on their own machine.
 
@@ -68,6 +70,8 @@ The map tour now opens once for a visitor who has not been shown it, which is th
 ### 5 September, later still: the site reads the database
 
 The map, the derived layers, the drainage graph and the flood board are fetched from the API. Each falls back to the copy in this container if the API cannot answer, and the footer of every screen names which source answered — see [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md) and `apps/web/src/data/source.ts`.
+
+> **On `develop` from 14 September the footer no longer names the source when the database answers.** The copy review removed *"Served from the DrainLens database."* along with the other two variants. What remains is the case a visitor can be misled by: when the map is the bundled Kensington copy, the footer says *"The full council map is not available right now, so this map shows only one square kilometre of Kensington."* (`SMALLER_MAP` in `ui/Shell.tsx`). **On a dev deployment the check below therefore changes shape:** the database is load-bearing when that line is *absent* and the map reaches beyond Kensington, which is an absence, and an absence is only evidence once you have seen the line appear with the API stopped. The root and the archive still serve the Iteration 1 footer, and the row below still describes them.
 
 **The API was deployed first, deliberately.** In the other order the site's first request is refused by CORS, it falls back to its bundled copies, and the result looks exactly like a working deployment that is not using the database.
 
@@ -189,6 +193,15 @@ naming it is more use than naming a commit.
 > holds. The deployed revision belongs here because a container cannot be asked;
 > the branch does not, because it can. This is the same lesson as the test
 > counts three files away, arrived at from the other direction.
+
+> **14 September: not re-checked, and "the only thing behind" is the part that
+> has gone stale.** Whether `drainlens-dev` still serves `8cd079b` is a question
+> for `gcloud run services describe drainlens-dev`, run by the team, and nothing
+> since has been recorded here. If it does, the comparison is no longer the only
+> user-visible difference: the council terrain tiles with contours and spot
+> heights, the address insight, the suburb names, the flood map's area shapes
+> and checked events, the board's per-1,000-residents ranking and the copy pass
+> all merged into `develop` afterwards.
 
 ```bash
 gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
@@ -621,6 +634,8 @@ Verified against the live URL, not only locally.
 | **`/data/*` returns 404** | A missing artefact 404s | Otherwise the single-page rewrite returns `index.html`, which reaches `assertUsable` as a parse error rather than as a missing file. |
 
 The content types are set with a `types` block, not `add_header`. `add_header` **appends**, so the first version sent every response with two `Content-Type` headers — caught by `curl -I` before it went anywhere.
+
+**Two types have been added since, and neither has been checked against a deployed URL.** `application/gzip` for the scenario tiles, which the pipeline gzips once and the worker decompresses, and `image/webp` for the terrain tiles. Neither type is in `gzip_types`, and that is the point: both are already compressed, and nginx should send them as they are rather than compress compressed bytes again. The table above was verified live; these two types are only configuration until somebody runs `curl -sI` against a tile on a deployment that carries them.
 
 ---
 

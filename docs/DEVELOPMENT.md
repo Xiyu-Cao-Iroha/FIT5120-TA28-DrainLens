@@ -18,7 +18,7 @@ There are **two toolchains**: Node for `packages/` and `apps/`, Python for `pipe
 
 ## First-time setup
 
-### Node side — schema, and later the web and api apps
+### Node side — schema, scenario, and the web and api apps
 
 ```bash
 git clone https://github.com/Xiyu-Cao-Iroha/FIT5120-TA28-DrainLens.git
@@ -62,6 +62,8 @@ From the repository root:
 | `npm run coverage` | Suite plus coverage, with thresholds enforced |
 | `npm run typecheck` | TypeScript across every workspace |
 | `npm run check` | Typecheck then coverage — **run this before opening a pull request** |
+| `npm run test:db` | The suite that needs Postgres, which `npm test` leaves out. Start one first with `docker compose -f db/docker-compose.yml up -d` |
+| `node tools/data/check-*.mjs` | The published-artefact checks CI runs, one script at a time — worth running after rebuilding any artefact |
 
 From `pipeline/`:
 
@@ -92,22 +94,27 @@ Source exports come from the City of Melbourne Open Data Portal (`drainpipes`, `
 
 The build prints a summary and compares it against the figures in the Epic 1 data audit. **Drift is reported, not fatal** — the rules live in this repository and may legitimately change, but a change should never pass unnoticed. If you see drift you did not expect, stop and work out why before building on top of it.
 
-That builds the council-wide graph. The artefacts the browser actually loads are built separately, and each writes straight into `apps/web/public/data/`:
+That builds the council-wide graph. The artefacts the browser actually loads are built separately, and the block below is the outline rather than the invocations. **Not every stage writes where it is published by default**: `network`, `addresses`, `derived`, `trace` and `scene` write under the ignored `/data` unless given `--out`, while the later stages default to their published paths. Pass `--out` and check the path before committing.
 
 ```bash
-./.venv/Scripts/python.exe -m drainlens_pipeline.network   # map.json
-./.venv/Scripts/python.exe -m drainlens_pipeline.terrain   # the ground surface and hydrology
-./.venv/Scripts/python.exe -m drainlens_pipeline.derived   # derived.json
-./.venv/Scripts/python.exe -m drainlens_pipeline.trace     # trace.json
-./.venv/Scripts/python.exe -m drainlens_pipeline.scene     # scene.json and the .bin arrays
-./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   # flood-history.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.network         # map.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.terrain         # the ground surface and hydrology, under /data
+./.venv/Scripts/python.exe -m drainlens_pipeline.derived         # derived.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.trace           # trace.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.scene           # Kensington's scene/, which the site no longer reads
+./.venv/Scripts/python.exe -m drainlens_pipeline.scene_tiles     # scene-tiles/, the comparison's terrain, council-wide
+./.venv/Scripts/python.exe -m drainlens_pipeline.terrain_tiles   # terrain-tiles/, Ground height, council-wide
+./.venv/Scripts/python.exe -m drainlens_pipeline.address_ground  # terrain/address-ground.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.flood_history   # flood-history.json, and sa2-areas.json given --areas PATH
+./.venv/Scripts/python.exe -m drainlens_pipeline.population      # population.json
+./.venv/Scripts/python.exe -m drainlens_pipeline.area_points     # sa2-points.json
 ```
 
-Order matters for two of them: `derived` and `trace` both read what earlier stages wrote.
+Order matters: everything that reads the ground runs after `terrain`, `trace` reads the map, and `population` reads the area list `flood_history --areas` wrote. `flood-events.json` has no stage at all — it is written by hand, and `tools/data/check-events.mjs` holds it against the map's areas. The full commands — the council-wide ones, and the source files `population` and `area_points` require — are in [pipeline/README.md](../pipeline/README.md).
 
 ### Which extent
 
-`network`, `addresses` and `derived` take `--extent`, and it names a **published** extent rather than four numbers:
+`network`, `addresses` and `derived` take `--extent`, and it names a **published** extent rather than four numbers. `fetch_tiles` and `terrain` spell the same thing `--name`, because their `--extent` is still the four numbers:
 
 ```bash
 ./.venv/Scripts/python.exe -m drainlens_pipeline.network --extent city-of-melbourne
@@ -115,14 +122,14 @@ Order matters for two of them: `derived` and `trace` both read what earlier stag
 
 | Name | Size | What it is |
 |---|---|---|
-| `kensington` | 1 × 1 km | The Iteration 1 demonstration extent. The default, and what everything ships from today |
-| `city-of-melbourne` | 8.5 × 9 km | Everywhere the council publishes a drainage record |
+| `kensington` | 1 × 1 km | The Iteration 1 demonstration extent. The default, the copy bundled with the site, and the only extent the address index covers |
+| `city-of-melbourne` | 8.5 × 9 km | Everywhere the council publishes a drainage record. What the database serves, and what the scenario and terrain tiles are cut from |
 
 Both live in `geo.py`'s `EXTENTS`, and `resolve_extent` is shared so four builders cannot come to spell the same extent differently. **An unknown name exits rather than falling back** — a build that quietly produced Kensington when it was asked for the council is a build whose output nobody can tell apart from the right one. `network` also keeps `--bounds MIN_E MIN_N MAX_E MAX_N` for a one-off that is not published under a name; that used to be spelled `--extent`.
 
 > **`city-of-melbourne` was measured, not drawn around the LGA boundary** — the same method that chose Kensington, and for the same reason: the extent that matters is where the *data* is. All 21,113 pits in the council-wide graph carry a position and span 7,971 × 8,237 m; the extent is that rounded outward onto the point cloud's 500 m tile grid.
 >
-> **It is a 76.5 km² box holding 65.7 km² of data.** Only 56 of its 72 square kilometres contain a pit at all — the Yarra, the parks, and land the council does not drain — and it touches **306** tiles where the archive holds 215. A terrain build over it will not find a tile for every square, and that is a fact about the city rather than a missing download. Density is not uniform either: the median occupied square kilometre holds 225 pits and the densest holds **1,905**, against Kensington's 895. Anything that draws every pit at once needs to know that before it is asked to draw the CBD.
+> **It is a 76.5 km² box holding 65.7 km² of data.** Only 56 of its 72 square kilometres contain a pit at all — the Yarra, the parks, and land the council does not drain — and it touches **306** tiles where the archive holds 215. A terrain build over it will not find a tile for every square, and that is a fact about the city rather than a missing download. *(13 September 2026: the build found 211 of the 306, and not one of the council's pits or pipes lies in the other 95.)* Density is not uniform either: the median occupied square kilometre holds 225 pits and the densest holds **1,905**, against Kensington's 895. Anything that draws every pit at once needs to know that before it is asked to draw the CBD.
 
 `flood_history` is the exception to the pattern: it fetches its own two sources rather than reading what an earlier stage left on disk, because neither is a local export. Give it `--incidents` and `--geography` to build from files you already have — both or neither, so a published file is never silently mixed with a local one. See [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md) for what the sources are and what they do and do not support.
 
@@ -134,8 +141,10 @@ See [pipeline/README.md](../pipeline/README.md) for what each stage does and the
 
 **Never push to `main`.** Every change goes through a pull request with written technical feedback from another team member. This is a commitment the team made in its Week 4 KPI assessment and it is assessed.
 
+**Branch from `develop`, and open the pull request into `develop`.** Since 10 September `main` is the published iteration rather than the newest good code: it holds at `iteration-1-frozen` for the whole of Iteration 2, and `git rev-parse origin/main` must stay `138a002`. A pull request into `main` is the mistake to watch for, because it was the habit for a fortnight — see [deploy/README.md](../deploy/README.md#preserving-each-iteration).
+
 ```bash
-git checkout main
+git checkout develop
 git pull
 git checkout -b feat/short-description       # or fix/, docs/, chore/
 # ... work, committing as you go ...
@@ -143,7 +152,7 @@ npm run check                                 # and pytest, if you touched pipel
 git push -u origin feat/short-description
 ```
 
-The push prints a link that opens the pull request. In the description, say what changed and why, and **name the acceptance criterion the change serves** — `1.2.2.d`, `2.1.2.e`, and so on, from [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md). A change that serves no criterion is worth a conversation before it is worth a review.
+The push prints a link that opens the pull request. In the description, say what changed and why, and **name the acceptance criterion the change serves** — `1.2.2.d`, `2.1.2.e`, and so on, from [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md), or during Iteration 2 from [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md). A change that serves no criterion is worth a conversation before it is worth a review.
 
 ### Commit messages
 
@@ -180,19 +189,20 @@ It happens; do it in this order.
 
 ## Quality gates
 
-CI runs on every pull request and both jobs must pass. The thresholds live in configuration, not in prose, so they move with the code.
+CI runs on every pull request and all three jobs must pass: `check` (Node), `pipeline` (Python) and `database` (the suite that needs Postgres, against a service container). The thresholds live in configuration, not in prose, so they move with the code.
 
 | Gate | Where it is set | Value |
 |---|---|---|
 | Node coverage, overall | `vitest.config.ts` | 88% |
 | Node coverage, `packages/schema` | `vitest.config.ts` | 90% |
-| Node coverage, `packages/scenario` | `vitest.config.ts` | 90% — **currently 90.84%, so the margin is about four statements**. A defensive branch added here without a test to reach it can fail the build on its own |
+| Node coverage, `packages/scenario` | `vitest.config.ts` | 90% — **was 90.84%, a margin of about four statements**, when this row was written; 98.08% of lines and 96.08% of branches on 14 September 2026. The margin is wider, and a defensive branch without a test to reach it still counts against it |
 | Python coverage | `pipeline/pyproject.toml` | 90% |
 | Suite runtime | not automated — watch it | under 5 s. **On the CI runner: Node 5 s in all three samples, which is at the limit, and Python 51–67 s, which breaches it.** Locally 3.6 s and 105 s — different hardware, so quote the one you mean. See the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
-| Markdown structure | `node tools/docs/check.mjs` | stray table rows, ragged rows, unclosed fences, broken relative links |
+| Markdown structure | `node tools/docs/check.mjs` | stray table rows, ragged rows, unclosed fences, broken relative links, and a raw NUL byte in any tracked text file |
+| Published artefacts | `node tools/data/check-*.mjs`, six scripts | a recorded inlet with a path onward within 200 m of every address the guide can be given, the area files against each other, both copies of the derived layers, the scenario and terrain tile packs against their indexes, and the verified flood events against the map's areas |
 
-> **`apps/web/dist` locally is not what ships.** `npm run typecheck` is `tsc --build`, which emits a `.js`, `.d.ts` and `.map` for every source file into the same `dist` Vite writes to — 130 files locally against the 14 the site serves. The container never sees them: the Dockerfile runs only `npm run build`. Confirmed against the live site, where `/map/draw.js` returns the single-page fallback as `text/html` rather than a script. Do not read a local `dist` listing as the deployed file list.
+> **`apps/web/dist` locally is not what ships.** `npm run typecheck` is `tsc --build --force`, which emits a `.js`, `.d.ts` and `.map` for every source file into the same `dist` Vite writes to — 130 files locally against the 14 the site serves. The container never sees them: the Dockerfile runs only `npm run build`. Confirmed against the live site, where `/map/draw.js` returns the single-page fallback as `text/html` rather than a script. Do not read a local `dist` listing as the deployed file list.
 
 If a test would push the suite past five seconds, it belongs behind a separate script rather than in this run.
 
@@ -202,10 +212,16 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 Cloud Run: https://drainlens-205559161217.australia-southeast1.run.app. The runbook, the two mistakes made getting there, and the verification that asserts the absence of stored IPs are in [deploy/README.md](../deploy/README.md).
 
+**During Iteration 2 the only service that is redeployed is `drainlens-dev`**, built from `develop`. The root service serves `iteration-1-frozen` until Iteration 2 is finished, and `drainlens-iteration1` is never touched. Firebase Hosting is not an option: it was rejected by the teacher before anything was deployed.
+
+A deployment is run by hand, from a terminal on the project, by the team member holding its credentials — never from CI, and never by a script or an automated session acting on its own:
+
 ```bash
-# From the repository root. --source looks for ./Dockerfile and nothing else.
-gcloud run deploy drainlens --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=3
+# From the repository root, on develop. --source looks for ./Dockerfile and nothing else.
+gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
 ```
+
+The command that once stood here deployed the root service with `--max-instances=3`. Run today, it would replace Iteration 1 at the one URL that is meant to stay put.
 
 ---
 
@@ -231,9 +247,12 @@ The "before" figures are in [DEPLOYMENT-BASELINE.md](./DEPLOYMENT-BASELINE.md), 
 packages/schema     shared definitions — provenance, vocabularies, scenario, wire payloads
 packages/scenario   scenario engine — routing, depressions, drains, comparison. No DOM
 apps/web            frontend (React + Vite) — session state, canvas map. No map library
-apps/api            backend (Node + Hono on Cloud Run)                       not yet started
+apps/api            backend (Node + Hono on Cloud Run) — read-only API over Postgres
+db                  the database migrations, and a local Postgres for npm run test:db
 pipeline            Python geospatial pipeline and model training, never deployed
 tools/perf          the deployment measurement, run identically before and after
+tools/data          checks that published artefacts still agree with each other, run in CI
+tools/docs          the markdown structure and source-encoding check, run in CI
 deploy              the Cloud Run runbook and the nginx configuration
 data                full-size intermediates — git-ignored, rebuilt locally
 docs                iteration scope, acceptance criteria, interface contract, this guide

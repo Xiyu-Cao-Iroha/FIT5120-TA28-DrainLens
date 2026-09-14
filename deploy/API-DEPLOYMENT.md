@@ -6,9 +6,11 @@ Deployed **5 September 2026**. This file was written as a runbook before any of 
 
 A second Cloud Run service, `drainlens-api`, over a Cloud SQL for PostgreSQL instance. Five `GET` routes returning the artefacts the frontend already accepts, rebuilt from rows. Same project `fit5120-504507`, same region `australia-southeast1`, same log exclusion — that last one has to be *verified*, not inherited by assumption, and step 2 is where.
 
-**The site reads four of its five artefacts from here**, and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. The footer of every screen says which source answered. See `apps/web/src/data/source.ts`.
+**The site reads four artefacts from here** — the map, the derived layers, the drainage graph and the flood board — and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. See `apps/web/src/data/source.ts`.
 
-The address index is the fifth artefact and stays bundled, deliberately and permanently.
+**What the footer says depends on the build.** The Iteration 1 build that `drainlens` and `drainlens-iteration1` serve names the source on every screen. On `develop` since 14 September it speaks only when the answer changes what a visitor sees: when the map is the bundled Kensington copy, the footer says *"The full council map is not available right now, so this map shows only one square kilometre of Kensington."* When the database answers, it says nothing about where the map came from.
+
+The address index stays bundled, deliberately and permanently. So does everything the site has gained since the four — the area shapes, population, checked flood events, address insight and both council tile packs are static files in the site's container, and nothing here serves them.
 
 ---
 
@@ -237,6 +239,8 @@ Read the execution log before continuing. It prints a line per table, and the nu
 
 A second execution prints `schema  already current` and the same table counts: the migrations are skipped once recorded and the load is a truncate-and-insert.
 
+> **That block is 5 September's, and `load.test.ts` no longer asserts all of it** (checked 14 September 2026). Migration **004** holds every area in the scope rather than the board's thirty, and the load now fills `population` as well. Against the same Kensington artefacts the test asserts `derived_shape` **362**, `flood_area` **1,686**, `flood_area_coverage` **281** of which thirty carry a `board_rank`, and `population` **1,967**. The pits, pipes, roads, labels and trace rows are unchanged. `/health` still reports `areas` as thirty, because it counts the ranked rows rather than the table, and adds `scopeAreas` for the 281 — `loaded()` in `queries.ts` says why a number that silently changed meaning would have been worse. Read the job's own log against the test, not against this block.
+
 Then the service:
 
 ```bash
@@ -302,6 +306,8 @@ Two extents are published. **The database holds exactly one**, and changing whic
 
 1.3 MB as git objects, paid once per rebuild of the council extent. Everything else under `/data` — including the 4 GB point cloud — stays ignored.
 
+> **The `derived.json` row is 11 September's.** Since 13 September the council's derived layers are no longer Kensington's reframed: they are calculated over the whole extent wherever the point cloud has a tile — 211 of the 306 — and the file is **7.7 MB**, holding 990 water-path, 14,926 low-area and 824 limited-ground shapes, with the 95 missing tiles listed in the artefact itself. `tools/data/check-derived.mjs` checks it against its own extent in CI. The database load grows with it, from the 394 derived shapes in the log below to 16,740, and **whether `--memory=1Gi` and `--task-timeout=30m` below still hold for that load has not been measured against Cloud SQL.** The git-object figure above has not been re-measured either.
+
 ### `--replace`, and why it is not the default
 
 The two extents **overlap**: Kensington is a square kilometre inside the council, and its 895 pits are 895 of the council's 21,113 under the same `asset_number`, which is a global primary key. Loading either one into a database holding the other fails on `pit_pkey` — **in both directions**. The load deletes the extent it is *loading*, so it leaves the one that is in the way; that was measured, not reasoned about, after the reasoning got the direction wrong.
@@ -321,6 +327,8 @@ Failing this way is safe: migrations 002 and 003 have already been applied and r
 ### The sequence
 
 Migrations **002** and **003** are new since the first deployment and are applied by the same job. 003 is the one that matters for the council: `pipe.ref` was a primary key because the sample had no duplicates, and council-wide **85 of 17,242 pipes carry no `ref` at all and one `ref` is used twice**.
+
+**Migration 004 arrived on 12 September**, after the deployment recorded below: `db/migrations/004_scope_areas.sql` widens the flood tables from the board's thirty areas to all 281 and keeps the thirty as the rows carrying a `board_rank`. The next execution of the job applies it the same way. Nothing on this page records that execution against Cloud SQL, so the counts in the logs below are from before it.
 
 Build the image at the commit being deployed — on `develop` for Iteration 2, not `main`, which is frozen:
 
@@ -460,7 +468,7 @@ Nothing about the frontend deployment. The site asks the API for `city-of-melbou
 | | |
 |---|---|
 | **AD1** | No log entry from either service carries a client address, and the positive control shows that logging is happening at all |
-| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
+| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so — on a `develop` build, the line that the full council map is not available and the map shows one square kilometre of Kensington. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
 | **CORS names the site, not `*`** | `allowedOrigins()` lists the site and the dev server. Nothing here is secret and no request carries a credential, so `*` would leak nothing — but a list is easy to widen later and impossible to narrow once something unknown depends on it |
 | **`FORBIDDEN_WIRE_KEYS`** | Still nothing on the wire that names a person. Every route is a `GET` with no body; there is no path that could carry one |
 | **The database is derived** | Nothing is written here that is not in the repository. If that stops being true — Epic 4's drain checks would be the first — this document is wrong and `--no-backup` is wrong with it |

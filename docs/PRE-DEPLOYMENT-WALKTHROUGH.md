@@ -10,6 +10,16 @@ This document exists for one purpose: help any member of the team, asked to open
 
 > **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
 
+> **14 September 2026: that redeployment happened, and `develop` has gone further.** The live root has served `iteration-1-frozen`, the 7 September build, since that day, so the three places above are out of date on the live URL too. The sheet is kept as the 1 September record; these are the answers in it that are no longer true of the code on `develop`:
+>
+> | Section | What it says | Now |
+> |---|---|---|
+> | 2, 8 | There is no request; `apps/api` and `models/` are empty | `apps/api` is a service over Postgres since 5 September, and the map, derived layers, trace and flood board are asked of it first — see [deploy/API-DEPLOYMENT.md](../deploy/API-DEPLOYMENT.md). There is no `models/` directory at all. The address index still never leaves the browser |
+> | 5 | The browser loads `scene.json` and the `*.bin` arrays | The map's ground is pre-coloured 500 m terrain tiles with contours and spot heights (`map/terrainTiles.ts`), and the comparison reads `data/scene-tiles/`. Nothing reads `data/scene/` |
+> | 5 | Tiling is not needed and has not been built | Built for the whole City of Melbourne: 211 terrain tiles and 211 scenario tiles, under `data/terrain-tiles/` and `data/scene-tiles/` |
+> | 4.8 | *No clear change*, *Higher than baseline* | On screen, *No clear difference* and *More water than with a clear drain*. The identifiers `no-clear-change` and `higher-than-baseline` are unchanged |
+> | 7 | The test and coverage figures | Dated to their columns. Current figures are in the root [README.md](../README.md), dated there |
+
 ---
 
 ## 1 · The system in sixty seconds

@@ -101,6 +101,8 @@ AC 4.1.6 asks for three states. The match settles how many of them this data can
 | No recorded activity | 4 | **0** |
 | Not available | — | **7** |
 
+**On screen the states have plainer names since 14 September** (#144): *Complete published total*, *Minimum total*, *No recorded call-outs* and *Not available*, and an area without a score says *No rate*. The states and the counts above are unchanged.
+
 **Every area with no recorded activity is an area with no score.** All six — two airports, a racecourse, two industrial areas and Melbourne Airport — have under 200 residents, so the severity map never shows a *no recorded activity* area at all, while the activity map shows six. A legend shared between the two modes would offer, in each mode, a state that mode cannot produce.
 
 ---

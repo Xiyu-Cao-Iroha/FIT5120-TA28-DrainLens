@@ -10,6 +10,8 @@ What "done" means for Epic 3 and Epic 4. The work that produces it is in [ITERAT
 
 **134 sub-criteria: 56 in Epic 3, 78 in Epic 4.** Iteration 1 had 96.
 
+**The notes under each criterion were written on 11 September, before the work**, and are kept as the plan they were. Several say *nothing here is built* or *does not exist yet* about things that now do: what is built is in *Where this stands*, and the names the site now uses for the criteria's own terms are in *Names on screen*.
+
 ---
 
 ## The one measurement that shapes this iteration
@@ -61,11 +63,40 @@ What must not happen is the one change that would make the screen look better an
 | **4.3.1–4.3.4** | Every evidence sentence, with its numbers read from the artefacts — **80 of the 281 areas** hold a withheld count, 7 have no score — and three marks for three kinds of information | #132 |
 | **4.2.1–4.2.3** | `flood-events.json`, four events with two or three sources each. **None is shown until a team member checks it** and fills in `checkedBy` and `checkedOn`; until then every area shows the 4.2.3 empty state | #133 |
 
+### Since then, 14 September
+
+| | What changed | PR |
+|---|---|---|
+| **4.1.1**, **4.1.2** | The areas are drawn as their ASGS 2011 boundaries, simplified to 25 m — 19,682 vertices in `sa2-points.json` version 2 — rather than as marks at a point each. Dots on an empty ground gave no sense of where anything was. The map stops zooming in at 20 m per pixel, and `check-areas.mjs` asserts every name point lies inside its own shape | #136 |
+| **4.2.2.a** | **One event is checked and shown**: the Maribyrnong River flood of October 2022, signed off on 14 September, so Maribyrnong, Kensington and Ascot Vale now show it. The other three are still waiting, and `check-events.mjs` reports *1 checked and shown, 3 waiting* | #137 |
+| Names | The copy review renamed what a resident reads, including terms the criteria use — *Severity Score* among them. See *Names on screen* below | #144 |
+| **4.1.3**, **4.3.2** | The flood history board ranks either by call-outs or by call-outs per 1,000 residents, over the 274 areas that have a rate, with *How the rate is calculated* folded beneath the list | #145 |
+
 ### Still needs a person
 
-- **4.2.2.a** — a team member to open every source of the four drafted events and sign them off. Nothing in code can do this, which is the point of it.
-- **Deploy #128–#133** to `drainlens-dev`, then walk both journeys in a browser and tick what is seen.
+- **4.2.2.a** — a team member to open every source of the **three** drafted events still unchecked and sign them off. Nothing in code can do this, which is the point of it.
+- **Deploy `develop`** to `drainlens-dev`, whose last deploy recorded in this repository is `8cd079b` from 11 September ([deploy/README.md](../deploy/README.md)); a later redeploy is not written down anywhere, so check the running revision before assuming #128–#146 are on it — then walk both journeys in a browser and tick what is seen.
 - Desk check 2, and the rehearsal decision on leading with *No clear change* (DECISIONS-PENDING.md §1).
+
+---
+
+## Names on screen — the criteria's words and the site's
+
+**The criteria below are quoted from *Iteration 2 Requirements* and are not reworded.** The copy review of 14 September (#144) gave each thing one plain name, held in `apps/web/src/ui/terms.ts`, and several of those names differ from the words the criteria use. Tick a criterion against the thing it describes, under the name the site now gives it. `ui/terms.test.ts` fails if *Severity Score* appears in the site's source again, so it will not be found on screen.
+
+| The criteria say | The site says | Held in |
+|---|---|---|
+| *Historical Flood Activity* mode | *Recorded SES flood call-outs* | `FLOOD.callouts` |
+| *Severity Score* mode, and the score | *SES flood call-outs per 1,000 residents*; the value is written with the unit *call-outs per 1,000 residents* | `FLOOD.rate`, `FLOOD.rateUnit` |
+| SES crew dispatch | *call-out* — "one SES crew response, not one flood event" | `FLOOD.unit` |
+| *Exact* / *Minimum value* / *Not available* (4.1.6.a) | *Complete published total* / *Minimum total* / *Not available*, and *No recorded call-outs* for a complete zero | `completenessText` in `history/severity.ts` |
+| An area with no score | *No rate* | `scoreLabel` in `history/severity.ts` |
+| *Higher than baseline* / *No clear change* | *More water than with a clear drain* / *No clear difference* | `BANDS` in `scenario/outcome.ts` |
+| The all-clear baseline | The clear-drain setting | `scenario/outcome.ts` |
+| Accumulated rainfall | *Total rainfall* | `TOTAL_RAINFALL` |
+| Recorded source data / system-derived information / user-selected assumptions (3.3.1.d) | *Council record* / *Calculated by DrainLens* / *Your setting* | `SOURCE` |
+
+**Only what is displayed changed.** Code identifiers keep the old names — the map mode `'severity'`, the band key `'no-clear-change'`, the field `rate` — so a search of the source for a criterion's term still finds the code that serves it.
 
 ---
 
@@ -489,6 +520,8 @@ Four items, and three of them are data rather than code. Each blocks criteria th
 
 **And one decision already open:** [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md), where the measured ground stops on a council-wide map — deferred to 13 September, and AC 3.3.2.i cannot be closed before it is taken.
 
+> **14 September: all four exist, and the decision is taken.** The boundaries are the 2011 edition, in `sa2-points.json` version 2; the population is `population.json`, 281 of 281 areas matched ([POPULATION-DATA.md](./POPULATION-DATA.md)); four events are drafted in `flood-events.json` and one is checked; and the rainfall levels are `VALIDATED_RAINFALL_LEVELS_MM`, 20, 40 and 60 mm. §8 was decided on 13 September by measuring the rest of the council. What remains is people rather than data — *Still needs a person*, above.
+
 ---
 
 ## UI definition of done
@@ -507,6 +540,8 @@ Behaviours the criteria express through state retention rather than as buttons, 
 ## Wording to hold on the day
 
 Everyone who speaks about the product holds these. They are what the criteria above commit us to, and nothing further.
+
+**Say what the screen says.** Since 14 September the site calls a dispatch a *call-out*, the Severity Score *SES flood call-outs per 1,000 residents*, and *No clear change* *No clear difference* — *Names on screen*, above. The meaning of each line below is unchanged.
 
 - Not a flood warning, not a forecast, not an engineering assessment.
 - **The blockage is an assumption somebody chose. The rainfall is an input somebody chose.** Neither is an observation, and neither is a forecast.

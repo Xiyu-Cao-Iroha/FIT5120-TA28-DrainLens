@@ -8,6 +8,8 @@ What to do. Every task names the criterion it serves in [ITERATION-2-ACCEPTANCE.
 
 **The critical path is W1, and it is data.** Epic 3 is largely built and needs one engine change and a route back into the interface. Epic 4 needs a map of Greater Melbourne, a population dataset and a set of verified events, none of which are in the repository — and two of those three cannot be started by writing code.
 
+> **14 September: all three are in the repository now** — the boundaries in `sa2-points.json`, the population in `population.json`, four drafted events in `flood-events.json` with one checked. The critical path has moved from data to people: three events to check, a deployment, and the desk checks.
+
 ---
 
 ## Where Iteration 2 starts from
@@ -17,8 +19,8 @@ Iteration 1 is frozen and serving. `origin/main` stays at `138a002` for the whol
 **Already delivered during the Iteration 1 to 2 gap**, and relevant to what follows:
 
 - **The map is the whole City of Melbourne** when the database answers — 21,113 pits and 17,242 pipes against Kensington 895 and 893 — with the container copy as the fallback. The API serves it compressed.
-- **A guided tutorial** on the real map, with the four-card chooser behind *Get started* and the whole map behind an unlock.
-- ~~**The terrain, derived layers and scenario engine still cover the Kensington square kilometre only.**~~ **Since 13 September they cover the council**: 211 point-cloud tiles, every one the archive has (#125, #127), and the comparison runs around any of the 9,239 inlets (#130). [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md) records how.
+- **A guided tutorial** on the real map, with the four-card chooser behind *Get started* and the whole map behind an unlock. Since 14 September the unlock is a notice that opens at once; the five-second countdown in front of it was removed in the copy review (#144).
+- ~~**The terrain, derived layers and scenario engine still cover the Kensington square kilometre only.**~~ **Since 13 September they cover the council**: 211 point-cloud tiles, every one the archive has (#125, #127), and the comparison runs around any of the 9,239 inlets (#130). [DECISIONS-PENDING.md §8](./DECISIONS-PENDING.md) records how. **Since 14 September the ground height itself is drawn council-wide** too, as the same 211 tiles pre-coloured into 500 m WebP images, with contours and spot heights (#141, #143).
 
 ---
 
@@ -87,7 +89,7 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 - [x] **Define what *verified* means** and who does it → *4.2.2.a*. Written into `flood-events.json` itself: two sources at least, every sentence stated on one of them, and shown only once a team member has filled in `checkedBy` and `checkedOn`. The loader filters on those two fields (#133)
 - [x] **Schema for events**: name, first recorded date, associated places, area, team-written summary, source links → *4.2.1.a–e*. A published file with a guard (`history/events.ts`) and `tools/data/check-events.mjs` in CI, not a table: the events are hand-written and a table would add a migration and an API route for four rows
 - [x] **Three or four events, well sourced** → *4.2.1, 4.2.2*. Four drafted: Melbourne storm March 2010, storms February 2011, Christmas Day storm 2011, Maribyrnong River flood October 2022 — AIDR, ABC News and Melbourne Water
-- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader. **This is the check that makes the four events appear** — it is waiting for a team member
+- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader. **This is the check that makes the four events appear** — **one of four is done**: the Maribyrnong River flood, October 2022, checked on 14 September (#137) and shown for Maribyrnong, Kensington and Ascot Vale. The other three are waiting for a team member
 
 ---
 
@@ -117,12 +119,13 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 ## W4 · Frontend — flood map
 
-- [x] **The map draws**, 281 areas as marks → *4.1.1.a, 4.1.2.a*
+- [x] **The map draws**, 281 areas as marks → *4.1.1.a, 4.1.2.a*. Since 13 September as their boundaries, simplified to 25 m (#136)
 - [x] **One map, two paint functions, one mode switch** → *4.1.1.b, 4.1.1.c*. Selection and zoom survive a mode change, as predicted, because there is nothing to retain
 - [x] **Colour ramp with named breaks** → *4.1.2.b, 4.1.2.d*. Activity 1–10 / 11–25 / 26–50 / 51+, severity at the quartiles 1.3 and 3.0, ranges on the legend. **The distribution is severely skewed** — 209 at the top and single digits across most areas — so equal-width bins produce one dark area and twenty-nine identical pale ones. Choose the breaks deliberately and put the ranges in the legend
 - [x] **Recorded activity distinguished from no recorded activity** → *4.1.2.e*, with *0+* for a zero that is only a floor (#132)
 - [x] **Area detail panel** → *4.1.4.a–h*, showing what is available and saying why anything absent is absent (#132)
-- [x] **Completeness states** — Exact, Minimum value, Not available → *4.1.6.a* (#128 corrected one sentence), with the two distinct causes kept distinct: a suppressed numerator is a floor, a missing denominator is no score
+- [x] **Completeness states** — Exact, Minimum value, Not available → *4.1.6.a* (#128 corrected one sentence), with the two distinct causes kept distinct: a suppressed numerator is a floor, a missing denominator is no score. On screen since 14 September they read *Complete published total*, *Minimum total* and *Not available*, and a missing score reads *No rate* (#144)
+- [x] **The board ranks by the rate too** → *4.1.3, 4.3.2*. *Ranked by* either *Call-outs* or *Call-outs per 1,000 residents*, over the 274 areas with a rate, with *How the rate is calculated* folded under the list and its numbers read from the artefacts rather than typed (#145)
 - [x] **Events section**, including the empty state → *4.2.1, 4.2.3*. **Build the empty state first**; it is what almost every area shows (#133)
 - [x] **Evidence explanations** → *4.3.1, 4.3.2, 4.3.3* (#132). 4.3.1 is six sentences that already exist on the Iteration 1 board and should be lifted rather than rewritten
 - [x] **A third provenance mark** → *4.3.4.a*: *Recorded by the SES*, *Calculated by DrainLens*, *Written by the DrainLens team* (#132). The legend separates *recorded by the council* from *calculated by DrainLens*; a verified event is neither
@@ -133,9 +136,9 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 - [x] ~~Migration for the events table~~ — the events are a published file (#133); the Severity Score's population is loaded → *4.2.1*
 - [x] `check-guide.mjs` equivalent for the new artefacts — `tools/data/check-areas.mjs`, in CI. It recomputes the board’s thirty from the 281 and checks the population against the same codes. Mutation-tested: a swapped name, a changed total, a dropped population row and a reordered board are all caught
-- [ ] Boundary artefact size measured raw and gzipped, and recorded
-- [ ] The API compresses `/api/*` already; confirm any new route is under it
-- [ ] `verify-api.mjs` extended to any new endpoint, **deeply** — it compares whole responses against the published artefact, and that is what caught 85 pipes reported as reference number 0
+- [x] Boundary artefact size measured raw and gzipped, and recorded — `sa2-points.json` v2, 177 KB and 72 KB gzipped, under *Boundaries* above
+- [ ] The API compresses `/api/*` already; confirm any new route is under it. *14 September: none has been added* — `apps/api/src/server.ts` is unchanged since 11 September, and the areas, population and events reach the browser as published files under `/data/`
+- [ ] `verify-api.mjs` extended to any new endpoint, **deeply** — it compares whole responses against the published artefact, and that is what caught 85 pipes reported as reference number 0. No new endpoint yet, as above
 - [ ] Deploy to `drainlens-dev` from `develop` as the work lands; `origin/main` untouched at `138a002`
 - [ ] AD1 re-checked after each deployment, with its positive control
 
@@ -196,7 +199,7 @@ Carried from Iteration 1, with the two that were breached still breached.
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main`; `origin/main` stays at `138a002` | Continuous | enforced and checked after every push |
-| ≥2 structured desk checks | Day 4, Day 9 | sheet ready: [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md) |
+| ≥2 structured desk checks | Day 4, Day 9 | a sheet exists for the 27 August criteria, [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md); **none yet for the Iteration 2 set** — the acceptance file is the list to work from |
 | ≥8 hours cross-discipline pair programming | — | **record the hours that happen** |
 | Critical defects triaged within 24 h, resolved within the iteration | Continuous | — |
 | p95 latency recorded before and after deployment | Each deployment | API measured 11 September; the map route was 749.6 ms p50 uncompressed and is now gzipped 5.7× |
