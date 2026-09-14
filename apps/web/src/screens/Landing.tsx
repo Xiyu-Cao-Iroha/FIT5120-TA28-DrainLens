@@ -61,7 +61,7 @@ export const PRIVACY_LINE =
  * What the product does, and what it refuses to do, before anybody types.
  *
  * The second list is not a disclaimer bolted on at the end. It is the claim
- * the banner makes on every screen and the result screen makes again in its
+ * the footer makes on every screen and the result screen makes again in its
  * own words, said once more at the only moment it can still change what
  * somebody expects — which is before they have asked for anything.
  */

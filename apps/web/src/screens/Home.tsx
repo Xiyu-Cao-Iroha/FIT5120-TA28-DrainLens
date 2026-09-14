@@ -1123,7 +1123,7 @@ function ClaimCard({
 /**
  * The line the whole site is built around, said once more on the way out.
  *
- * The banner above says it on every screen. This repeats it at the bottom of
+ * The footer says it on every screen. This repeats it at the bottom of
  * the page somebody reads before deciding to trust the thing, which is the
  * other moment it can change what they expect.
  */
