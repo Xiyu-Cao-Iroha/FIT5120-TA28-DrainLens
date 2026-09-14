@@ -159,11 +159,16 @@ export function ScenarioChoices({ scenario, distanceM, onBlockage, onRainfall, o
         <legend style={question}>
           Choose a {TOTAL_RAINFALL.toLowerCase()} amount <SettingTag />
         </legend>
-        <p style={{ ...note, margin: `0 0 ${String(space(2))}px` }}>
-          {scenario.rainfallMm === null
-            ? 'Choose one amount to use for both drain settings.'
-            : `Selected: ${String(scenario.rainfallMm)} mm. Choose another amount to change it.`}
-        </p>
+        {/*
+          Only once an amount is chosen. Before that this line said *Choose
+          one amount to use for both drain settings* over `RAINFALL_EXPLAINED`
+          saying the same thing, and the 15 September user test read both.
+        */}
+        {scenario.rainfallMm !== null && (
+          <p style={{ ...note, margin: `0 0 ${String(space(2))}px` }}>
+            Selected: {String(scenario.rainfallMm)} mm. Choose another amount to change it.
+          </p>
+        )}
         {/*
           The three validated levels and nothing else (AC 3.2.3.b). A number
           box sat above them until 13 September and accepted any amount,

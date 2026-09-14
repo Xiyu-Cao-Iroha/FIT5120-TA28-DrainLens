@@ -10,6 +10,7 @@ import {
   fitWithin,
   focus,
   LOCAL_SCALE,
+  scaleForAddress,
   pan,
   scaleToContain,
   scaleToCover,
@@ -319,5 +320,13 @@ describe('containing an extent instead of covering it', () => {
 
     const defaulted = zoomAt(start, 0.25, [400, 150], WIDE);
     expect(defaulted.scale).toBeGreaterThan(floor);
+  });
+});
+
+describe('the scale a newly chosen address opens at', () => {
+  it('comes in to local from the whole council, and keeps a closer view', () => {
+    expect(scaleForAddress(0.1)).toBe(LOCAL_SCALE);
+    expect(scaleForAddress(LOCAL_SCALE)).toBe(LOCAL_SCALE);
+    expect(scaleForAddress(6)).toBe(6);
   });
 });

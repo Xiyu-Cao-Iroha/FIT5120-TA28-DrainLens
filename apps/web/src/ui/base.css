@@ -170,6 +170,9 @@ button:disabled {
  * number worth checking is the worst one.
  */
 .home__hero-photo {
+  position: relative;
+  isolation: isolate;
+  /* Ends on 0.78, the sections' scrim below it, so there is no edge to see. */
   background-image: linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%);
 }
 
@@ -233,10 +236,16 @@ button:disabled {
  * scrim it becomes rgb(65, 72, 78), on which white measures 9.30, the lead
  * 7.61, the quiet line 6.38 and the eyebrow's mint 6.28. Every card on these
  * sections is opaque white, so nothing else is read against the picture.
+ *
+ * **No rule between them** (user test, 15 September). Each section used to
+ * start with a hairline of white at 0.08, and over a photograph that stays
+ * still while the page moves, a hairline reads as a crease in the picture
+ * rather than the start of a section. The same scrim on both sides of the edge
+ * is what makes it one picture; the headings already say where a section
+ * starts.
  */
 .home__on-photo {
   background-color: rgba(12, 20, 28, 0.78);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* The flood section's two blocks: ranking and map. Stacked until there is room. */
@@ -245,6 +254,20 @@ button:disabled {
   grid-template-columns: 1fr;
   gap: 20px;
   align-items: stretch;
+}
+
+/*
+ * The frame of the flood area map's picture. 4:3 while the cards are stacked;
+ * beside the ranking it takes the height the ranking leaves (below), so the
+ * two cards end together without a gap above either button. The picture is
+ * absolutely placed inside, so it adds nothing to the row's height.
+ */
+.home__flood-thumb {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
 }
 
 /* A feature section: the figure and the words. Figure first on a phone too. */
@@ -259,8 +282,23 @@ button:disabled {
  * A row of the homepage's top five: rank, name, count on one line and the bar
  * under the name. Narrow, the bar gets its own line rather than squeezing the
  * name to one word a line.
+ *
+ * **The columns belong to the list, not the row** (user test, 15 September).
+ * With a grid per row, `auto` sized the count to that row's own text, so the
+ * two rows with a `+` had a wider count and a bar that started further left
+ * and ended sooner than the three above them. Each row is now a subgrid of
+ * `.home__ranks`, so the count column is as wide as the widest count and every
+ * bar starts and ends at the same x. A browser without subgrid keeps the
+ * per-row grid, which is the old layout rather than a broken one.
  */
+.home__ranks {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  column-gap: 12px;
+}
+
 .home__rank {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 20px 1fr auto;
   grid-template-areas:
@@ -271,10 +309,26 @@ button:disabled {
   row-gap: 6px;
 }
 
+@supports (grid-template-columns: subgrid) {
+  .home__rank {
+    grid-template-columns: subgrid;
+  }
+}
+
 @media (min-width: 560px) {
+  .home__ranks {
+    grid-template-columns: 20px minmax(96px, 0.9fr) 1.2fr auto;
+  }
+
   .home__rank {
     grid-template-columns: 20px minmax(96px, 0.9fr) 1.2fr auto;
     grid-template-areas: 'rank name bar count';
+  }
+
+  @supports (grid-template-columns: subgrid) {
+    .home__rank {
+      grid-template-columns: subgrid;
+    }
   }
 }
 
@@ -305,19 +359,63 @@ button:disabled {
      text column — it is still 0.72, where the same worst pixel becomes
      rgb(68, 75, 81) and the four colours measure 8.86, 7.24, 6.08 and 5.44. */
   .home__hero-photo {
+    background-image: none;
+  }
+
+  .home__hero-photo::before,
+  .home__hero-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .home__hero-photo::before {
     background-image: linear-gradient(
       100deg,
       rgba(12, 20, 28, 0.84) 0%,
       rgba(12, 20, 28, 0.72) 52%,
       rgba(12, 20, 28, 0.34) 100%
     );
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 140px), transparent 100%);
+    mask-image: linear-gradient(180deg, #000 calc(100% - 140px), transparent 100%);
   }
 
-  /* The ranking a little wider than the map: the picture is 4:3, and at equal
-     widths it made its card a row and a half taller than the ranking beside it. */
+  /*
+   * The hand-over to the sections' flat 0.78 (user test, 15 September).
+   *
+   * The easing above is 0.34 at its right edge and the section under it is
+   * 0.78, so where one ended and the other began there was a hard line across
+   * the picture. Over the last 200 px the flat scrim fades in and the easing
+   * fades out, so the hero's bottom edge is exactly the section's 0.78.
+   *
+   * The two fades overlap rather than meet — the flat one is whole by 60 px
+   * from the bottom, the easing starts to go at 140 px — because stacked
+   * scrims combine as 1 - (1 - a)(1 - b), and without the overlap the middle
+   * of the band came out lighter than either side. With it, computed over
+   * every easing value from 0.34 to 0.84, the combined scrim is never below
+   * the lighter of the two it blends and at most 0.07 darker than the darker,
+   * so no text over the band is on less than the 0.72 measured above.
+   */
+  .home__hero-photo::after {
+    background-color: rgba(12, 20, 28, 0.78);
+    -webkit-mask-image: linear-gradient(180deg, transparent calc(100% - 200px), #000 calc(100% - 60px));
+    mask-image: linear-gradient(180deg, transparent calc(100% - 200px), #000 calc(100% - 60px));
+  }
+
+  /* The ranking a little wider than the map. The map's card gives up height to
+     match the ranking rather than the ranking stretching to match a 4:3
+     picture, which left a gap above "See flood history". */
   .home__split {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
     gap: 24px;
+  }
+
+  .home__flood-thumb {
+    flex: 1 1 0;
+    aspect-ratio: auto;
+    min-height: 200px;
   }
 
   .home__feature {

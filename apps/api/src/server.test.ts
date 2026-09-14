@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ARTEFACT_CACHE, DEFAULT_ORIGINS, allowedOrigins } from './server.js';
+import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createMemo } from './server.js';
 
 describe('who may read this from a browser', () => {
   it('allows the deployed site and the local dev server by default', () => {
@@ -77,5 +77,31 @@ describe('how long an answer may be reused', () => {
     // is re-fetched, or a performance comparison between the two measures the
     // cache policy instead of the source.
     expect(ARTEFACT_CACHE).toBe('public, max-age=300');
+  });
+});
+
+describe('remembering a rebuilt artefact', () => {
+  it('builds once for everybody who asks within the window, and again after it', async () => {
+    let clock = 0;
+    let builds = 0;
+    const memo = createMemo(1000, () => clock);
+    const build = () => Promise.resolve(++builds);
+    const [a, b] = await Promise.all([memo.get('map/x', build), memo.get('map/x', build)]);
+    expect([a, b, builds]).toEqual([1, 1, 1]);
+    clock = 999;
+    expect(await memo.get('map/x', build)).toBe(1);
+    clock = 1000;
+    expect(await memo.get('map/x', build)).toBe(2);
+    expect(await memo.get('map/y', build)).toBe(3);
+  });
+
+  it('forgets a failed build, so a missing extent is not remembered as missing', async () => {
+    const memo = createMemo(60_000, () => 0);
+    await expect(memo.get('map/x', () => Promise.reject(new Error('not loaded')))).rejects.toThrow('not loaded');
+    expect(await memo.get('map/x', () => Promise.resolve('loaded'))).toBe('loaded');
+  });
+
+  it('keeps an answer for ten minutes', () => {
+    expect(REBUILT_FOR_MS).toBe(600_000);
   });
 });

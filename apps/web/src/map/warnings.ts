@@ -2,17 +2,23 @@
  * The warning sign on an especially deep low area.
  *
  * The industry mentor's request, and the team's decision: where a low area is
- * especially deep, put a warning sign at its deepest point; pressing it opens a
- * small card saying water collects there easily and not to park there when
- * heavy rain is coming. **Just that sentence** — no depth, no caveat — because
- * the card is advice about a place, and everything the map says about how the
- * low areas were calculated is already said beside the layer itself.
+ * especially deep, put a warning sign on it; pressing it opens a small card
+ * saying water collects there easily and not to park there when heavy rain is
+ * coming. **Just that sentence** — no depth, no caveat — because the card is
+ * advice about a place, and everything the map says about how the low areas
+ * were calculated is already said beside the layer itself.
  *
- * Which hollows qualify is decided in the pipeline, from the real distribution
- * of depths: at least 1 m below the hollow's spill level and at least 100 m².
+ * **The sign stands on the street, because the sentence is about parking.**
+ * The first file put it at each hollow's deepest cell, and the 15 September
+ * live test found one screen of Carlton holding 22 signs, most of them in
+ * courtyards and backyards. Where signs go is decided in the pipeline: the
+ * lowest cell of the hollow inside a street's road corridor and off a
+ * building, at least 1 m below the spill level there, on a hollow of at least
+ * 100 m², and no two within 150 m.
  * `pipeline/src/drainlens_pipeline/low_area_warnings.py` carries the numbers.
- * That gives 11 signs over Kensington's square kilometre and 764 over the
- * council, so the sign is only drawn close in — see `WARNING_MIN_SCALE`.
+ * That gives 2 signs over Kensington's square kilometre and 91 over the
+ * council (it was 11 and 764), and the sign is still only drawn close in — see
+ * `WARNING_MIN_SCALE`.
  *
  * **The sign is drawn, not typed.** The site's typeface is a 120-character
  * subset (`public/fonts/README.md`) and has no ⚠, and an emoji falls back to
@@ -23,7 +29,7 @@ import type { Local, Screen, Viewport } from './viewport.js';
 import { toScreen } from './viewport.js';
 
 export interface WarningPoint {
-  /** The deepest cell of the hollow, in the extent's local metres. */
+  /** The lowest street cell of the hollow, in the extent's local metres. */
   readonly c: Local;
   readonly depthM: number;
   readonly areaM2: number;
@@ -56,7 +62,8 @@ export const WARNING_BODY =
  * guide can show a sign without asking anyone to zoom first.
  *
  * Measured sliding a 1080 × 775 window over each extent: the council's worst
- * view holds 56 signs at 1.25 px/m and 19 at 3; Kensington's worst holds 6.
+ * view holds 13 signs at 1.25 px/m and 4 at 3; Kensington's worst holds 2.
+ * (Before the signs moved to the streets, 59 and 20, and 6.)
  */
 export const WARNING_MIN_SCALE = 1.25;
 
@@ -125,8 +132,9 @@ const EDGE = '#5c3b00';
  * One sign, centred on the point.
  *
  * Centred rather than standing on it like the address pin: the point is the
- * deepest part of a hollow, not a spot on the ground to be pointed at, and a
- * sign hovering above it would sit over whatever is north of the hollow.
+ * deepest part of a hollow's street, not a spot on the ground to be pointed at,
+ * and a sign hovering above it would sit over whatever is north of it — on a
+ * street running east–west, the fronts of the houses.
  */
 export function drawWarning(context: CanvasRenderingContext2D, x: number, y: number): void {
   const top = y - WARNING_HEIGHT_PX / 2;

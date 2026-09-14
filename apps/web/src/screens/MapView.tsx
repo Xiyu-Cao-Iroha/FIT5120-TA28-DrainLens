@@ -26,8 +26,9 @@ import {
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
+import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
 import { MAX_SUGGESTIONS, search } from '../address/search.js';
 import type { MapArtefact } from '../map/artefact.js';
@@ -761,6 +762,13 @@ function midpoint(path: readonly Local[]): Local {
  * match there means. Choosing one hands the address up to the session — the
  * map does not move itself, because the address is a decision the whole
  * application shares rather than a view state this screen owns.
+ *
+ * **Enter chooses, and the arrow keys move through the list** (15 September
+ * user test: Enter did nothing, and only a click chose). The field is a
+ * combobox over a listbox, with the suggestion the arrows are on named in
+ * `aria-activedescendant`, so focus stays in the field and typing carries on
+ * from wherever the arrows left it. Which address Enter takes when no
+ * suggestion is highlighted is `addressForEnter`: the first screen's rule.
  */
 function MapSearch({
   index,
@@ -775,11 +783,22 @@ function MapSearch({
 }) {
   const [typed, setTyped] = useState('');
   const [focused, setFocused] = useState(false);
+  // The suggestion the arrow keys are on, or -1 for the typed text itself.
+  const [active, setActive] = useState(-1);
+  const listId = useId();
 
   const matches: Match[] = useMemo(
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
+  const highlighted = active >= 0 && active < matches.length ? active : -1;
+  const optionId = (at: number) => `${listId}-option-${String(at)}`;
+
+  const pick = (chosen: IndexedAddress) => {
+    onPick(chosen);
+    setTyped('');
+    setActive(-1);
+  };
 
   return (
     <div data-tour="address" style={{ position: 'relative', width: 268 }}>
@@ -803,6 +822,21 @@ function MapSearch({
           value={typed}
           onChange={(event) => {
             setTyped(event.target.value);
+            setActive(-1);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              if (matches.length === 0) return;
+              // Otherwise the caret jumps to the start or end of the text.
+              event.preventDefault();
+              setActive(nextActive(highlighted, matches.length, event.key));
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              const chosen = matches[highlighted]?.address ?? addressForEnter(index, typed);
+              if (chosen) pick(chosen);
+            } else if (event.key === 'Escape' && highlighted >= 0) {
+              setActive(-1);
+            }
           }}
           onFocus={() => {
             setFocused(true);
@@ -812,6 +846,11 @@ function MapSearch({
           }}
           placeholder={address?.label ?? 'Search an address'}
           aria-label="Search for an address"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={matches.length > 0}
+          aria-controls={listId}
+          {...(highlighted >= 0 ? { 'aria-activedescendant': optionId(highlighted) } : {})}
           autoComplete="off"
           style={{
             flex: 1,
@@ -839,6 +878,7 @@ function MapSearch({
             type="button"
             onClick={() => {
               setTyped('');
+              setActive(-1);
               // Only when there is one. Clearing a half-typed search should
               // not throw away the address the map is centred on.
               if (address !== null) onClear();
@@ -867,6 +907,8 @@ function MapSearch({
       */}
       {matches.length > 0 && (
         <ul
+          id={listId}
+          role="listbox"
           aria-label="Matching addresses"
           style={{
             position: 'absolute',
@@ -883,28 +925,39 @@ function MapSearch({
             boxShadow: shadow.lifted,
           }}
         >
-          {matches.map((match) => (
-            <li key={match.address.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onPick(match.address);
-                  setTyped('');
-                }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: `${String(space(2))}px ${String(space(2))}px`,
-                  border: 'none',
-                  borderRadius: radius.small,
-                  background: 'transparent',
-                  font: type(text.label),
-                  color: ink.base,
-                }}
-              >
-                {match.address.label}
-              </button>
+          {/*
+            Options rather than buttons: a button inside an option is a
+            control inside a control, and the field already owns the keyboard.
+            A press still chooses, and the pointer moves the highlight so the
+            arrows carry on from where it was.
+          */}
+          {matches.map((match, at) => (
+            <li
+              key={match.address.id}
+              id={optionId(at)}
+              role="option"
+              aria-selected={at === highlighted}
+              onMouseDown={(event) => {
+                // Keep focus in the field, so the list is not blurred away
+                // before the press lands.
+                event.preventDefault();
+              }}
+              onMouseEnter={() => {
+                setActive(at);
+              }}
+              onClick={() => {
+                pick(match.address);
+              }}
+              style={{
+                padding: `${String(space(2))}px ${String(space(2))}px`,
+                borderRadius: radius.small,
+                background: at === highlighted ? surface.sunken : 'transparent',
+                font: type(text.label),
+                color: ink.base,
+                cursor: 'pointer',
+              }}
+            >
+              {match.address.label}
             </li>
           ))}
         </ul>

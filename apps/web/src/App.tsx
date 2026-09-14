@@ -342,6 +342,12 @@ export function App() {
               void mode;
               dispatch({ type: 'get-started' });
             }}
+            // The chooser's "Skip to Full map", so the link named after the
+            // full map opens it -- through the same notice, which the reducer
+            // puts in front of every way in.
+            onOpenFullMap={() => {
+              dispatch({ type: 'map-opened', from: 'home' });
+            }}
             onOpenHistory={() => {
               dispatch({ type: 'history-opened' });
             }}
@@ -461,6 +467,8 @@ export function App() {
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
+            // The comparison's own words when it is the task waiting.
+            task={session.pendingTask}
             onFound={(address) =>
               dispatch({
                 type: 'address-accepted',
@@ -1230,7 +1238,6 @@ function ComparisonMapPane({
   return (
     <ComparisonMap
       map={loaded.map}
-      derived={loaded.derived}
       step={step}
       address={addressAt}
       addressLabel={addressLabel}

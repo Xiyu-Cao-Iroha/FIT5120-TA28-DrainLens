@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { type ArtefactError, assertUsable, boundsOf } from './artefact.js';
-import { TAP_RADIUS_PX, distanceToSegment, pick, selectableLayers } from './hit.js';
+import { SUGGESTED_HALO_R } from './draw.js';
+import { TAP_RADIUS_PX, distanceToSegment, pick, pickComparison, selectableLayers } from './hit.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
@@ -185,5 +186,77 @@ describe('only what is drawn can be selected', () => {
     // An absent layer and a switched-off one are the same to a press, and
     // neither may reach `pick` as undefined.
     expect(selectableLayers({}, { pits: true, pipes: true })).toEqual({ pit: [], pipe: [] });
+  });
+});
+
+describe('a press on the comparison map reaches the drain it asks about', () => {
+  /*
+   * The user test of 15 September, at 200 Bourke Street: the highlighted drain
+   * about 10 m from the address, a grey pit that cannot be tested 3 m from the
+   * drain, and the map at about three pixels a metre. A press on the drain's
+   * ripple, a little off its centre, selected the grey pit and said
+   * "Can't be tested".
+   */
+  const street = { ...view, scale: 3 };
+  const drain = pit(510, 500, 1363621);
+  const grey = pit(513, 500, 999001);
+  const layers = { pit: [grey, drain], pipe: [pipe([[400, 500], [600, 500]], 77)] };
+  const marks = { comparable: new Set(['1363621']), suggested: 1363621 };
+  const pressAt = (east: number, north: number, dx = 0) => {
+    const [x, y] = toScreen(street, [east, north]);
+    return [x + dx, y] as const;
+  };
+
+  it('reproduces the defect: nearest-wins picks the grey pit', () => {
+    // Five pixels right of the drain's centre is four from the grey pit's.
+    expect(pick(pressAt(510, 500, 5), street, layers)?.feature).toBe(grey);
+  });
+
+  it('gives that press to the highlighted drain', () => {
+    expect(pickComparison(pressAt(510, 500, 5), street, layers, marks)?.feature).toBe(drain);
+    expect(pickComparison(pressAt(510, 500), street, layers, marks)?.feature).toBe(drain);
+  });
+
+  it('gives it to the highlighted drain even dead centre on the grey pit, which sits on its ripple', () => {
+    expect(pickComparison(pressAt(513, 500), street, layers, marks)?.feature).toBe(drain);
+  });
+
+  it('reaches the highlighted drain anywhere on its ripple, past the ordinary tap radius', () => {
+    const onRipple = pressAt(510, 500, -(SUGGESTED_HALO_R - 1));
+    expect(SUGGESTED_HALO_R - 1).toBeGreaterThan(TAP_RADIUS_PX);
+    expect(pickComparison(onRipple, street, layers, marks)?.feature).toBe(drain);
+    expect(pickComparison(pressAt(510, 500, -(SUGGESTED_HALO_R + 2)), street, layers, marks)?.kind).toBe('pipe');
+  });
+
+  it('prefers any comparable drain to a grey pit, on later steps too', () => {
+    // No suggestion from step 2 on: the chosen drain is simply comparable.
+    const later = { comparable: new Set(['1363621']), suggested: null };
+    expect(pickComparison(pressAt(510, 500, 5), street, layers, later)?.feature).toBe(drain);
+  });
+
+  it('takes the nearer of two drains that can both be chosen, off the highlighted drain’s disc', () => {
+    // 73 Bayswater Road: a second comparable drain 14 px from the highlighted
+    // one. Its visible edge, outside the highlighted disc, stays pressable.
+    const other = pit(514.7, 500, 1363588);
+    const both = { comparable: new Set(['1363621', '1363588']), suggested: 1363621 };
+    const hit = pickComparison(pressAt(514.7, 500, 5), street, { pit: [drain, other] }, both);
+    expect(hit?.feature).toBe(other);
+  });
+
+  it('gives a press on the highlighted drain’s painted disc to that drain, whatever lies under it', () => {
+    // Ten pixels from the highlighted centre, four from the other drain's:
+    // but the highlighted disc is painted over it there.
+    const other = pit(514.7, 500, 1363588);
+    const both = { comparable: new Set(['1363621', '1363588']), suggested: 1363621 };
+    expect(pickComparison(pressAt(510, 500, 10), street, { pit: [drain, other, grey] }, both)?.feature).toBe(drain);
+    // The chosen drain on later steps is painted the same way.
+    const later = { comparable: both.comparable, suggested: null, selected: 1363621 };
+    expect(pickComparison(pressAt(510, 500, 10), street, { pit: [drain, other] }, later)?.feature).toBe(drain);
+  });
+
+  it('still answers with the grey pit when nothing that can be chosen is in reach', () => {
+    const alone = pit(560, 500, 999002);
+    const hit = pickComparison(pressAt(560, 500), street, { pit: [drain, alone] }, marks);
+    expect(hit?.feature).toBe(alone);
   });
 });

@@ -15,12 +15,19 @@
  * drain.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { MapArtefact, Pit } from '../map/artefact.js';
-import type { DerivedArtefact } from '../map/derived.js';
 import { DIFFERENCE_FILL, type DifferenceArea } from '../map/difference.js';
-import { COACH_WIDTH_PX, placeStepOneLabels } from '../map/comparisonLabels.js';
+import {
+  COACH_WIDTH_PX,
+  type HeldReason,
+  SELECTED_LABEL_PX,
+  nameBox,
+  placeSelectedLabel,
+  placeStepOneLabels,
+  reasonOnScreen,
+} from '../map/comparisonLabels.js';
 import { DAY } from '../map/draw.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
@@ -30,13 +37,11 @@ import { DIFFERENCE_LEGEND, DIFFERENCE_LEGEND_NOTE } from '../scenario/outcome.j
 import { MAP_KEY, UNSUPPORTED_SHORT, supportOf } from '../scenario/support.js';
 import type { Trace } from '../trace/graph.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
-import { EVERYTHING } from './MapView.js';
 
 export type ComparisonStep = 'drain' | 'scenario' | 'review' | 'result';
 
 export interface ComparisonMapProps {
   readonly map: MapArtefact;
-  readonly derived: DerivedArtefact;
   readonly step: ComparisonStep;
   /** The searched address in local metres, or null when opened from the full map. */
   readonly address: Local | null;
@@ -62,7 +67,6 @@ export const DRAIN_FOCUS_COLOUR = '#db2777';
 
 export function ComparisonMap({
   map,
-  derived,
   step,
   address,
   addressLabel,
@@ -78,10 +82,12 @@ export function ComparisonMap({
   locked,
 }: ComparisonMapProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null);
-  const [hover, setHover] = useState<Hit | null>(null);
+  // What is under the pointer, held with the step it was found on. See
+  // `reasonOnScreen`: a hover from one step is never shown on another.
+  const [hover, setHover] = useState<{ readonly hit: Hit; readonly step: ComparisonStep } | null>(null);
   // Why the last grey drain pressed cannot be tested. A press is the only way
   // a touch screen, which has no hover, can ask.
-  const [refused, setRefused] = useState<{ readonly pit: Pit; readonly reason: string } | null>(null);
+  const [refused, setRefused] = useState<HeldReason<Pit> | null>(null);
   const nearest = eligibility?.nearest ?? null;
   const choosing = step === 'drain';
 
@@ -99,7 +105,15 @@ export function ComparisonMap({
     [supported, withoutGround],
   );
 
+  // A new step starts with nothing under the pointer and nothing refused.
+  // The render below would hide a stale one anyway; this lets it go.
+  useEffect(() => {
+    setHover(null);
+    setRefused(null);
+  }, [step]);
+
   const onSelect = (hit: Hit | null) => {
+    setHover(null);
     if (hit?.kind !== 'pit' || locked) {
       setRefused(null);
       return;
@@ -108,7 +122,7 @@ export function ComparisonMap({
     if (reason !== null) {
       // Not clickable, and saying so: a map that ignores a press in silence
       // reads as broken (AC 3.1.1.d).
-      setRefused({ pit: hit.feature, reason });
+      setRefused({ pit: hit.feature, reason, step });
       return;
     }
     setRefused(null);
@@ -125,12 +139,28 @@ export function ComparisonMap({
     [supported, suggestedMark, selectedMark],
   );
   // Only a different pit is news; the same pit under a moving pointer is not.
-  const onHover = useCallback((hit: Hit | null) => {
-    setHover((held) => (held?.feature === hit?.feature ? held : hit));
-  }, []);
+  // The canvas reports null on a press, a drag, a zoom and on leaving it.
+  const onHover = useCallback(
+    (hit: Hit | null) => {
+      setHover((held) =>
+        held !== null && held.step === step && held.hit.feature === hit?.feature
+          ? held
+          : hit === null
+            ? null
+            : { hit, step },
+      );
+    },
+    [step],
+  );
 
-  const hoveredReason = hover?.kind === 'pit' ? reasonFor(hover.feature) : null;
-  const hoverComparable = hover?.kind === 'pit' && hoveredReason === null;
+  const hovered = hover !== null && hover.step === step && hover.hit.kind === 'pit' ? hover.hit.feature : null;
+  const hoveredReason = hovered === null ? null : reasonFor(hovered);
+  const hoverComparable = hovered !== null && hoveredReason === null;
+  const reasonShown = reasonOnScreen(
+    hovered !== null && hoveredReason !== null ? { pit: hovered, reason: hoveredReason, step } : null,
+    refused,
+    step,
+  );
 
   const on = (at: Local): readonly [number, number] | null => {
     if (viewport === null) return null;
@@ -151,7 +181,13 @@ export function ComparisonMap({
   const differenceShown = difference !== null && difference.cells.length > 0;
   const placed =
     addressScreen !== null && drainScreen !== null && viewport !== null
-      ? placeStepOneLabels(addressScreen, drainScreen, viewport.widthPx, viewport.heightPx)
+      ? placeStepOneLabels(
+          addressScreen,
+          drainScreen,
+          viewport.widthPx,
+          viewport.heightPx,
+          addressLabel === null ? 0 : nameWidthPx(addressLabel),
+        )
       : null;
 
   return (
@@ -202,8 +238,14 @@ export function ComparisonMap({
 
       <MapCanvas
         artefact={map}
-        derived={derived}
-        show={EVERYTHING}
+        /*
+          No calculated layers at all: no likely water paths, low areas,
+          limited-ground hatching or warning signs. The 15 September user test
+          found the drain step drawn over every one of them, and the drain the
+          screen asks for was hard to find in it. This map is for the drains,
+          the address and, on the result, the difference.
+        */
+        derived={null}
         comparison={marks}
         address={address}
         openAt={address === null && selectedPit !== null ? selectedPit.c : null}
@@ -292,16 +334,18 @@ export function ComparisonMap({
         <span
           style={{
             ...floatingLabel,
-            // Beside the drain, on whichever side has room, and above it when
-            // neither does — never over the tick it labels.
-            ...(drainScreen[0] + 20 + SELECTED_LABEL_PX <= viewport.widthPx - 8
-              ? { left: drainScreen[0] + 20, top: drainScreen[1] - 18 }
-              : drainScreen[0] - 20 - SELECTED_LABEL_PX >= 8
-                ? { left: drainScreen[0] - 20 - SELECTED_LABEL_PX, top: drainScreen[1] - 18 }
-                : {
-                    left: Math.max(8, Math.min(drainScreen[0] - SELECTED_LABEL_PX / 2, viewport.widthPx - 8 - SELECTED_LABEL_PX)),
-                    top: drainScreen[1] - 64,
-                  }),
+            // Beside the drain where that is free, and never over the tick it
+            // labels, the pin or the address name. See `placeSelectedLabel`.
+            ...(() => {
+              const [left, top] = placeSelectedLabel(
+                drainScreen,
+                addressScreen,
+                placed !== null && addressLabel !== null ? nameBox(placed.address, nameWidthPx(addressLabel)) : null,
+                viewport.widthPx,
+                viewport.heightPx,
+              );
+              return { left, top };
+            })(),
             width: SELECTED_LABEL_PX,
             boxSizing: 'border-box',
             padding: `${String(space(1))}px ${String(space(3))}px`,
@@ -319,10 +363,9 @@ export function ComparisonMap({
 
       {/* The one-line reason on a drain that cannot be tested. */}
       {viewport !== null &&
+        reasonShown !== null &&
         (() => {
-          const pit = hoveredReason !== null && hover?.kind === 'pit' ? hover.feature : refused?.pit;
-          const reason = hoveredReason ?? refused?.reason ?? null;
-          if (pit === undefined || reason === null) return null;
+          const { pit, reason } = reasonShown;
           const at = on(pit.c);
           if (at === null) return null;
           return (
@@ -473,8 +516,11 @@ function KeyLine({ swatch: mark, children }: { readonly swatch: React.ReactNode;
   );
 }
 
-/** Width of the selected drain's label, for placing it beside the drain. */
-const SELECTED_LABEL_PX = 190;
+/**
+ * About how wide the address name sets, for keeping other labels off it.
+ * Generous, at 7 px a character of 12.5 px medium type, plus the halo.
+ */
+const nameWidthPx = (label: string): number => Math.min(320, label.length * 7 + 6);
 
 const swatch: React.CSSProperties = {
   display: 'inline-block',

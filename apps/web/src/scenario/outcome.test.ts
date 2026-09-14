@@ -126,8 +126,8 @@ describe('each reason offers a way out that can actually help', () => {
 describe('what no result may claim', () => {
   const everything = [
     RESULT_DISCLAIMER,
-    ...Object.values(BANDS).flatMap((p) => [p.finding, p.body]),
-    ...INSUFFICIENT_VALUES().flatMap((p) => [p.finding, p.body]),
+    ...Object.values(BANDS).flatMap((p) => [p.finding ?? '', p.body]),
+    ...INSUFFICIENT_VALUES().flatMap((p) => [p.finding ?? '', p.body]),
     ...HOW_IT_WAS_PRODUCED.flatMap((step) => [step.title, step.body]),
   ].join(' ');
 
@@ -287,6 +287,26 @@ describe('the Iteration 2 wording', () => {
     expect(BANDS['higher-than-baseline'].comparison).toBe('More water than with a clear drain');
     expect(BANDS['no-clear-change'].comparison).toBe('No clear difference');
     expect(Object.values(BANDS).map((b) => b.band).join(' ')).not.toMatch(/baseline|change/i);
+  });
+
+  it('names each band in the heading and does not say it again underneath', () => {
+    // The 15 September user test counted *No clear difference* five times on
+    // one result. The heading is the band; the summary row and the callout
+    // are required; the lines between them must not repeat it.
+    for (const presentation of Object.values(BANDS)) {
+      expect(presentation.finding).toBeNull();
+      expect(presentation.body.toLowerCase()).not.toContain(presentation.band.toLowerCase());
+      expect(presentation.body.trim()).not.toBe('');
+    }
+    // The body still says what happened, in its own words.
+    expect(BANDS['no-clear-change'].body).toMatch(/could not separate your drain setting from a clear drain/);
+    expect(BANDS['higher-than-baseline'].body).toMatch(/less water enters the selected drain/);
+  });
+
+  it('keeps a finding on every insufficient state, whose heading alone does not say which', () => {
+    for (const presentation of INSUFFICIENT_VALUES()) {
+      expect(presentation.finding).toBeTruthy();
+    }
   });
 
   it('says what No clear difference does not mean', () => {

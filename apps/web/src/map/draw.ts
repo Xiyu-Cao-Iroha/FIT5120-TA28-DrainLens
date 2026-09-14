@@ -265,6 +265,18 @@ export const OTHER_COMPARABLE_ALPHA = 0.4;
 export const COMPARISON_MARK_R = 12;
 
 /**
+ * Radius of the suggested drain's outer ripple, in pixels.
+ *
+ * Named because two other things depend on it: the hit test lets a press
+ * anywhere on the ripple reach the drain (`pickComparison` in `hit.ts`), and
+ * step 1's writing is kept off it (`comparisonLabels.ts`). A user test on
+ * 15 September found the ripple was all that showed of the drain once the
+ * labels had covered its icon — and that pressing its centre selected a grey
+ * pit beside it.
+ */
+export const SUGGESTED_HALO_R = COMPARISON_MARK_R * 2.6;
+
+/**
  * Every pit, as the comparison needs them read.
  *
  * Two passes. The ordinary pits first — grey when the comparison cannot use
@@ -335,7 +347,7 @@ function drawComparisonPits(
       context.save();
       context.globalAlpha = 0.14;
       context.beginPath();
-      context.arc(x, y, COMPARISON_MARK_R * 2.6, 0, Math.PI * 2);
+      context.arc(x, y, SUGGESTED_HALO_R, 0, Math.PI * 2);
       context.fillStyle = palette.selected;
       context.fill();
       context.globalAlpha = 0.22;

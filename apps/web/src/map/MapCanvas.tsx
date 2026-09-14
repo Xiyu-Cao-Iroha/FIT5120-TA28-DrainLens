@@ -15,7 +15,7 @@ import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
 import { type ComparisonMarks, DAY, drawMap, pressedThePin } from './draw.js';
 import { fitPadding, fitPoints } from './fitBounds.js';
-import { type Hit, pick, selectableLayers } from './hit.js';
+import { type Hit, pick, pickComparison, selectableLayers } from './hit.js';
 import {
   MAX_SCALE,
   type Local,
@@ -24,6 +24,7 @@ import {
   fit,
   focus,
   pan,
+  scaleForAddress,
   scaleToContain,
   scaleToCover,
   toScreen,
@@ -318,15 +319,32 @@ export function MapCanvas({
       if (viewport === null) return;
       const factor = Math.exp(-event.deltaY * 0.0015);
       movedRef.current = true;
+      // What was under the pointer is somewhere else now. A hover answer
+      // outliving the view it described stayed on screen through a whole
+      // comparison in the 15 September user test.
+      onHover?.(null);
       setViewport(clamp(zoomAt(viewport, factor, at(event), bounds, floorOf(viewport)), bounds));
     },
-    [viewport, bounds, at],
+    [viewport, bounds, at, onHover],
   );
 
-  const onPointerDown = useCallback((event: React.PointerEvent) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { x: event.clientX, y: event.clientY, moved: 0 };
-  }, []);
+  const onPointerDown = useCallback(
+    (event: React.PointerEvent) => {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = { x: event.clientX, y: event.clientY, moved: 0 };
+      // A press, or the start of a drag, ends the hover either way.
+      onHover?.(null);
+    },
+    [onHover],
+  );
+
+  // The pits a press or a hover can reach. On the comparison map a drain that
+  // can be chosen outranks a grey pit beside it; see `pickComparison`.
+  const pickPits = useCallback(
+    (point: readonly [number, number], v: Viewport, layers: Parameters<typeof pick>[2]) =>
+      comparison ? pickComparison(point, v, layers, comparison) : pick(point, v, layers),
+    [comparison],
+  );
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent) => {
@@ -334,7 +352,7 @@ export function MapCanvas({
       if (!drag) {
         // Hovering, not dragging: say what is under the pointer.
         if (onHover && viewport !== null) {
-          onHover(pick(at(event), viewport, { pit: showPits ? (artefact.layers.pit ?? []) : [] }));
+          onHover(pickPits(at(event), viewport, { pit: showPits ? (artefact.layers.pit ?? []) : [] }));
         }
         return;
       }
@@ -347,7 +365,7 @@ export function MapCanvas({
       if (drag.moved > DRAG_SLOP_PX) movedRef.current = true;
       setViewport(clamp(pan(viewport, dx, dy), bounds));
     },
-    [viewport, bounds, onHover, at, showPits, artefact],
+    [viewport, bounds, onHover, at, showPits, artefact, pickPits],
   );
 
   const onPointerUp = useCallback(
@@ -364,8 +382,10 @@ export function MapCanvas({
       // network cannot steal a press from a pit -- and testing it after would
       // let a pipe running under the pin's head take one from the pin.
       const press = at(event);
-      if (address && pressedThePin(press, toScreen(viewport, address))) {
-        onAddressPress?.();
+      // Only where pressing the pin does something: on the comparison map it
+      // does nothing, and its head can stand over a drain a few metres north.
+      if (address && onAddressPress && pressedThePin(press, toScreen(viewport, address))) {
+        onAddressPress();
         return;
       }
 
@@ -390,14 +410,14 @@ export function MapCanvas({
         two flags go to the draw call a few lines above.
       */
       onSelect?.(
-        pick(
+        pickPits(
           press,
           viewport,
           selectableLayers(artefact.layers, { pits: showPits, pipes: showPipes }),
         ),
       );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes, warnings, onWarningPress],
+    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes, warnings, onWarningPress, pickPits],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and
@@ -430,7 +450,7 @@ export function MapCanvas({
     setViewport((current) =>
       current === null
         ? current
-        : clamp(focus(current.widthPx, current.heightPx, bounds, address, current.scale), bounds),
+        : clamp(focus(current.widthPx, current.heightPx, bounds, address, scaleForAddress(current.scale)), bounds),
     );
   }, [address, bounds]);
 

@@ -25,10 +25,10 @@
  * **The warning sign comes straight after the shapes**, while the reader is
  * still looking at blue, because it is a mark on those shapes and means
  * nothing without them. A `read` step rather than a `do`: the guide opens
- * 300 m across on 46 Gatehouse Drive, and the nearest sign is on the large low
- * area 161 m east and 91 m north of it -- just outside that view. A step that
+ * 300 m across on 46 Gatehouse Drive, and the nearest sign is on the street
+ * 18 m east and 181 m north of it -- just outside that view. A step that
  * waited for a press on it would wait for a drag the reader was never asked
- * to make, so the step says to make it instead. Kensington has 11 signs; see
+ * to make, so the step says to make it instead. Kensington has 2 signs; see
  * `map/warnings.ts` for which hollows get one and from what zoom.
  */
 
@@ -53,7 +53,7 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
     kind: 'read',
     id: 'deep-hollow-sign',
     prompt:
-      'Where a low area is especially deep, a warning sign marks its deepest point once the map is zoomed in. Select the sign to read what it means. If none is in view, drag the map to look nearby.',
+      'Where a low area is especially deep, a warning sign marks its deepest point on a street once the map is zoomed in. Select the sign to read what it means. If none is in view, drag the map to look nearby.',
   },
   {
     kind: 'do',

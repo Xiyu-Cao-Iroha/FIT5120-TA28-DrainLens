@@ -37,6 +37,7 @@ import {
   search,
 } from '../address/search.js';
 import { demonstrationAddress } from '../address/demonstration.js';
+import type { Task } from '../session.js';
 import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
 import { COVERAGE, LAYER } from '../ui/terms.js';
 import {
@@ -96,7 +97,40 @@ export interface LandingProps {
    */
   readonly onBack?: (() => void) | undefined;
   readonly onHome?: (() => void) | undefined;
+  /**
+   * The task waiting for this address, if one is.
+   *
+   * **The comparison's address screen used to be the explorer's.** Somebody
+   * who had just pressed *Search an address to start* on the blocked-drain
+   * comparison was asked to *See how rainwater may move near your address*
+   * and offered *Explore this area*, which in the 15 September user test read
+   * as having been sent somewhere else. The team's Figma (H2 and H3) gives the
+   * comparison its own words; every other way here keeps these.
+   */
+  readonly task?: Task | null | undefined;
 }
+
+/** The words that change with the task waiting for the address. */
+export interface LandingCopy {
+  readonly title: string;
+  readonly lead: string;
+  readonly submit: string;
+}
+
+export const EXPLORE_COPY: LandingCopy = {
+  title: 'See how rainwater may move near your address',
+  lead: 'Search an address to view likely water paths, council drain records and ground height nearby.',
+  submit: 'Explore this area →',
+};
+
+export const COMPARE_COPY: LandingCopy = {
+  title: 'Which address do you want to check?',
+  lead: 'We’ll find the nearest drain you can test for a blocked-drain comparison.',
+  submit: 'Find a drain →',
+};
+
+export const landingCopyFor = (task: Task | null | undefined): LandingCopy =>
+  task === 'compare' ? COMPARE_COPY : EXPLORE_COPY;
 
 type Problem =
   | { readonly kind: 'outside-pilot'; readonly typed: string }
@@ -110,7 +144,9 @@ export function Landing({
   onUnsupported,
   onBack,
   onHome,
+  task,
 }: LandingProps) {
+  const copy = landingCopyFor(task);
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
@@ -182,14 +218,13 @@ export function Landing({
         className="landing__title"
         style={{ margin: `${String(space(5))}px 0 ${String(space(3))}px`, color: ink.strong }}
       >
-        See how rainwater may move near your address
+        {copy.title}
       </h1>
       <p
         className="landing__lead"
         style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
       >
-        Search an address to view likely water paths, council drain records and ground height
-        nearby.
+        {copy.lead}
       </p>
 
       <form
@@ -260,7 +295,7 @@ export function Landing({
               event.currentTarget.style.background = brand.base;
             }}
           >
-            Explore this area →
+            {copy.submit}
           </button>
         </div>
 

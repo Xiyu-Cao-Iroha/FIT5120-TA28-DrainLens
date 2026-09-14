@@ -145,13 +145,23 @@ export function Result({
         </p>
       )}
 
+      {/*
+        The bold finding only where the heading does not already say it: on
+        a band the heading is the finding. See `Presentation.finding`.
+      */}
       <div>
-        <p style={{ margin: 0, font: type(text.body, { weight: weight.semibold, leading: 1.45 }), color: ink.strong }}>
-          {shown.finding}
-        </p>
-        <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.label, { leading: 1.55 }), color: ink.base }}>
-          {shown.body}
-        </p>
+        {shown.finding !== null && (
+          <p
+            style={{
+              margin: `0 0 ${String(space(1))}px`,
+              font: type(text.body, { weight: weight.semibold, leading: 1.45 }),
+              color: ink.strong,
+            }}
+          >
+            {shown.finding}
+          </p>
+        )}
+        <p style={{ margin: 0, font: type(text.label, { leading: 1.55 }), color: ink.base }}>{shown.body}</p>
       </div>
 
       {/*

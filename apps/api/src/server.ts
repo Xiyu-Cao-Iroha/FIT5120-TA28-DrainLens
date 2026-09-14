@@ -103,7 +103,48 @@ export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORI
  */
 export const ARTEFACT_CACHE = 'public, max-age=300';
 
-export function createApp(pool: pg.Pool): Hono {
+/**
+ * How long a process keeps an artefact it has already rebuilt from rows.
+ *
+ * The user test of 15 September timed the map and derived routes at 2.5 and
+ * 3.0 seconds on the deployed site. Part of that is a cold instance, which no
+ * code here can help; the rest is rebuilding 21,113 pits and 17,242 pipes from
+ * rows on every request, for an answer that only changes when the migration
+ * job runs. Ten minutes bounds how stale a warm instance can be after a load,
+ * and an instance rarely lives that long between visits anyway.
+ */
+export const REBUILT_FOR_MS = 10 * 60 * 1000;
+
+export interface Memo {
+  /** The value for `key`, building it at most once per `ttlMs` however many ask at once. */
+  get<T>(key: string, build: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * A small in-process memo for rebuilt artefacts.
+ *
+ * Concurrent requests for the same key share one build, so the first visitors
+ * after a cold start do not each rebuild the council map. A build that fails
+ * is forgotten at once: a 404 for an extent that has not been loaded yet, or a
+ * database that was briefly unreachable, must not be remembered as the answer.
+ */
+export function createMemo(ttlMs: number, now: () => number = Date.now): Memo {
+  const held = new Map<string, { readonly at: number; readonly value: Promise<unknown> }>();
+  return {
+    get<T>(key: string, build: () => Promise<T>): Promise<T> {
+      const found = held.get(key);
+      if (found !== undefined && now() - found.at < ttlMs) return found.value as Promise<T>;
+      const value = build();
+      held.set(key, { at: now(), value });
+      value.catch(() => {
+        if (held.get(key)?.value === value) held.delete(key);
+      });
+      return value;
+    },
+  };
+}
+
+export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)): Hono {
   const app = new Hono();
 
   app.use('*', cors({ origin: allowedOrigins() }));
@@ -158,14 +199,27 @@ export function createApp(pool: pg.Pool): Hono {
    * sentence the query threw; anything else is logged server-side and becomes
    * a bare 500, because the details of an unexpected failure are ours.
    */
+  const withClient = async (work: (client: pg.PoolClient) => Promise<unknown>) => {
+    const client = await pool.connect();
+    try {
+      return await work(client);
+    } finally {
+      client.release();
+    }
+  };
+
   const answer = async (
     c: Context,
     work: (client: pg.PoolClient) => Promise<unknown>,
     cache: string = ARTEFACT_CACHE,
+    // Rebuilt artefacts are memoised by route; `/health` passes none, because
+    // a health check answered from memory is a health check of the memory.
+    key?: string,
   ) => {
-    const client = await pool.connect();
     try {
-      const body = (await work(client)) as Record<string, unknown>;
+      const body = (await (key === undefined
+        ? withClient(work)
+        : memo.get(key, () => withClient(work)))) as Record<string, unknown>;
       // Only on an answer. A 404 cached for five minutes is a missing extent
       // that stays missing after the migration job has put it there.
       c.header('Cache-Control', cache);
@@ -174,8 +228,6 @@ export function createApp(pool: pg.Pool): Hono {
       if (error instanceof NotFound) return c.json({ error: error.message }, 404);
       console.error(error);
       return c.json({ error: 'the request could not be answered' }, 500);
-    } finally {
-      client.release();
     }
   };
 
@@ -193,18 +245,20 @@ export function createApp(pool: pg.Pool): Hono {
   );
 
   app.get('/api/map/:extent', (c) =>
-    answer(c, (client) => mapArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => mapArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `map/${c.req.param('extent')}`),
   );
 
   app.get('/api/derived/:extent', (c) =>
-    answer(c, (client) => derivedArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => derivedArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `derived/${c.req.param('extent')}`),
   );
 
   app.get('/api/trace/:extent', (c) =>
-    answer(c, (client) => traceArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => traceArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `trace/${c.req.param('extent')}`),
   );
 
-  app.get('/api/flood-history', (c) => answer(c, (client) => floodHistoryArtefact(client)));
+  app.get('/api/flood-history', (c) =>
+    answer(c, (client) => floodHistoryArtefact(client), ARTEFACT_CACHE, 'flood-history'),
+  );
 
   return app;
 }
