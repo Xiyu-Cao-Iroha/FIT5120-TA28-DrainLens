@@ -217,7 +217,7 @@ Reach an insufficient state — a pit the scene cannot place will do.
 
 | | What to look at | Result | Note |
 |---|---|---|---|
-| — | The *General information only · not a flood warning* banner never scrolls away | | |
+| — | The footer's *Data sources · Licensing · Not a flood warning* line is on every screen | | |
 | — | The data credit is in the footer, with a working licence link | | |
 | — | It says the derived layers are **calculated, not published by the council** | | |
 | 1.1.5.a | "Choose a task" returns to the task page | | |

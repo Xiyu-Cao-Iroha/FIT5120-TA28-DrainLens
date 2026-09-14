@@ -30,9 +30,6 @@ export const LAYER = {
 
 export const FULL_MAP = 'Full map';
 
-/** The strip across the top of every page. */
-export const TOP_NOTICE = 'General information only · not a flood warning';
-
 /**
  * What the site covers, said once.
  *

@@ -1,12 +1,13 @@
 /**
  * The frame every screen sits in.
  *
- * The banner is not decoration and does not scroll away. This product shows a
- * simplified comparison built from a filtered photogrammetric surface, and the
- * one thing a resident must never take from it is that they are looking at an
- * official flood map. The line stays on every screen for the same reason the
- * provenance labels stay on every layer: the moment it is somewhere else, the
- * screen someone is actually reading does not carry it.
+ * **There is no advisory strip across the top any more.** It said *General
+ * information only · not a flood warning* on every screen, and the review of 14
+ * September asked for it to go: by then every screen said the same thing in
+ * its own place — the footer's always-visible *Not a flood warning*, the
+ * homepage's closing note, the notice before the full map, and the provenance
+ * tag on every layer — and a fifth copy pinned above all of them took a row
+ * of the map repeating what the reader had already been told.
  */
 
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -18,7 +19,6 @@ import {
   describeDatasets,
 } from './attribution.js';
 import {
-  advisory,
   brand,
   ink,
   line,
@@ -30,32 +30,7 @@ import {
   type,
   weight,
 } from './theme.js';
-import { COVERAGE, TOP_NOTICE } from './terms.js';
-
-/**
- * Drawn, not typed.
- *
- * The obvious character for this is `ⓘ`, and Source Sans 3 does not have it —
- * so setting it as text hands one glyph on every screen to whatever face the
- * reader's system supplies, in a different weight and on a different baseline
- * from the sentence beside it. Four characters in this interface are in that
- * position; all four are drawn instead. See `public/fonts/README.md`.
- */
-function InfoMark() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
-      <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="4.6" r="0.95" fill="currentColor" />
-      <path
-        d="M8 7.1v4.7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+import { COVERAGE } from './terms.js';
 
 export interface ShellProps {
   readonly children: ReactNode;
@@ -101,14 +76,13 @@ export interface ShellProps {
    * On the homepage the masthead says what this is to somebody who has just
    * arrived. On the map it says it again to somebody who is already inside,
    * and costs 56 pixels of the thing they came for — stacked with the
-   * advisory banner and the breadcrumb, the map was starting an eighth of the
-   * way down a laptop window. Nothing goes with it: the mark is not a link,
-   * and the way back is the Back control on the row below.
+   * breadcrumb, the map was starting well down a laptop window. Nothing goes
+   * with it: the mark is not a link, and the way back is the Back control on
+   * the row below.
    *
-   * **The advisory banner is not part of this and cannot be turned off.** It
-   * is the one line that stops a simplified drainage map being read as an
-   * official flood map, and the screen most likely to be mistaken for one is
-   * exactly the screen this prop exists for.
+   * **The footer is not part of this and cannot be turned off.** Its summary
+   * line says *Not a flood warning*, and the screen most likely to be mistaken
+   * for an official flood map is exactly the screen this prop exists for.
    */
   readonly masthead?: boolean;
   /**
@@ -215,24 +189,6 @@ export function Shell({
           <span style={{ marginLeft: 'auto' }}>{actions}</span>
         </header>
       )}
-
-      <div
-        role="note"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: space(2),
-          padding: `${String(space(2))}px ${String(space(6))}px`,
-          background: advisory.fill,
-          borderBottom: `1px solid ${advisory.line}`,
-          font: type(text.label, { leading: 1.4 }),
-          color: advisory.ink,
-          flexShrink: 0,
-        }}
-      >
-        <InfoMark />
-        {TOP_NOTICE}
-      </div>
 
       {(crumbs !== undefined || back !== undefined) && (
         <nav
