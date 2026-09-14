@@ -12,9 +12,7 @@ import {
   type ContourLine,
   SPOT_MAX,
   type SpotHeight,
-  TerrainMarksError,
   drawTerrainMarks,
-  loadTerrainMarks,
   placeContourLabels,
   placeSpots,
   projector,
@@ -180,43 +178,6 @@ describe('the frame', () => {
       { widthPx: 100, heightPx: 100, scale: 1, centre: [0, 0] },
     );
     expect(project([0, 0])).toEqual([50 + 1500, 50 - 6000]);
-  });
-});
-
-describe('loading', () => {
-  const extent = { min_e: 0, min_n: 0, width_m: 10, height_m: 10 };
-  const good = {
-    '/t/terrain-contours.json': { artefact: 'terrain-contours', extent, lines: [{ m: 1, major: false, c: [[0, 0], [1, 1]] }] },
-    '/t/spot-heights.json': { artefact: 'spot-heights', extent, points: [spot('sp-0', 1, 1)] },
-  } as Record<string, unknown>;
-  const from = (over: Record<string, unknown> = {}) => (url: string) => Promise.resolve(over[url] ?? good[url]);
-
-  it('reads both', async () => {
-    const marks = await loadTerrainMarks('/t', from());
-    expect(marks.contours).toHaveLength(1);
-    expect(marks.spots[0]!.id).toBe('sp-0');
-  });
-
-  it('refuses the wrong artefact, a missing extent, two frames, or malformed entries', async () => {
-    await expect(loadTerrainMarks('/t', from({ '/t/spot-heights.json': {} }))).rejects.toThrow(TerrainMarksError);
-    await expect(
-      loadTerrainMarks('/t', from({ '/t/terrain-contours.json': { artefact: 'terrain-contours', lines: [] } })),
-    ).rejects.toThrow(/where they are/);
-    await expect(
-      loadTerrainMarks(
-        '/t',
-        from({ '/t/spot-heights.json': { artefact: 'spot-heights', extent: { ...extent, min_e: 5 }, points: [] } }),
-      ),
-    ).rejects.toThrow(/different frames/);
-    await expect(
-      loadTerrainMarks(
-        '/t',
-        from({ '/t/terrain-contours.json': { artefact: 'terrain-contours', extent, lines: [{ m: 1, c: [[0, 0]] }] } }),
-      ),
-    ).rejects.toThrow(/fewer than two/);
-    await expect(
-      loadTerrainMarks('/t', from({ '/t/spot-heights.json': { artefact: 'spot-heights', extent, points: [{ id: 'x' }] } })),
-    ).rejects.toThrow(/no id, position or height/);
   });
 });
 

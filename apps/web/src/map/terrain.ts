@@ -27,9 +27,11 @@
  * - a ramp fitted to what is in view changes a colour's meaning whenever the
  *   view or the extent changes.
  *
- * Now the layer reads the raw ground (`/data/terrain/ground.bin`) and colours
- * it on a **fixed AHD ramp**: the same colour means the same height anywhere,
- * on any map. The previous comment argued that the surface's 25 cm accuracy
+ * Now the layer is the raw ground coloured on a **fixed AHD ramp**: the same
+ * colour means the same height anywhere, on any map. Since 14 September the
+ * colouring is done at build time, into 500 m tiles for the whole council
+ * (`terrainTiles.ts`, `pipeline/.../terrain_tiles.py`); this file keeps the ramp
+ * itself, which the legend draws and the pipeline's copy is checked against. The previous comment argued that the surface's 25 cm accuracy
  * could not support a scale in metres; that was true of a percentile ramp with
  * nothing to anchor it, and it does not hold for this one. The finest step
  * named on the legend is a metre, four times the error, and heights are
@@ -50,8 +52,6 @@
  * to 16°. A multiply with nothing above 1 cannot clip.
  */
 
-import type { TerrainMarks } from './terrainMarks.js';
-import { type Viewport, toScreen } from './viewport.js';
 
 export class TerrainError extends Error {}
 
@@ -100,11 +100,6 @@ export const BUILDING_HEX = '#ceccc8';
  * the street pattern still reads, and the height underneath it still shows.
  */
 export const ROAD_OVER_TERRAIN = 'rgba(255, 255, 255, 0.66)';
-
-/** The hillshade byte to a multiply factor: `0.5 + 0.5 × (0.62 + 0.38 × hs)`. */
-export function shadeFactor(byte: number): number {
-  return 0.5 + 0.5 * (0.62 + (0.38 * byte) / 255);
-}
 
 export function hexToRgb(hex: string): Rgb {
   const value = Number.parseInt(hex.slice(1), 16);
@@ -177,193 +172,4 @@ export interface TerrainExtent {
   readonly min_n: number;
   readonly width_m: number;
   readonly height_m: number;
-}
-
-export interface TerrainRaster {
-  readonly cols: number;
-  readonly rows: number;
-  /** Metres AHD, row 0 being the northern edge. */
-  readonly groundM: Float32Array;
-  /** One byte per cell, 1 inside a building footprint. */
-  readonly building: Uint8Array;
-  /** Hillshade bytes, already attenuated where the ground was interpolated. */
-  readonly shade: Uint8Array;
-  readonly extent: TerrainExtent;
-}
-
-interface Header {
-  grid?: { rows?: number; cols?: number };
-  extent?: Partial<TerrainExtent>;
-  arrays?: {
-    ground?: { file?: string; scale?: number };
-    buildings?: { file?: string };
-    shade?: { file?: string };
-  };
-}
-
-/** Read the display terrain: raw ground, building mask and hillshade. */
-export async function loadTerrain(
-  base: string,
-  {
-    fetchJson = (url: string) => fetch(url).then((r) => r.json()),
-    fetchBinary = (url: string) => fetch(url).then((r) => r.arrayBuffer()),
-  }: {
-    fetchJson?: (url: string) => Promise<unknown>;
-    fetchBinary?: (url: string) => Promise<ArrayBuffer>;
-  } = {},
-): Promise<TerrainRaster> {
-  const header = (await fetchJson(`${base}/terrain.json`)) as Header;
-  const rows = header.grid?.rows ?? 0;
-  const cols = header.grid?.cols ?? 0;
-  const ground = header.arrays?.ground;
-  const extent = header.extent;
-
-  if (!(rows > 0) || !(cols > 0)) throw new TerrainError('the terrain declares a grid with no area');
-  if (typeof ground?.file !== 'string') throw new TerrainError('the terrain does not name its ground array');
-  if (!((ground.scale ?? 0) > 0)) throw new TerrainError('the terrain does not say how to scale its heights');
-  if (typeof header.arrays?.buildings?.file !== 'string' || typeof header.arrays.shade?.file !== 'string') {
-    throw new TerrainError('the terrain does not name its building and shade arrays');
-  }
-  if (
-    !extent ||
-    !Number.isFinite(extent.min_e) ||
-    !Number.isFinite(extent.min_n) ||
-    !((extent.width_m ?? 0) > 0) ||
-    !((extent.height_m ?? 0) > 0)
-  ) {
-    // Without it the raster is placed wherever the map happens to start, which
-    // on the council map is 1.5 km west and 6 km south of Kensington.
-    throw new TerrainError('the terrain does not say where it is');
-  }
-
-  const cells = rows * cols;
-  const [centimetres, bits, shade] = await Promise.all([
-    fetchBinary(`${base}/${ground.file}`).then((b) => new Int16Array(b)),
-    fetchBinary(`${base}/${header.arrays.buildings.file}`).then((b) => new Uint8Array(b)),
-    fetchBinary(`${base}/${header.arrays.shade.file}`).then((b) => new Uint8Array(b)),
-  ]);
-  if (centimetres.length !== cells) {
-    throw new TerrainError(`the ground array holds ${String(centimetres.length)} cells but the grid is ${String(cells)}`);
-  }
-  if (shade.length !== cells) {
-    throw new TerrainError(`the shade array holds ${String(shade.length)} cells but the grid is ${String(cells)}`);
-  }
-  if (bits.length !== Math.ceil(cells / 8)) {
-    throw new TerrainError(`the building mask holds ${String(bits.length)} bytes but the grid needs ${String(Math.ceil(cells / 8))}`);
-  }
-
-  const groundM = new Float32Array(cells);
-  const building = new Uint8Array(cells);
-  for (let cell = 0; cell < cells; cell += 1) {
-    groundM[cell] = centimetres[cell]! / ground.scale!;
-    building[cell] = (bits[cell >> 3]! >> (7 - (cell & 7))) & 1;
-  }
-  return { cols, rows, groundM, building, shade, extent: extent as TerrainExtent };
-}
-
-/** The two images the map draws: colour under the roads, shade over them. */
-export interface PaintedTerrain {
-  readonly colour: HTMLCanvasElement;
-  readonly shade: HTMLCanvasElement;
-  readonly extent: TerrainExtent;
-  /** Contours and spot heights, when they loaded. The layer still draws without them. */
-  readonly marks?: TerrainMarks;
-}
-
-/**
- * Paint both rasters once, at their own resolution.
- *
- * Kept as canvases so panning and zooming are a `drawImage` rather than a
- * million-cell loop per frame. The colour ramp is looked up per centimetre
- * rather than computed per cell.
- */
-export function rasterise(
-  terrain: TerrainRaster,
-  create: (w: number, h: number) => HTMLCanvasElement,
-): PaintedTerrain {
-  const colourCanvas = create(terrain.cols, terrain.rows);
-  const shadeCanvas = create(terrain.cols, terrain.rows);
-  const colourContext = colourCanvas.getContext('2d');
-  const shadeContext = shadeCanvas.getContext('2d');
-  if (colourContext === null || shadeContext === null) {
-    throw new TerrainError('a canvas for the terrain could not be created');
-  }
-
-  const building = hexToRgb(BUILDING_HEX);
-  const cache = new Map<number, Rgb>();
-  const colour = colourContext.createImageData(terrain.cols, terrain.rows);
-  const shade = shadeContext.createImageData(terrain.cols, terrain.rows);
-  for (let cell = 0; cell < terrain.groundM.length; cell += 1) {
-    const at = cell * 4;
-    const isBuilding = terrain.building[cell] === 1;
-    let rgb = building;
-    if (!isBuilding) {
-      const key = Math.round(terrain.groundM[cell]! * 100);
-      rgb = cache.get(key) ?? rampColour(key / 100);
-      cache.set(key, rgb);
-    }
-    colour.data[at] = rgb[0];
-    colour.data[at + 1] = rgb[1];
-    colour.data[at + 2] = rgb[2];
-    colour.data[at + 3] = 255;
-
-    // Buildings take no shading: a white multiply leaves them as they are.
-    const grey = isBuilding ? 255 : Math.round(255 * shadeFactor(terrain.shade[cell]!));
-    shade.data[at] = grey;
-    shade.data[at + 1] = grey;
-    shade.data[at + 2] = grey;
-    shade.data[at + 3] = 255;
-  }
-  colourContext.putImageData(colour, 0, 0);
-  shadeContext.putImageData(shade, 0, 0);
-  return { colour: colourCanvas, shade: shadeCanvas, extent: terrain.extent };
-}
-
-/**
- * Where the raster lands on screen, in the frame of the map being drawn.
- *
- * Every artefact's coordinates are metres from its own extent's south-west
- * corner. The terrain is Kensington's square kilometre; the map may be the
- * whole council. So the raster is offset by the difference between the two
- * corners, not stretched over the map's bounds.
- */
-export function placement(
-  terrain: TerrainExtent,
-  map: { readonly min_e?: number; readonly min_n?: number },
-  viewport: Viewport,
-): { left: number; top: number; width: number; height: number } {
-  const east = terrain.min_e - (map.min_e ?? terrain.min_e);
-  const north = terrain.min_n - (map.min_n ?? terrain.min_n);
-  const [left, top] = toScreen(viewport, [east, north + terrain.height_m]);
-  const [right, bottom] = toScreen(viewport, [east + terrain.width_m, north]);
-  return { left, top, width: right - left, height: bottom - top };
-}
-
-/** The colour raster, opaque, under the roads. */
-export function drawTerrain(
-  context: CanvasRenderingContext2D,
-  painted: PaintedTerrain,
-  viewport: Viewport,
-  map: { readonly min_e?: number; readonly min_n?: number },
-): void {
-  const { left, top, width, height } = placement(painted.extent, map, viewport);
-  context.save();
-  context.imageSmoothingEnabled = true;
-  context.drawImage(painted.colour, left, top, width, height);
-  context.restore();
-}
-
-/** The hillshade, multiplied over the colour and the roads together. */
-export function drawTerrainShade(
-  context: CanvasRenderingContext2D,
-  painted: PaintedTerrain,
-  viewport: Viewport,
-  map: { readonly min_e?: number; readonly min_n?: number },
-): void {
-  const { left, top, width, height } = placement(painted.extent, map, viewport);
-  context.save();
-  context.globalCompositeOperation = 'multiply';
-  context.imageSmoothingEnabled = true;
-  context.drawImage(painted.shade, left, top, width, height);
-  context.restore();
 }

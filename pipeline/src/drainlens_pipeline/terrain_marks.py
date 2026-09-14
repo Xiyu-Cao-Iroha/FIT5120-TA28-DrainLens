@@ -212,54 +212,76 @@ def road_mask(roads: list[dict], rows: int, cols: int) -> np.ndarray:
 
 
 def spot_heights(
-    ground: np.ndarray, measured: np.ndarray, buildings: np.ndarray, roads: np.ndarray
+    ground: np.ndarray,
+    measured: np.ndarray,
+    buildings: np.ndarray,
+    roads: np.ndarray,
+    *,
+    origin: tuple[int, int] = (0, 0),
+    grid_rows: int | None = None,
+    squares: list[tuple[int, int]] | None = None,
 ) -> list[dict]:
-    """Up to three candidates per 80 m square, with stable ids and a priority."""
+    """Up to three candidates per 80 m square, with stable ids and a priority.
+
+    The arrays may be one block of a larger grid: `origin` is the block's
+    (row, column) in that grid, `grid_rows` the grid's height (for northing),
+    and `squares` the (tx, ty) squares of the grid to answer for. Ids and
+    coordinates are the whole grid's, so a square gets the same id whichever
+    block it was computed in.
+    """
     if not (ground.shape == measured.shape == buildings.shape == roads.shape):
         raise TerrainMarksError("the ground, measured, building and road grids are not the same shape")
     rows, cols = ground.shape
+    row0, col0 = origin
+    total_rows = rows if grid_rows is None else grid_rows
     coverage = ndimage.uniform_filter(measured.astype(np.float64), size=SPOT_COVERAGE_WINDOW_M, mode="nearest")
     usable = ~buildings & ~roads & (coverage >= SPOT_MIN_MEASURED)
     usable = ndimage.binary_erosion(usable, structure=np.ones((SPOT_EROSION_CELLS, SPOT_EROSION_CELLS), dtype=bool))
 
+    if squares is None:
+        squares = [
+            (tx, ty)
+            for ty in range(math.ceil(rows / SPOT_TILE_M))
+            for tx in range(math.ceil(cols / SPOT_TILE_M))
+        ]
+
     points: list[dict] = []
-    for ty in range(math.ceil(rows / SPOT_TILE_M)):
-        for tx in range(math.ceil(cols / SPOT_TILE_M)):
-            r0, c0 = ty * SPOT_TILE_M, tx * SPOT_TILE_M
-            block = usable[r0 : r0 + SPOT_TILE_M, c0 : c0 + SPOT_TILE_M]
-            cell_r, cell_c = np.nonzero(block)
-            if cell_r.size < 3:
+    for tx, ty in squares:
+        r0, c0 = ty * SPOT_TILE_M - row0, tx * SPOT_TILE_M - col0
+        lo_r, lo_c = max(r0, 0), max(c0, 0)
+        block = usable[lo_r : r0 + SPOT_TILE_M, lo_c : c0 + SPOT_TILE_M]
+        cell_r, cell_c = np.nonzero(block)
+        if cell_r.size < 3:
+            continue
+        cell_r, cell_c = cell_r + lo_r, cell_c + lo_c
+        heights = ground[cell_r, cell_c].astype(np.float64)
+        priority = coverage[cell_r, cell_c]
+        first, second = np.percentile(heights, [100 / 3, 200 / 3])
+        bands = (heights <= first, (heights > first) & (heights <= second), heights > second)
+        taken: set[float] = set()
+        for tier, band in zip(TIERS, bands):
+            index = np.nonzero(band)[0]
+            if index.size == 0:
                 continue
-            heights = ground[r0 + cell_r, c0 + cell_c].astype(np.float64)
-            priority = coverage[r0 + cell_r, c0 + cell_c]
-            first, second = np.percentile(heights, [100 / 3, 200 / 3])
-            bands = (heights <= first, (heights > first) & (heights <= second), heights > second)
-            taken: set[float] = set()
-            for tier, band in zip(TIERS, bands):
-                index = np.nonzero(band)[0]
-                if index.size == 0:
-                    continue
-                median = float(np.median(heights[index]))
-                # Most measured first; then nearest the band's middle height; then north-west.
-                order = np.lexsort(
-                    (cell_c[index], cell_r[index], np.abs(heights[index] - median), -priority[index])
-                )
-                best = index[order[0]]
-                rounded = round(float(heights[best]) / SPOT_ROUNDING_M) * SPOT_ROUNDING_M
-                if rounded in taken:
-                    continue
-                taken.add(rounded)
-                row, col = int(r0 + cell_r[best]), int(c0 + cell_c[best])
-                points.append(
-                    {
-                        "id": f"sp-{tx:03d}-{ty:03d}-{tier}",
-                        "tier": tier,
-                        "e": col + 0.5,
-                        "n": rows - (row + 0.5),
-                        "heightM": rounded,
-                        "priority": round(float(priority[best]), 3),
-                    }
-                )
+            median = float(np.median(heights[index]))
+            # Most measured first; then nearest the band's middle height; then north-west.
+            order = np.lexsort((cell_c[index], cell_r[index], np.abs(heights[index] - median), -priority[index]))
+            best = index[order[0]]
+            rounded = round(float(heights[best]) / SPOT_ROUNDING_M) * SPOT_ROUNDING_M
+            if rounded in taken:
+                continue
+            taken.add(rounded)
+            row, col = int(row0 + cell_r[best]), int(col0 + cell_c[best])
+            points.append(
+                {
+                    "id": f"sp-{tx:03d}-{ty:03d}-{tier}",
+                    "tier": tier,
+                    "e": col + 0.5,
+                    "n": total_rows - (row + 0.5),
+                    "heightM": rounded,
+                    "priority": round(float(priority[best]), 3),
+                }
+            )
     return points
 
 

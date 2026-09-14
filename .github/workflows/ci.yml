@@ -81,6 +81,12 @@ jobs:
       - name: Check the scenario tile pack against its index and the council map
         run: node tools/data/check-scene-tiles.mjs
 
+      # The Terrain layer fetches a tile by name as its square comes into view.
+      # A missing one is a square of the council that stays blurred, with
+      # nothing on screen to say why; and its tiles must be the scenario pack's.
+      - name: Check the terrain tile pack against its index and the scenario pack
+        run: node tools/data/check-terrain-tiles.mjs
+
       # The verified events are written by hand, so nothing rebuilds them and
       # nothing else notices an event tied to an area the map does not have —
       # that event is shown nowhere, silently.

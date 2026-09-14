@@ -30,8 +30,9 @@ import {
 } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
-import { type PaintedTerrain, ROAD_OVER_TERRAIN, drawTerrain, drawTerrainShade } from './terrain.js';
+import { ROAD_OVER_TERRAIN } from './terrain.js';
 import { drawTerrainMarks } from './terrainMarks.js';
+import { type TerrainTiles, drawTerrainColour, drawTerrainShade, marksInView } from './terrainTiles.js';
 import { MapControls, STEP } from './MapControls.js';
 import type { Trace } from '../trace/graph.js';
 
@@ -47,8 +48,13 @@ export interface MapCanvasProps {
   readonly suggestedPit?: number | null;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
-  /** The painted terrain rasters, or null when the layer is off or not loaded. */
-  readonly terrain?: PaintedTerrain | null;
+  /** The terrain tiles, or null when the layer is off or not loaded. */
+  readonly terrain?: TerrainTiles | null;
+  /**
+   * Bumped whenever a terrain tile arrives, so the canvas redraws with it. The
+   * tiles object itself does not change identity as it fills.
+   */
+  readonly terrainVersion?: number;
   /**
    * How many metres wide the view is when it opens, instead of `LOCAL_SCALE`.
    *
@@ -133,6 +139,7 @@ export function MapCanvas({
   suggestedPit = null,
   comparablePits = null,
   terrain = null,
+  terrainVersion = 0,
   openAcrossM,
   locked = false,
   showPipes = true,
@@ -227,12 +234,13 @@ export function MapCanvas({
         ? {
             palette: { ...DAY, road: ROAD_OVER_TERRAIN },
             beneathRoads: (c: CanvasRenderingContext2D) => {
-              drawTerrain(c, terrain, viewport, artefact.extent);
+              drawTerrainColour(c, terrain, viewport, artefact.extent);
             },
             overRoads: (c: CanvasRenderingContext2D) => {
               drawTerrainShade(c, terrain, viewport, artefact.extent);
               // Contours and spot heights over the shading, under the network.
-              if (terrain.marks) drawTerrainMarks(c, terrain.marks, viewport, artefact.extent);
+              const marks = marksInView(terrain, viewport, artefact.extent);
+              if (marks) drawTerrainMarks(c, marks, viewport, artefact.extent);
             },
           }
         : {}),
@@ -248,7 +256,7 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, address, trace,
-      terrain, showPipes, showPits, difference]);
+      terrain, terrainVersion, showPipes, showPits, difference]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

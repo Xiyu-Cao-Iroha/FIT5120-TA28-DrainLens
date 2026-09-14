@@ -13,7 +13,9 @@ requires-python = ">=3.11"
 # openpyxl reads the SES workbook (.xlsx); xlrd reads the ABS population
 # estimates, which are published as the older OLE2 .xls that openpyxl refuses
 # and that nothing here can write — see the note at the top of population.py.
-dependencies = ["numpy>=1.26", "scipy>=1.11", "openpyxl>=3.1", "xlrd>=2.0"]
+# pillow writes the terrain tiles as WebP; like the others it never reaches the
+# browser, only its output does.
+dependencies = ["numpy>=1.26", "scipy>=1.11", "openpyxl>=3.1", "xlrd>=2.0", "pillow>=10.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -88,7 +88,7 @@ export async function criticalPath(base) {
 
   const assets = [...entry, ...workers];
 
-  const terrain = await (await get(base + '/data/terrain/terrain.json')).json();
+  const terrain = await (await get(base + '/data/terrain-tiles/index.json')).json();
 
   /**
    * The arrays a reachable screen actually fetches, which is now one.
@@ -109,18 +109,21 @@ export async function criticalPath(base) {
    * than trusted. Verified against the source on 5 September.
    */
   //
-  // Since 14 September the map's Terrain layer reads its own display terrain,
-  // `/data/terrain/`, and not the scene: the raw ground, the building mask and
-  // the hillshade. The scenario worker reads `/data/scene-tiles/`.
-  const REACHABLE = ['ground', 'buildings', 'shade'];
-  const arrays = REACHABLE.map((name) => `/data/terrain/${terrain.arrays[name].file}`);
+  // Since 14 September the map's Terrain layer is pre-coloured tiles for the
+  // whole council, `/data/terrain-tiles/`. What a map visit fetches before any
+  // tile is the index and the council overview; tiles follow the view, so they
+  // are not part of a fixed first visit and are not counted here.
+  const arrays = [
+    `/data/terrain-tiles/${terrain.overview.colour}`,
+    `/data/terrain-tiles/${terrain.overview.shade}`,
+  ];
 
   return {
     document: ['/'],
     code: assets,
-    artefacts: [...FIXED, '/data/terrain/terrain.json'],
+    artefacts: [...FIXED, '/data/terrain-tiles/index.json'],
     scene: arrays,
-    all: ['/', ...assets, ...FIXED, '/data/terrain/terrain.json', ...arrays],
+    all: ['/', ...assets, ...FIXED, '/data/terrain-tiles/index.json', ...arrays],
   };
 }
 
