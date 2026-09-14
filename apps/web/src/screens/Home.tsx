@@ -170,6 +170,12 @@ export interface HomeProps {
   readonly history: FloodHistoryArtefact;
   /** Called with the mode the map should open in, or nothing for all of them. */
   readonly onOpenMap: (mode?: MapMode) => void;
+  /**
+   * The full map itself, through the notice before it — what the chooser's
+   * *Skip to Full map* does. Not `onOpenMap`: a link named after the full map
+   * that opened the chooser was the user test's 15 September finding.
+   */
+  readonly onOpenFullMap: () => void;
   readonly onOpenHistory: () => void;
   /** The flood area map, from the picture of it. */
   readonly onOpenFloodMap: () => void;
@@ -177,7 +183,14 @@ export interface HomeProps {
   readonly onCompare: () => void;
 }
 
-export function Home({ history, onOpenMap, onOpenHistory, onOpenFloodMap, onCompare }: HomeProps) {
+export function Home({
+  history,
+  onOpenMap,
+  onOpenFullMap,
+  onOpenHistory,
+  onOpenFloodMap,
+  onCompare,
+}: HomeProps) {
   return (
     /*
       `height: 100%` is what lets the hero's `minHeight: 100%` mean the first
@@ -207,7 +220,7 @@ export function Home({ history, onOpenMap, onOpenHistory, onOpenFloodMap, onComp
             onOpenMap();
           }}
         />
-        <Paths onOpenMap={onOpenMap} />
+        <Paths onOpenMap={onOpenMap} onOpenFullMap={onOpenFullMap} />
         <FloodSection
           history={history}
           onOpenHistory={onOpenHistory}
@@ -770,7 +783,7 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
 
   return (
     <div>
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ol className="home__ranks" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {top.map((area) => (
           <li
             key={area.name}
@@ -860,7 +873,13 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
   );
 }
 
-function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) {
+function Paths({
+  onOpenMap,
+  onOpenFullMap,
+}: {
+  readonly onOpenMap: (mode?: MapMode) => void;
+  readonly onOpenFullMap: () => void;
+}) {
   return (
     <Band tone="photo" id={SECTIONS.paths}>
       <SectionHeading
@@ -891,12 +910,18 @@ function Paths({ onOpenMap }: { readonly onOpenMap: (mode?: MapMode) => void }) 
         The unnarrowed way in, kept quieter than the four. Somebody who already
         knows what the map holds should not have to pick a question first, but
         it is the wrong first suggestion for somebody who does not.
+
+        It goes where it says: the full map, through the notice before it, as
+        the chooser's *Skip to Full map* does. It used to open the chooser,
+        which is the four cards' door, and a reader who pressed a link named
+        after the full map landed on a question instead (user test, 15
+        September).
       */}
       <p style={{ margin: `${String(space(5))}px 0 0` }}>
         <button
           type="button"
           onClick={() => {
-            onOpenMap();
+            onOpenFullMap();
           }}
           style={{
             background: 'none',
@@ -1041,24 +1066,35 @@ function FloodMapCard({
         transition: 'box-shadow 120ms ease, border-color 120ms ease',
       }}
     >
-      <img
-        src="/flood-areas-thumb.webp"
-        alt=""
-        width={960}
-        height={720}
-        loading="lazy"
-        decoding="async"
-        style={{
-          display: 'block',
-          width: '100%',
-          height: 'auto',
-          aspectRatio: '4 / 3',
-          objectFit: 'cover',
-          background: '#e3e8ec',
-          borderBottom: `1px solid ${line.hair}`,
-        }}
-      />
-      <span style={{ display: 'block', padding: space(5), flex: 1 }}>
+      {/*
+        The frame, not the picture, decides the height: 4:3 when the cards are
+        stacked, and beside the ranking whatever room the ranking leaves (see
+        `.home__flood-thumb`). The picture is contained in it rather than
+        cropped, on its own ground colour, so a taller or wider frame adds
+        margin and never cuts off the bay.
+      */}
+      <span
+        className="home__flood-thumb"
+        style={{ background: '#e3e7eb', borderBottom: `1px solid ${line.hair}` }}
+      >
+        <img
+          src="/flood-areas-thumb.webp"
+          alt=""
+          width={960}
+          height={720}
+          loading="lazy"
+          decoding="async"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      </span>
+      <span style={{ display: 'block', padding: space(5), flex: 'none' }}>
         <span style={{ ...cardTitle, display: 'block', margin: `0 0 ${String(space(2))}px` }}>
           The flood area map
         </span>

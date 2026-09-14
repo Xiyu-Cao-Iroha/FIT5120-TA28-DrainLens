@@ -8,6 +8,7 @@
  */
 
 import type { Pipe, Pit } from './artefact.js';
+import { COMPARISON_MARK_R, SUGGESTED_HALO_R } from './draw.js';
 import { type Local, type Screen, type Viewport, toScreen } from './viewport.js';
 
 /**
@@ -102,12 +103,88 @@ export function pick(
     }
   }
   if (best !== null) return best;
+  return pickPipe(point, viewport, layers.pipe ?? [], radiusPx);
+}
 
-  for (const feature of layers.pipe ?? []) {
+const pickPipe = (point: Screen, viewport: Viewport, pipes: readonly Pipe[], radiusPx: number): Hit | null => {
+  let best: Hit | null = null;
+  for (const feature of pipes) {
     const distancePx = distanceToPath(point, feature.c, viewport);
     if (distancePx <= radiusPx && (best === null || distancePx < best.distancePx)) {
       best = { kind: 'pipe', feature, distancePx };
     }
   }
   return best;
+};
+
+/** What the comparison's map says about each pit, as far as a press is concerned. */
+export interface ComparisonPickMarks {
+  /** Asset numbers the comparison can use. */
+  readonly comparable: ReadonlySet<string>;
+  /** Step 1's highlighted drain, which answers a press anywhere on its ripple. */
+  readonly suggested: number | null;
+  /** The chosen drain, from step 2 on. Painted on top like the suggestion. */
+  readonly selected?: number | null;
+}
+
+/**
+ * Radius of the suggested and selected markers' painted disc, stroke included.
+ * `COMPARISON_MARK_R` in `draw.ts` plus half its 3-pixel edge.
+ */
+const MARK_DISC_R = COMPARISON_MARK_R + 1.5;
+
+/**
+ * The nearest thing within reach of a press on the comparison's map, where a
+ * drain that can be chosen outranks one that cannot.
+ *
+ * **Plain `pick` chose the wrong drain in a user test.** At 200 Bourke Street
+ * the highlighted drain is about 10 m from the address, a grey pit sits a few
+ * metres from it, and a press on the highlighted drain's ripple was nearer
+ * the grey pit's centre than the drain's own — so the press step 1 asks for
+ * answered *Can't be tested* and selected nothing. Nearest-wins is right on
+ * the full map, where every pit is equal; here one pit is the question and
+ * the grey ones are background.
+ *
+ * In order:
+ *
+ * 1. **A press on the highlighted (or chosen) drain's painted disc is that
+ *    drain.** The disc is drawn over every pit beneath it, so a pit whose
+ *    centre happens to be nearer is not what the person could see there.
+ * 2. **Otherwise the nearest drain that can be chosen** — the highlighted one
+ *    anywhere on its ripple, any other comparable drain within the ordinary
+ *    tap radius. Found at Bayswater Road: a second comparable drain 14 px
+ *    from the highlighted one, whose visible edge must stay pressable.
+ * 3. **A grey pit only when nothing selectable is in reach**, which keeps its
+ *    one-line reason for a press that really was meant for it.
+ * 4. Pipes last, as in `pick`.
+ */
+export function pickComparison(
+  point: Screen,
+  viewport: Viewport,
+  layers: { readonly pit?: readonly Pit[]; readonly pipe?: readonly Pipe[] },
+  marks: ComparisonPickMarks,
+  radiusPx: number = TAP_RADIUS_PX,
+): Hit | null {
+  const emphasised = marks.suggested ?? marks.selected ?? null;
+  let onDisc: Hit | null = null;
+  let selectable: Hit | null = null;
+  let grey: Hit | null = null;
+
+  for (const feature of layers.pit ?? []) {
+    const [x, y] = toScreen(viewport, feature.c);
+    const distancePx = Math.hypot(point[0] - x, point[1] - y);
+    const hit: Hit = { kind: 'pit', feature, distancePx };
+    const isEmphasised = emphasised !== null && feature.asset_number === emphasised;
+    if (isEmphasised && distancePx <= MARK_DISC_R) onDisc = hit;
+
+    const suggested = marks.suggested !== null && feature.asset_number === marks.suggested;
+    if (distancePx > (suggested ? Math.max(radiusPx, SUGGESTED_HALO_R) : radiusPx)) continue;
+    if (isEmphasised || marks.comparable.has(String(feature.asset_number ?? ''))) {
+      if (selectable === null || distancePx < selectable.distancePx) selectable = hit;
+    } else if (grey === null || distancePx < grey.distancePx) {
+      grey = hit;
+    }
+  }
+
+  return onDisc ?? selectable ?? grey ?? pickPipe(point, viewport, layers.pipe ?? [], radiusPx);
 }

@@ -131,6 +131,19 @@ export function fit(widthPx: number, heightPx: number, bounds: Bounds): Viewport
 export const LOCAL_SCALE = 3;
 
 /**
+ * The scale to show a newly chosen address at: never further out than local.
+ *
+ * Moving to an address at the scale the view already had was right while the
+ * map was one square kilometre. Over the council the full map opens at the
+ * whole extent, about a tenth of a pixel per metre, and the user test of
+ * 15 September searched 10 Lygon Street from there: the map slid to Carlton
+ * and stayed so far out that the pin was a dot and no drain was visible. A view
+ * already closer than local is kept, so somebody zoomed in to one street is not
+ * pulled back out.
+ */
+export const scaleForAddress = (current: number): number => Math.max(current, LOCAL_SCALE);
+
+/**
  * The whole extent, centred on `at`, at `scale`.
  *
  * Clamped, so asking to centre on an address near the boundary moves the view

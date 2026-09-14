@@ -45,7 +45,18 @@ export interface Presentation {
   readonly title: string;
   /** The small label above the finding. */
   readonly band: string;
-  readonly finding: string;
+  /**
+   * A bold line under the heading, or null when the heading already says it.
+   *
+   * Null on both bands. Their heading *is* the band's name, and in the
+   * 15 September user test *No clear difference* was on one result five
+   * times -- heading, this line, the body, the callout and the summary -- which
+   * read as insisting rather than informing. The insufficient states keep
+   * theirs, because their heading is only *Insufficient information* and this
+   * line is what says which kind.
+   */
+  readonly finding: string | null;
+  /** One plain sentence, which must not repeat the heading. */
   readonly body: string;
   /** What goes in the summary's Comparison field. */
   readonly comparison: string;
@@ -69,8 +80,10 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
   'higher-than-baseline': {
     title: COMPARISON_TITLE,
     band: 'More water than with a clear drain',
-    finding: 'More water remains on the ground near this low area',
-    body: 'In this comparison, less water enters the selected drain and more remains on the ground near the highlighted low area.',
+    finding: null,
+    // Not "near the highlighted low area": the comparison's map no longer
+    // draws low areas, and the purple has its own line beside this one.
+    body: 'With your drain setting, less water enters the selected drain, so more stays on the ground nearby.',
     comparison: 'More water than with a clear drain',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: true,
@@ -79,8 +92,10 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
     title: COMPARISON_TITLE,
     // Plain words from the 14 September copy review, over AC 3.1.3.e's band names.
     band: 'No clear difference',
-    finding: 'No clear difference was found between the two drain settings',
-    body: 'For this total rainfall, the calculation found no clear difference between the blocked and clear settings.',
+    finding: null,
+    // What the heading means, in other words. What it does not mean is
+    // `NO_CLEAR_CHANGE_MEANS`, which the screen shows beside this.
+    body: 'At this total rainfall, the calculation could not separate your drain setting from a clear drain.',
     comparison: 'No clear difference',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: false,
@@ -232,7 +247,7 @@ export const RAINFALL_CONTROL_NOTE =
  * water is added (evenly, from dry ground) is in `HOW_IT_WAS_PRODUCED`.
  */
 export const RAINFALL_EXPLAINED =
-  'Choose the same total rainfall for both drain settings. This is not a forecast and does not include rainfall duration or intensity.';
+  'The same amount is used for both drain settings. It is not a forecast and does not include rainfall duration or intensity.';
 
 /**
  * What "No clear difference" means, said outright beside the finding.
