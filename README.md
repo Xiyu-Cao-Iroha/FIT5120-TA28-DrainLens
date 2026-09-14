@@ -122,9 +122,9 @@ Re-measured on **11 September 2026**, on this laptop, in a self-check that ran e
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **94.82%** Node · **92.71%** Python |
+| Coverage, overall | ≥ 88% | **94.88%** Node · **92.89%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **1,094** Node unit across 59 files · **62** database across 4 · **551** Python across 24 — **1,707** |
+| Tests | — | **1,106** Node unit across 60 files · **62** database across 4 · **564** Python across 25 — **1,732** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |

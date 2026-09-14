@@ -51,7 +51,8 @@ import {
 import type { MapNow } from '../tutorial/lesson.js';
 import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
-import { WaterCompass } from '../map/WaterCompass.js';
+import { AddressInsight } from '../map/AddressInsight.js';
+import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type PaintedTerrain, loadTerrain, rasterise } from '../map/terrain.js';
 import { loadTerrainMarks } from '../map/terrainMarks.js';
 import type { SupportedAddress, Task } from '../session.js';
@@ -272,6 +273,28 @@ export function MapView({
       live = false;
     };
   }, []);
+
+  // Which way the ground falls around each address, precomputed. Loaded once;
+  // if it cannot be, the card still says what is near and says nothing about
+  // the ground rather than guessing.
+  const [groundIndex, setGroundIndex] = useState<AddressGroundArtefact | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadAddressGround()
+      .then((artefact) => {
+        if (live) setGroundIndex(artefact);
+      })
+      .catch(() => {
+        if (live) setGroundIndex(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const groundTrend = useMemo(
+    () => (address === null || groundIndex === null ? null : groundAt(groundIndex, address.id)),
+    [address, groundIndex],
+  );
 
   const explanation = useMemo(
     () =>
@@ -628,11 +651,11 @@ export function MapView({
             setAddressCardOpen(false);
           }}
         >
-          {explanation === null ? (
+          {explanation === null && groundTrend === null ? (
             'No surface-water path or low area was measured close enough to this address to say anything about it.'
           ) : (
             <>
-              <WaterCompass near={explanation} />
+              <AddressInsight ground={groundTrend} near={explanation} />
               <Badge basis={NEARBY_BASIS} />
             </>
           )}

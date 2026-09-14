@@ -406,7 +406,17 @@ Four seconds. Writes what the Terrain layer draws and nothing the engine reads �
 python -m drainlens_pipeline.terrain_marks --terrain ../data/terrain --map ../apps/web/public/data/map.json --out ../apps/web/public/data/terrain
 ```
 
-Three seconds. **Contours** (`terrain-contours.json`, 199 KB, 65 KB gzipped): marching squares at whole metres over the raw ground smoothed with a 2 m Gaussian, lines under 25 m dropped, simplified to 0.5 m — 304 lines, 36 at 5 m. **Spot heights** (`spot-heights.json`, 30 KB): up to three candidates per fixed 80 m square, the low, middle and high third of ground that is not a building, not a road, and at least 35% measured in 15 m (eroded 5 × 5); the most-measured cell in each third, rounded to 0.5 m, with stable ids — 357 candidates over 166 squares. The handover's own candidate file covers the same 166 squares, 257 ids match, their positions are a median 0.7 m apart, and the lowest heights agree within 0.5 m in 162 of the 166. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
+Three seconds. **Contours** (`terrain-contours.json`, 199 KB, 65 KB gzipped): marching squares at whole metres over the raw ground smoothed with a 2 m Gaussian, lines under 25 m dropped, simplified to 0.5 m — 304 lines, 36 at 5 m. **Spot heights** (`spot-heights.json`, 30 KB): up to three candidates per fixed 80 m square, the low, middle and high third of ground that is not a building, not a road, and at least 35% measured in 15 m (eroded 5 × 5); the most-measured cell in each third, rounded to 0.5 m, with stable ids — 357 candidates over 166 squares. The handover's own candidate file covers the same 166 squares, 257 ids match, their positions are a median 0.7 m apart, and the lowest heights agree within 0.5 m in 162 of the 166.
+
+## Which way the ground falls around each address — `address_ground`
+
+```bash
+python -m drainlens_pipeline.address_ground --terrain ../data/terrain --addresses ../apps/web/public/data/addresses.json --out ../apps/web/public/data/terrain/address-ground.json
+```
+
+23 seconds for the 4,089 addresses. A weighted plane over the raw ground within 75 m of each (no weight on buildings; 0.35 on interpolated open ground, 1 on measured), and a direction only when the fall across 150 m is at least 0.5 m, R² at least 0.30, the fit's weight at least 35% measured, and the 75 m and 100 m directions within 22.5° of each other. **1,982 falls (48.5%), 1,640 unclear (40.1%), 467 too near the edge of the measured ground (11.4%).** 456 KB, 28 KB gzipped.
+
+Compared with the handover's own `address-insight.sample.json`, matched by id: the same answer for 92.8% of addresses, and the same compass point for 98.4% of those both call reliable. Its measured-coverage values are reproduced exactly; its R² values are not (median difference 0.02, and 272 addresses it calls reliable fall under 0.30 here), so the difference is in how R² was taken, not in the thresholds. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
 
 ## Built since this file was first written
 
