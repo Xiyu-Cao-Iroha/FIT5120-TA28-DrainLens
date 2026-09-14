@@ -46,7 +46,7 @@ export const BOARD_CHANGES_NOTICE =
 
 /** What the flood map adds to its sources, the same clause as `CHANGES_NOTICE`. */
 export const FLOOD_CHANGES_NOTICE =
-  'The Severity Score and where each area is drawn are calculated from this data by DrainLens, not published by the sources.';
+  'The call-out rate and where each area is drawn are calculated from this data by DrainLens, not published by the sources.';
 
 interface NamedSource {
   readonly publisher: string;
@@ -83,7 +83,7 @@ export function creditsForSources(sources: readonly (NamedSource | undefined)[])
  * only their data.
  */
 export const CHANGES_NOTICE =
-  'Surface-water paths, low points and the ground surface are calculated from this data by DrainLens, not published by the source.';
+  'Likely water paths, low areas and ground height are calculated from this data by DrainLens, not published by the source.';
 
 export interface Credit {
   readonly publisher: string;

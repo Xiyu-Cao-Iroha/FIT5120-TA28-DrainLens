@@ -191,7 +191,7 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
           /*
             The view is held where it opened.
 
-            Every step says press *this* — a chip, the ringed pit, the button
+            Every step says select *this* — a chip, the ringed pit, the button
             on its card — and a reader who has dragged the map somewhere else
             is being asked for something no longer on screen, with nothing
             saying why. It also gives the corner back: the zoom and recentre
@@ -306,8 +306,8 @@ function Coach({
 
             {step.kind === 'do' && step.requires === 'pit-selected' && teaching !== null && (
               <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-                It is the ringed one, about {String(Math.round(teaching.metres / 10) * 10)} m from
-                your address. Pit {teaching.id}.
+                Select the ringed pit about {String(Math.round(teaching.metres / 10) * 10)} m from
+                the address. Council ID {teaching.id}.
               </p>
             )}
 
@@ -421,8 +421,7 @@ function NotWritten({
         {SECTIONS[section].label}
       </h2>
       <p style={{ margin: `0 0 ${String(space(5))}px`, font: type(text.body, { leading: 1.5 }), color: ink.muted }}>
-        This part of the guide is not written yet. Nothing has been unlocked, and nothing about the
-        map has changed.
+        Terrain guide coming soon.
       </p>
       <button type="button" onClick={onFinish} style={primary}>
         Back to the four →

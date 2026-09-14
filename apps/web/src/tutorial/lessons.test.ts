@@ -31,8 +31,8 @@ describe('which sections are on offer', () => {
   });
 
   it('leaves terrain out rather than offering an empty room', () => {
-    // The whole map is gated on finishing all four. A fourth lesson that
-    // walked somebody through nothing would open the gate and teach nothing.
+    // A fourth lesson that walked somebody through nothing would count as
+    // finished and teach nothing.
     expect(GUIDED_SECTIONS).not.toContain('terrain');
     expect(lessonFor('terrain')).toBeUndefined();
   });
@@ -82,8 +82,8 @@ describe.each(written)('%s', (id, lesson) => {
 
   it('offers a chip for every layer its steps ask for, by the step that asks', () => {
     /*
-     * The bug this catches: a step that says *press Water flow* with no Water
-     * flow chip on screen. It waits forever, and nothing else fails.
+     * The bug this catches: a step that says *Select Likely water paths* with
+     * no chip for it on screen. It waits forever, and nothing else fails.
      */
     const wanted: Partial<Record<string, string>> = {
       'pits-on': 'pit',

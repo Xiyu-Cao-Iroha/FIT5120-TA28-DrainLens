@@ -6,9 +6,9 @@
  * and where they came from. Kept apart, the two drift — a layer renamed in the
  * control and not in the legend is a map that disagrees with its own key.
  *
- * **One level: a chip is a layer.** Pits, Pipes, Water flow and Low areas are
- * the chips; Terrain and the data-quality hatching are switches behind the
- * Layers button. `modes.ts` holds the split and the note on why it departs
+ * **One level: a chip is a layer.** Drain pits, Drain pipes, Likely water
+ * paths and Low areas are the chips; Ground height and Limited ground data are
+ * switches behind the Layers button. `modes.ts` holds the split and the note on why it departs
  * from AC 1.1.4 and 1.1.5; this file only draws it.
  *
  * **The chips are multi-select.** All four can be on at once, and every layer
@@ -24,6 +24,7 @@ import {
   PANEL_KEYS,
 } from './modes.js';
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
+import { LAYER, SOURCE } from '../ui/terms.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -31,11 +32,11 @@ type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch';
 
 export interface LayerSpec {
   readonly key: LayerKey;
-  /** The short name on a chip. */
+  /** The name on a chip. */
   readonly chip: string;
-  /** The full name in the legend, which has room for it. */
+  /** The name in the legend and the panel: the same name, from `ui/terms.ts`. */
   readonly label: string;
-  readonly basis: 'Official recorded data' | 'System-derived result';
+  readonly basis: 'Council record' | 'Calculated by DrainLens';
   readonly swatch: Swatch;
 }
 
@@ -50,12 +51,12 @@ export interface LayerSpec {
  * control governs it is `modes.ts`.
  */
 export const LAYERS: readonly LayerSpec[] = [
-  { key: 'terrain', chip: 'Terrain', label: 'Ground surface', basis: 'System-derived result', swatch: 'ramp' },
-  { key: 'pipe', chip: 'Pipes', label: 'Drainage pipes', basis: 'Official recorded data', swatch: 'line' },
-  { key: 'pit', chip: 'Pits', label: 'Drainage pits', basis: 'Official recorded data', swatch: 'dot' },
-  { key: 'channel', chip: 'Water flow', label: 'Likely surface water paths', basis: 'System-derived result', swatch: 'flow' },
-  { key: 'lowPoint', chip: 'Low areas', label: 'Low points and depressions', basis: 'System-derived result', swatch: 'blob' },
-  { key: 'unavailable', chip: 'No ground data', label: 'Not enough ground measured', basis: 'System-derived result', swatch: 'hatch' },
+  { key: 'terrain', chip: LAYER.ground, label: LAYER.ground, basis: 'Calculated by DrainLens', swatch: 'ramp' },
+  { key: 'pipe', chip: LAYER.pipes, label: LAYER.pipes, basis: 'Council record', swatch: 'line' },
+  { key: 'pit', chip: LAYER.pits, label: LAYER.pits, basis: 'Council record', swatch: 'dot' },
+  { key: 'channel', chip: LAYER.paths, label: LAYER.paths, basis: 'Calculated by DrainLens', swatch: 'flow' },
+  { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, basis: 'Calculated by DrainLens', swatch: 'blob' },
+  { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, basis: 'Calculated by DrainLens', swatch: 'hatch' },
 ];
 
 /** The look-up the controls and the legend both go through. */
@@ -209,7 +210,7 @@ export interface LayerChipsProps {
    * Which chips to draw. All four unless the guide says otherwise.
    *
    * The guide shows the two the section is about and no more. That is not
-   * tidiness: its first instruction is *press Pits*, and a row of four chips
+   * tidiness: its first instruction is *press Drain pits*, and a row of four chips
    * makes that a search rather than a press. The layers left out are not
    * disabled — a disabled control is still a control somebody reads and
    * wonders about — they are the ones this section has not reached yet.
@@ -319,7 +320,7 @@ export function LayerChips({
                 color: ink.subtle,
               }}
             >
-              Other map layers
+              More map layers
             </p>
             {PANEL_KEYS.map((key) => {
               const spec = specOf(key);
@@ -362,7 +363,7 @@ export function LayerChips({
 }
 
 function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
-  const tone = which === 'Official recorded data' ? basis.recorded : basis.derived;
+  const tone = which === 'Council record' ? basis.recorded : basis.derived;
   return (
     <span
       style={{
@@ -384,8 +385,8 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
  * The legend, and where "distinguish official recorded data from system-derived
  * information" is met — AC 1.1.4, and AC 1.3.1 for the terrain in particular.
  *
- * The criterion asks that every layer carry *Official recorded data* or
- * *System-derived result*. It used to sit under each checkbox in the panel;
+ * The criterion asks that every layer carry *Council record* or
+ * *Calculated by DrainLens*. It used to sit under each checkbox in the panel;
  * with the controls compressed into chips there is no room for it there, and a
  * tooltip is not something a layer *carries*. So it lives here, on screen
  * beside the mark it describes, for every layer that is currently drawn.
@@ -490,9 +491,9 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
               color: ink.subtle,
             }}
           >
-            <BasisDot basis="Official recorded data" /> recorded by the council
+            <BasisDot basis="Council record" /> {SOURCE.recorded}
             <br />
-            <BasisDot basis="System-derived result" /> calculated by DrainLens
+            <BasisDot basis="Calculated by DrainLens" /> {SOURCE.derived}
           </p>
         </>
       )}
@@ -501,7 +502,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
 }
 
 /**
- * The ground surface, as a fixed scale in metres.
+ * Ground height, as a fixed scale in metres.
  *
  * **The whole ramp, always.** A legend that dropped the steps not in view
  * would change every time the map moved, and a key that changes under a
@@ -510,7 +511,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
  * It used to read *Lower* and *Higher* with no numbers, because the ramp was
  * fitted to the ground in view and a colour meant "low for around here". The
  * ramp is now fixed to metres AHD, so the numbers are what the colours mean.
- * `System-derived` is in the words as well as the dot: AC 1.3.1.
+ * *Calculated by DrainLens* is in the words as well as the dot: AC 1.3.1.
  */
 function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
@@ -567,15 +568,16 @@ function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
         ))}
       </div>
       <p style={micro}>metres above sea level (AHD), fixed everywhere</p>
-      <p style={micro}>Estimated ground height · system-derived</p>
-      <p style={micro}>Shading shows ground shape, not water depth.</p>
-      <p style={micro}>Contours: 1 m; bold every 5 m. ≈ numbers are spot heights, to 0.5 m.</p>
+      <p style={micro}>Estimated ground height · calculated by DrainLens</p>
+      <p style={micro}>Shading shows the shape of the land, not water depth.</p>
+      <p style={micro}>Ground-height lines · 1 m intervals, bold every 5 m</p>
+      <p style={micro}>≈ numbers are estimated ground heights, to 0.5 m, not surveyed points.</p>
     </div>
   );
 }
 
 function BasisDot({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
-  const recorded = which === 'Official recorded data';
+  const recorded = which === 'Council record';
   const tone = recorded ? basis.recorded : basis.derived;
   return (
     <span

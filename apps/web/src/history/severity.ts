@@ -316,22 +316,22 @@ export function completenessText(
   state: Completeness,
   incidentType: string,
 ): { readonly label: string; readonly body: string } {
-  const withheld = `A count inside this area was withheld for privacy — ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
+  const withheld = `At least one exact count within this area was not published, for privacy — ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
   switch (state) {
     case 'minimum':
-      return { label: 'Minimum value.', body: `${withheld} — so the total is a lower bound rather than a number.` };
+      return { label: 'Minimum total.', body: `${withheld} — so the real total may be higher.` };
     case 'none':
       return {
-        label: 'No recorded activity.',
-        body: `The SES recorded no ${incidentType.toLowerCase()} dispatch here across the whole period. That is different from a small number.`,
+        label: 'No recorded call-outs.',
+        body: `The SES recorded no ${incidentType.toLowerCase()} call-out here across the whole period. That is different from a small number.`,
       };
     case 'unavailable':
       return {
         label: 'Not available.',
-        body: `${area.complete ? 'The counts are exact' : `${withheld}, so the total is a minimum`}; the score is not published because there is no usable population to divide by.`,
+        body: `${area.complete ? 'The published total is complete' : `${withheld}, so the total is a minimum`}; there is no rate because the area has too few residents to divide by.`,
       };
     case 'exact':
-      return { label: 'Exact.', body: 'No count inside this area was withheld.' };
+      return { label: 'Complete published total.', body: 'No count within this area was withheld.' };
   }
 }
 
@@ -406,7 +406,7 @@ export const valueOf = (area: MapArea, mode: MapMode): number | null =>
  * the map's most common qualification invisible.
  */
 export function scoreLabel(area: MapArea): string {
-  if (area.rate === null) return 'No score';
+  if (area.rate === null) return 'No rate';
   return `${area.rate.toFixed(2)}${area.complete ? '' : '+'}`;
 }
 

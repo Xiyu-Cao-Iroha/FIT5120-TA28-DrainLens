@@ -19,6 +19,7 @@ import {
   notAPrediction,
   severityEvidence,
 } from './evidence.js';
+import { FLOOD } from '../ui/terms.js';
 import { type PointsArtefact, type PopulationArtefact, type ScopeAreas, joinAreas } from './severity.js';
 
 const DATA = path.resolve(__dirname, '../../public/data');
@@ -41,16 +42,17 @@ describe('AC 4.3.1: historical flood activity', () => {
 
   it('says where the data comes from, the years, and that it is grouped by area', () => {
     expect(all).toContain('Victoria State Emergency Service');
-    expect(all).toContain('2009-10 to 2014-15');
+    expect(all).toContain('2009–10 to 2014–15');
     expect(all).toContain('SA2');
   });
 
-  it('says one value is a dispatch, not a flood event', () => {
-    expect(all).toMatch(/one crew dispatch, not one flood/i);
+  it('says one value is a crew response, not a flood event', () => {
+    expect(all).toMatch(/one SES crew response, not one flood event/i);
   });
 
-  it('says some records were withheld, with the count read from the data', () => {
+  it('says some exact counts were not published, with the count read from the data', () => {
     expect(all).toContain('80 of the 281 areas');
+    expect(all).toMatch(/exact counts were not published/i);
   });
 
   it('says it is not current or future flooding', () => {
@@ -58,21 +60,23 @@ describe('AC 4.3.1: historical flood activity', () => {
   });
 });
 
-describe('AC 4.3.2: the Severity Score', () => {
+describe('AC 4.3.2: SES flood call-outs per 1,000 residents', () => {
   const all = text(severityEvidence(scope, population));
 
   it('names the data, the inputs, how they combine and the periods', () => {
     expect(all).toContain('Australian Bureau of Statistics');
     expect(all).toMatch(/divided by the residents on 2012-06-30, times 1,000/);
-    expect(all).toContain('fewer than 1,000 residents');
-    expect(all).toMatch(/Dispatches: 2009-07-01 to 2015-06-30\. Residents: one estimate, on 2012-06-30/);
+    expect(all).toContain('fewer than 1,000 residents are not given a rate');
+    expect(all).toMatch(/Call-outs: 2009-07-01 to 2015-06-30\. Residents: one estimate, on 2012-06-30/);
   });
 
   it('says it is calculated, what higher means, and the three things it is not', () => {
     expect(all).toContain('Calculated by DrainLens');
-    expect(all).toMatch(/More recorded flood-related SES activity relative to the number of people/);
+    expect(all).toMatch(/More recorded SES flood call-outs for every 1,000 people/);
     expect(all).toMatch(/not a count of people affected/i);
+    expect(all).toMatch(/does not measure flood depth, damage, probability or current risk/);
     expect(all).toMatch(/how deep or damaging any flood was, how likely flooding is, or what flood risk/);
+    expect(all).not.toMatch(/score|severity/i);
   });
 });
 
@@ -80,16 +84,18 @@ describe('AC 4.3.3: coverage and uncertainty', () => {
   const all = text(coverageEvidence(scope, population, areas));
 
   it('names what is missing, the years, and the mismatch between periods', () => {
-    expect(all).toContain('80 areas have withheld counts');
-    expect(all).toContain('7 areas have too few residents');
-    expect(all).toMatch(/Flash flooding/);
+    expect(all).toContain('80 areas have at least one exact count that was not published');
+    expect(all).toContain('7 areas have fewer than 1,000 residents');
+    expect(all).toMatch(/flash flooding/);
+    expect(all).toMatch(/simplified to about 25 metres/);
     expect(all).toMatch(/periods do not match exactly/i);
   });
 
-  it('separates source from calculated, fills nothing in, and says how the score is affected', () => {
+  it('separates source from calculated, fills nothing in, and says how the rate is affected', () => {
     expect(all).toMatch(/calculated by DrainLens/);
     expect(all).toMatch(/not treated as zero/);
-    expect(all).toMatch(/score is a minimum too/);
+    expect(all).toMatch(/rate is a minimum too/);
+    expect(all).toContain('The call-out rate and map symbol positions are calculated by DrainLens');
   });
 });
 
@@ -108,8 +114,8 @@ describe('AC 4.3.4 and the map header', () => {
   });
 
   it('says neither view is a prediction, with the years from the data', () => {
-    expect(notAPrediction(scope)).toMatch(/between 2009-10 and 2014-15\. Neither view is a forecast/);
-    expect(AREAS_NOTE).toMatch(/belongs to the whole area/);
-    expect(AREAS_NOTE).toMatch(/simplified to about 25 metres/);
+    expect(notAPrediction(scope)).toBe('This map shows SES records from 2009–10 to 2014–15, not current or future flooding.');
+    expect(AREAS_NOTE).toMatch(/applies to the whole statistical area/);
+    expect(INFORMATION_TYPES.map((t) => t.what)).toEqual([FLOOD.callouts, FLOOD.rate, 'Verified flood events']);
   });
 });

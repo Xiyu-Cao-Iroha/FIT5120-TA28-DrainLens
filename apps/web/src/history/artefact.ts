@@ -210,6 +210,14 @@ export function periodLabel(artefact: FloodHistoryArtefact): string {
   return years.length === 1 ? String(first) : `${String(first)} to ${String(last)}`;
 }
 
+/** A financial year as a sentence writes it: "2010–11", with an en dash. */
+export const financialYear = (label: string | undefined): string => (label ?? '').replace('-', '–');
+
+/** "2009–10 to 2014–15", for the copy rather than the data labels. */
+export function yearRange(years: readonly string[]): string {
+  return years.length <= 1 ? financialYear(years[0]) : `${financialYear(years[0])} to ${financialYear(years.at(-1))}`;
+}
+
 /**
  * Areas hidden by the cut that recorded the same total as the last one shown.
  *

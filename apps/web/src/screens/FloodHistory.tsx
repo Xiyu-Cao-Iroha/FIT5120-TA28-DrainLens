@@ -4,10 +4,11 @@
  * A ranked list of suburbs is the most persuasive thing this product will ever
  * put on a screen and the least supported. The counts are real; almost every
  * reading a person will bring to them is not. So the page is built so that the
- * qualifications cannot be scrolled past: the period, the unit and the source
- * sit above the first row rather than in a footer, the year the counts came
- * from is drawn beside the ranking rather than described under it, and an area
- * whose total is a floor says so on its own row.
+ * qualifications cannot be scrolled past: the period and the source sit above
+ * the first row rather than in a footer, the area unit is under Data details,
+ * the year the counts came from is drawn beside the ranking rather than
+ * described under it, and an area whose total is a minimum says so on its own
+ * row.
  *
  * **The bar is the ranking; the sparkline is the timing.** The bar is scaled
  * against every published area, so pressing *Show more locations* never
@@ -26,10 +27,11 @@ import {
   type FloodArea,
   type FloodHistoryArtefact,
   barScale,
+  financialYear,
   hasMore,
   incompleteCount,
-  periodLabel,
   tiedBeyond,
+  yearRange,
 } from '../history/artefact.js';
 import {
   basis as basisTone,
@@ -76,9 +78,8 @@ export function FloodHistory({ artefact, onOpenMap, onOpenAreas, onBack }: Flood
           color: ink.subtle,
         }}
       >
-        Ranked by total incidents. The small chart on each row is that area's six years scaled to
-        its own busiest one — it shows <em>when</em>, not how many. The number beside it is how
-        many.
+        Ranked by total incidents. Each mini-chart shows <em>when</em> incidents occurred. Compare
+        the total number, not the bar heights, between areas.
       </p>
       <ol
         ref={listRef}
@@ -143,7 +144,7 @@ export function FloodHistory({ artefact, onOpenMap, onOpenAreas, onBack }: Flood
             ? `All ${String(artefact.areas.length)} published areas, of ${String(artefact.counts.areasWithIncidents)} in ${artefact.geography.scope} with a recorded incident.`
             : `Showing the ${String(artefact.defaultAreas)} highest of ${String(artefact.areas.length)} published areas.`}
           {incomplete > 0 &&
-            ` ${String(incomplete)} of them ${incomplete === 1 ? 'holds' : 'hold'} a withheld count.`}
+            ` ${String(incomplete)} of them ${incomplete === 1 ? 'has a minimum total' : 'have minimum totals'}, because an exact count was not published.`}
           {alsoTied.length > 0 &&
             ` ${alsoTied.map((a) => a.name).join(' and ')} recorded the same count as the last of them, and ${alsoTied.length === 1 ? 'appears' : 'appear'} under Show more locations.`}
         </span>
@@ -181,9 +182,8 @@ export function FloodHistory({ artefact, onOpenMap, onOpenAreas, onBack }: Flood
             See all {String(artefact.counts.areasInScope)} areas on a map
           </h3>
           <span style={{ color: ink.muted, font: type(text.label, { leading: 1.55 }) }}>
-            This list is the highest {String(artefact.areas.length)}. The map draws every area in{' '}
-            {artefact.geography.scope}, including the ones with nothing recorded, and can show the
-            counts relative to how many people live there.
+            This page lists the {String(artefact.areas.length)} highest totals. Open the map to see
+            all {artefact.geography.scope} areas and compare incident counts with population.
           </span>
         </span>
         <button
@@ -261,10 +261,8 @@ function Heading({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
           color: ink.muted,
         }}
       >
-        Areas ordered by how many times a State Emergency Service crew was sent to a flood,
-        {' '}
-        {periodLabel(artefact)}. It is a record of what was reported and attended —
-        not of how deep the water was, what it damaged, or where it will happen next.
+        Areas are ranked by SES flood call-outs from {yearRange(artefact.reportingPeriod.years)}.
+        The data does not show flood depth, damage or future risk.
       </p>
     </>
   );
@@ -273,8 +271,7 @@ function Heading({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
 /** AC 2.1.1.f, above the ranking rather than beneath it. */
 function Provenance({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
   const facts: readonly (readonly [string, string])[] = [
-    ['Reporting period', `${periodLabel(artefact)} (${artefact.reportingPeriod.start} to ${artefact.reportingPeriod.end})`],
-    ['Area unit', `${artefact.geography.unit}, ${artefact.geography.standard}`],
+    ['Reporting period', yearRange(artefact.reportingPeriod.years)],
     ['Source', `${artefact.source.publisher} · ${artefact.source.licence}`],
     ['Area names', `${artefact.geographySource.publisher} · ${artefact.geographySource.licence}`],
   ];
@@ -340,9 +337,9 @@ function WhenChart({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
         When these incidents were recorded
       </h2>
       <p style={{ margin: `0 0 ${String(space(3))}px`, font: type(text.small, { leading: 1.5 }), color: ink.muted }}>
-        Across all {artefact.areas.length} areas below. {years[biggest]} alone is{' '}
-        {Math.round((100 * peak) / Math.max(1, sum))}% of them, so the ranking is substantially a
-        record of that year rather than of a standing difference between suburbs.
+        Across all {artefact.areas.length} areas below,{' '}
+        {Math.round((100 * peak) / Math.max(1, sum))}% of the incidents occurred in{' '}
+        {financialYear(years[biggest])}, so that year strongly affects the ranking.
       </p>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: space(2), height: 96 }}>
         {totals.map((value, i) => (
@@ -355,7 +352,7 @@ function WhenChart({ artefact }: { readonly artefact: FloodHistoryArtefact }) {
               }}
             />
             <span style={{ display: 'block', marginTop: space(1), font: type(text.micro), color: ink.subtle }}>
-              {years[i]}
+              {financialYear(years[i])}
             </span>
             <span style={{ display: 'block', font: type(text.micro, { weight: weight.medium }), color: ink.base }}>
               {value.toLocaleString()}
@@ -406,7 +403,7 @@ function Row({
             {area.name}
           </strong>
           {area.tied && <Flag tone="quiet">tied</Flag>}
-          {!area.complete && <Flag tone="loud">a count withheld</Flag>}
+          {!area.complete && <Flag tone="loud">exact count not published</Flag>}
         </span>
         <span
           aria-hidden
@@ -544,17 +541,17 @@ function Explanation({ artefact }: { readonly artefact: FloodHistoryArtefact }) 
           color: ink.muted,
         }}
       >
-        Six things this ranking cannot tell you. Each one says what it says here; open it for
-        the detail behind it.
+        Six things this ranking cannot tell you, then the data details. Each one says what it
+        says here; open it for the detail behind it.
       </p>
 
-      <Point title="One count is one crew dispatch, not one flood">
+      <Point title="Each count is one SES crew response, not one flood event">
         {artefact.note} It is recorded by {artefact.source.publisher} in{' '}
         {artefact.source.dataset}, published under {artefact.source.licence}.
       </Point>
 
       <Point title="Not a measure of severity or damage">
-        A dispatch to a flooded garage and a dispatch to a flooded street are one count each.
+        A call-out to a flooded garage and a call-out to a flooded street are one count each.
         Nothing in this data says how deep the water was, how long it stayed, or what it cost —
         and a higher count does not mean worse flooding, only more calls attended.
       </Point>
@@ -566,25 +563,30 @@ function Explanation({ artefact }: { readonly artefact: FloodHistoryArtefact }) 
         rainfall have all changed since. Nothing here describes conditions today or predicts them.
       </Point>
 
-      <Point title="Flash flooding is counted somewhere else, so it is not in these totals">
+      <Point title="These totals do not include incidents recorded as flash flooding">
         {artefact.excludes} An area whose flooding arrives as sudden run-off in a heavy storm can
         therefore sit lower on this list than a resident would expect.
       </Point>
 
-      <Point
-        title={`${String(withheld)} small areas had counts withheld, so some totals are floors`}
-      >
+      <Point title={`The exact count was not published for ${String(withheld)} small areas`}>
         {withheld} of the {artefact.counts.regions.toLocaleString()} small areas behind this
-        ranking had their counts withheld under the Privacy and Data Protection Act 2014, because
-        too few people live there for a count to be published safely. Any area marked{' '}
-        <em>a count withheld</em> holds at least one, so its total is a minimum rather than a
-        measurement.
+        ranking had no exact count published, under the Privacy and Data Protection Act 2014,
+        because too few people live there for a count to be published safely. Any area marked{' '}
+        <em>exact count not published</em> holds at least one, so some totals are minimums: the
+        real total may be higher.
       </Point>
 
       <Point title="A count depends on who calls, which varies by area">
         Areas differ in population, in how much of the drainage is public, and in how likely people
         are to call the SES rather than the council or nobody. The ranking reflects those
         differences as much as it reflects water.
+      </Point>
+
+      <Point title="Data details">
+        Areas are {artefact.geography.unit}s — statistical areas defined by the{' '}
+        {artefact.geographySource.publisher} in the {artefact.geography.standard}. The reporting
+        period runs from {readableDate(artefact.reportingPeriod.start)} to{' '}
+        {readableDate(artefact.reportingPeriod.end)}.
       </Point>
     </section>
   );
@@ -711,12 +713,12 @@ function ToTheMap({
           color: ink.strong,
         }}
       >
-        This is history. The map is what is under the street now.
+        These figures show past SES call-outs
       </h2>
       <p style={{ margin: `0 0 ${String(space(4))}px`, maxWidth: 620, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
         {pilot === null
-          ? 'The drainage map shows the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.'
-          : `${pilot.name}, where the drainage map began, recorded ${String(pilot.total)}${pilot.complete ? '' : ' or more'} flood incidents over the same six years, which places it well down this list. The map does not rank anything: it shows the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.`}
+          ? 'The drainage map shows current council records and calculated ground information: the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.'
+          : `${pilot.name}, where the drainage map began, recorded ${String(pilot.total)}${pilot.complete ? '' : ' or more'} SES flood call-outs over the same six years, which places it well down this list. The drainage map does not rank anything. It shows current council records and calculated ground information: the City of Melbourne\'s recorded pits and pipes, the shape of the measured ground, and where surface water is likely to run.`}
       </p>
       <button
         type="button"

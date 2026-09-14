@@ -1,5 +1,5 @@
 /**
- * Low areas where water can collect, step by step.
+ * Low areas where water may collect, step by step.
  *
  * **The sentence this section exists to prevent is "so this is where it
  * floods".** A hollow is a place water *can* collect. Whether it does depends
@@ -23,59 +23,60 @@
  * hollow is 5 cm, which is the surface's own noise.
  */
 
+import { FULL_MAP, LAYER } from '../ui/terms.js';
 import { type Lesson, unlockingChips } from './lesson.js';
 
 export const LOW_AREAS_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'low-areas-on',
-    prompt: 'Press Low areas to show the dips in the ground near your address.',
-    hint: 'The map opens with nothing on it. Everything you see from here is something you turned on.',
+    prompt: `Select ${LAYER.lowAreas} to show calculated dips in the ground near the address.`,
+    hint: 'The map starts with all optional layers turned off.',
     requires: 'low-areas-on',
   },
   {
     kind: 'read',
     id: 'hollows-shown',
     prompt:
-      'Each shape is a hollow deep enough to hold water — at least 25 cm, because that is about as finely as the ground was measured. Shallower dips are left out rather than drawn as if we were sure of them.',
+      'Each blue shape is a calculated dip at least 25 cm below its estimated outlet level. Water may collect there. Shallower changes are not shown because they are within the uncertainty of the ground-height data.',
   },
   {
     kind: 'do',
     id: 'water-flow-on',
-    prompt: 'Press Water flow to see what runs into them.',
+    prompt: `Select ${LAYER.paths} to compare them with calculated low areas.`,
     requires: 'water-flow-on',
   },
   {
     kind: 'read',
     id: 'paths-into-hollows',
     prompt:
-      'A hollow with paths running into it collects water from further away than its own footprint. That is the difference between a dip in a road and the low corner of a neighbourhood.',
+      'A low area connected to several calculated paths may receive water from a wider area.',
   },
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: 'Now press Pits to see which hollows have a drain in them.',
-    hint: 'A hollow with a drain has a way out. One without has whatever the ground gives it.',
+    prompt: `Select ${LAYER.pits} to see where council records show a pit inside a calculated low area.`,
+    hint: 'A recorded pit does not show whether the drain is clear or how much water it can take.',
     requires: 'pits-on',
   },
   {
     kind: 'read',
     id: 'what-this-is-not',
     prompt:
-      'This is not a flood map. A hollow is somewhere water can collect, not somewhere it will — how much arrives depends on the rain and on what the drains do with it, and neither of those is on this screen.',
+      'Blue areas show where water may collect. They do not predict flooding. Rainfall and drain performance are not included in this view.',
   },
 ];
 
 export const LOW_AREAS_DONE: Lesson['finished'] = {
   headline: 'That is where water can collect.',
-  body: 'You turned on hollows measured from the ground surface, saw what runs into them, and saw which of them have a drain. It is the shape of the ground and the council’s record together — not a forecast of either.',
-  unlocked: 'Low areas are now yours on the whole map.',
+  body: 'You viewed calculated low areas, likely water paths and pit locations from council records. These layers do not predict flooding.',
+  unlocked: `You can now use ${LAYER.lowAreas} on the ${FULL_MAP.toLowerCase()}.`,
 };
 
 export const LOW_AREAS: Lesson = {
   steps: LOW_AREAS_STEPS,
   finished: LOW_AREAS_DONE,
-  // Low areas, then Water flow at step 2, then Pits at step 4.
+  // Low areas, then Likely water paths at step 2, then Drain pits at step 4.
   chips: unlockingChips([
     { key: 'lowPoint', at: 0, on: (now) => now.lowPoints },
     { key: 'channel', at: 2, on: (now) => now.channel },

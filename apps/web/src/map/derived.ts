@@ -4,7 +4,7 @@
  * Pits and pipes are published records used as provided. Surface-water paths,
  * low points and the unavailable areas are calculated from a filtered
  * photogrammetric surface. The interface calls the first `Official recorded
- * data` and the second `System-derived result`, and the map has to make that
+ * data` and the second `Calculated by DrainLens`, and the map has to make that
  * difference visible without anyone reading a legend — otherwise a derivation
  * borrows the authority of a record simply by being drawn beside one.
  *

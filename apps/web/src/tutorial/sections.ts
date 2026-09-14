@@ -7,13 +7,14 @@
  * not add a fifth way of thinking about the map, and a section whose id did
  * not match a mode would be one.
  *
- * **The whole map is locked until all four are done**, which is the mentor's
- * point put into the product: the user journey was somebody arriving at a
- * square kilometre with four layers and no basemap and being left to it.
- * There is a way past the lock — see `LOCK_NOTICE` — because a product that
- * cannot be entered is not a product, and because the five seconds it costs
- * are spent on a disclosure rather than on a nag.
+ * **Until all four are done, the full map opens through a short notice**,
+ * which is the mentor's point put into the product: the user journey was
+ * somebody arriving at the map with four layers and no basemap and being left
+ * to it. The notice — see `lockNotice` — is a disclosure, not a lock: its
+ * button works at once, and the guides are optional.
  */
+
+import { COVERAGE } from '../ui/terms.js';
 
 import type { MapMode } from '../map/modes.js';
 
@@ -32,7 +33,7 @@ export interface Section {
   readonly id: SectionId;
   /** The name under the card. */
   readonly label: string;
-  /** Shown on a card nobody has unlocked yet. */
+  /** Shown on a card whose guide has not been finished yet. */
   readonly locked: string;
 }
 
@@ -40,22 +41,22 @@ export const SECTIONS: Record<SectionId, Section> = {
   drainage: {
     id: 'drainage',
     label: 'Local drainage pits and pipes',
-    locked: 'Finish the guide to unlock this',
+    locked: 'Start guide',
   },
   'water-flow': {
     id: 'water-flow',
     label: 'Where rainwater may move',
-    locked: 'Finish the guide to unlock this',
+    locked: 'Start guide',
   },
   'low-areas': {
     id: 'low-areas',
-    label: 'Low areas where water can collect',
-    locked: 'Finish the guide to unlock this',
+    label: 'Low areas where water may collect',
+    locked: 'Start guide',
   },
   terrain: {
     id: 'terrain',
     label: 'The shape of the ground',
-    locked: 'Finish the guide to unlock this',
+    locked: 'Start guide',
   },
 };
 
@@ -87,19 +88,17 @@ export function nextSection(learned: Learned): SectionId | null {
 }
 
 /**
- * What somebody is told before the whole map opens without the guide.
+ * What somebody is told before the full map opens without the guide.
  *
- * **Four disclosures, not four reasons to stay.** The five-second wait in
- * front of this is only defensible if the wait buys the reader something, and
- * what it buys is the one moment in the product where a person is about to
- * read the data without having been told what it is. Each line is a claim this
- * repository can back:
+ * **Four disclosures, not four reasons to stay.** This is the one moment in
+ * the product where a person is about to read the data without having been
+ * told what it is. Each line is a claim this repository can back:
  *
- * - the extent is `map.json`'s own, one square kilometre;
+ * - the extent is the served map's own;
  * - 215 of 895 pits have no recorded downstream, which is why the second line
  *   exists and why it says *record* rather than *network*;
  * - the paths and low areas are `derived.json`, calculated here and published
- *   by nobody, which is also what the footer's CC BY notice has to say;
+ *   by nobody, and drawn only where the ground data allows;
  * - and the fourth is the sentence this product has refused to stop saying.
  */
 export function lockNotice(extentName: string): readonly string[] {
@@ -119,21 +118,13 @@ export function lockNotice(extentName: string): readonly string[] {
   */
   const where =
     extentName === 'city-of-melbourne'
-      ? 'This is the City of Melbourne — about 76 square kilometres, and not the rest of Greater Melbourne.'
+      ? COVERAGE.map
       : 'This is one square kilometre of Kensington, not all of Melbourne.';
-
-  const ground =
-    extentName === 'city-of-melbourne'
-      ? 'The water paths and low areas are calculated here from measured ground, which covers every part of the City of Melbourne the drainage record does. Beyond that, nothing is claimed about where water goes.'
-      : 'The water paths and low areas are calculated here from measured ground. Nobody publishes them.';
 
   return [
     where,
-    'The drainage is the council’s record. Where it stops, the map stops — that is not a loading failure.',
-    ground,
+    'Drain pits and pipes come from council records. A line that ends may mean the council record ends there.',
+    'Calculated water paths and low areas are shown only where enough ground data is available.',
     'It is not a flood warning and not a forecast.',
   ];
 }
-
-/** How long the notice stands before the way in is offered. */
-export const LOCK_NOTICE_SECONDS = 5;

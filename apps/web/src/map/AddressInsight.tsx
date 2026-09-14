@@ -26,7 +26,7 @@
  * the eighth its sentence names, because the fit claims no more than that. The
  * dashed lines point at where the nearest path and low area actually are; the
  * rounded distance is on the label, and every line is the same length whatever
- * that distance. The caption says so.
+ * that distance. The caption says so: *distances rounded · not to scale*.
  *
  * The figure's accessible name is `describeAddress`, the same structure the
  * marks are drawn from, so the picture and what a screen reader hears cannot
@@ -235,7 +235,8 @@ export function AddressInsight({
   readonly near: WaterNearby | null;
 }) {
   const notes = notesFor(ground, near);
-  const height = HEIGHT + notes.length * NOTE_LINE;
+  // One caption line more than `HEIGHT` was drawn for.
+  const height = HEIGHT + notes.length * NOTE_LINE + 12;
   return (
     <svg
       viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
@@ -263,11 +264,14 @@ export function AddressInsight({
           {note}
         </text>
       ))}
-      <text x={CX} y={height - 16} fontSize="10" fill={CAPTION} textAnchor="middle">
+      <text x={CX} y={height - 28} fontSize="10" fill={CAPTION} textAnchor="middle">
         Arrow = which way the ground falls
       </text>
+      <text x={CX} y={height - 16} fontSize="10" fill={CAPTION} textAnchor="middle">
+        Dashed = direction to a nearby calculated feature
+      </text>
       <text x={CX} y={height - 4} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Dashed = something is there · not to scale
+        Distances rounded · not to scale
       </text>
     </svg>
   );

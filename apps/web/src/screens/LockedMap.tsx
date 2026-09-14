@@ -1,40 +1,31 @@
 /**
- * The whole map, before the guide has been finished.
+ * The full map, before the guide has been finished.
  *
- * **The five seconds are only defensible if they buy the reader something**,
- * and what they buy is a disclosure. This is the one moment in the product
- * where somebody is about to read a square kilometre of drainage data without
- * having been told what it is, and the four lines in `LOCK_NOTICE` are the
- * four things they would otherwise have to work out: the extent, that a path
- * stopping is the record stopping, that the water layers are ours and nobody
- * else's, and that none of it is a forecast.
+ * **A disclosure, not a gate.** This is the one moment in the product where
+ * somebody is about to read the drainage data without having been told what
+ * it is, and the four lines from `lockNotice` are the four things they would
+ * otherwise have to work out: the extent, that a line ending may be the record
+ * ending, where the calculated layers are drawn, and that none of it is a
+ * forecast. *Open the full map* works at once — the five-second countdown that
+ * stood in front of it was removed in the copy review of 14 September.
  *
- * A timed gate is close enough to WCAG 2.2.1 to be worth saying out loud: the
- * countdown is announced rather than only drawn, the button says why it cannot
- * be pressed yet rather than being silently inert, and nothing behind it is
- * withheld permanently — five seconds later it opens whether or not any of the
- * guide has been done.
- *
- * **The map is drawn behind, dimmed and inert.** A lock over a blank page says
- * "there is nothing here"; a lock over the streets says "this is what is here,
+ * **The map is drawn behind, dimmed and inert.** A notice over a blank page says
+ * "there is nothing here"; a notice over the streets says "this is what is here,
  * and here is what it means first". Its pointer events are off, so the dimming
  * is not the only thing stopping a press.
  */
 
-import { useEffect, useState } from 'react';
-
 import type { MapArtefact } from '../map/artefact.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import {
-  LOCK_NOTICE_SECONDS,
   type Learned,
   SECTIONS,
   countLearned,
   lockNotice,
   nextSection,
-  SECTION_ORDER,
 } from '../tutorial/sections.js';
 import type { SectionId } from '../tutorial/sections.js';
+import { FULL_MAP } from '../ui/terms.js';
 import {
   ink,
   line,
@@ -68,17 +59,8 @@ export function LockedMap({
   onOpenAnyway,
   onBack,
 }: LockedMapProps) {
-  const [left, setLeft] = useState(LOCK_NOTICE_SECONDS);
-
-  useEffect(() => {
-    if (left <= 0) return;
-    const timer = setTimeout(() => {
-      setLeft((n) => n - 1);
-    }, 1000);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [left]);
+  const done = countLearned(learned);
+  const fullMap = FULL_MAP.toLowerCase();
 
   // The next section that has a guide, which is not always the next section.
   const suggested = nextSection(learned);
@@ -108,7 +90,7 @@ export function LockedMap({
         }}
       >
         <section
-          aria-label="Before you open the whole map"
+          aria-label={`Before you open the ${fullMap}`}
           style={{
             maxWidth: 620,
             width: '100%',
@@ -122,12 +104,9 @@ export function LockedMap({
             gap: space(5),
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: space(3) }}>
-            <Lock />
-            <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
-              Before you open the whole map
-            </h2>
-          </div>
+          <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
+            Before you open the {fullMap}
+          </h2>
 
           <ul
             style={{
@@ -146,9 +125,9 @@ export function LockedMap({
           </ul>
 
           <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-            {countLearned(learned) === 0
-              ? `The guide covers all four in about two minutes, one at a time.`
-              : `${String(countLearned(learned))} of ${String(SECTION_ORDER.length)} parts of the guide finished.`}
+            {done === 0
+              ? `Try a short guide, or open the ${fullMap}.`
+              : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${fullMap}.`}
           </p>
 
           <div style={{ display: 'flex', gap: space(3), flexWrap: 'wrap' }}>
@@ -175,22 +154,17 @@ export function LockedMap({
             <button
               type="button"
               onClick={onOpenAnyway}
-              disabled={left > 0}
-              // Said rather than only shown. A control that is inert without
-              // explaining itself is read as broken, and a screen reader is
-              // given nothing at all by a greyed-out fill.
-              aria-describedby="lock-countdown"
               style={{
                 padding: `${String(space(3))}px ${String(space(5))}px`,
-                border: `1px solid ${left > 0 ? line.base : line.strong}`,
+                border: `1px solid ${line.strong}`,
                 borderRadius: radius.base,
                 background: surface.raised,
-                color: left > 0 ? ink.subtle : ink.base,
+                color: ink.base,
                 font: type(text.label, { weight: weight.medium }),
-                cursor: left > 0 ? 'default' : 'pointer',
+                cursor: 'pointer',
               }}
             >
-              {left > 0 ? `Open the whole map (${String(left)})` : 'Open the whole map'}
+              Open the {fullMap}
             </button>
 
             <button
@@ -208,42 +182,8 @@ export function LockedMap({
               ← Back
             </button>
           </div>
-
-          <p
-            id="lock-countdown"
-            aria-live="polite"
-            style={{ margin: 0, font: type(text.small), color: ink.subtle }}
-          >
-            {left > 0
-              ? `You can open the whole map in ${String(left)} second${left === 1 ? '' : 's'}.`
-              : 'You can open the whole map now.'}
-          </p>
         </section>
       </div>
     </div>
-  );
-}
-
-function Lock() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden focusable="false">
-      <rect
-        x="4.5"
-        y="10.5"
-        width="15"
-        height="10"
-        rx="2"
-        fill="none"
-        stroke={ink.strong}
-        strokeWidth="1.6"
-      />
-      <path
-        d="M8 10.5V8a4 4 0 0 1 8 0v2.5"
-        fill="none"
-        stroke={ink.strong}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

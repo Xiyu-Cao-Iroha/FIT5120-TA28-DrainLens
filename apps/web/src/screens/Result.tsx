@@ -25,7 +25,6 @@ import {
   NO_CLEAR_CHANGE_MEANS,
   type Outcome,
   RAINFALL_CONTROL_NOTE,
-  RAINFALL_EXPLAINED,
   RESULT_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
@@ -35,6 +34,7 @@ import {
 import type { SolvedPosition } from '../scenario/worker.js';
 import { BLOCKAGE_OPTIONS } from './ScenarioSetup.js';
 import type { ScenarioInputs } from '../session.js';
+import { TOTAL_RAINFALL } from '../ui/terms.js';
 
 export interface ResultProps {
   readonly outcome: Outcome;
@@ -81,7 +81,7 @@ export function Result({
         }}
       >
         {shown.showsDifference
-          ? 'Highlighted areas show where the selected blockage assumption leaves more surface water than the all-clear baseline, at the same accumulated rainfall.'
+          ? 'Highlighted areas show where more water remains on the ground with the selected drain setting than with the clear setting, using the same total rainfall.'
           : 'No difference is drawn on the map for this result.'}
       </p>
 
@@ -151,11 +151,11 @@ export function Result({
         world, while the last is a fact about them.
       */}
       <Group basis="recorded">
-        <Pair label="Selected drain" value={scenario.pitId === null ? '—' : `Pit ${scenario.pitId}`} />
+        <Pair label="Drain" value={scenario.pitId === null ? '—' : `Pit ${scenario.pitId}`} />
       </Group>
       <Group basis="assumption">
-        <Pair label="Blockage assumption" value={blockage} />
-        <Pair label="Accumulated rainfall" value={`${scenario.rainfallMm} mm`} />
+        <Pair label="Drain setting" value={blockage} />
+        <Pair label={TOTAL_RAINFALL} value={`${scenario.rainfallMm} mm`} />
       </Group>
       <Group basis="derived">
         <Pair label="Comparison" value={shown.comparison} />
@@ -220,7 +220,7 @@ export function Result({
           <>
             <ul style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 13, color: '#4d5f6e' }}>
               {WHAT_IS_UNCERTAIN.map((item) =>
-                /ground surface/i.test(item.title) ? groundUncertainty(measuredShare) : item,
+                /ground height/i.test(item.title) ? groundUncertainty(measuredShare) : item,
               ).map((item) => (
                 <li key={item.title} style={{ marginBottom: 8 }}>
                   <strong style={{ color: '#1e2b36' }}>{item.title}</strong>
@@ -342,7 +342,7 @@ function Group({ basis, children }: { readonly basis: Basis; readonly children: 
 }
 
 /**
- * The accumulated-rainfall control.
+ * The total-rainfall control.
  *
  * Every position was solved by the run that produced this screen, so moving
  * this reads a cached answer rather than starting another calculation. That is
@@ -372,9 +372,7 @@ function RainfallControl({
         background: '#ffffff',
       }}
     >
-      <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#61707c' }}>
-        ACCUMULATED RAINFALL
-      </span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: '#61707c' }}>{TOTAL_RAINFALL}</span>
       <div style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
         {positions.map((position) => {
           const on = position.rainfallMm === selectedMm;
@@ -402,7 +400,6 @@ function RainfallControl({
         })}
       </div>
       <p style={{ margin: 0, fontSize: 12, color: '#5b6e7e' }}>{RAINFALL_CONTROL_NOTE}</p>
-      <p style={{ margin: '6px 0 0', fontSize: 12, color: '#5b6e7e' }}>{RAINFALL_EXPLAINED}</p>
     </section>
   );
 }
@@ -410,9 +407,7 @@ function RainfallControl({
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <span>
-      <dt style={{ fontSize: 11, letterSpacing: 0.4, color: '#61707c', margin: 0 }}>
-        {label.toUpperCase()}
-      </dt>
+      <dt style={{ fontSize: 12, color: '#61707c', margin: 0 }}>{label}</dt>
       <dd style={{ margin: 0, fontWeight: 600 }}>{value}</dd>
     </span>
   );

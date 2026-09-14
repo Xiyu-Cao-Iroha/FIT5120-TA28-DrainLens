@@ -23,12 +23,12 @@ describe('which drains support a comparison', () => {
 describe('what an unsupported drain is not', () => {
   it('says every time that it is about the calculation, not a clean bill for the drain', () => {
     for (const text of [...Object.values(UNSUPPORTED_TEXT), SUPPORT_LEGEND]) {
-      expect(text).toMatch(/does not mean (this drain|they) (has|have) no drainage or flood concern/);
+      expect(text).toMatch(/does not show whether (the|those) pits? works? or whether the area may flood/);
     }
   });
 
   it('gives each reason its own cause', () => {
     expect(UNSUPPORTED_TEXT['not-an-inlet']).toMatch(/surface inlet/);
-    expect(UNSUPPORTED_TEXT['no-measured-ground']).toMatch(/measured ground/);
+    expect(UNSUPPORTED_TEXT['no-measured-ground']).toMatch(/not enough ground data/);
   });
 });

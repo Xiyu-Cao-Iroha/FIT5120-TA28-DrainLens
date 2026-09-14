@@ -297,7 +297,7 @@ export interface LegendEntry {
  * was never called to is an area almost nobody lives in. An entry for a state
  * a mode cannot produce is a key to a colour that appears nowhere.
  */
-export function legendFor(mode: MapMode): readonly LegendEntry[] {
+export function legendFor(mode: MapMode, minimumResidents: number): readonly LegendEntry[] {
   const bands: LegendEntry[] = breaksFor(mode).map((band: Break, index) => ({
     label: band.label,
     fill: RAMPS[mode][index] ?? null,
@@ -307,7 +307,7 @@ export function legendFor(mode: MapMode): readonly LegendEntry[] {
   }));
 
   bands.push({
-    label: 'Total is a minimum — a count inside was withheld',
+    label: 'Minimum total — at least one exact count was not published',
     fill: RAMPS[mode][1] ?? null,
     stroke: RAMPS[mode][1] ?? NOTHING_RECORDED,
     dashed: false,
@@ -318,14 +318,14 @@ export function legendFor(mode: MapMode): readonly LegendEntry[] {
     // Two areas have a published total of zero because every region in them
     // was withheld. They draw hatched over no colour.
     bands.push({
-      label: '0+ — nothing published, every count inside withheld',
+      label: 'Exact total not published',
       fill: null,
       stroke: NOTHING_RECORDED,
       dashed: false,
       hatched: true,
     });
     bands.push({
-      label: 'No recorded activity',
+      label: 'No recorded call-outs',
       fill: null,
       stroke: NOTHING_RECORDED,
       dashed: false,
@@ -333,7 +333,7 @@ export function legendFor(mode: MapMode): readonly LegendEntry[] {
     });
   } else {
     bands.push({
-      label: 'No score — too few residents to divide by',
+      label: `No rate — fewer than ${minimumResidents.toLocaleString('en-AU')} residents`,
       fill: null,
       stroke: NO_SCORE,
       dashed: true,

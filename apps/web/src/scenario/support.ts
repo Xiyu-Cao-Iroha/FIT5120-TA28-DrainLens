@@ -34,14 +34,14 @@ export function supportOf(support: ScenarioSupport, assetNumber: string): PitSup
 /** Why a drain cannot be compared, and what that does not mean. */
 export const UNSUPPORTED_TEXT: Readonly<Record<Exclude<PitSupport, 'supported'>, string>> = {
   'not-an-inlet':
-    'A blockage comparison cannot be calculated for this drain: the council record does not describe it as a surface inlet — a side-entry or grated pit — which is the only kind a surface blockage applies to. That is about what our calculation can use. It does not mean this drain has no drainage or flood concern.',
+    'This pit cannot be used in the blockage comparison because the council record does not identify it as a surface inlet. This is a data limitation; it does not show whether the pit works or whether the area may flood.',
   'no-measured-ground':
-    'A blockage comparison cannot be calculated for this drain: there is not a full kilometre of measured ground around it to route water over. That is about the ground data we hold. It does not mean this drain has no drainage or flood concern.',
+    'This pit cannot be used in the blockage comparison because there is not enough ground data around it for the calculation. This is a data limitation; it does not show whether the pit works or whether the area may flood.',
 };
 
 /** The legend line on the comparison map. */
 export const SUPPORT_LEGEND =
-  'Drains ringed in teal can be compared. Other drains cannot be compared here — either the record does not describe them as surface inlets, or there is not enough measured ground around them. That is about our calculation, not about the drains, and it does not mean they have no drainage or flood concern.';
+  'Only teal-ringed drain pits can be used in this comparison. Other pits are missing records or ground data needed by the calculation. This does not show whether those pits work or whether the area may flood.';
 
 /** What the map offers on a drain that can be compared. */
 export const COMPARE_HERE = 'Compare a blockage scenario at this drain';

@@ -6,15 +6,15 @@
  * position, the zoom and the selected area for free, where two screens would
  * make retaining any of them into work.
  *
- * The mode switch carries the *question* rather than a label — *how much was
- * recorded* against *how much relative to the people living there* — because
+ * The mode switch carries the *question* rather than a label — *how many
+ * call-outs were recorded* against *how many per 1,000 residents* — because
  * they are different questions and neither ranking is the correct one. That is
  * the mentor review's fifth point, and the size of it is measured: Dandenong
  * is 5th by count and 24th by rate, and the rate's top area is not in the
  * count's top twelve at all.
  *
  * **What is deliberately not on it.** No forecast, no probability, no depth,
- * and no claim about who was affected. The score's denominator is the
+ * and no claim about who was affected. The rate's denominator is the
  * population; dividing by it is the opposite of counting people.
  */
 
@@ -57,7 +57,9 @@ import {
   eventsFor,
   noEventsText,
 } from '../history/events.js';
+import { financialYear, yearRange } from '../history/artefact.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
+import { FLOOD } from '../ui/terms.js';
 import {
   brand,
   ink,
@@ -75,12 +77,12 @@ import {
 const QUESTIONS: Readonly<Record<MapMode, { readonly tab: string; readonly asks: string }>> = {
   activity: {
     // AC 4.1.1.a names the mode.
-    tab: 'Historical Flood Activity',
-    asks: 'How much flood-related SES activity was recorded?',
+    tab: FLOOD.callouts,
+    asks: 'How many SES flood call-outs were recorded in each area?',
   },
   severity: {
-    tab: 'Severity Score',
-    asks: 'How much was recorded relative to the people living there?',
+    tab: FLOOD.rate,
+    asks: 'How many SES flood call-outs were recorded per 1,000 residents?',
   },
 };
 
@@ -203,9 +205,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
             Flood history across {scope.geography.scope}
           </h1>
           <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-            {scope.reportingPeriod.start} to {scope.reportingPeriod.end} ·{' '}
-            {String(areas.length)} {scope.geography.unit} areas · recorded {scope.incidentType}{' '}
-            activity, grouped by statistical area
+            {FLOOD.callouts} · {yearRange(years)} · {scope.geography.scope} statistical areas
           </p>
 
           <div
@@ -311,7 +311,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
             aria-label={`${String(areas.length)} statistical areas, ${QUESTIONS[mode].asks}`}
             style={{ display: 'block', cursor: 'grab', background: GROUND, touchAction: 'none' }}
           />
-          <Legend mode={mode} years={years} />
+          <Legend mode={mode} years={years} minimumResidents={population.minimumResidents} />
           <Zoom
             onZoom={(by) => {
               setViewport((current) =>
@@ -342,7 +342,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
         }}
       >
         {chosen === null ? (
-          <Nothing count={areas.length} mode={mode} scope={scope} population={population} areas={areas} />
+          <Nothing mode={mode} scope={scope} population={population} areas={areas} />
         ) : (
           <Detail
             area={chosen}
@@ -366,13 +366,11 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
  * panel beside a full map reads as a panel that failed to load.
  */
 function Nothing({
-  count,
   mode,
   scope,
   population,
   areas,
 }: {
-  readonly count: number;
   readonly mode: MapMode;
   readonly scope: ScopeAreas;
   readonly population: PopulationArtefact;
@@ -387,12 +385,11 @@ function Nothing({
           color: ink.strong,
         }}
       >
-        Select an area to see its records
+        Select an area
       </h2>
       <p style={{ margin: 0 }}>
-        Any of the {String(count)} areas on the map. Each one shows what was recorded in it, how
-        that was spread across the years, the population the score is measured against, and how
-        complete the record is.
+        See its yearly call-outs, population, the calculated rate and how complete the published
+        data is.
       </p>
       <Evidence mode={mode} scope={scope} population={population} areas={areas} open />
     </div>
@@ -443,10 +440,7 @@ function Evidence({
       </button>
       {shown && (
         <div style={{ marginTop: space(3) }}>
-          <Points
-            heading={mode === 'activity' ? 'Historical Flood Activity' : 'Severity Score'}
-            points={view}
-          />
+          <Points heading={QUESTIONS[mode].tab} points={view} />
           <Points heading="Coverage and uncertainty" points={coverageEvidence(scope, population, areas)} />
           <h4 style={headingStyle}>Three kinds of information</h4>
           {INFORMATION_TYPES.map((kind) => (
@@ -545,16 +539,16 @@ function Detail({
         {area.name}
       </h2>
       <p style={{ margin: `0 0 ${String(space(5))}px`, font: type(text.micro), color: ink.subtle }}>
-        {scope.geography.unit} · {scope.reportingPeriod.start} to {scope.reportingPeriod.end}
+        Statistical area · {yearRange(years)}
       </p>
 
-      <Section title="Recorded activity">
+      <Section title={FLOOD.callouts}>
         <Badge kind="recorded" />
         <p style={{ margin: `0 0 ${String(space(3))}px` }}>
           <strong style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}>
             {totalLabel(area)}
           </strong>{' '}
-          recorded {scope.incidentType} dispatches
+          recorded SES {scope.incidentType.toLowerCase()} call-outs
         </p>
         {area.byYear.map((count, index) => (
           <div
@@ -562,7 +556,7 @@ function Detail({
             style={{ display: 'flex', alignItems: 'center', gap: space(3), marginBottom: space(1) }}
           >
             <span style={{ width: 62, font: type(text.micro), color: ink.subtle }}>
-              {years[index] ?? ''}
+              {financialYear(years[index])}
             </span>
             <span
               style={{
@@ -589,20 +583,20 @@ function Detail({
           </div>
         ))}
         <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
-          One count is one SES crew dispatch, not one flood event.
+          Each count is one SES crew response, not one flood event.
           {area.complete
             ? ''
-            : ' A count inside this area was withheld, so each year is a minimum as well as the total.'}
+            : ' At least one exact count within this area was not published, so each year is a minimum as well as the total.'}
         </p>
       </Section>
 
-      <Section title="Severity Score">
+      <Section title={FLOOD.rate}>
         <Badge kind="calculated" />
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>
           <strong style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}>
             {scoreLabel(area)}
           </strong>{' '}
-          {area.rate === null ? '' : 'dispatches per 1,000 residents'}
+          {area.rate === null ? '' : 'call-outs per 1,000 residents'}
         </p>
         <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
           {/*
@@ -614,11 +608,11 @@ function Detail({
           */}
           {area.persons === null ? (
             <>
-              No score: this area had{' '}
+              No rate: this area had{' '}
               {(area.personsByYear[population.asAt.indexOf(population.denominator)] ?? 0).toLocaleString('en-AU')}{' '}
               residents on {population.denominator}, fewer than{' '}
-              {population.minimumResidents.toLocaleString('en-AU')}, and a rate per resident needs
-              residents. It is not a low score.
+              {population.minimumResidents.toLocaleString('en-AU')}, and small populations can make
+              the result unstable. It is not a low rate.
             </>
           ) : (
             <>
@@ -626,14 +620,13 @@ function Detail({
               {population.source.publisher}. It is not a count of people affected.
               {area.complete
                 ? ''
-                : ' Because a count inside this area was withheld, the score is a minimum too.'}
+                : ' Because at least one exact count was not published, the rate is a minimum too.'}
             </>
           )}
         </p>
         <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
-          Calculated by DrainLens from recorded SES activity and ABS population. It is not the
-          physical severity of any flood, a flood probability, or a measure of current or future
-          flood risk.
+          Calculated by DrainLens from recorded SES flood call-outs and ABS population. This rate
+          does not measure flood depth, damage, probability or current risk.
         </p>
       </Section>
 
@@ -738,7 +731,15 @@ function Section({ title, children }: { readonly title: string; readonly childre
 }
 
 /** The key, over the map rather than beside it, because the map is the page. */
-function Legend({ mode, years }: { readonly mode: MapMode; readonly years: readonly string[] }) {
+function Legend({
+  mode,
+  years,
+  minimumResidents,
+}: {
+  readonly mode: MapMode;
+  readonly years: readonly string[];
+  readonly minimumResidents: number;
+}) {
   return (
     <div
       style={{
@@ -766,16 +767,16 @@ function Legend({ mode, years }: { readonly mode: MapMode; readonly years: reado
       {/*
         AC 4.1.3.c and e, 4.3.3.d: what the numbers are, over what years, and
         who produced them. A band name without its unit is a judgement with
-        the workings hidden; a score without "calculated" borrows the SES's
+        the workings hidden; a rate without "calculated" borrows the SES's
         authority.
       */}
       <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.4 }), color: ink.muted }}>
         {mode === 'activity'
-          ? `SES crew dispatches, ${years[0] ?? ''} to ${years.at(-1) ?? ''}`
-          : `Dispatches per 1,000 residents, ${years[0] ?? ''} to ${years.at(-1) ?? ''}`}
+          ? `SES crew call-outs, ${yearRange(years)}`
+          : `Call-outs per 1,000 residents, ${yearRange(years)}`}
       </p>
       <Badge kind={mode === 'activity' ? 'recorded' : 'calculated'} />
-      {legendFor(mode).map((entry) => (
+      {legendFor(mode, minimumResidents).map((entry) => (
         <div
           key={entry.label}
           style={{ display: 'flex', gap: space(3), alignItems: 'center', marginBottom: space(2) }}

@@ -64,7 +64,7 @@ export const SURFACE_ENTRY_NOTE: Record<SurfaceEntry, string> = {
   'not-an-inlet':
     'The record calls this a join in the network rather than a way in, so no surface inflow is drawn: water arrives through the pipes.',
   'not-recorded':
-    'The record does not say whether surface water enters here, so no surface inflow is drawn.',
+    'The record does not say whether surface water can enter here, so no surface inflow is drawn.',
 };
 
 /**
@@ -82,12 +82,31 @@ export const SURFACE_ENTRY_NOTE: Record<SurfaceEntry, string> = {
  */
 export const PIT_SUMMARY: Record<SurfaceEntry, string> = {
   'recorded-inlet':
-    'This pit collects surface water from the street and connects it to the recorded drainage network.',
+    'Council records list this pit as a way in for water from the street, connected to the public drain network.',
   'not-an-inlet':
     'The record calls this a join in the drainage network rather than a way into it: water reaches it through the pipes rather than off the street.',
   'not-recorded':
-    'This pit is part of the recorded drainage network. The record does not say whether surface water enters here.',
+    'This pit appears in council drain records. The record does not say whether surface water can enter here.',
 };
+
+/**
+ * The pit's name in a resident's words, read from the recorded type.
+ *
+ * `SWD Pit - Lane Type` is a council code. The card leads with this and the
+ * raw description and type stay under *View technical details*. Every label
+ * starts *Drain pit*, the layer's name, and says no more than the type does.
+ */
+export function publicLabelOf(pit: Pit): string {
+  const type = (text(pit.object_type_lupvalue) ?? text(pit.asset_description) ?? '').toLowerCase();
+  if (/lane type/.test(type)) return 'Drain pit beside a lane';
+  if (/junction|system node/.test(type)) return 'Drain pit where pipes join';
+  if (/gsep|grated side entry/.test(type)) return 'Drain pit with a grate and kerb opening';
+  if (/side entry/.test(type)) return 'Drain pit with a kerb opening';
+  if (/kerbside/.test(type)) return 'Drain pit with a kerbside grate';
+  if (/grated/.test(type)) return 'Drain pit with a grate';
+  if (/inlet/.test(type)) return 'Drain pit recorded as an inlet';
+  return 'Drain pit';
+}
 
 /**
  * Read from the recorded type, and only where the words plainly say so.

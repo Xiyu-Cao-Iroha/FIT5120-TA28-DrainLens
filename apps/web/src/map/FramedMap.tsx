@@ -190,7 +190,7 @@ function Pit({ x, y, selected = false }: { readonly x: string; readonly y: strin
 /**
  * The card the map opens on a pit, drawn at the pit it belongs to.
  *
- * The words are the map's own: the badge is the *Official recorded data* the
+ * The words are the map's own: the badge is the *Council record* the
  * pit layer carries everywhere else, and the sentence claims nothing about
  * depth, capacity or blockage — the three things `What the data doesn't show`
  * says the record does not hold.
@@ -231,7 +231,7 @@ function Callout() {
         fontWeight={weight.semibold}
         fill={ink.strong}
       >
-        Drainage pit
+        Drain pit
       </text>
 
       <rect
@@ -243,13 +243,13 @@ function Callout() {
         fill={basis.recorded.fill}
       />
       <text x={x + 70} y={y + 53} fontSize="10.5" fontWeight={weight.medium} fill={basis.recorded.ink}>
-        Official recorded data
+        Council record
       </text>
 
       <g fontSize="12.5" fill={ink.muted}>
-        <text x={x + 20} y={y + 86}>This pit collects surface water from</text>
-        <text x={x + 20} y={y + 104}>the street and connects it to the</text>
-        <text x={x + 20} y={y + 122}>recorded drainage network.</text>
+        <text x={x + 20} y={y + 86}>Council records show this pit</text>
+        <text x={x + 20} y={y + 104}>connected to the public drain</text>
+        <text x={x + 20} y={y + 122}>network.</text>
       </g>
 
       <path
@@ -258,7 +258,7 @@ function Callout() {
         strokeWidth="1"
       />
       <text x={x + 20} y={y + 158} fontSize="12.5" fontWeight={weight.semibold} fill={brand.ink}>
-        Show connected pipe →
+        Show connected drain pipe →
       </text>
     </g>
   );

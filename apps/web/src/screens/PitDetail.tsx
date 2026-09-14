@@ -21,7 +21,7 @@ import { CrossSection, SectionNotes } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
 
-const RECORDED_BADGE = 'Official recorded data';
+const RECORDED_BADGE = 'Council record';
 
 /**
  * The fields the pit layer carries, in the order a person reads them.
@@ -33,8 +33,8 @@ const RECORDED_BADGE = 'Official recorded data';
  */
 const FIELDS: readonly { readonly key: keyof Pit; readonly label: string }[] = [
   { key: 'asset_number', label: 'Asset number' },
-  { key: 'asset_description', label: 'Description' },
-  { key: 'object_type_lupvalue', label: 'Type' },
+  { key: 'asset_description', label: 'Council description' },
+  { key: 'object_type_lupvalue', label: 'Council type' },
 ];
 
 export const NOT_RECORDED = 'Not recorded';
@@ -44,17 +44,28 @@ export const DEPTH_NOTE =
   'pit in this area, and filling the gap with an estimate would present a ' +
   'guess as a measurement.';
 
-/** One line per way a path can stop, in the person's words rather than ours. */
+/**
+ * One line per way a path can stop, in the person's words rather than ours.
+ *
+ * Each reads after *The path ends where*.
+ */
 export const ENDING_LABELS: Readonly<Record<string, string>> = {
-  'no-recorded-connection': 'the record has no pipe leaving that pit',
-  'unrecorded-destination': 'a pipe leaves, but the record does not say where it goes',
+  'no-recorded-connection': 'the council record has no outgoing pipe',
+  'unrecorded-destination': 'a pipe leaves but the council record does not say where it goes',
   'leaves-mapped-area': 'the pipe continues outside the mapped area',
   'cycle-guard': 'the recorded connections loop back on themselves',
 };
 
 export const NO_OUTLET_NOTE =
-  'This area has no recorded outfall, so a path always ends where the record ' +
-  'ends rather than where the water leaves the drainage system.';
+  'No outfall is recorded in this area. The displayed path therefore ends where ' +
+  'the council pipe record ends; this may not be where water leaves the real system.';
+
+/** How many recorded pipes the followed path shows, as a sentence. */
+export function pipesShown(count: number): string {
+  if (count === 0) return 'No pipe could be followed from this pit.';
+  if (count === 1) return 'One recorded downstream pipe is shown.';
+  return `${String(count)} recorded downstream pipes are shown.`;
+}
 
 /**
  * The three limits, in the words somebody who is not an engineer would use.
@@ -251,7 +262,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
 /**
  * What the followed path did.
  *
- * The count of stops is given before the reasons, because "it stopped in four
+ * The count of stops is given before the reasons, because "it ends in four
  * places" is the fact that changes how much of this path a person should
  * trust, and the reasons only qualify it.
  */
@@ -265,30 +276,29 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
     <div style={{ paddingTop: 10, borderTop: '1px solid #e6ebe4' }}>
       <span style={LABEL}>FOLLOWED PATH</span>
       <p style={{ margin: '6px 0 8px' }}>
-        {trace.pipes.length === 0 ? (
-          'No pipe could be followed from this pit.'
-        ) : (
-          <>
-            <strong>
-              {trace.pipes.length} recorded {trace.pipes.length === 1 ? 'pipe' : 'pipes'}
-            </strong>{' '}
-            across {trace.steps} {trace.steps === 1 ? 'step' : 'steps'} downstream.
-          </>
-        )}
+        <strong>{pipesShown(trace.pipes.length)}</strong>
       </p>
 
-      <p style={{ margin: '0 0 6px' }}>
-        The path stops in {trace.endings.length} {trace.endings.length === 1 ? 'place' : 'places'}
-        {brokenRecord > 0 ? ':' : ', all at the edge of the mapped area:'}
-      </p>
-      <ul style={{ margin: '0 0 10px', paddingLeft: 18, color: '#4a5b68' }}>
-        {reasons.map(({ reason, count }) => (
-          <li key={reason} style={{ marginBottom: 3 }}>
-            {count > 1 ? `${count} × ` : ''}
-            {ENDING_LABELS[reason] ?? reason}
-          </li>
-        ))}
-      </ul>
+      {reasons.length === 1 && trace.endings.length === 1 ? (
+        <p style={{ margin: '0 0 10px' }}>
+          The path ends where {ENDING_LABELS[reasons[0]!.reason] ?? reasons[0]!.reason}.
+        </p>
+      ) : (
+        <>
+          <p style={{ margin: '0 0 6px' }}>
+            The path ends in {trace.endings.length} places
+            {brokenRecord > 0 ? ', where:' : ', all at the edge of the mapped area:'}
+          </p>
+          <ul style={{ margin: '0 0 10px', paddingLeft: 18, color: '#4a5b68' }}>
+            {reasons.map(({ reason, count }) => (
+              <li key={reason} style={{ marginBottom: 3 }}>
+                {count > 1 ? `${count} × ` : ''}
+                {ENDING_LABELS[reason] ?? reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
 

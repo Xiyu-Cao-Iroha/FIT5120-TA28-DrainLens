@@ -98,8 +98,8 @@ Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 | 1.1.3.a | Centred on and marking the address | | |
 | 1.1.3.b | Five controls: pits, pipes, ground surface, water paths, low points | | |
 | 1.1.3.c | Each one turns its layer off and on **individually** | | |
-| | **Ground surface off → on is obviously different** (see above) | | |
-| 1.1.3.d | Every layer carries *Official recorded data* or *System-derived result* | | |
+| | **Ground height off → on is obviously different** (see above) | | |
+| 1.1.3.d | Every layer carries *Council record* or *Calculated by DrainLens* | | |
 | 1.1.3.e | The "not enough ground measured" layer is available and legible | | |
 
 ---
@@ -113,7 +113,7 @@ Select a pit near the address. **Pit 1145091 is a good one** — 33 pipes, 15 st
 | 1.2.1.a | The selected pit is visibly highlighted | | |
 | 1.2.1.b | Its recorded fields are shown | | |
 | | A field the record does not hold says **Not recorded**, not blank | | |
-| 1.2.1.c | Labelled *Official recorded data* | | |
+| 1.2.1.c | Labelled *Council record* | | |
 | 1.2.1.d | A follow-downstream action is offered | | |
 | 1.2.2.a | The path highlights the pit and its pipes | | |
 | 1.2.2.b | Arrows show which way water runs — **check one against the map** | | |
@@ -175,7 +175,7 @@ Open it on the same pit, then on one the record connects nothing to.
 | | **On pit 1363621 a violet patch appears on the map, just north of the pin.** The panel promises highlighted areas; check they are there | | |
 | | On a pit that reports *No clear difference*, the panel says *"no difference is drawn on the map for this result"* and **nothing is painted**. Both directions matter | | |
 | 2.2.1.d | The selected pit **and its downstream path** stay visible on the map | | |
-| 2.2.1.e | The band is *No clear change* or *Higher than baseline* | | |
+| 2.2.1.e | The band is *No clear difference* or *More water than with a clear drain* | | |
 | 2.2.1.f | Where the data cannot support a comparison, *Insufficient information* appears instead of a band — tested properly in section 8 | | |
 | 2.2.1.g | It is described as indicative, not a flood prediction | | |
 | | **Open "Why this is usually the answer here"** — does it explain, or excuse? | | |
@@ -209,7 +209,7 @@ Reach an insufficient state — a pit the scene cannot place will do.
 | 2.3.2.c | No strong result category is assigned | | |
 | 2.3.2.d | It is not presented as evidence about real flood accuracy | | |
 
-> **The distinction to test out loud:** *No clear change* means the calculation ran and found nothing. *Insufficient information* means it could not be made. Ask the navigator to say which one they are looking at without being told.
+> **The distinction to test out loud:** *No clear difference* means the calculation ran and found nothing. *Insufficient information* means it could not be made. Ask the navigator to say which one they are looking at without being told.
 
 ---
 
@@ -217,7 +217,7 @@ Reach an insufficient state — a pit the scene cannot place will do.
 
 | | What to look at | Result | Note |
 |---|---|---|---|
-| — | The *Indicative local information* banner never scrolls away | | |
+| — | The *General information only · not a flood warning* banner never scrolls away | | |
 | — | The data credit is in the footer, with a working licence link | | |
 | — | It says the derived layers are **calculated, not published by the council** | | |
 | 1.1.5.a | "Choose a task" returns to the task page | | |

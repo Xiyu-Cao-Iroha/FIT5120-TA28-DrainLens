@@ -230,6 +230,6 @@ describe('describeWaterNearby', () => {
   });
 
   it('is labelled as derived, not as recorded', () => {
-    expect(NEARBY_BASIS).toBe('System-derived result');
+    expect(NEARBY_BASIS).toBe('Calculated by DrainLens');
   });
 });

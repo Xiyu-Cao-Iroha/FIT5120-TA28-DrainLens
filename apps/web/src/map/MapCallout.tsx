@@ -75,7 +75,7 @@ export interface MapCalloutProps {
    * inside it *is* derived and carries its own badge. One label over both
    * would put their house into a dataset.
    */
-  readonly basis?: 'Official recorded data' | 'System-derived result';
+  readonly basis?: 'Council record' | 'Calculated by DrainLens';
   readonly children: ReactNode;
   /** The relevant next action, where there is one — AC 1.1.7.e. */
   readonly action?: { readonly label: string; readonly onPress: () => void };
@@ -129,7 +129,7 @@ export function MapCallout({
   const tone =
     basis === undefined
       ? null
-      : basis === 'Official recorded data'
+      : basis === 'Council record'
         ? basisTone.recorded
         : basisTone.derived;
 

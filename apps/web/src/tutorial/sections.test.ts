@@ -1,16 +1,15 @@
 /**
- * The four things somebody is told before the whole map opens.
+ * The four things somebody is told before the full map opens.
  *
- * These are the sentences the five-second wait exists to buy, and they are the
- * plainest ones in the product — everything else here is hedged. A plain
- * sentence that is false is not a smaller error than a hedged one, so the
- * contents are asserted rather than trusted to a reviewer's eye.
+ * These are the plainest sentences in the product — everything else here is
+ * hedged. A plain sentence that is false is not a smaller error than a hedged
+ * one, so the contents are asserted rather than trusted to a reviewer's eye.
  */
 
 import { describe, expect, it } from 'vitest';
 
+import { COVERAGE } from '../ui/terms.js';
 import {
-  LOCK_NOTICE_SECONDS,
   NOTHING_LEARNED,
   SECTIONS,
   SECTION_ORDER,
@@ -26,7 +25,7 @@ const learned = (...ids: readonly string[]) =>
     boolean
   > as never;
 
-describe('the disclosure before the whole map', () => {
+describe('the disclosure before the full map', () => {
   it('says how much ground is actually on screen, for each extent', () => {
     /*
      * It read "one square kilometre of Kensington" for as long as that was the
@@ -35,41 +34,31 @@ describe('the disclosure before the whole map', () => {
      * reader is about to look at opened by telling them it was seventy-five
      * times smaller than it is.
      */
-    expect(lockNotice('city-of-melbourne')[0]).toContain('City of Melbourne');
+    expect(lockNotice('city-of-melbourne')[0]).toBe(COVERAGE.map);
     expect(lockNotice('city-of-melbourne')[0]).not.toContain('one square kilometre');
     expect(lockNotice('kensington')[0]).toContain('one square kilometre');
   });
 
-  it('says the ground was measured somewhere smaller than the map', () => {
-    // The recorded network expanded and the terrain did not. A reader looking
-    // at 75 km² with no water paths on it has to be able to tell "no water
-    // goes here" from "nobody measured this ground".
-    const wide = lockNotice('city-of-melbourne');
-    expect(wide.some((s) => s.includes('nothing is claimed'))).toBe(true);
-  });
-
-  it('says the measured ground reaches as far as the drainage record, and no further', () => {
-    // It named Kensington, then Kensington and the central city. Since the
-    // council-wide terrain build every one of the 21,113 recorded pits sits on
-    // a measured tile, so naming places would now understate it -- and the
-    // tiles the archive lacks still have to be disclaimed.
-    const ground = lockNotice('city-of-melbourne').find((s) => s.includes('measured ground')) ?? '';
-    expect(ground).toContain('every part of the City of Melbourne the drainage record does');
-    expect(ground).not.toContain('Kensington');
-    expect(ground).toContain('nothing is claimed');
+  it('says the calculated layers are drawn only where the ground data allows', () => {
+    // A reader looking at a street with no water paths on it has to be able to
+    // tell "no water goes here" from "there was not enough ground data here".
+    for (const name of ['kensington', 'city-of-melbourne']) {
+      const ground = lockNotice(name).find((s) => s.includes('ground data')) ?? '';
+      expect(ground).toContain('only where enough ground data is available');
+      expect(ground).not.toContain('drainage record');
+    }
   });
 
   it('keeps the two sentences that are true of any extent', () => {
     for (const name of ['kensington', 'city-of-melbourne', 'something-else']) {
       const notice = lockNotice(name);
-      expect(notice.some((s) => s.includes('that is not a loading failure'))).toBe(true);
+      expect(notice.some((s) => s.includes('may mean the council record ends there'))).toBe(true);
       expect(notice.some((s) => s.includes('not a flood warning'))).toBe(true);
     }
   });
 
   it('is always four lines, whatever the extent', () => {
-    // Five seconds is only defensible against something a person can read in
-    // five seconds.
+    // Short enough to read before pressing the button beside it.
     for (const name of ['kensington', 'city-of-melbourne', 'unknown']) {
       expect(lockNotice(name)).toHaveLength(4);
     }
@@ -80,10 +69,6 @@ describe('the disclosure before the whole map', () => {
     // in; claiming more is the direction that misleads.
     expect(lockNotice('unknown')[0]).toContain('one square kilometre');
   });
-
-  it('waits five seconds, which is what the four lines are worth', () => {
-    expect(LOCK_NOTICE_SECONDS).toBe(5);
-  });
 });
 
 describe('what has been finished', () => {
@@ -92,7 +77,7 @@ describe('what has been finished', () => {
     expect(allLearned(NOTHING_LEARNED)).toBe(false);
   });
 
-  it('unlocks the map only when all four are done', () => {
+  it('counts the guide as done only when all four are', () => {
     expect(allLearned(learned('drainage', 'water-flow', 'low-areas'))).toBe(false);
     expect(allLearned(learned(...SECTION_ORDER))).toBe(true);
   });

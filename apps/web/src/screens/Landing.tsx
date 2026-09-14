@@ -12,8 +12,8 @@
  * An address we cannot resolve is never quietly swapped for one we can. The
  * three outcomes stay distinct all the way to the screen.
  *
- * The demonstration address is offered directly, because the pilot is one
- * square kilometre and most people's own address is outside it. Without that
+ * The demonstration address is offered directly, because the address search
+ * covers Kensington only and most people's own address is outside it. Without that
  * offer the honest answer is also a dead end, and a dead end on the first
  * screen is where somebody leaves.
  *
@@ -37,7 +37,8 @@ import {
   search,
 } from '../address/search.js';
 import { demonstrationAddress } from '../address/demonstration.js';
-import { FixtureNotice, PilotBadge } from '../ui/Shell.js';
+import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
+import { COVERAGE, LAYER } from '../ui/terms.js';
 import {
   advisory,
   brand,
@@ -54,7 +55,7 @@ import {
 } from '../ui/theme.js';
 
 export const PRIVACY_LINE =
-  'No account is required. Your address stays in this browser tab: it is not sent anywhere, and nothing is kept when you close it.';
+  'No account is needed. Your search stays on this device and is not saved.';
 
 /**
  * What the product does, and what it refuses to do, before anybody types.
@@ -65,15 +66,15 @@ export const PRIVACY_LINE =
  * somebody expects — which is before they have asked for anything.
  */
 const SHOWS: readonly string[] = [
-  'Surface-water paths and low points, calculated from a measured ground surface',
-  "The council's recorded drainage pits and pipes, and where a path stops because the record does",
-  'The shape of the ground, and which parts of it were measured rather than filled in',
+  `${LAYER.paths} and ${LAYER.lowAreas.toLowerCase()} calculated from ground-height data`,
+  'Drain pits and pipes in council records, including gaps where the record ends',
+  `${LAYER.ground} and areas with limited measured data`,
 ];
 
 const DOES_NOT: readonly string[] = [
-  'It is not a flood map and not a prediction',
-  'It does not show how deep water would be, or when it would arrive',
-  'It covers one square kilometre of Kensington, so most Melbourne addresses are outside it',
+  'It does not predict flooding.',
+  'It does not show how deep water would be, or when it would arrive.',
+  COVERAGE.addresses,
 ];
 
 export interface LandingProps {
@@ -208,7 +209,7 @@ export function Landing({
         </div>
       )}
 
-      <PilotBadge />
+      <CoverageBadge />
 
       <h1
         className="landing__title"
@@ -220,8 +221,8 @@ export function Landing({
         className="landing__lead"
         style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
       >
-        Explore local surface water paths, public drainage connections and the shape of the
-        ground around an address.
+        Search an address to view likely water paths, council drain records and ground height
+        nearby.
       </p>
 
       <form
@@ -481,7 +482,7 @@ function SuggestionButton({
 /**
  * What we say when we cannot help.
  *
- * The two cases read differently on purpose. "Outside the pilot area" is a
+ * The two cases read differently on purpose. "Outside the address search area" is a
  * statement about us; "we hold no record of that street" is a statement about
  * the query. Collapsing them into one message would tell somebody in Carlton
  * that their address does not exist.
@@ -515,26 +516,24 @@ function UnsupportedNotice({
         }}
       >
         {problem.kind === 'outside-pilot'
-          ? 'That address is outside the area this pilot covers'
+          ? 'That address is outside the address search area'
           : 'We have no record of that address'}
       </strong>
       <span style={{ color: advisory.ink }}>
         {problem.kind === 'outside-pilot' ? (
           <>
-            <em>{problem.typed}</em> is on a street the pilot reaches, but this demonstration
-            covers one square kilometre of Kensington and that address is not inside it. We are
-            not able to say anything about drainage there.
+            <em>{problem.typed}</em> is on a street we know, but that number is not in the address
+            list. {COVERAGE.addresses}
           </>
         ) : (
           <>
-            Nothing in the pilot area matches <em>{problem.typed}</em>. This demonstration covers
-            one square kilometre of Kensington, so most Melbourne addresses will not be found.
+            Nothing in the address list matches <em>{problem.typed}</em>. {COVERAGE.addresses}
           </>
         )}
       </span>
       {demonstration && (
         <span style={{ display: 'block', marginTop: space(2), color: advisory.ink }}>
-          Try <strong>{demonstration.label}</strong> to see what the pilot area shows.
+          Try <strong>{demonstration.label}</strong> to see what the map shows.
         </span>
       )}
     </div>

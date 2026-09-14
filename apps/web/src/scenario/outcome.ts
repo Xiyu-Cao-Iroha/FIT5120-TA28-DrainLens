@@ -14,6 +14,8 @@
 
 import type { ComparisonBand, InsufficiencyReason } from '@drainlens/schema';
 
+import { SOURCE } from '../ui/terms.js';
+
 export type Action =
   | 'change-scenario'
   | 'choose-another-pit'
@@ -45,7 +47,7 @@ export interface Presentation {
   readonly showsDifference: boolean;
 }
 
-const COMPARISON_TITLE = 'Difference from the all-clear baseline';
+const COMPARISON_TITLE = 'Compared with the clear-drain setting';
 
 /**
  * The heading over every result that could not be calculated.
@@ -59,22 +61,20 @@ const INSUFFICIENT_TITLE = 'Insufficient information';
 export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
   'higher-than-baseline': {
     title: COMPARISON_TITLE,
-    band: 'HIGHER THAN BASELINE',
-    finding: 'Higher surface water build-up appears near the selected low point',
-    body: 'In this comparison, less water enters the selected drain and more remains on the surface near the highlighted low area.',
-    comparison: 'Higher than baseline',
+    band: 'More water than with a clear drain',
+    finding: 'More water remains on the ground near this low area',
+    body: 'In this comparison, less water enters the selected drain and more remains on the ground near the highlighted low area.',
+    comparison: 'More water than with a clear drain',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: true,
   },
   'no-clear-change': {
     title: COMPARISON_TITLE,
-    // "No clear change", not "No clear difference": AC 3.1.3.e names the two
-    // bands, and the words on screen should be the words in the criteria and
-    // in the explanation beside them.
-    band: 'NO CLEAR CHANGE',
-    finding: 'No clear change under these assumptions',
-    body: 'At this accumulated rainfall amount, the selected assumptions do not produce a clear change from the all-clear baseline.',
-    comparison: 'No clear change',
+    // Plain words from the 14 September copy review, over AC 3.1.3.e's band names.
+    band: 'No clear difference',
+    finding: 'No clear difference was found between the two drain settings',
+    body: 'For this total rainfall, the calculation found no clear difference between the blocked and clear settings.',
+    comparison: 'No clear difference',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: false,
   },
@@ -91,17 +91,17 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
 export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> = {
   terrain_unavailable: {
     title: INSUFFICIENT_TITLE,
-    band: 'TERRAIN UNAVAILABLE',
+    band: 'Terrain unavailable',
     finding: 'Terrain data is unavailable for this area',
-    body: 'Changing the drainage pit will not fix this. Too little ground was measured around here to route water over. Return to the map or choose another supported address.',
+    body: 'Changing the drainage pit will not fix this. There is not enough reliable ground data to calculate water paths in this area. Return to the map or choose another supported address.',
     comparison: 'Not calculated',
     actions: ['change-address', 'return-to-map'],
     showsDifference: false,
   },
   invalid_inlet: {
     title: INSUFFICIENT_TITLE,
-    band: 'DRAIN RECORD UNAVAILABLE',
-    finding: 'Required inlet records are missing or invalid',
+    band: 'Drain record unavailable',
+    finding: 'This pit is missing information needed for the comparison',
     body: 'Choose another recorded drainage pit. The official identifier for this one remains visible; the fields we do not hold stay marked unavailable rather than being filled in.',
     comparison: 'Not calculated',
     actions: ['choose-another-pit', 'review-scenario'],
@@ -109,18 +109,18 @@ export const INSUFFICIENT: Readonly<Record<InsufficiencyReason, Presentation>> =
   },
   scenario_calculation_failed: {
     title: INSUFFICIENT_TITLE,
-    band: 'CALCULATION FAILED',
+    band: 'Calculation failed',
     finding: 'We could not complete this comparison',
-    body: 'Your selected rainfall and blockage assumptions are still here. Try again, or review the scenario.',
+    body: 'Your drain setting and total rainfall are still here. Try again, or review the scenario.',
     comparison: 'Failed',
     actions: ['try-again', 'review-scenario'],
     showsDifference: false,
   },
   comparison_not_comparable: {
     title: INSUFFICIENT_TITLE,
-    band: 'RESULTS NOT COMPARABLE',
-    finding: 'These two scenario runs cannot be compared',
-    body: 'The blocked and all-clear runs were not produced from the same usable inputs. Review the assumptions and run the comparison again at the same accumulated rainfall.',
+    band: 'Results not comparable',
+    finding: 'These two drain settings cannot be compared',
+    body: 'The two drain settings could not be compared using the same data. Review your settings and run the comparison again with the same total rainfall.',
     comparison: 'Not comparable',
     actions: ['review-scenario', 'return-to-map'],
     showsDifference: false,
@@ -142,7 +142,7 @@ export const presentationFor = (outcome: Outcome): Presentation =>
  * accumulated water between two assumptions and knows nothing about when.
  */
 export const RESULT_DISCLAIMER =
-  'This is an indicative comparison between two assumptions. It is not a live flood prediction, and it does not show measured flood depth or when water would reach a location.';
+  'This comparison does not predict flooding. It does not show flood depth or when water may arrive.';
 
 /**
  * Why "no clear difference" is the usual answer here, in the person's terms.
@@ -164,16 +164,16 @@ export const RESULT_DISCLAIMER =
  */
 export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly body: string }[] = [
   {
-    title: 'The drains below this one take the water instead',
-    body: 'The recorded network here has enough inlets that water passing one blocked drain is captured within the next few. Blocking a single drain moves very little water.',
+    title: 'The model routes some water to other nearby drains',
+    body: 'The council’s drainage network here has enough drain pits that, in the model, water passing one blocked drain is taken in by the next few. Blocking a single drain moves very little water.',
   },
   {
-    title: 'What does get past spreads out',
-    body: 'Water that reaches a low area spreads across all of it. A blocked drain can add real volume and still raise the surface by less than a millimetre, which is not something to act on.',
+    title: 'The model spreads remaining water across the calculated low area',
+    body: 'In the model, water that reaches a low area spreads across all of it. A blocked drain can add real volume and still raise the surface by less than a millimetre, which is not something to act on.',
   },
   {
     title: 'We will not report a difference finer than the ground data',
-    body: 'The ground surface is measured from aerial photography to about 25 centimetres. A calculated change smaller than that is below what the data can support, so it is reported as no clear difference rather than as a number.',
+    body: 'Ground-height data comes from aerial photography and is accurate to about 25 centimetres. A calculated change smaller than that is below what the data can support, so it is reported as no clear difference rather than as a number.',
   },
 ];
 
@@ -186,27 +186,26 @@ export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly bo
  * one, and this sentence is the only thing standing between the two readings.
  */
 export const RAINFALL_CONTROL_NOTE =
-  'This shows how the comparison changes as rainfall accumulates. It does not show when water would reach a location. A change need not grow steadily with rainfall: it can appear at one amount and not at the next, as low areas fill and overflow.';
+  'Each button is an amount of total rainfall, not a point in time. A change need not grow steadily with rainfall: it can appear at one amount and not at the next, as low areas fill and overflow.';
 
 /**
- * What accumulated rainfall is in this model, wherever an amount is chosen.
+ * What total rainfall is in this model, where an amount is chosen.
  *
- * AC 3.2.3.c, d and e: a simplified total, no intensity or duration, and not
- * a forecast of any storm. The model adds one depth of water evenly over the
- * area and routes it; how hard it fell and for how long are not inputs at all.
+ * AC 3.2.3.d and e: no intensity or duration, and not a forecast. How the
+ * water is added (evenly, from dry ground) is in `HOW_IT_WAS_PRODUCED`.
  */
 export const RAINFALL_EXPLAINED =
-  'Accumulated rainfall here is a simplified total: the same depth of water added evenly across the area. The scenario does not model how intense the rain is or how long it lasts, and 20, 40 and 60 mm are comparison amounts, not a weather forecast or a prediction of a future storm.';
+  'Choose the same total rainfall for both drain settings. This is not a forecast and does not include rainfall duration or intensity.';
 
 /**
- * What "No clear change" means, said outright beside the finding.
+ * What "No clear difference" means, said outright beside the finding.
  *
  * AC 3.3.2.h and 3.1.3.f. This is the sentence that makes a null result honest
  * rather than reassuring, which is why it is not inside a collapsed section:
  * the audit on 13 September found it was not on the screen at all.
  */
 export const NO_CLEAR_CHANGE_MEANS =
-  'No clear change means this simplified calculation did not identify a clear difference from the all-clear baseline. It does not mean the selected drain has no blockage or flood concern, or that a blockage would have no effect in a real flood.';
+  'No clear difference means this simplified calculation did not find a clear difference from the clear-drain setting. It does not show whether this drain is blocked now, or that a blockage would have no effect in a real flood.';
 
 /**
  * Everything the comparison cannot tell a person, AC 3.3.2 a to i, in order.
@@ -214,22 +213,22 @@ export const NO_CLEAR_CHANGE_MEANS =
  * Kept as one list so the criteria can be checked against it line by line.
  */
 export const LIMITATIONS: readonly string[] = [
-  'The blockage condition is an assumption you chose, not an observation of the drain.',
-  'Accumulated rainfall is an input you chose, not a weather observation or forecast.',
+  'The drain setting is one you chose, not an observation of the drain.',
+  'The total rainfall is an amount you chose, not a weather observation or forecast.',
   'The model does not work out the rainfall amount at which a drain would fail.',
-  'Actual pipe hydraulic capacity is not modelled.',
-  'The result does not show a validated flood depth or water depth.',
+  'How much water the pipes can carry is not modelled.',
+  'The result does not show flood depth or water depth.',
   'It does not estimate when floodwater would arrive.',
   'It does not give a flood probability or a risk score.',
   NO_CLEAR_CHANGE_MEANS,
-  'It only shows differences from the all-clear baseline, within the area the ground surface covers around the selected drain.',
+  'It only shows differences from the clear-drain setting, within the area of ground data around the selected drain.',
 ];
 
 /**
  * How strongly to read a result, AC 3.3.3.d.
  */
 export const HOW_STRONGLY_TO_READ_IT =
-  'Read this as a comparison between two assumptions on an approximate ground surface. Higher than baseline says where, in this model, the blockage leaves more water on the surface — not how much, and not that it would flood. No clear change says the model could not separate the two runs — not that the drain does not matter.';
+  'Read this as a comparison between two drain settings on estimated ground height. More water than with a clear drain says where, in this model, the blockage leaves more water on the ground — not how much, and not that it would flood. No clear difference says the model could not separate the two settings — not that the drain does not matter.';
 
 /**
  * The three kinds of thing on this screen, and their colours.
@@ -242,9 +241,9 @@ export const HOW_STRONGLY_TO_READ_IT =
 export type Basis = 'recorded' | 'derived' | 'assumption';
 
 export const BASIS_LABELS: Readonly<Record<Basis, string>> = {
-  recorded: 'Official recorded data',
-  derived: 'System-derived result',
-  assumption: 'Your assumption',
+  recorded: SOURCE.recorded,
+  derived: SOURCE.derived,
+  assumption: SOURCE.setting,
 };
 
 export const BASIS_COLOURS: Readonly<Record<Basis, { background: string; color: string }>> = {
@@ -273,15 +272,15 @@ export function groundUncertainty(measuredShare: number | null): { readonly titl
       ? 'so part of this area was measured directly'
       : `so ${(measuredShare * 100).toFixed(1)}% of the ground in this one-kilometre calculation window was measured directly`;
   return {
-    title: 'The ground surface is derived from imagery, not survey',
+    title: 'Ground height is estimated from aerial photographs, not surveyed',
     body: `It is photogrammetric — calculated from overlapping aerial photographs rather than a laser or ground survey — ${how}, and the rest, under roofs and tree canopy, is interpolated from the nearest measured ground.`,
   };
 }
 
 export const WHAT_IS_UNCERTAIN: readonly { readonly title: string; readonly body: string }[] = [
   {
-    title: 'How much water a drain takes is assumed',
-    body: 'The model assumes a clear drain captures 60% of the water reaching it. The council record does not describe inlet geometry or grate condition, so this figure is an assumption and not a measurement.',
+    title: 'How much water a drain takes is set by the model',
+    body: 'The model sets a clear drain to take in 60% of the water reaching it. The council record does not describe the pit opening or grate condition, so this figure is a model setting and not a measurement.',
   },
   groundUncertainty(null),
   {
@@ -298,23 +297,23 @@ export const WHAT_IS_UNCERTAIN: readonly { readonly title: string; readonly body
 export const HOW_IT_WAS_PRODUCED: readonly { readonly title: string; readonly body: string }[] = [
   {
     title: 'Your selections',
-    body: 'The drainage pit, the blockage assumption and the accumulated rainfall amount you chose.',
+    body: 'The drainage pit, the drain setting and the total rainfall you chose.',
   },
   {
     title: 'Local information used',
-    body: 'A ground surface derived from aerial imagery, the low points measured on it, and the recorded public drainage network.',
+    body: 'Ground height estimated from aerial imagery, the low areas calculated from it, and the drain pits and pipes in council records.',
   },
   {
-    title: 'Controlled comparison',
-    body: 'The same rainfall is run twice — once with every drain clear, once with your blockage assumption — and only the difference is shown.',
+    title: 'How the two settings are compared',
+    body: 'The same total rainfall is calculated twice — once with every drain clear, once with your drain setting — and only the difference is shown.',
   },
   {
     title: 'How to read it',
-    body: 'Only locations where more water remains than in the all-clear baseline are highlighted. Nothing here is a depth.',
+    body: 'Only places where more water remains than with a clear drain are highlighted. Nothing here is a depth.',
   },
   {
     // AC 3.3.1.e: the simplifications, with their numbers.
-    title: 'Simplified assumptions',
-    body: 'Rain is added evenly across the area and runs downhill over the ground surface. A clear drain takes 60% of the water reaching it, a partly blocked one half of that, and a fully blocked one none; only the selected drain changes. Each rainfall amount is calculated from dry ground, and a change smaller than 0.05 m³ in a one-metre square is not reported.',
+    title: 'How the model simplifies things',
+    body: 'The total rainfall is added evenly across the area, with no duration or intensity, and runs downhill over the estimated ground. A clear drain takes 60% of the water reaching it, a partly blocked one half of that, and a fully blocked one none; only the selected drain changes. Each rainfall amount is calculated from dry ground, and a change smaller than 0.05 m³ in a one-metre square is not reported.',
   },
 ];
