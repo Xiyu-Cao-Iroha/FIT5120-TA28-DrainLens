@@ -6,8 +6,9 @@
  * as the four things along the top, and AC 1.1.5 puts Drainage Pits and
  * Drainage Pipes behind the Layers button beneath a Drainage mode. That was
  * built on 3 September and then reversed the same day at the design owner's
- * request: the chips are the layers again — **Pits, Pipes, Water flow, Low
- * areas** — and Terrain sits behind Layers with the data-quality hatching.
+ * request: the chips are the layers again — **Drain pits, Drain pipes, Likely
+ * water paths, Low areas** — and Ground height sits behind Layers with the
+ * data-quality hatching.
  *
  * The deviation is recorded in `docs/ITERATION-1-ACCEPTANCE.md` rather than
  * papered over, because it is a real one and somebody will be asked about it.
@@ -52,7 +53,7 @@ export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoi
  * everything else, and rarely the thing somebody is changing. It was on by
  * default until 11 September and is now on under every homepage card and off
  * on the unguided way in -- see `NOTHING_ON`.
- * "Not enough ground measured" answers a question about the *evidence* rather
+ * "Limited ground data" answers a question about the *evidence* rather
  * than about the ground, and it stays switchable in every view because it is
  * the one mark that says the map is guessing.
  */
@@ -87,7 +88,7 @@ export function visibilityOf(state: LayerState): DerivedVisibility {
  * it was the loudest thing left once the four chips went off. And the
  * implication it was there to prevent is only made by a map that *says*
  * nothing about the ground; this one says it in a control called **Ground
- * surface**, one press away, sitting in the Layers panel where somebody who
+ * height**, one press away, sitting in the Layers panel where somebody who
  * wants to know about the ground will look.
  *
  * The starting state is now the same claim as an empty page: it asserts

@@ -10,19 +10,18 @@
  * `PATHS` and the same `PathThumb`. Two definitions would drift, and the drift
  * would be a card whose picture here is not the layer it opens there.
  *
- * **A locked card is still pressable, and that is the point of it.** The
- * padlock says the *layer on the whole map* is locked, not that the card is:
- * pressing it is exactly what somebody who has not done that part should do.
- * A card that refused the press would leave nothing on the screen that starts
- * anything.
+ * **An unfinished card says *Start guide*, and pressing it does.** It had a
+ * padlock and *Finish the guide to unlock this*, which read as the card being
+ * locked when pressing it was exactly what the reader should do.
  *
- * *Skip to Whole Map* is the way past all of it, and it goes through the
+ * *Skip to Full map* is the way past all of it, and it goes through the
  * notice rather than around it — see `LockedMap`.
  */
 
 import type { MapMode } from '../map/modes.js';
 import { PATHS, PathThumb } from './Home.js';
 import { SECTIONS, type Learned, type SectionId, countLearned } from '../tutorial/sections.js';
+import { FULL_MAP } from '../ui/terms.js';
 import {
   ink,
   line,
@@ -69,7 +68,7 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
           ← Back
         </button>
         <button type="button" onClick={onSkip} style={quiet}>
-          Skip to Whole Map →
+          Skip to {FULL_MAP} →
         </button>
       </div>
 
@@ -95,8 +94,8 @@ export function Choose({ learned, guided, onStart, onSkip, onBack }: ChooseProps
         }}
       >
         {done === 0
-          ? 'Each part takes about two minutes on your own street. Finish all four and the whole map opens.'
-          : `${String(done)} of 4 finished. Finish all four and the whole map opens.`}
+          ? `Each guide takes about two minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
+          : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${FULL_MAP.toLowerCase()}.`}
       </p>
 
       <div
@@ -142,7 +141,7 @@ function Card({
   readonly ready: boolean;
   readonly onStart: () => void;
 }) {
-  const locked = !done;
+  const status = ready ? SECTIONS[mode].locked : 'Terrain guide coming soon';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(3) }}>
@@ -152,10 +151,8 @@ function Card({
         disabled={!ready}
         aria-label={
           done
-            ? `${title}. This part of the guide is finished.`
-            : ready
-              ? `${title}. Start this part of the guide.`
-              : `${title}. This part of the guide is not written yet.`
+            ? `${title}. Guide completed.`
+            : `${title}. ${status}.`
         }
         style={{
           position: 'relative',
@@ -176,12 +173,12 @@ function Card({
           The overlay wraps the picture rather than being positioned against
           the whole card. Measured against the card it was a percentage that
           had to agree with however tall the words underneath happened to be,
-          and at four cards of unequal copy it did not: the lock landed on its
-          own caption. One container, one box.
+          and at four cards of unequal copy it did not: the overlay landed on
+          its own caption. One container, one box.
         */}
         <span style={{ position: 'relative', display: 'block' }}>
           <PathThumb mode={mode} />
-          {locked && (
+          {!done && (
             <span
               aria-hidden
               style={{
@@ -197,14 +194,13 @@ function Card({
                 padding: space(3),
               }}
             >
-              <Padlock />
               <span
                 style={{
                   font: type(text.label, { weight: weight.medium, leading: 1.35 }),
                   textAlign: 'center',
                 }}
               >
-                {ready ? 'Finish the guide to unlock this' : 'Guide coming soon'}
+                {status}
               </span>
             </span>
           )}
@@ -239,30 +235,6 @@ function Card({
         {SECTIONS[mode].label}
       </span>
     </div>
-  );
-}
-
-function Padlock() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden focusable="false">
-      <rect
-        x="4.5"
-        y="10.5"
-        width="15"
-        height="10"
-        rx="2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M8 10.5V8a4 4 0 0 1 8 0v2.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 

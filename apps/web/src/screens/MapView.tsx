@@ -6,8 +6,8 @@
  * in which case every mode is on, because nothing has been narrowed yet.
  *
  * **One `LayerState`, and the controls write to it directly.** The chips are
- * Pits, Pipes, Water flow and Low areas; Terrain and the data-quality hatching
- * sit behind the Layers button. Which control lives where is `modes.ts`,
+ * Drain pits, Drain pipes, Likely water paths and Low areas; Ground height and
+ * Limited ground data sit behind the Layers button. Which control lives where is `modes.ts`,
  * along with the note on why that departs from AC 1.1.4 and 1.1.5.
  *
  * **The chrome is deliberately in pieces.** It used to be one 310px panel
@@ -34,7 +34,7 @@ import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
-import { PIT_SUMMARY, surfaceEntryOf } from '../crosssection/section.js';
+import { PIT_SUMMARY, publicLabelOf, surfaceEntryOf } from '../crosssection/section.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
@@ -116,7 +116,7 @@ export interface MapViewProps {
   /**
    * Which chips to offer, and whether the Layers button is there.
    *
-   * The guide narrows both. Its first instruction is *press Pits*, and a row
+   * The guide narrows both. Its first instruction is *press Drain pits*, and a row
    * of four chips turns that into a search.
    */
   readonly chipKeys?: readonly LayerKey[] | undefined;
@@ -128,7 +128,7 @@ export interface MapViewProps {
    * `task="follow"`, which is the guided preset — pits, pipes, water flow and
    * the ground all on — so its first two instructions were already satisfied
    * and it began at step 3 of 6, beside a map drawing a layer whose chip it
-   * had deliberately hidden. A guide whose first words are *press Pits* has to
+   * had deliberately hidden. A guide whose first words are *press Drain pits* has to
    * open on a map with no pits on it, and that is a fact about the guide
    * rather than about any task, so it is said here rather than inferred.
    */
@@ -174,7 +174,7 @@ export interface MapViewProps {
    *
    * It is also saying what the guide is in the middle of saying. The step
    * beside the map reads *those are the structures the council has a record
-   * of*; a box repeating "Drainage pits — recorded by the council" is a second
+   * of*; a box repeating "Drain pits — Council record" is a second
    * voice on the same sentence.
    */
   readonly legend?: boolean | undefined;
@@ -306,9 +306,9 @@ export function MapView({
   /*
     Switching a layer off also lets go of anything selected on it.
 
-    The other half of the same defect as the hit test: with Pits off, the pit
-    card stayed open beside a map that no longer drew the pit it was about,
-    and pressing "Show connected pipe" traced a path through features nobody
+    The other half of the same defect as the hit test: with Drain pits off, the
+    pit card stayed open beside a map that no longer drew the pit it was about,
+    and pressing "Show connected drain pipe" traced a path through features nobody
     could see. A card that outlives its layer is a claim about a map that is
     no longer on screen.
 
@@ -504,7 +504,7 @@ export function MapView({
           }}
         >
           <strong style={{ color: ink.strong }}>
-            {legible.inView.toLocaleString('en-AU')} drainage pits are in view.
+            {legible.inView.toLocaleString('en-AU')} drain pits are in view.
           </strong>{' '}
           Zoom in to see them individually — at this scale they are closer together than
           they can be drawn or pressed.
@@ -527,7 +527,7 @@ export function MapView({
         <MinimisedCallout
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
-          title={`Drainage pit ${String(hit.feature.asset_number)}`}
+          title={`Drain pit ${String(hit.feature.asset_number)}`}
           onExpand={() => {
             setMinimised(false);
           }}
@@ -542,18 +542,18 @@ export function MapView({
         <MapCallout
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
-          title="Drainage pit"
-          basis="Official recorded data"
+          title={publicLabelOf(hit.feature)}
+          basis="Council record"
           action={
             followed === null
               ? {
-                  label: 'Show connected pipe',
+                  label: 'Show connected drain pipe',
                   onPress: () => {
                     setFollowing(String(hit.feature.asset_number));
                   },
                 }
               : {
-                  label: 'Hide the connected pipe',
+                  label: 'Hide the connected drain pipe',
                   onPress: () => {
                     setFollowing(null);
                   },
@@ -598,7 +598,7 @@ export function MapView({
           at={toScreen(viewport, midpoint(hit.feature.c))}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
-          basis="Official recorded data"
+          basis="Council record"
           onClose={() => {
             setHit(null);
           }}
@@ -652,7 +652,7 @@ export function MapView({
           )}
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
-              Select a drainage pit or pipe to read what the council recorded about it.
+              Select a drain pit or pipe to read what the council recorded about it.
             </span>
           )}
         </MapCallout>
@@ -840,7 +840,7 @@ function MapSearch({
 }
 
 function Badge({ basis }: { readonly basis: string }) {
-  const tone = basis === 'Official recorded data' ? basisTone.recorded : basisTone.derived;
+  const tone = basis === 'Council record' ? basisTone.recorded : basisTone.derived;
   return (
     <span
       style={{

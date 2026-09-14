@@ -35,7 +35,7 @@ describe('what the steps say', () => {
   it('hedges the two calculated layers where the map hedges them', () => {
     const flow = TOUR_STEPS.find((s) => s.target === 'chip-channel');
     const low = TOUR_STEPS.find((s) => s.target === 'chip-lowPoint');
-    expect(flow?.body).toMatch(/likely|tends to/i);
-    expect(low?.body).toMatch(/indicative/i);
+    expect(flow?.body).toMatch(/likely/i);
+    expect(low?.body).toMatch(/\bmay\b/i);
   });
 });

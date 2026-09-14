@@ -11,6 +11,7 @@
 import { COMPARISON_BANDS, INSUFFICIENCY_REASONS } from '@drainlens/schema';
 import { describe, expect, it } from 'vitest';
 
+import { SOURCE } from '../ui/terms.js';
 import {
   ACTION_LABELS,
   BANDS,
@@ -57,11 +58,11 @@ describe('every outcome the engine can return has words', () => {
 
 describe('a band and a missing answer are different kinds of thing', () => {
   it('uses a different heading for each', () => {
-    // "No clear change" is an answer. "Insufficient information" is the
+    // "No clear difference" is an answer. "Insufficient information" is the
     // absence of one. A resident acting on the first is reasonable; acting on
     // the second, believing it was the first, is not.
     for (const band of COMPARISON_BANDS) {
-      expect(BANDS[band].title).toBe('Difference from the all-clear baseline');
+      expect(BANDS[band].title).toBe('Compared with the clear-drain setting');
     }
     for (const reason of INSUFFICIENCY_REASONS) {
       expect(INSUFFICIENT[reason].title).toBe('Insufficient information');
@@ -71,7 +72,7 @@ describe('a band and a missing answer are different kinds of thing', () => {
   it('never reports an insufficiency as a comparison result', () => {
     for (const reason of INSUFFICIENT_VALUES()) {
       expect(reason.comparison.toLowerCase()).not.toContain('no clear');
-      expect(reason.comparison.toLowerCase()).not.toContain('higher than');
+      expect(reason.comparison.toLowerCase()).not.toContain('more water');
     }
   });
 
@@ -137,9 +138,9 @@ describe('what no result may claim', () => {
 
   it('says outright what it is not', () => {
     const said = RESULT_DISCLAIMER.toLowerCase();
-    expect(said).toContain('not a live flood prediction');
+    expect(said).toContain('does not predict flooding');
     expect(said).toContain('depth');
-    expect(said).toContain('when water would reach');
+    expect(said).toContain('when water may arrive');
   });
 
   it('never calls the ground surface a LiDAR model', () => {
@@ -152,7 +153,7 @@ describe('what no result may claim', () => {
 
   it('says only the difference is shown, in the step that explains reading it', () => {
     const step = HOW_IT_WAS_PRODUCED.find((s) => s.title === 'How to read it');
-    expect(step?.body).toContain('all-clear baseline');
+    expect(step?.body).toContain('than with a clear drain');
     expect(step?.body.toLowerCase()).toContain('nothing here is a depth');
   });
 });
@@ -180,8 +181,7 @@ describe('the rainfall control note', () => {
     // AC 2.2.2.d (Aug-27 set). A control that slides left to right looks exactly like a
     // timeline; the model's variable is how much has fallen, never how long
     // it took, and this sentence is what stands between the two readings.
-    expect(RAINFALL_CONTROL_NOTE).toMatch(/as rainfall accumulates/i);
-    expect(RAINFALL_CONTROL_NOTE).toMatch(/does not show when/i);
+    expect(RAINFALL_CONTROL_NOTE).toMatch(/amount of total rainfall, not a point in time/i);
   });
 
   it('claims nothing about arrival, speed or duration', () => {
@@ -200,12 +200,12 @@ describe('bases', () => {
     expect(new Set(backgrounds).size).toBe(backgrounds.length);
   });
 
-  it('calls the chosen settings an assumption rather than data', () => {
+  it('calls the chosen settings the person’s own rather than data', () => {
     // The distinction the whole screen turns on: a blockage setting the
     // person chose is a fact about them, not about their street.
-    expect(BASIS_LABELS.assumption).toMatch(/assumption/i);
-    expect(BASIS_LABELS.assumption).not.toMatch(/data|recorded|measured/i);
-    expect(BASIS_LABELS.recorded).toMatch(/recorded/i);
+    expect(BASIS_LABELS.assumption).toBe(SOURCE.setting);
+    expect(BASIS_LABELS.assumption).not.toMatch(/data|record|measured/i);
+    expect(BASIS_LABELS.recorded).toBe(SOURCE.recorded);
   });
 });
 
@@ -218,10 +218,10 @@ describe('what is missing or uncertain', () => {
     }
   });
 
-  it('names the capture fraction as an assumption, with its number', () => {
+  it('names the capture fraction as a model setting, with its number', () => {
     const item = WHAT_IS_UNCERTAIN.find((i) => /drain takes/i.test(i.title));
     expect(item?.body).toContain('60%');
-    expect(item?.body).toMatch(/assumption and not a measurement/i);
+    expect(item?.body).toMatch(/model setting and not a measurement/i);
   });
 
   it('gives the measured share of ground in the window rather than a vague hedge', () => {
@@ -255,7 +255,11 @@ describe('why no clear difference', () => {
 
   it('explains the redundancy rather than apologising for the model', () => {
     const all = WHY_NO_CLEAR_CHANGE.map((i) => `${i.title} ${i.body}`).join(' ').toLowerCase();
-    expect(all).toMatch(/captured within the next few|drains below/);
+    expect(all).toMatch(/other nearby drains|taken in by the next few/);
+    for (const item of WHY_NO_CLEAR_CHANGE.slice(0, 2)) {
+      // O10 and O11: a statement about the model, not about the real drains.
+      expect(item.title).toMatch(/^The model /);
+    }
     expect(all).not.toMatch(/sorry|unfortunately|limitation of this tool|failed/);
   });
 
@@ -274,39 +278,38 @@ describe('why no clear difference', () => {
 });
 
 describe('the Iteration 2 wording', () => {
-  it('names the two bands in the criteria\'s own words', () => {
-    // AC 3.1.3.e: Higher than baseline, No clear change.
-    expect(BANDS['higher-than-baseline'].comparison).toBe('Higher than baseline');
-    expect(BANDS['no-clear-change'].comparison).toBe('No clear change');
-    expect(Object.values(BANDS).map((b) => b.band).join(' ')).not.toMatch(/DIFFERENCE/);
+  it('names the two bands in plain words', () => {
+    // The 14 September copy review replaced AC 3.1.3.e's band names.
+    expect(BANDS['higher-than-baseline'].comparison).toBe('More water than with a clear drain');
+    expect(BANDS['no-clear-change'].comparison).toBe('No clear difference');
+    expect(Object.values(BANDS).map((b) => b.band).join(' ')).not.toMatch(/baseline|change/i);
   });
 
-  it('says what No clear change does not mean', () => {
+  it('says what No clear difference does not mean', () => {
     // AC 3.3.2.h and 3.1.3.f. Found missing from the screen on 13 September.
-    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/did not identify a clear difference from the all-clear baseline/);
-    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/does not mean the selected drain has no blockage or flood concern/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/did not find a clear difference from the clear-drain setting/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/does not show whether this drain is blocked now/);
     expect(NO_CLEAR_CHANGE_MEANS).toMatch(/no effect in a real flood/);
   });
 
   it('lists all nine limitations, a to i, in order', () => {
     expect(LIMITATIONS).toHaveLength(9);
     const [a, b, c, d, e, f, g, h, i] = LIMITATIONS;
-    expect(a).toMatch(/blockage condition is an assumption/i);
+    expect(a).toMatch(/drain setting is one you chose/i);
     expect(b).toMatch(/not a weather observation or forecast/i);
     expect(c).toMatch(/rainfall amount at which a drain would fail/i);
-    expect(d).toMatch(/pipe hydraulic capacity is not modelled/i);
-    expect(e).toMatch(/does not show a validated flood depth or water depth/i);
+    expect(d).toMatch(/how much water the pipes can carry is not modelled/i);
+    expect(e).toMatch(/does not show flood depth or water depth/i);
     expect(f).toMatch(/when floodwater would arrive/i);
     expect(g).toMatch(/flood probability or a risk score/i);
     expect(h).toBe(NO_CLEAR_CHANGE_MEANS);
-    expect(i).toMatch(/only shows differences from the all-clear baseline/i);
+    expect(i).toMatch(/only shows differences from the clear-drain setting/i);
   });
 
-  it('explains accumulated rainfall as a simplified total, without intensity, duration or forecast', () => {
-    // AC 3.2.3.c, d and e.
-    expect(RAINFALL_EXPLAINED).toMatch(/simplified total/);
-    expect(RAINFALL_EXPLAINED).toMatch(/does not model how intense the rain is or how long it lasts/);
-    expect(RAINFALL_EXPLAINED).toMatch(/not a weather forecast or a prediction of a future storm/);
+  it('explains total rainfall without intensity, duration or forecast', () => {
+    // AC 3.2.3.d and e.
+    expect(RAINFALL_EXPLAINED).toMatch(/not a forecast/);
+    expect(RAINFALL_EXPLAINED).toMatch(/does not include rainfall duration or intensity/);
   });
 
   it('does not let the rainfall control imply a steady climb', () => {
@@ -315,7 +318,7 @@ describe('the Iteration 2 wording', () => {
   });
 
   it('states the simplified assumptions with their numbers, and how strongly to read the result', () => {
-    const step = HOW_IT_WAS_PRODUCED.find((s) => s.title === 'Simplified assumptions');
+    const step = HOW_IT_WAS_PRODUCED.find((s) => s.title === 'How the model simplifies things');
     expect(step?.body).toContain('60%');
     expect(step?.body).toContain('0.05 m³');
     expect(step?.body).toMatch(/evenly/);

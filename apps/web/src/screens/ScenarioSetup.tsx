@@ -1,10 +1,9 @@
 /**
- * Setting up a comparison: a pit, an assumption, an amount of rain.
+ * Setting up a comparison: a pit, a drain setting, an amount of rain.
  *
- * Two sentences on this screen are not copy, they are AD13, and the tests hold
- * them: the blockage setting is an assumption rather than an observation of
- * the pit's condition, and this model does not calculate when or how quickly a
- * blockage forms. The teacher's question about deposit rates is answered here,
+ * Two sentences on this screen are not copy, they are AD13: the blockage
+ * setting is not an observation of the drain, and DrainLens does not know
+ * whether it is blocked now or how a blockage formed. The teacher's question about deposit rates is answered here,
  * on the screen, rather than in a document nobody reading the result will open.
  *
  * The blockage starts unchosen. A pre-selected assumption is one the interface
@@ -18,13 +17,14 @@ import { RAINFALL_EXPLAINED } from '../scenario/outcome.js';
 import { SUPPORT_LEGEND } from '../scenario/support.js';
 import type { ScenarioInputs, SupportedAddress } from '../session.js';
 import { missingScenarioInput } from '../session.js';
+import { TOTAL_RAINFALL } from '../ui/terms.js';
 
 /**
- * What each setting means, expressed against the all-clear baseline.
+ * What each setting means, expressed against the clear setting.
  *
  * Not "50% blocked". The model has a capture fraction it assumes and no way to
  * measure a real blockage, so a percentage of blockage would be a physical
- * claim it cannot support. A share of the baseline capture is what the
+ * claim it cannot support. A share of the clear drain's intake is what the
  * calculation actually does.
  */
 export const BLOCKAGE_OPTIONS: readonly {
@@ -32,25 +32,22 @@ export const BLOCKAGE_OPTIONS: readonly {
   readonly title: string;
   readonly detail: string;
 }[] = [
-  { setting: 'clear', title: 'Clear', detail: '100% of the all-clear baseline capture' },
-  { setting: 'partly-blocked', title: 'Partly blocked', detail: '50% of the all-clear baseline capture' },
-  { setting: 'fully-blocked', title: 'Fully blocked', detail: 'No capture at this pit' },
+  { setting: 'clear', title: 'Clear', detail: 'Uses the model’s normal drain setting' },
+  { setting: 'partly-blocked', title: 'Partly blocked', detail: 'Takes half as much water as the clear setting' },
+  { setting: 'fully-blocked', title: 'Fully blocked', detail: 'Takes no surface water at this pit' },
 ];
 
 /** AD13, both statements, as the interface must be able to quote them. */
 export const BLOCKAGE_IS_AN_ASSUMPTION =
-  'These settings are scenario assumptions, not observations of the drainage pit’s current condition. The selected setting stays the same throughout the comparison, and DrainLens does not calculate when or how quickly a blockage forms.';
-
-export const RAINFALL_IS_AN_ASSUMPTION =
-  'This is a user-selected comparison amount, not a rainfall observation or forecast.';
+  'These are settings for the comparison, not observations of the drain. DrainLens does not know whether the drain is blocked now or how a blockage formed.';
 
 /**
  * The validated levels, labelled. The amounts come from the schema so the
  * buttons and the check the session applies cannot drift apart.
  */
 export const RAINFALL_PRESETS: readonly { readonly label: string; readonly mm: number }[] =
-  VALIDATED_RAINFALL_LEVELS_MM.map((mm, index) => ({
-    label: ['Lower comparison amount', 'Middle comparison amount', 'Higher comparison amount'][index] ?? `${String(mm)} mm`,
+  VALIDATED_RAINFALL_LEVELS_MM.map((mm) => ({
+    label: `${String(mm)} mm ${TOTAL_RAINFALL.toLowerCase()}`,
     mm,
   }));
 
@@ -82,16 +79,16 @@ export function ScenarioSetup({
   const missing = missingScenarioInput(scenario);
   const steps = [
     { n: 1, label: 'Select a drainage pit', done: scenario.pitId !== null },
-    { n: 2, label: 'Choose a blockage assumption', done: scenario.blockage !== null },
-    { n: 3, label: 'Choose accumulated rainfall', done: true },
+    { n: 2, label: 'Choose how blocked it is', done: scenario.blockage !== null },
+    { n: 3, label: 'Choose total rainfall', done: true },
     { n: 4, label: 'Run comparison', done: false },
   ];
 
   return (
     <div style={{ padding: '18px 20px 40px', maxWidth: 420 }}>
-      <h1 style={{ margin: '0 0 6px', fontSize: 22 }}>Compare a local drain-blockage scenario</h1>
+      <h1 style={{ margin: '0 0 6px', fontSize: 22 }}>What changes if a drain is blocked</h1>
       <p style={{ margin: '0 0 8px', color: '#4d5f6e', fontSize: 14 }}>
-        Choose one nearby drain, a blockage assumption, and an accumulated rainfall amount.
+        Choose a nearby drain, how blocked it is, and a total rainfall amount.
       </p>
       <p style={{ margin: '0 0 18px', color: '#6b7a88', fontSize: 13 }}>
         <span aria-hidden>◎ </span>
@@ -141,11 +138,11 @@ export function ScenarioSetup({
         ))}
       </ol>
 
-      <Section n={1} title="Selected drain">
+      <Section n={1} title="Drain">
         {scenario.pitId === null ? (
           suggestedPitId === null ? (
             <p style={{ margin: 0, color: '#6b7a88' }}>
-              Select a drainage pit on the map to set the scenario drain.
+              Select a drainage pit on the map to choose the drain.
             </p>
           ) : (
             <>
@@ -184,7 +181,7 @@ export function ScenarioSetup({
         )}
       </Section>
 
-      <Section n={2} title="Blockage assumption">
+      <Section n={2} title="Drain setting">
         <div style={{ display: 'flex', gap: 8 }}>
           {BLOCKAGE_OPTIONS.map((option) => {
             const chosen = scenario.blockage === option.setting;
@@ -216,7 +213,7 @@ export function ScenarioSetup({
         </p>
       </Section>
 
-      <Section n={3} title="Total accumulated rainfall">
+      <Section n={3} title={TOTAL_RAINFALL}>
         {/*
           The three validated levels and nothing else (AC 3.2.3.b). A number
           box sat above them until 13 September and accepted any amount,
@@ -231,7 +228,6 @@ export function ScenarioSetup({
             style={{
               display: 'flex',
               width: '100%',
-              justifyContent: 'space-between',
               padding: '9px 11px',
               marginBottom: 6,
               background: scenario.rainfallMm === preset.mm ? '#eaf4f0' : '#ffffff',
@@ -241,14 +237,10 @@ export function ScenarioSetup({
               font: 'inherit',
             }}
           >
-            <span>{preset.label}</span>
-            <strong>{preset.mm} mm</strong>
+            {preset.label}
           </button>
         ))}
-        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7a88' }}>
-          {RAINFALL_IS_AN_ASSUMPTION}
-        </p>
-        <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6b7a88' }}>{RAINFALL_EXPLAINED}</p>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7a88' }}>{RAINFALL_EXPLAINED}</p>
       </Section>
 
       <section
@@ -260,7 +252,7 @@ export function ScenarioSetup({
           borderRadius: 10,
         }}
       >
-        <span style={{ fontSize: 11, letterSpacing: 0.6, color: '#8593a0' }}>SCENARIO SUMMARY</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#5b6e7e' }}>Comparison summary</span>
         <dl
           style={{
             display: 'grid',
@@ -272,15 +264,15 @@ export function ScenarioSetup({
         >
           <Pair label="Drain" value={scenario.pitId === null ? 'Not chosen' : `Pit ${scenario.pitId}`} />
           <Pair
-            label="Blockage assumption"
+            label="Drain setting"
             value={
               scenario.blockage === null
                 ? 'Not chosen'
                 : (BLOCKAGE_OPTIONS.find((o) => o.setting === scenario.blockage)?.title ?? '')
             }
           />
-          <Pair label="Rainfall" value={`${scenario.rainfallMm} mm`} />
-          <Pair label="Local area" value="Around selected drain" />
+          <Pair label={TOTAL_RAINFALL} value={`${scenario.rainfallMm} mm`} />
+          <Pair label="Area compared" value="Around the chosen drain" />
         </dl>
       </section>
 
@@ -289,7 +281,7 @@ export function ScenarioSetup({
           <span aria-hidden>⚠ </span>
           {missing === 'pit'
             ? 'Select a drainage pit to compare.'
-            : 'Choose a blockage assumption to compare.'}
+            : 'Choose how blocked the drain is to compare.'}
         </p>
       )}
 
@@ -330,9 +322,7 @@ function Section({ n, title, children }: { n: number; title: string; children: R
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <span>
-      <dt style={{ fontSize: 11, letterSpacing: 0.4, color: '#8593a0', margin: 0 }}>
-        {label.toUpperCase()}
-      </dt>
+      <dt style={{ fontSize: 12, color: '#6b7a88', margin: 0 }}>{label}</dt>
       <dd style={{ margin: 0, fontWeight: 600 }}>{value}</dd>
     </span>
   );

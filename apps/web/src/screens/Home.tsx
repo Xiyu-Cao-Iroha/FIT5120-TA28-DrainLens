@@ -29,7 +29,7 @@
  * Flood history arrived on 3 September and is the fifth card, set apart from
  * the four modes because it is the one way in that does not open the map. It
  * answers a question about the past across Greater Melbourne; the other four
- * answer questions about the ground under one square kilometre. Putting it in
+ * answer questions about the ground in the City of Melbourne. Putting it in
  * the same row would suggest the map can show it, which the map cannot.
  */
 
@@ -46,7 +46,8 @@ import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
-import { PilotBadge } from '../ui/Shell.js';
+import { CoverageBadge } from '../ui/Shell.js';
+import { COVERAGE, FULL_MAP, LAYER, TOTAL_RAINFALL } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -82,7 +83,7 @@ export const SECTIONS = {
  * mentor review's fourth point was that nobody reads them — which is worse
  * than it sounds, because the sentences being skipped were the careful ones.
  * The qualifications are not gone: what a layer is and is not stays on the map
- * beside the layer (*Official recorded data* / *System-derived result*), and
+ * beside the layer (*Council record* / *Calculated by DrainLens*), and
  * *DrainLens does not provide* further down this page still says, in full, that
  * there are no forecasts and no depths. A caveat nobody reads is not a caveat.
  */
@@ -100,27 +101,27 @@ export const PATHS: readonly {
   {
     mode: 'drainage',
     title: 'Recorded drainage',
-    body: 'The public pits and pipes the council has a record of.',
+    body: 'Drain pits and pipes shown in council records.',
     accent: DAY.pit,
   },
   {
     mode: 'water-flow',
     title: 'Where rainwater may move',
-    body: 'Likely surface-water paths, calculated from measured ground.',
+    body: 'Likely paths rainwater may follow, calculated from ground-height data.',
     accent: DERIVED_DAY.channel,
   },
   {
     mode: 'terrain',
     title: 'The shape of the ground',
-    body: 'Elevation shading, so you can see which way is downhill.',
+    body: 'Colour shows higher and lower ground. Shading shows the shape of the land.',
     // The 20 m node: the ramp's pale low end is close to white and would not
     // read as an accent at all.
     accent: RAMP[7]!.hex,
   },
   {
     mode: 'low-areas',
-    title: 'Low points and depressions',
-    body: 'Places the calculated surface says water can collect.',
+    title: 'Low areas',
+    body: `Calculated ${LAYER.lowAreas.toLowerCase()} where water may collect.`,
     accent: DERIVED_DAY.lowPointEdge,
   },
 ];
@@ -128,21 +129,21 @@ export const PATHS: readonly {
 const STEPS: readonly { readonly title: string; readonly body: string }[] = [
   {
     title: 'Open the map',
-    body: 'It opens over the pilot square kilometre with no address selected and nothing assumed about you.',
+    body: 'Open the map. No address is selected until you search for one.',
   },
   {
     title: 'Find a street',
-    body: 'Search an address from the top of the map. It is matched against an index that ships with the site, so the search never leaves your browser.',
+    body: `Search an address from the top of the map. ${COVERAGE.addresses} The search happens on your device. Your address is not sent or saved.`,
   },
   {
     title: 'Read what is recorded',
-    body: 'Switch modes along the top, open Layers to show pits and pipes on their own, and see which parts are the council’s record and which DrainLens calculated.',
+    body: `Use the map buttons to show drain records, ${LAYER.paths.toLowerCase()}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()}. Each layer says whether it comes from council records or DrainLens calculations.`,
   },
 ];
 
 const PROVIDES: readonly string[] = [
-  'Recorded public drainage pits and pipes, and where a path stops because the record does',
-  'Surface-water paths, low points and a ground surface calculated from measured terrain',
+  'Council records of public drain pits and pipes, including gaps where the record ends',
+  `${LAYER.paths}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()} calculated from available ground data`,
   'A plain-English note on every layer saying whether it is recorded or calculated',
   'Recorded flood-incident counts by area across Greater Melbourne, 2009-10 to 2014-15',
 ];
@@ -150,7 +151,7 @@ const PROVIDES: readonly string[] = [
 const WITHHOLDS: readonly string[] = [
   'Live warnings, forecasts, or any prediction of future flooding',
   'How deep water would be, or when it would arrive',
-  'Drainage, water paths or low points anywhere outside the City of Melbourne',
+  `Drainage, ${LAYER.paths.toLowerCase()} or ${LAYER.lowAreas.toLowerCase()} anywhere outside the City of Melbourne`,
 ];
 
 export interface HomeProps {
@@ -236,7 +237,9 @@ function SectionHeading({
       <h2
         className="home__section-title"
         style={{
-          margin: `${String(space(3))}px 0 ${String(space(3))}px`,
+          // The body carries the gap to the content below; without one, the
+          // heading has to.
+          margin: `${String(space(3))}px 0 ${String(body === undefined ? space(10) : space(3))}px`,
           color: ink.strong,
           maxWidth: 620,
         }}
@@ -259,21 +262,7 @@ function SectionHeading({
   );
 }
 
-function Eyebrow({
-  children,
-  /**
-   * Its colour, where the default cannot be read.
-   *
-   * `brand.ink` is measured against the page, and the hero is a photograph
-   * now. Passing the colour in keeps the one that was measured for *that*
-   * surface beside the rest of the hero's palette, rather than leaving a
-   * component to guess which background it landed on.
-   */
-  tone,
-}: {
-  readonly children: React.ReactNode;
-  readonly tone?: string;
-}) {
+function Eyebrow({ children }: { readonly children: React.ReactNode }) {
   return (
     <span
       style={{
@@ -283,10 +272,10 @@ function Eyebrow({
         font: type(text.micro, { weight: weight.semibold }),
         letterSpacing: tracking.caps,
         textTransform: 'uppercase',
-        color: tone ?? brand.ink,
+        color: brand.ink,
       }}
     >
-      <span aria-hidden style={{ width: 18, height: 2, background: tone ?? brand.base }} />
+      <span aria-hidden style={{ width: 18, height: 2, background: brand.base }} />
       {children}
     </span>
   );
@@ -352,7 +341,7 @@ function TickMark() {
  * what this has to say is not a map.
  *
  * **It is a photograph, so it is not evidence.** Nothing in it is measured,
- * it is not the pilot area, and no number on this site comes from it. The
+ * it is not the mapped area, and no number on this site comes from it. The
  * badge and the footer say what the data is; this says what the subject is.
  *
  * 157 KB of WebP at 1600 px — about 15% on top of a first visit, which is the
@@ -364,7 +353,7 @@ function TickMark() {
  * the text has a column of its own — which is a layout question and belongs
  * where the other layout question on this page is already answered.
  *
- * **These four colours are the ones measured against it**, against the
+ * **These three colours are the ones measured against it**, against the
  * brightest pixel under the text rather than the average, because a
  * photograph's contrast changes with every pixel and the only number worth
  * checking is the worst one.
@@ -373,7 +362,6 @@ const ON_PHOTO = {
   title: '#ffffff',
   lead: '#e4e9ec',
   quiet: '#cfd7dc',
-  eyebrow: '#9fd6c4',
 } as const;
 
 function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
@@ -400,10 +388,9 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
         }}
       >
         <div>
-          <Eyebrow tone={ON_PHOTO.eyebrow}>Local drainage made easier to understand</Eyebrow>
           <h1
             className="home__title"
-            style={{ margin: `${String(space(4))}px 0 ${String(space(4))}px`, color: ON_PHOTO.title }}
+            style={{ margin: `0 0 ${String(space(4))}px`, color: ON_PHOTO.title }}
           >
             Understand how water moves through your neighbourhood.
           </h1>
@@ -415,8 +402,8 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Explore recorded drainage infrastructure, the shape of the ground, and where surface
-            water is likely to run around a local address.
+            Search an address to view council drain records, ground height and likely paths
+            rainwater may follow nearby.
           </p>
 
           {/*
@@ -444,7 +431,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
             }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(2) }}>
-              <TickMark /> Official drainage records
+              <TickMark /> Council drain records
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(2) }}>
               <TickMark /> No account required
@@ -452,7 +439,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
           </div>
 
           <div style={{ marginTop: space(6) }}>
-            <PilotBadge />
+            <CoverageBadge />
           </div>
         </div>
 
@@ -466,7 +453,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
  * The picture on each card, drawn rather than photographed.
  *
  * Four small SVGs, in the map's own colours, on the map's own ground tint.
- * They are not screenshots: a screenshot of the pilot square kilometre at
+ * They are not screenshots: a screenshot of the map at
  * thumbnail size is a grey smear, and it would also go stale silently the
  * next time the artefacts are rebuilt. These say what the *mark* looks like —
  * dots and lines, arrows, a ramp, pooled shapes — which is the thing a person
@@ -808,8 +795,8 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
         }}
       >
         {artefact.incidentType} incidents recorded by {artefact.source.publisher}, {periodLabel(artefact)},
-        by {artefact.geography.unit} across {artefact.geography.scope}. A <strong>+</strong> means a
-        count inside that area was withheld, so the total is a floor.
+        by statistical area across {artefact.geography.scope}. <strong>+</strong> means the
+        exact count was not published, so the total is at least the number shown.
       </p>
     </div>
   );
@@ -831,7 +818,7 @@ function Paths({
       <SectionHeading
         eyebrow="What you can explore"
         title="Four ways to understand your area"
-        body="Each one shows a different piece of the picture, and opens the same map with that question already asked. You can turn them on and off at any time once you are there."
+        body="Choose a topic to open the map. You can change layers at any time."
       />
       <div
         style={{
@@ -855,8 +842,8 @@ function Paths({
         The fifth kind of information AC 1.1.1.b names, and the only one that
         is not a map layer. It gets a band of its own rather than a fifth card
         because a card in that row would say "this opens the map too", and the
-        difference between the past across a city and the ground under a
-        square kilometre is the thing most worth not blurring.
+        difference between the past across a city and the ground in one
+        council area is the thing most worth not blurring.
       */}
       <article
         style={{
@@ -887,10 +874,9 @@ function Paths({
               Recorded flood incidents across {history.geography.scope}
             </h3>
             <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-              Which areas called the State Emergency Service about flooding most often across{' '}
-              {periodLabel(history)}, what a count actually means, and why it is not a measure of
-              how bad the flooding was. This one is about the past, and about the whole city
-              rather than the pilot area.
+              See which {history.geography.scope} areas had the most SES flood call-outs from{' '}
+              {periodLabel(history)}. These counts show past call-outs, not flood depth, damage or
+              future risk.
             </p>
           </span>
           <button
@@ -946,13 +932,12 @@ function Paths({
               color: ink.strong,
             }}
           >
-            Compare a drain-blockage scenario
+            What changes if a drain is blocked
           </h3>
           <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-            Choose a recorded drainage pit near an address, assume it is partly or fully blocked,
-            and compare the calculated result against the same rainfall with every drain clear.
-            Both sides are assumptions you set, not observations of the drain or a forecast of
-            rain, and the answer is often that there is no clear difference.
+            Choose a nearby drain and compare two settings under the same{' '}
+            {TOTAL_RAINFALL.toLowerCase()}: clear and blocked. This is a model comparison, not an
+            observation or forecast.
           </p>
         </span>
         <button
@@ -983,7 +968,6 @@ function Paths({
           color: ink.muted,
         }}
       >
-        Or{' '}
         <button
           type="button"
           onClick={() => {
@@ -997,7 +981,7 @@ function Paths({
             color: brand.ink,
           }}
         >
-          open the map with every mode on →
+          Open the {FULL_MAP.toLowerCase()} →
         </button>
       </p>
     </Band>
@@ -1008,8 +992,7 @@ function Flow() {
   return (
     <Band tone="tint" id={SECTIONS.flow}>
       <SectionHeading
-        title="From an address to a clearer local picture."
-        body="A short path that keeps the map approachable the first time somebody opens it."
+        title="How to use the map"
       />
       <ol
         style={{
@@ -1061,8 +1044,7 @@ function Limits() {
   return (
     <Band id={SECTIONS.limits}>
       <SectionHeading
-        title="Clear about what the information means."
-        body="The boundaries stay visible rather than living in a policy nobody opens. The detail behind them is available without crowding this page."
+        title="What DrainLens can and cannot show"
       />
       <div
         style={{

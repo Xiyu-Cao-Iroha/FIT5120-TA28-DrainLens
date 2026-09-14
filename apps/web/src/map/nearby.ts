@@ -288,4 +288,4 @@ export const COMPASS_ANGLE: Record<Compass, number> = {
  * Every clause above comes from a calculated surface rather than from the
  * council's record, and AC 1.1.4.g requires the two never to look alike.
  */
-export const NEARBY_BASIS = 'System-derived result';
+export const NEARBY_BASIS = 'Calculated by DrainLens';

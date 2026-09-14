@@ -183,18 +183,19 @@ describe('what an area is worth saying', () => {
     expect(state).toBe('unavailable');
     const said = completenessText(both, state, 'Flood');
     expect(said.label).toBe('Not available.');
-    expect(said.body).not.toContain('exact');
+    expect(said.body).not.toContain('published total is complete');
     expect(said.body).toContain('1 of its 3 smaller regions');
     expect(said.body).toContain('minimum');
 
     const exactButUnscored = area({ rate: null, persons: 400 });
-    expect(completenessText(exactButUnscored, 'unavailable', 'Flood').body).toContain('The counts are exact');
+    expect(completenessText(exactButUnscored, 'unavailable', 'Flood').body).toContain('The published total is complete');
   });
 
   it('says each completeness state in its own words', () => {
-    expect(completenessText(area(), 'exact', 'Flood').label).toBe('Exact.');
+    expect(completenessText(area(), 'exact', 'Flood').label).toBe('Complete published total.');
+    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').label).toBe('Minimum total.');
     expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').body).toContain('2 of its 46');
-    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood dispatch');
+    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood call-out');
   });
 
   it('reads the mode’s own number off the area', () => {
@@ -203,8 +204,8 @@ describe('what an area is worth saying', () => {
     expect(valueOf(area({ rate: null }), 'severity')).toBeNull();
   });
 
-  it('says No score rather than a dash or a zero', () => {
-    expect(scoreLabel(area({ rate: null }))).toBe('No score');
+  it('says No rate rather than a dash or a zero', () => {
+    expect(scoreLabel(area({ rate: null }))).toBe('No rate');
   });
 });
 

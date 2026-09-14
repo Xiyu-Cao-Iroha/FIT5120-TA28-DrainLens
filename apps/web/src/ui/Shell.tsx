@@ -30,10 +30,7 @@ import {
   type,
   weight,
 } from './theme.js';
-
-export const INDICATIVE = 'Indicative local information';
-
-export const PILOT_BADGE = 'Kensington pilot · illustrative prototype geometry';
+import { COVERAGE, TOP_NOTICE } from './terms.js';
 
 /**
  * Drawn, not typed.
@@ -125,15 +122,13 @@ export interface ShellProps {
   /** What was changed from the sources, for the credit. Defaults to the drainage map's. */
   readonly creditNotice?: string;
   /**
-   * Where the artefacts on this screen came from: the API over the database,
-   * the copies bundled with the site, or some of each.
+   * Which extent is on screen, so the footer can say when the map got smaller.
    *
-   * Shown because a fallback nobody can see is indistinguishable from an API
-   * nobody is using -- and because "this map is the database's answer" is a
-   * claim, and a claim this product makes visible rather than asserts.
+   * Where the artefacts came from used to be said as well, and the copy review
+   * of 14 September cut it: which server answered is not something a resident
+   * can act on. What they can act on is the consequence -- the fallback covers
+   * one square kilometre instead of the council -- and that is still said.
    */
-  readonly servedFrom?: 'api' | 'bundled' | 'mixed';
-  /** Which extent is on screen, so the footer can say how much ground it is. */
   readonly extentName?: string;
 }
 
@@ -146,7 +141,6 @@ export function Shell({
   masthead = true,
   credits,
   creditNotice,
-  servedFrom,
   extentName,
   at,
 }: ShellProps) {
@@ -237,7 +231,7 @@ export function Shell({
         }}
       >
         <InfoMark />
-        {INDICATIVE}
+        {TOP_NOTICE}
       </div>
 
       {(crumbs !== undefined || back !== undefined) && (
@@ -291,44 +285,37 @@ export function Shell({
       </main>
 
       {credits !== undefined && credits.length > 0 && (
-        <Attribution credits={credits} servedFrom={servedFrom} extentName={extentName} notice={creditNotice ?? CHANGES_NOTICE} />
+        <Attribution credits={credits} extentName={extentName} notice={creditNotice ?? CHANGES_NOTICE} />
       )}
     </div>
   );
 }
 
 /**
+ * The line shown when the map is the bundled fallback.
+ *
+ * The database holds the whole City of Melbourne and the container holds one
+ * square kilometre of Kensington, so when the instance is stopped the map does
+ * not merely come from somewhere else -- **it gets smaller**. Left unsaid,
+ * somebody finds that out by finding their street missing. The full extent
+ * needs no line: it is what `COVERAGE` already says.
+ */
+const SMALLER_MAP: Record<string, string> = {
+  kensington:
+    'The full council map is not available right now, so this map shows only one square kilometre of Kensington.',
+};
+
+/**
  * The data credit, on every screen.
  *
- * CC BY 4.0 requires the attribution to be visible to the person using the
- * work, so it sits in the frame rather than behind a link — the same argument
- * as the indicative banner above it. It is small and quiet, which the licence
- * permits; it is not absent, which the licence does not.
+ * CC BY 4.0 requires the attribution to be reachable by the person using the
+ * work. It used to be spelled out on every screen as dataset ids, which the
+ * copy review of 14 September found nobody could read; it now sits one press
+ * behind a line that names what is there. Collapsed, which the licence
+ * permits; not absent, which it does not.
  */
-/**
- * How much ground is on screen, which changed with where it came from.
- *
- * The database holds the whole City of Melbourne and the container holds the
- * pilot square kilometre, so when the instance is stopped the map does not
- * merely come from somewhere else -- **it gets smaller**. A footer that said
- * only where the data came from would leave somebody to notice that on their
- * own, by finding a street missing.
- */
-const AREA: Record<string, string> = {
-  'city-of-melbourne': 'Showing the whole City of Melbourne.',
-  kensington:
-    'Showing the Kensington pilot square kilometre — the wider council map needs the database, which is not answering.',
-};
-
-const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
-  api: 'Served from the DrainLens database.',
-  bundled: 'Served from the copy bundled with this site.',
-  mixed: 'Served partly from the DrainLens database and partly from the bundled copy.',
-};
-
 function Attribution({
   credits,
-  servedFrom,
   extentName,
   notice,
 }: {
@@ -336,9 +323,9 @@ function Attribution({
   readonly notice: string;
   // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
   // treats those as different, and the caller always passes the key.
-  readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
   readonly extentName: string | undefined;
 }) {
+  const smaller = extentName === undefined ? undefined : SMALLER_MAP[extentName];
   return (
     <footer
       style={{
@@ -350,25 +337,31 @@ function Attribution({
         color: ink.subtle,
       }}
     >
-      {credits.map((credit) => (
-        <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
-          {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
-          <a
-            href={licenceUrl(credit.licence)}
-            target="_blank"
-            rel="license noreferrer"
-            style={{ color: ink.muted, textDecorationColor: line.strong }}
-          >
-            {credit.licence}
-          </a>
-          {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
-        </span>
-      ))}
-      <span>{notice}</span>
-      {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
-      {extentName !== undefined && AREA[extentName] !== undefined && (
-        <span> {AREA[extentName]}</span>
+      {smaller !== undefined && (
+        <p role="status" style={{ margin: `0 0 ${String(space(1))}px`, color: ink.muted }}>
+          {smaller}
+        </p>
       )}
+      <details>
+        <summary style={{ cursor: 'pointer' }}>Data sources · Licensing · Not a flood warning</summary>
+        <p style={{ margin: `${String(space(1))}px 0 0` }}>
+          {credits.map((credit) => (
+            <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
+              {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
+              <a
+                href={licenceUrl(credit.licence)}
+                target="_blank"
+                rel="license noreferrer"
+                style={{ color: ink.muted, textDecorationColor: line.strong }}
+              >
+                {credit.licence}
+              </a>
+              {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
+            </span>
+          ))}
+          <span>{notice}</span> <span>DrainLens is not a flood warning service.</span>
+        </p>
+      </details>
     </footer>
   );
 }
@@ -401,13 +394,13 @@ export function FixtureNotice({ note }: { readonly note: string }) {
 }
 
 /**
- * The pilot badge, which is a claim about scope rather than a label.
+ * The coverage badge, which is a claim about scope rather than a label.
  *
- * Exported because the landing page and the task page both carry it, and two
+ * Exported because the landing page and the homepage both carry it, and two
  * copies of a sentence about what this product does *not* cover is how they
- * drift apart.
+ * drift apart. The sentence itself is `COVERAGE.map`, for the same reason.
  */
-export function PilotBadge() {
+export function CoverageBadge() {
   return (
     <span
       style={{
@@ -420,7 +413,7 @@ export function PilotBadge() {
         color: brand.ink,
       }}
     >
-      {PILOT_BADGE}
+      {COVERAGE.map}
     </span>
   );
 }

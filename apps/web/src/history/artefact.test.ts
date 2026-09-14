@@ -19,6 +19,7 @@ import {
   incompleteCount,
   periodLabel,
   tiedBeyond,
+  yearRange,
 } from './artefact.js';
 
 const YEARS = ['2009-10', '2010-11', '2011-12'] as const;
@@ -232,6 +233,11 @@ describe('reading it', () => {
       ],
     });
     expect(periodLabel(single)).toBe('2020-21');
+  });
+
+  it('writes the years with an en dash in copy', () => {
+    expect(yearRange(['2009-10', '2010-11', '2014-15'])).toBe('2009–10 to 2014–15');
+    expect(yearRange(['2020-21'])).toBe('2020–21');
   });
 
   it('counts the areas whose totals are lower bounds — AC 2.1.1.g', () => {

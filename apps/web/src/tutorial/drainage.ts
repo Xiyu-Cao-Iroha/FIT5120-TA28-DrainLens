@@ -16,45 +16,46 @@
  * chooses it.
  */
 
+import { FULL_MAP, LAYER } from '../ui/terms.js';
 import { type Lesson, unlockingChips } from './lesson.js';
 
 export const DRAINAGE_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: 'Press Pits to show the drainage pits near your address.',
-    hint: 'The map opens with nothing on it. Everything you see from here is something you turned on.',
+    prompt: `Select ${LAYER.pits} to show nearby pits listed in council records.`,
+    hint: 'The map starts with all optional layers turned off.',
     requires: 'pits-on',
   },
   {
     kind: 'read',
     id: 'pits-shown',
     prompt:
-      'Those are the structures the council has a record of — a grate in the kerb, a lid in the footpath, or a join where pipes meet.',
+      'These symbols mark features in council records. They may be kerb grates, footpath lids or pipe junctions.',
   },
   {
     kind: 'do',
     id: 'pipes-on',
-    prompt: 'Now press Pipes to show what connects them underground.',
+    prompt: `Select ${LAYER.pipes} to show the underground connections listed in council records.`,
     requires: 'pipes-on',
   },
   {
     kind: 'read',
     id: 'pipes-shown',
     prompt:
-      'That is the recorded network. Nothing here is measured by us: it is what the council published, drawn as published.',
+      'These pits and pipes come from council records. DrainLens has not checked them on site.',
   },
   {
     kind: 'do',
     id: 'pit-selected',
-    prompt: 'Press the pit marked on the map.',
-    hint: 'We picked this one because the record carries a path onward from it. Not every pit does.',
+    prompt: 'Select the pit marked on the map.',
+    hint: 'This pit has a connected pipe in the council data. Some pits do not.',
     requires: 'pit-selected',
   },
   {
     kind: 'do',
     id: 'trace-following',
-    prompt: 'Press Show connected pipe to follow the water downstream.',
+    prompt: 'Select Show connected drain pipe to follow the recorded pipes downstream.',
     requires: 'trace-following',
   },
 ];
@@ -63,7 +64,7 @@ export const DRAINAGE_STEPS: Lesson['steps'] = [
 export const DRAINAGE_DONE: Lesson['finished'] = {
   headline: 'That is the drainage layer.',
   body: 'You turned on the council’s record, followed one path downstream, and saw where the record stops. The same two controls work anywhere on the map.',
-  unlocked: 'Recorded drainage is now yours on the whole map.',
+  unlocked: `You can now use ${LAYER.pits} and ${LAYER.pipes} on the ${FULL_MAP.toLowerCase()}.`,
 };
 
 export const DRAINAGE: Lesson = {

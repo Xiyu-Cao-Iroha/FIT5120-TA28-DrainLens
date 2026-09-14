@@ -6,10 +6,9 @@
  * from the lessons it was describing, which is two places to remember when a
  * third one lands. Here a lesson is offered because a lesson exists.
  *
- * `terrain` has none yet, so its card stays *Guide coming soon* and its
- * section cannot be started. That is the honest state rather than a stub: the
- * whole map is gated on finishing all four, and a fourth lesson that walked
- * somebody through nothing would open the gate without teaching anything.
+ * `terrain` has none yet, so its card stays *Terrain guide coming soon* and
+ * its section cannot be started. That is the honest state rather than a stub:
+ * a fourth lesson that walked somebody through nothing would teach nothing.
  */
 
 import type { Lesson } from './lesson.js';

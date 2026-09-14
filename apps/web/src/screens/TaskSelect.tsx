@@ -147,8 +147,8 @@ export const GUIDED: readonly {
   },
   {
     task: 'compare',
-    title: 'Compare a drain-blockage scenario',
-    body: 'Choose a drainage pit, a blockage assumption and an accumulated rainfall amount, then compare the result against all drains clear.',
+    title: 'What changes if a drain is blocked',
+    body: 'Choose a nearby drain, how blocked it is and a total rainfall amount, then compare it with the same drain clear. This is a model comparison, not an observation of the drain.',
     action: 'Set up a comparison',
   },
 ];

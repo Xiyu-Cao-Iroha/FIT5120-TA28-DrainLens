@@ -328,7 +328,7 @@ export function MapCanvas({
         Only what is drawn can be selected.
 
         `pick` was given every layer the artefact carries, whatever the
-        switches said, so turning Pits off hid the markers and left them
+        switches said, so turning Drain pits off hid the markers and left them
         selectable: a press on blank ground opened a card about a pit that was
         not on the map. The rule belongs here rather than inside `pick`,
         because this is the one place that knows what was painted -- the same

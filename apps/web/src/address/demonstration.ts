@@ -25,7 +25,7 @@
  *
  * 307 metres is more than the guide's 300-metre opening view needs, so the
  * address centres and its pit sits near the middle of the frame. The 22-pipe
- * path is the other half: *press Show connected pipe* draws a walk across the
+ * path is the other half: *press Show connected drain pipe* draws a walk across the
  * neighbourhood rather than a single hop into a dead end.
  *
  * It is also already the demonstration address everywhere else — `pit.test.ts`

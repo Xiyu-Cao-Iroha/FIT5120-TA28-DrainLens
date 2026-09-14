@@ -34,7 +34,7 @@ describe('the tasks this screen offers', () => {
   it('sends each card to a screen, and the comparison card to the comparison', () => {
     // The task name is read off the card rather than written here, so a card
     // wired to the wrong screen fails even though the reducer is right.
-    const comparison = GUIDED.find((option) => option.title.includes('blockage'));
+    const comparison = GUIDED.find((option) => option.title.includes('blocked'));
     expect(comparison).toBeDefined();
     expect(screenFor(comparison!.task)).toBe('scenario');
 

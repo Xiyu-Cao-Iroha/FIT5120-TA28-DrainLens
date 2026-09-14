@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DEPTH_NOTE, ENDING_LABELS, NOT_RECORDED, NO_OUTLET_NOTE } from './PitDetail.js';
+import { DEPTH_NOTE, ENDING_LABELS, NOT_RECORDED, NO_OUTLET_NOTE, pipesShown } from './PitDetail.js';
 import { TERMINATIONS, type TraceArtefact, endingsByReason, traceDownstream } from '../trace/graph.js';
 
 const artefact = (links: TraceArtefact['links']): TraceArtefact => ({
@@ -41,7 +41,8 @@ describe('wording', () => {
     // claiming one would be describing a drainage system we cannot see.
     const all = [...Object.values(ENDING_LABELS), NO_OUTLET_NOTE, DEPTH_NOTE].join(' ').toLowerCase();
     expect(all).not.toMatch(/reaches the outlet|reaches an outlet|the water leaves here/);
-    expect(NO_OUTLET_NOTE).toMatch(/no recorded outfall/);
+    expect(NO_OUTLET_NOTE).toMatch(/No outfall is recorded/);
+    expect(NO_OUTLET_NOTE).toMatch(/may not be where water leaves the real system/);
   });
 
   it('distinguishes a gap in the record from the edge of the map', () => {
@@ -55,6 +56,13 @@ describe('wording', () => {
   it('says depth is absent from the record rather than showing a blank', () => {
     expect(DEPTH_NOTE).toMatch(/not shown/);
     expect(DEPTH_NOTE).toMatch(/guess as a measurement/);
+  });
+
+  it('counts pipes shown, not steps of the traversal', () => {
+    expect(pipesShown(0)).toBe('No pipe could be followed from this pit.');
+    expect(pipesShown(1)).toBe('One recorded downstream pipe is shown.');
+    expect(pipesShown(22)).toBe('22 recorded downstream pipes are shown.');
+    expect([pipesShown(1), ...Object.values(ENDING_LABELS)].join(' ')).not.toMatch(/steps?|stops in/);
   });
 
   it('names an unrecorded field rather than leaving it empty', () => {

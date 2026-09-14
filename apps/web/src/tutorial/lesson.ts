@@ -76,8 +76,8 @@ export const NOTHING_ON_MAP: MapNow = {
 /**
  * What the guide says when a section is finished.
  *
- * `unlocked` is one sentence and it is a promise: the section's layer is the
- * reader's on the whole map from now on.
+ * `unlocked` is one sentence: where the section's layer can be used on the
+ * full map.
  */
 export interface Finished {
   readonly headline: string;

@@ -160,15 +160,15 @@ describe('what is shown', () => {
     const period = { start: '2009-07-01', end: '2015-06-30' };
     expect(againstRecord(newer, period)).toMatch(/after the SES record on this map ends \(2015-06-30\)/);
     expect(againstRecord(event({ date: '2005-01' }), period)).toMatch(/before the SES record/);
-    expect(againstRecord(older, period)).toMatch(/do not say which dispatches, if any, belong to it/);
+    expect(againstRecord(older, period)).toMatch(/do not say which call-outs, if any, belong to it/);
   });
 
   it('handles an area with no verified event as 4.2.3 asks', () => {
     const text = noEventsText('Brunswick');
-    expect(text).toMatch(/No verified flood event is currently available for Brunswick in the DrainLens record/);
-    expect(text).toMatch(/does not mean flooding has never occurred here/);
-    expect(text).toMatch(/not a complete record of historical flooding/);
-    expect(text).toMatch(/recorded activity and Severity Score above still apply/);
+    expect(text).toMatch(/DrainLens has not added a verified flood event for Brunswick\./);
+    expect(text).toMatch(/This list is incomplete, so this does not mean flooding has never occurred there/);
+    expect(text).toMatch(/call-out counts and rate above still apply/);
+    expect(text).not.toMatch(/Severity|score/);
     expect(NOT_COMPLETE).toMatch(/not a complete record/);
     expect(EVENTS_UNAVAILABLE).toMatch(/not a statement about this area/);
   });

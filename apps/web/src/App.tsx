@@ -44,16 +44,15 @@ import {
   reduce,
 } from './session.js';
 import { Shell } from './ui/Shell.js';
+import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
 import {
   API_BASE,
   API_EXTENT,
   BUNDLED_EXTENT,
-  type Origin,
   fetchArtefact,
   fetchTogether,
-  served,
 } from './data/source.js';
 import { tourGate } from './ui/tourGate.js';
 import { type Credit, creditsFor } from './ui/attribution.js';
@@ -73,8 +72,6 @@ interface Loaded {
   readonly index: AddressIndex;
   readonly history: FloodHistoryArtefact;
   readonly fixtureNote: string | undefined;
-  /** Where the three artefacts describing this place came from -- all of them. */
-  readonly servedFrom: Origin | 'mixed';
   /** `city-of-melbourne` or `kensington`, depending on which answered. */
   readonly extentName: string;
 }
@@ -162,7 +159,6 @@ async function load(): Promise<Loaded> {
     history: history.value,
     index,
     fixtureNote: packed.fixture,
-    servedFrom: served([place.from, history.from]),
     // Which extent is actually on screen, so the interface can say so rather
     // than leaving somebody to notice the map got smaller.
     extentName: place.from === 'api' ? API_EXTENT : BUNDLED_EXTENT,
@@ -236,7 +232,7 @@ export function App() {
   if (loaded === null) {
     return (
       <Shell>
-        <Spinner label="Loading the pilot area…" />
+        <Spinner label="Loading the map…" />
       </Shell>
     );
   }
@@ -279,7 +275,6 @@ export function App() {
         <Shell
           at={session.screen}
           credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
           actions={
             <HomeNav
@@ -380,7 +375,6 @@ export function App() {
           at={session.screen}
           credits={creditsForSources([loaded.history.source, loaded.history.geographySource])}
           creditNotice={BOARD_CHANGES_NOTICE}
-          servedFrom={loaded.servedFrom}
           back={{
             label: 'Home',
             onBack: () => {
@@ -408,7 +402,6 @@ export function App() {
     case 'unsupported':
       return (
         <Shell at={session.screen} credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}>
           <Landing
             index={loaded.index}
@@ -439,7 +432,7 @@ export function App() {
 
     case 'choose':
       return (
-        <Shell at={session.screen} credits={credits} servedFrom={loaded.servedFrom}
+        <Shell at={session.screen} credits={credits}
           extentName={loaded.extentName} masthead={false}>
           <Choose
             learned={session.learned}
@@ -462,7 +455,6 @@ export function App() {
         <Shell
           at={session.screen}
           credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
           masthead={false}
           back={{
@@ -471,7 +463,7 @@ export function App() {
               dispatch({ type: 'leave-map' });
             },
           }}
-          crumbs={crumb('The whole map', undefined, true)}
+          crumbs={crumb(FULL_MAP, undefined, true)}
         >
           <LockedMap
             map={loaded.map}
@@ -502,7 +494,6 @@ export function App() {
         <Shell
           at={session.screen}
           credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
           masthead={false}
           back={{
@@ -556,7 +547,6 @@ export function App() {
         <Shell
           at={session.screen}
           credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
           crumbs={
             <>
@@ -667,12 +657,11 @@ export function App() {
         <Shell
           at={session.screen}
           credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
           crumbs={
             <>
               {session.scenarioOrigin === 'map' ? (
-                crumb('Full map', () => dispatch({ type: 'back' }))
+                crumb(FULL_MAP, () => dispatch({ type: 'back' }))
               ) : (
                 <>
                   {crumb('Address search', () => dispatch({ type: 'change-address' }))}
@@ -681,7 +670,7 @@ export function App() {
                 </>
               )}
               {separator}
-              {crumb('Compare scenario', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
+              {crumb('Blocked drain comparison', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
               {session.screen === 'result' && (
                 <>
                   {separator}
@@ -782,7 +771,7 @@ export function App() {
                 scenarioDrains={scenario.supported}
                 onRefusePit={(pitId) => {
                   setRefusal(
-                    `Pit ${pitId}: ${UNSUPPORTED_TEXT[supportOf({ supported: scenario.supported, withoutGround: scenario.withoutGround }, pitId) === 'no-measured-ground' ? 'no-measured-ground' : 'not-an-inlet']}`,
+                    `${UNSUPPORTED_TEXT[supportOf({ supported: scenario.supported, withoutGround: scenario.withoutGround }, pitId) === 'no-measured-ground' ? 'no-measured-ground' : 'not-an-inlet']}`,
                   );
                 }}
                 difference={differenceShown}
@@ -860,7 +849,6 @@ function MapScreen({
     <Shell
       at={session.screen}
       credits={credits}
-          servedFrom={loaded.servedFrom}
           extentName={loaded.extentName}
       // Inside the map, the name at the top tells somebody something they
       // worked out by arriving. The row below carries the way back out.
@@ -883,7 +871,7 @@ function MapScreen({
         },
       }}
       crumbs={crumb(
-        session.task === 'full-map' ? 'Full map' : 'Explore drainage',
+        session.task === 'full-map' ? FULL_MAP : 'Explore drainage',
         undefined,
         true,
       )}

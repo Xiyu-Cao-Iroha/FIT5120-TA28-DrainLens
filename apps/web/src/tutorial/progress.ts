@@ -14,7 +14,7 @@
  * A store that throws — a private window, blocked site data, some embedded
  * webviews — must not make the guide unusable, so a failed read starts you at
  * nothing learned and a failed write costs you the progress on reload and
- * nothing else. The guide still runs, and the whole map is still reachable
+ * nothing else. The guide still runs, and the full map is still reachable
  * through the notice.
  *
  * **A value that is not exactly four `0`/`1` characters reads as nothing
