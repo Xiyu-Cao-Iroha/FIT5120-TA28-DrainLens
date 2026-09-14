@@ -400,7 +400,13 @@ Four seconds. Writes what the Terrain layer draws and nothing the engine reads �
 - **`buildings.bin`**: the footprint mask, one bit per cell, so buildings are drawn as buildings.
 - **`shade.bin`**: a multi-directional hillshade (altitude 45°, vertical exaggeration 3.2, azimuths 315° × 0.55, 270° × 0.18, 360° × 0.18, 225° × 0.09), stretched between its 1st and 99th percentile over open ground, and pulled towards neutral where less than 35% of the surrounding 25 m was measured (down to 40% strength). The azimuth weights and the strength are the handover's trial values, to be checked on flat ground, a slope and a valley.
 
-2 MB, 125 KB and 1 MB; 1.74 MB gzipped. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
+2 MB, 125 KB and 1 MB; 1.74 MB gzipped.
+
+```bash
+python -m drainlens_pipeline.terrain_marks --terrain ../data/terrain --map ../apps/web/public/data/map.json --out ../apps/web/public/data/terrain
+```
+
+Three seconds. **Contours** (`terrain-contours.json`, 199 KB, 65 KB gzipped): marching squares at whole metres over the raw ground smoothed with a 2 m Gaussian, lines under 25 m dropped, simplified to 0.5 m — 304 lines, 36 at 5 m. **Spot heights** (`spot-heights.json`, 30 KB): up to three candidates per fixed 80 m square, the low, middle and high third of ground that is not a building, not a road, and at least 35% measured in 15 m (eroded 5 × 5); the most-measured cell in each third, rounded to 0.5 m, with stable ids — 357 candidates over 166 squares. The handover's own candidate file covers the same 166 squares, 257 ids match, their positions are a median 0.7 m apart, and the lowest heights agree within 0.5 m in 162 of the 166. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
 
 ## Built since this file was first written
 
