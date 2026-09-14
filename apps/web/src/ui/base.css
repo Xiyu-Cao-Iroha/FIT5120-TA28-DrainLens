@@ -438,3 +438,146 @@ button:disabled {
   background-position: 40% 70%;
   background-repeat: no-repeat;
 }
+
+/*
+ * The blocked-drain comparison: a panel beside the map, or under it.
+ *
+ * Here rather than in style attributes because the layout the Blockage Flow
+ * prototype asks for depends on the window. On a laptop the panel is 320 px
+ * on the left and the map narrows beside it (step 1 has no panel and the map
+ * is full width). On a phone there is no room for both side by side, so the
+ * map sits on top at a fixed share of the screen and the panel follows it,
+ * scrolling with the page.
+ *
+ * The colours are `line.base` and `surface.raised` from `theme.ts`.
+ */
+.comparison {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.comparison__panel {
+  width: 320px;
+  flex-shrink: 0;
+  overflow: auto;
+  background: #ffffff;
+  border-right: 1px solid #dbe4e4;
+  animation: drainlens-panel-in 180ms ease-out;
+}
+
+.comparison__map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes drainlens-panel-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The map key, bottom left, clear of the zoom controls at the bottom right. */
+.comparison__key {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  max-width: 280px;
+}
+
+/* Step 1's pointer-free way through, pinned to the bottom of the map. */
+.comparison__maplink {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 2;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/*
+ * The keyboard targets over the drains. Invisible until focused, and then a
+ * 3 px dashed ring in a pink no layer on this map uses (`DRAIN_FOCUS_COLOUR`),
+ * so it cannot be read as a mark.
+ */
+.comparison__drain:focus-visible {
+  outline: 3px dashed #db2777;
+  outline-offset: 2px;
+}
+
+@media (max-width: 759px) {
+  .comparison {
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .comparison__map {
+    order: 0;
+    flex: none;
+    height: 58vh;
+    min-height: 320px;
+  }
+
+  /* Step 1 has no panel, so on a phone the map takes the whole screen. */
+  .comparison--map-only {
+    height: 100%;
+  }
+
+  .comparison--map-only .comparison__map {
+    flex: 1;
+    height: auto;
+  }
+
+  .comparison__panel {
+    order: 1;
+    width: auto;
+    overflow: visible;
+    border-right: none;
+    border-top: 1px solid #dbe4e4;
+    animation-name: none;
+  }
+
+  /*
+   * On steps 2 and 3 the panel under the map already names the drain, and a
+   * key over a third of a phone's map costs more than it says.
+   */
+  /* `!important` because the card's own display is an inline style. */
+  .comparison__key--later {
+    display: none !important;
+  }
+
+  /*
+   * Above the bottom link, not at the top. At the top it sat on step 1's coach
+   * card, which the fit puts near the middle of a short phone map; the bottom
+   * third is where the fit leaves padding, so the key costs nothing there.
+   */
+  .comparison__key {
+    top: auto;
+    bottom: 64px;
+    left: 12px;
+    max-width: min(220px, calc(100% - 180px));
+  }
+
+  .comparison__maplink {
+    bottom: 12px;
+    white-space: normal;
+    width: max-content;
+    max-width: calc(100% - 96px);
+    left: 12px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparison__panel {
+    animation: none;
+  }
+}

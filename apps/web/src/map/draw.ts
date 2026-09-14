@@ -34,6 +34,14 @@ export interface Palette {
   readonly selected: string;
   readonly suggested: string;
   readonly comparable: string;
+  /**
+   * A pit the comparison cannot use, while the comparison is asking for one.
+   *
+   * Pale and small rather than hidden. The prototype's annotation is that a
+   * resident should be able to see the model chose one drain out of many and
+   * that the rest are unavailable — which a map that removed them cannot say.
+   */
+  readonly unavailable: string;
   readonly label: string;
   readonly labelHalo: string;
   /** Suburb names: darker than a street name, because they are read from further out. */
@@ -60,6 +68,8 @@ export const DAY: Palette = {
   // Amber, matching the panel's "suggested, not your choice yet" note. A
   // suggestion drawn in the chosen colour is a choice the person did not make.
   suggested: '#b4690e',
+  // Grey, and lighter than the street labels, so it recedes behind them.
+  unavailable: '#b9c3ca',
   label: '#5b6b7a',
   labelHalo: '#ffffff',
   // Near-black ink rather than the street grey. At the overview the names sit
@@ -226,6 +236,142 @@ function drawPits(
     if (isSelected) {
       drawPin(context, x, y, palette.selected, String(pit.asset_number ?? ''));
       context.lineWidth = 1.5;
+    }
+  }
+}
+
+/**
+ * The drains while the blocked-drain comparison is asking for one.
+ *
+ * Separate from `DrawOptions.suggestedPit` and `comparablePits`, which the
+ * guide and the full map use with their own meaning: there a suggestion is an
+ * amber "not your choice yet" ring. Here the design is the Blockage Flow
+ * prototype's, and its colours mean one thing each — teal for a drain that can
+ * be tested, grey for one that cannot, orange only for the address.
+ */
+export interface ComparisonMarks {
+  /** Asset numbers the engine can calculate a comparison for. */
+  readonly comparable: ReadonlySet<string>;
+  /** Step 1's highlighted drain: filled teal, with a ripple around it. */
+  readonly suggested: number | null;
+  /** The chosen drain: filled teal, with a white tick. */
+  readonly selected: number | null;
+}
+
+/** How opaque the ring on a comparable drain that is not the suggestion is. */
+export const OTHER_COMPARABLE_ALPHA = 0.4;
+
+/** Radius of the suggested and selected markers, which are drawn at a fixed size. */
+export const COMPARISON_MARK_R = 12;
+
+/**
+ * Every pit, as the comparison needs them read.
+ *
+ * Two passes. The ordinary pits first — grey when the comparison cannot use
+ * them, the council's own marker with a 40% teal ring when it can — and then
+ * the highlighted and chosen drains on top, so a neighbouring pit a few pixels
+ * away never paints over the one the screen is talking about.
+ */
+function drawComparisonPits(
+  context: CanvasRenderingContext2D,
+  viewport: Viewport,
+  pits: readonly Pit[],
+  palette: Palette,
+  seen: Extremes,
+  marks: ComparisonMarks,
+): void {
+  const radius = Math.max(2.5, Math.min(7, viewport.scale * 2.2));
+  const emphasised: { pit: Pit; kind: 'suggested' | 'selected' }[] = [];
+
+  for (const pit of pits) {
+    const [east, north] = pit.c;
+    if (east < seen.minE || east > seen.maxE || north < seen.minN || north > seen.maxN) continue;
+    if (marks.selected !== null && pit.asset_number === marks.selected) {
+      emphasised.push({ pit, kind: 'selected' });
+      continue;
+    }
+    if (marks.suggested !== null && pit.asset_number === marks.suggested) {
+      emphasised.push({ pit, kind: 'suggested' });
+      continue;
+    }
+    const [x, y] = toScreen(viewport, pit.c);
+    if (!marks.comparable.has(String(pit.asset_number ?? ''))) {
+      // Smaller than a comparable pit and without an edge, so it reads as
+      // part of the network rather than as something to press.
+      context.beginPath();
+      context.arc(x, y, Math.max(2, radius * 0.6), 0, Math.PI * 2);
+      context.fillStyle = palette.unavailable;
+      context.fill();
+      continue;
+    }
+    if (viewport.scale >= ICON_MIN_SCALE) {
+      drawPitIcon(context, x, y, palette.pit);
+    } else {
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fillStyle = palette.pit;
+      context.fill();
+      context.lineWidth = 1.5;
+      context.strokeStyle = palette.pitEdge;
+      context.stroke();
+    }
+    const ring = viewport.scale >= ICON_MIN_SCALE ? 15 : radius + 3.5;
+    context.save();
+    context.globalAlpha = OTHER_COMPARABLE_ALPHA;
+    context.beginPath();
+    context.arc(x, y, ring, 0, Math.PI * 2);
+    context.strokeStyle = palette.comparable;
+    context.lineWidth = 2.5;
+    context.stroke();
+    context.restore();
+  }
+
+  for (const { pit, kind } of emphasised) {
+    const [x, y] = toScreen(viewport, pit.c);
+    if (kind === 'suggested') {
+      // The ripple: two soft discs, the only translucent fill on the map
+      // besides the difference, and teal rather than violet so the two can
+      // never be read as one thing.
+      context.save();
+      context.globalAlpha = 0.14;
+      context.beginPath();
+      context.arc(x, y, COMPARISON_MARK_R * 2.6, 0, Math.PI * 2);
+      context.fillStyle = palette.selected;
+      context.fill();
+      context.globalAlpha = 0.22;
+      context.beginPath();
+      context.arc(x, y, COMPARISON_MARK_R * 1.7, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+    context.beginPath();
+    context.arc(x, y, COMPARISON_MARK_R, 0, Math.PI * 2);
+    context.fillStyle = palette.selected;
+    context.fill();
+    context.lineWidth = 3;
+    context.strokeStyle = palette.pitEdge;
+    context.stroke();
+
+    context.strokeStyle = palette.pitEdge;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    if (kind === 'selected') {
+      // The tick: chosen, and nothing left to confirm.
+      context.lineWidth = 2.5;
+      context.beginPath();
+      context.moveTo(x - 5, y + 0.5);
+      context.lineTo(x - 1.5, y + 4);
+      context.lineTo(x + 5.5, y - 3.5);
+      context.stroke();
+    } else {
+      // Four grate bars, so the highlighted drain still reads as a drain.
+      context.lineWidth = 1.8;
+      for (const dx of [-4.5, -1.5, 1.5, 4.5]) {
+        context.beginPath();
+        context.moveTo(x + dx, y - 5);
+        context.lineTo(x + dx, y + 5);
+        context.stroke();
+      }
     }
   }
 }
@@ -472,6 +618,13 @@ export interface DrawOptions {
   readonly suggestedPit?: number | null;
   /** Drains a comparison can be calculated for, ringed (AC 3.1.1.a). */
   readonly comparablePits?: ReadonlySet<string> | null;
+  /**
+   * The blocked-drain comparison's own reading of the pits.
+   *
+   * When given, it replaces `selectedPit`, `suggestedPit` and `comparablePits`
+   * for the pits, and is drawn at every zoom at which pits are drawn.
+   */
+  readonly comparison?: ComparisonMarks | null;
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
@@ -649,7 +802,9 @@ export function drawMap(
     drawPipes(context, viewport, artefact.layers.pipe ?? [], palette, seen, options.selectedPipe ?? null);
   }
 
-  if (options.showPits !== false && viewport.scale >= PIT_MIN_SCALE) {
+  if (options.comparison && options.showPits !== false && viewport.scale >= PIT_MIN_SCALE) {
+    drawComparisonPits(context, viewport, artefact.layers.pit ?? [], palette, seen, options.comparison);
+  } else if (options.showPits !== false && viewport.scale >= PIT_MIN_SCALE) {
     drawPits(
       context,
       viewport,

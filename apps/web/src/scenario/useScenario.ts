@@ -56,6 +56,8 @@ export interface ScenarioRunner {
   readonly withoutGround: ReadonlySet<string>;
   readonly running: boolean;
   readonly failure: string | null;
+  /** Start the worker again, after `failure`. */
+  readonly retry: () => void;
   readonly run: (
     assetNumber: string,
     blockage: BlockageSetting,
@@ -136,6 +138,8 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
   const [withoutGround, setWithoutGround] = useState<ReadonlySet<string>>(() => new Set());
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  // Bumped by `retry`, so the effect below tears the worker down and starts a new one.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -143,8 +147,21 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
+    // A worker started again starts without the last one's failure.
+    setFailure(null);
+    const loadId = nextId.current++;
     worker.onmessage = (event: MessageEvent<WorkerReply>) => {
       const reply = event.data;
+      /*
+        The index could not be loaded. The worker says so with the load's own
+        id, which nothing was waiting on, so this reply used to be dropped and
+        the comparison waited for a list of drains that was never coming --
+        a "Finding drains…" that never finished.
+      */
+      if (reply.type === 'failed' && reply.id === loadId) {
+        setFailure(reply.message);
+        return;
+      }
       if (reply.type === 'loaded') {
         setSupported(new Set(reply.supported));
         setWithoutGround(new Set(reply.withoutGround));
@@ -159,15 +176,14 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     };
     worker.onerror = (event) => setFailure(event.message || 'the scenario worker failed to start');
 
-    const id = nextId.current++;
-    worker.postMessage({ type: 'load', id, base } satisfies WorkerRequest);
+    worker.postMessage({ type: 'load', id: loadId, base } satisfies WorkerRequest);
 
     return () => {
       worker.terminate();
       workerRef.current = null;
       pending.current.clear();
     };
-  }, [base, enabled]);
+  }, [base, enabled, attempt]);
 
   const run = useCallback(
     (assetNumber: string, blockage: BlockageSetting, rainfallMm: number) =>
@@ -207,5 +223,9 @@ export function useScenario(base: string, enabled = true): ScenarioRunner {
     [],
   );
 
-  return { ready, supported, withoutGround, running, failure, run };
+  const retry = useCallback(() => {
+    setAttempt((n) => n + 1);
+  }, []);
+
+  return { ready, supported, withoutGround, running, failure, retry, run };
 }

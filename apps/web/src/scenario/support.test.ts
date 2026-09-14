@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SUPPORT_LEGEND, UNSUPPORTED_TEXT, supportOf } from './support.js';
+import { MAP_KEY, SUPPORT_LEGEND, UNSUPPORTED_SHORT, UNSUPPORTED_TEXT, supportOf } from './support.js';
 
 const SUPPORT = { supported: new Set(['1001']), withoutGround: new Set(['2002']) };
 
@@ -30,5 +30,24 @@ describe('what an unsupported drain is not', () => {
   it('gives each reason its own cause', () => {
     expect(UNSUPPORTED_TEXT['not-an-inlet']).toMatch(/surface inlet/);
     expect(UNSUPPORTED_TEXT['no-measured-ground']).toMatch(/not enough ground data/);
+  });
+});
+
+describe('the short reason on a grey drain', () => {
+  it('fits on one line and still says it is not a finding about the drain', () => {
+    for (const text of Object.values(UNSUPPORTED_SHORT)) {
+      expect(text.length).toBeLessThan(110);
+      expect(text).toMatch(/says nothing about whether it works/);
+    }
+    expect(UNSUPPORTED_SHORT['not-an-inlet']).toMatch(/surface inlet/);
+    expect(UNSUPPORTED_SHORT['no-measured-ground']).toMatch(/ground data/);
+  });
+
+  it('names the three marks on the key', () => {
+    expect(Object.values(MAP_KEY)).toEqual([
+      'Your address',
+      'Drain available to test',
+      'Other drains (not available for this test)',
+    ]);
   });
 });

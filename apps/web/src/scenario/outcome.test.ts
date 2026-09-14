@@ -17,6 +17,9 @@ import {
   BANDS,
   BASIS_COLOURS,
   BASIS_LABELS,
+  COMPARING_STEPS,
+  DIFFERENCE_LEGEND,
+  DIFFERENCE_LEGEND_NOTE,
   HOW_IT_WAS_PRODUCED,
   HOW_STRONGLY_TO_READ_IT,
   INSUFFICIENT,
@@ -25,6 +28,7 @@ import {
   RAINFALL_CONTROL_NOTE,
   RAINFALL_EXPLAINED,
   RESULT_DISCLAIMER,
+  REVIEW_DISCLAIMER,
   WHAT_IS_UNCERTAIN,
   WHY_NO_CLEAR_CHANGE,
   groundUncertainty,
@@ -330,5 +334,28 @@ describe('the Iteration 2 wording', () => {
     const item = groundUncertainty(0.5);
     expect(item.body).toMatch(/photogrammetric/);
     expect([...LIMITATIONS, RAINFALL_EXPLAINED, HOW_STRONGLY_TO_READ_IT].join(' ').toLowerCase()).not.toContain('lidar');
+  });
+});
+
+describe('the Blockage Flow copy', () => {
+  it('says before running that it is a comparison, not an inspection or a forecast', () => {
+    expect(REVIEW_DISCLAIMER).toMatch(/compares a clear drain/);
+    expect(REVIEW_DISCLAIMER).toMatch(/does not show the drain’s current condition/);
+    expect(REVIEW_DISCLAIMER).toMatch(/predict flooding/);
+  });
+
+  it('gives the purple one meaning and no magnitude', () => {
+    expect(DIFFERENCE_LEGEND).toBe('Area with more surface water in the model');
+    expect(`${DIFFERENCE_LEGEND} ${DIFFERENCE_LEGEND_NOTE}`).not.toMatch(/deeper|larger|light|dark|medium/i);
+    expect(DIFFERENCE_LEGEND_NOTE).toMatch(/not water depth/);
+  });
+
+  it('names the three parts of a run', () => {
+    expect(COMPARING_STEPS).toHaveLength(3);
+  });
+
+  it('uses the prototype’s words on the result’s two buttons', () => {
+    expect(ACTION_LABELS['change-scenario']).toBe('Change the test');
+    expect(ACTION_LABELS['return-to-map']).toBe('Return to the map');
   });
 });

@@ -24,13 +24,20 @@ export type Action =
   | 'try-again'
   | 'review-scenario';
 
+/**
+ * The words on the result's buttons, in the Blockage Flow prototype's voice.
+ *
+ * *Return to the map* no longer says *full map*: from a comparison that began
+ * with an address it goes back to step 1, the map around that address, and
+ * only a comparison opened from the full map returns there.
+ */
 export const ACTION_LABELS: Readonly<Record<Action, string>> = {
-  'change-scenario': 'Change scenario',
-  'choose-another-pit': 'Choose another pit',
-  'change-address': 'Change address',
-  'return-to-map': 'Return to full map',
+  'change-scenario': 'Change the test',
+  'choose-another-pit': 'Choose another drain',
+  'change-address': 'Try another address',
+  'return-to-map': 'Return to the map',
   'try-again': 'Try again',
-  'review-scenario': 'Review scenario',
+  'review-scenario': 'Review your choices',
 };
 
 export interface Presentation {
@@ -143,6 +150,36 @@ export const presentationFor = (outcome: Outcome): Presentation =>
  */
 export const RESULT_DISCLAIMER =
   'This comparison does not predict flooding. It does not show flood depth or when water may arrive.';
+
+/**
+ * The short line under *Show the difference*, before anything has run.
+ *
+ * AC 3.1.3.g said at the moment of asking rather than only on the answer: the
+ * comparison is between two settings, not an inspection of the drain and not
+ * a forecast. The full disclaimer follows on the result.
+ */
+export const REVIEW_DISCLAIMER =
+  'This compares a clear drain with your blocked-drain choice. It does not show the drain’s current condition or predict flooding.';
+
+/**
+ * The purple, named once, for the legend and the note beside the finding.
+ *
+ * **One purple, one line, no magnitude.** The engine returns a yes or no per
+ * cell against a fixed 0.05 m³ threshold, so there is nothing a light and a
+ * dark purple could honestly mean. See `DIFFERENCE_FILL` in `map/difference.ts`.
+ */
+export const DIFFERENCE_LEGEND = 'Area with more surface water in the model';
+
+/** What the purple is not, beside the legend line. */
+export const DIFFERENCE_LEGEND_NOTE =
+  'Purple marks changes large enough to report. It is not water depth, and its edge follows the area the model found rather than a circle around the drain.';
+
+/** The three parts of a run, as the progress names them while it waits. */
+export const COMPARING_STEPS: readonly string[] = [
+  'Every drain clear',
+  'Your drain condition',
+  'Finding the difference',
+];
 
 /**
  * Why "no clear difference" is the usual answer here, in the person's terms.

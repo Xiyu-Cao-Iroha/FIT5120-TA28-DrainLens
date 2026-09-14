@@ -6,14 +6,14 @@
  * than at every screen that happens to touch it.
  */
 
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
+import { demonstrationAddress } from './address/demonstration.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
 import { type TraceArtefact, assertTrace, traceDownstream } from './trace/graph.js';
-import { EVERYTHING, MapView } from './screens/MapView.js';
-import { MapCanvas } from './map/MapCanvas.js';
+import { MapView } from './screens/MapView.js';
 import { FloodHistory } from './screens/FloodHistory.js';
 import { type FloodHistoryArtefact, assertFloodHistory } from './history/artefact.js';
 import { useAreas } from './history/useAreas.js';
@@ -27,13 +27,17 @@ import { progress } from './tutorial/progress.js';
 import { GUIDED_SECTIONS } from './tutorial/lessons.js';
 import { Landing } from './screens/Landing.js';
 import { Result } from './screens/Result.js';
-import { ScenarioSetup } from './screens/ScenarioSetup.js';
+import { Comparing, ScenarioChoices, ScenarioReview } from './screens/ScenarioSetup.js';
+import { ComparisonMap } from './screens/ComparisonMap.js';
+import { DrainsUnavailable, FindingDrains, NoMatch } from './screens/NoMatch.js';
 import { TaskSelect } from './screens/TaskSelect.js';
-import { type DifferenceArea, intoMapFrame } from './map/difference.js';
+import { type DifferenceArea, footprintCorners, intoMapFrame } from './map/difference.js';
+import type { Local } from './map/viewport.js';
+import { comparableNear } from './scenario/eligibility.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
-import { UNSUPPORTED_TEXT, supportOf, useScenarioSupport } from './scenario/support.js';
+import { useScenarioSupport } from './scenario/support.js';
 import { BOARD_CHANGES_NOTICE, FLOOD_CHANGES_NOTICE, creditsForSources } from './ui/attribution.js';
 import type { SolvedPosition } from './scenario/worker.js';
 import {
@@ -186,11 +190,19 @@ export function App() {
   }, [session.learned]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  // Only the two comparison screens use it, and neither is reachable in the
-  // Iteration 1 interface. See the note at the top of `useScenario`.
+  /*
+    Started as soon as somebody asks for the comparison, not when step 1 opens.
+
+    The eligibility check runs straight after the address resolves and needs
+    the worker's list of comparable drains. Starting the worker on the address
+    screen, while the comparison is waiting for an address, means the list is
+    usually there by the time one is chosen — and a visit that never asks for
+    the comparison still downloads none of it.
+  */
   const scenario = useScenario(
     '/data/scene-tiles',
-    session.screen === 'scenario' || session.screen === 'result',
+    COMPARISON_SCREENS.has(session.screen) ||
+      ((session.screen === 'address' || session.screen === 'unsupported') && session.pendingTask === 'compare'),
   );
   // The flood map's three artefacts, 83 KB, fetched when the map is opened
   // and not on the way past. Same argument as the scenario scene.
@@ -212,11 +224,32 @@ export function App() {
   // difference on whichever map is served.
   const [windowOrigin, setWindowOrigin] = useState<{ readonly minE: number; readonly minN: number } | null>(null);
   const [measuredShare, setMeasuredShare] = useState<number | null>(null);
-  // Why the last drain tapped on the comparison map cannot be compared.
-  const [refusal, setRefusal] = useState<string | null>(null);
-  // The scenario panel is 420px of a laptop screen. Reading a result means
-  // looking at the map it is about, and a teammate reported not being able to.
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Names each run, so Cancel can drop an answer that arrives afterwards. See `Session.run`.
+  const runs = useRef(0);
+
+  /*
+    The eligibility check: the nearest comparable drain within the radius, and
+    the others by distance. Null until there is an address, a map and the
+    worker's list. Against the pits the served map draws, so the drain it
+    highlights is always one the person can see and press.
+  */
+  const eligibility = useMemo(
+    () =>
+      loaded === null || session.address === null || !scenario.ready
+        ? null
+        : comparableNear(
+            [session.address.eastingM, session.address.northingM],
+            loaded.map.layers.pit ?? [],
+            scenario.supported,
+          ),
+    [loaded, session.address, scenario.ready, scenario.supported],
+  );
+  // No match: the reducer decides what that may do, and only step 1 stops.
+  useEffect(() => {
+    if (session.screen === 'drain' && eligibility !== null && eligibility.nearest === null) {
+      dispatch({ type: 'drains-none-nearby' });
+    }
+  }, [session.screen, eligibility]);
 
   useEffect(() => {
     load()
@@ -597,15 +630,20 @@ export function App() {
         </Shell>
       );
 
+    case 'drain':
     case 'scenario':
-    case 'result': {
+    case 'review':
+    case 'result':
+    case 'no-match': {
       const startComparison = (): void => {
-        const pitId = session.scenario.pitId;
-        const blockage = session.scenario.blockage;
-        if (pitId === null || blockage === null) {
-          dispatch({ type: 'comparison-started' });
+        const { pitId, blockage, rainfallMm } = session.scenario;
+        runs.current += 1;
+        const run = runs.current;
+        if (pitId === null || blockage === null || rainfallMm === null) {
+          dispatch({ type: 'comparison-started', run });
           dispatch({
             type: 'comparison-finished',
+            run,
             outcome: { kind: 'insufficient', reason: 'invalid_inlet' },
           });
           return;
@@ -614,8 +652,10 @@ export function App() {
         // By asset number. The worker finds the drain's window and the cell
         // the pipeline snapped it to; nothing here works a cell out from the
         // map geometry, which is how every drain once came back invalid.
-        dispatch({ type: 'comparison-started' });
-        void scenario.run(pitId, blockage, session.scenario.rainfallMm).then((result) => {
+        dispatch({ type: 'comparison-started', run });
+        void scenario.run(pitId, blockage, rainfallMm).then((result) => {
+          // Cancelled, or overtaken by another run: nothing of this answer is kept.
+          if (run !== runs.current) return;
           // Cleared on failure: leaving the previous run's positions attached
           // would let the control offer answers to a question nobody asked.
           setPositions(result.status === 'successful' ? result.positions : []);
@@ -626,6 +666,7 @@ export function App() {
           }
           dispatch({
             type: 'comparison-finished',
+            run,
             outcome:
               result.status === 'successful'
                 ? { kind: 'comparison', band: result.band }
@@ -634,16 +675,23 @@ export function App() {
         });
       };
 
+      const cancel = (): void => {
+        runs.current += 1;
+        dispatch({ type: 'comparison-cancelled' });
+      };
+
       const onAction = (action: Action) => {
         switch (action) {
           case 'change-scenario':
           case 'review-scenario':
+            // Step 2, keeping the drain and the choices (AC 3.2.1.a, b).
             dispatch({ type: 'change-scenario' });
             return;
           case 'choose-another-pit':
-            // Keep the rainfall and the blockage: they were the person's own
-            // assumptions and the pit is the thing that did not work.
-            dispatch({ type: 'change-scenario' });
+          case 'return-to-map':
+            // Step 1 around the address, or the full map the drain came from.
+            // The condition and the rainfall are kept either way.
+            dispatch({ type: 'drains-reopened' });
             return;
           case 'try-again':
             // Runs the same comparison again. It used to dispatch a failure
@@ -652,15 +700,20 @@ export function App() {
             startComparison();
             return;
           case 'change-address':
-            dispatch({ type: 'change-address' });
-            return;
-          case 'return-to-map':
-            dispatch({ type: 'task-chosen', task: 'full-map' });
+            dispatch({ type: 'another-address-wanted' });
             return;
         }
       };
 
+      const address = session.address;
+      const addressAt: Local | null = address === null ? null : [address.eastingM, address.northingM];
+      const pitId = session.scenario.pitId;
+      const pitAt = pitId === null ? null : pitPosition(loaded, pitId);
+      const distanceM =
+        addressAt === null || pitAt === null ? null : Math.hypot(pitAt[0] - addressAt[0], pitAt[1] - addressAt[1]);
       const outcome = session.outcome;
+      const fromMap = session.scenarioOrigin === 'map';
+
       // The difference layer, and only where there is one to draw.
       //
       // Read from the position matching the amount currently selected, so the
@@ -672,144 +725,196 @@ export function App() {
         session.screen === 'result' && outcome?.kind === 'comparison'
           ? {
               cells: intoMapFrame(
-                positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)
-                  ?.higherAreasM ?? [],
+                positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)?.higherAreasM ?? [],
                 windowOrigin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
                 loaded.map.extent,
               ),
               cellSizeM,
             }
           : null;
-      return (
-        <Shell
-          at={session.screen}
-          credits={credits}
-          extentName={loaded.extentName}
-          crumbs={
+
+      /*
+        What the view is fitted to, and when it is fitted again.
+
+        On a new address, the address and the nearest comparable drain. On a
+        returned result, the address, the drain and the whole footprint. From
+        the full map, the drain alone. Choosing a drain is not a refit: the
+        person chose it on the map they were looking at.
+      */
+      const fit: { key: string; points: Local[] } =
+        session.screen === 'result' && session.run !== null
+          ? {
+              key: `result:${String(session.run)}`,
+              points: [
+                ...(addressAt === null ? [] : [addressAt]),
+                ...(pitAt === null ? [] : [pitAt]),
+                ...footprintCorners(differenceShown),
+              ],
+            }
+          : address !== null
+            ? {
+                key: `address:${address.id}`,
+                points: [addressAt!, ...(eligibility?.nearest ? [eligibility.nearest.at] : [])],
+              }
+            : { key: 'from-map', points: pitAt === null ? [] : [pitAt] };
+
+      /*
+        The breadcrumb is the steps so far: Address search › Choose a drain ›
+        Choices › Review, or Result. Nothing ahead of the current step is
+        shown, and nothing is pressable while a run is in progress — leaving
+        mid-run is Cancel's job, which says what happens to the answer.
+      */
+      const running = session.running;
+      const step = session.screen;
+      const reached = (at: 'drain' | 'scenario' | 'review' | 'result') =>
+        ({ drain: 1, scenario: 2, review: 3, result: 3, 'no-match': 0 })[step] >= { drain: 1, scenario: 2, review: 3, result: 3 }[at];
+      const crumbs = (
+        <>
+          {fromMap
+            ? crumb(FULL_MAP, running ? undefined : () => dispatch({ type: 'back' }))
+            : crumb('Address search', running ? undefined : () => dispatch({ type: 'another-address-wanted' }))}
+          {step === 'no-match' && (
             <>
-              {session.scenarioOrigin === 'map' ? (
-                crumb(FULL_MAP, () => dispatch({ type: 'back' }))
-              ) : (
-                <>
-                  {crumb('Address search', () => dispatch({ type: 'change-address' }))}
-                  {separator}
-                  {crumb('Choose a task', () => dispatch({ type: 'task-reconsidered' }))}
-                </>
-              )}
               {separator}
-              {crumb('Blocked drain comparison', () => dispatch({ type: 'change-scenario' }), session.screen === 'scenario')}
-              {session.screen === 'result' && (
-                <>
-                  {separator}
-                  {crumb('Result', undefined, true)}
-                </>
+              {crumb('No drain nearby', undefined, true)}
+            </>
+          )}
+          {!fromMap && reached('drain') && (
+            <>
+              {separator}
+              {crumb('Choose a drain', running ? undefined : () => dispatch({ type: 'drains-reopened' }), step === 'drain')}
+            </>
+          )}
+          {reached('scenario') && (
+            <>
+              {separator}
+              {crumb(
+                'Choices',
+                running ? undefined : () => dispatch({ type: step === 'review' ? 'choices-changed' : 'change-scenario' }),
+                step === 'scenario',
               )}
             </>
-          }
-        >
-          <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
-            <div
-              style={{
-                width: panelOpen ? 420 : 0,
-                flexShrink: 0,
-                overflow: panelOpen ? 'auto' : 'hidden',
-                borderRight: panelOpen ? `1px solid ${line.base}` : 'none',
-                background: surface.raised,
-                transition: 'width 160ms ease',
-              }}
-              aria-hidden={!panelOpen}
-            >
-              {session.screen === 'result' && outcome !== null ? (
-                <Result
-                  outcome={
-                    outcome.kind === 'comparison'
-                      ? { status: 'successful', band: outcome.band }
-                      : { status: 'insufficient-information', reason: outcome.reason }
-                  }
-                  scenario={session.scenario}
-                  positions={positions}
-                  measuredShare={measuredShare}
-                  onRainfall={(rainfallMm) => {
-                    const solved = positions.find((p) => p.rainfallMm === rainfallMm);
-                    if (solved === undefined) return;
-                    dispatch({ type: 'rainfall-selected', rainfallMm });
-                    dispatch({
-                      type: 'comparison-finished',
-                      outcome: { kind: 'comparison', band: solved.band },
-                    });
-                  }}
-                  onAction={onAction}
-                />
-              ) : (
-                <ScenarioSetup
-                  address={session.address}
-                  refusal={refusal}
-                  scenario={session.scenario}
-                  suggestedPitId={
-                    session.scenario.pitId === null
-                      ? nearestInlet(loaded, session.address, scenario.supported)
-                      : null
-                  }
-                  onUsePit={(pitId, suggested) => dispatch({ type: 'pit-selected', pitId, suggested })}
-                  onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
-                  onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
-                  onRun={startComparison}
-                  onReset={() => dispatch({ type: 'reset-choices' })}
-                />
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-              {/*
-                Over the map rather than beside it, so the button does not
-                move when the panel does — a control that runs away from the
-                cursor as it works is one people stop trusting.
-              */}
-              <button
-                type="button"
-                onClick={() => setPanelOpen((open) => !open)}
-                aria-expanded={panelOpen}
-                style={{
-                  position: 'absolute',
-                  top: space(3),
-                  left: space(3),
-                  zIndex: 2,
-                  padding: `${String(space(2))}px ${String(space(3))}px`,
-                  borderRadius: radius.base,
-                  border: `1px solid ${line.base}`,
-                  // Translucent, because it sits over the map and a solid
-                  // chip would punch a white hole in the thing it floats on.
-                  background: 'rgba(255, 255, 255, 0.92)',
-                  backdropFilter: 'blur(6px)',
-                  font: type(text.label, { weight: weight.medium }),
-                  color: ink.strong,
-                  boxShadow: shadow.floating,
-                }}
-              >
-                {panelOpen ? '‹ Hide panel' : '› Show panel'}
-              </button>
-              <MapCanvasPane
-                loaded={loaded}
-                session={session}
-                suggestedPitId={
-                  session.scenario.pitId === null
-                    ? nearestInlet(loaded, session.address, scenario.supported)
-                    : null
-                }
-                scenarioDrains={scenario.supported}
-                onRefusePit={(pitId) => {
-                  setRefusal(
-                    `${UNSUPPORTED_TEXT[supportOf({ supported: scenario.supported, withoutGround: scenario.withoutGround }, pitId) === 'no-measured-ground' ? 'no-measured-ground' : 'not-an-inlet']}`,
-                  );
-                }}
-                difference={differenceShown}
-                onPickPit={(pitId) => {
-                  setRefusal(null);
-                  dispatch({ type: 'pit-selected', pitId, suggested: false });
-                }}
-              />
-            </div>
-          </div>
+          )}
+          {step === 'review' && (
+            <>
+              {separator}
+              {crumb('Review', undefined, true)}
+            </>
+          )}
+          {step === 'result' && (
+            <>
+              {separator}
+              {crumb('Result', undefined, true)}
+            </>
+          )}
+        </>
+      );
+
+      const shell = (children: React.ReactNode) => (
+        <Shell at={session.screen} credits={credits} extentName={loaded.extentName} crumbs={crumbs}>
+          {children}
         </Shell>
+      );
+
+      const fullMap = () => {
+        dispatch({ type: 'map-opened', from: 'home' });
+      };
+
+      if (step === 'no-match') {
+        const example = demonstrationAddress(loaded.index);
+        return shell(
+          <NoMatch
+            addressLabel={address?.label ?? null}
+            onAnotherAddress={() => dispatch({ type: 'another-address-wanted' })}
+            onExample={
+              example === undefined || example.id === address?.id
+                ? undefined
+                : () =>
+                    dispatch({
+                      type: 'example-address-chosen',
+                      address: { id: example.id, label: example.label, eastingM: example.e, northingM: example.n },
+                    })
+            }
+            onFullMap={fullMap}
+          />,
+        );
+      }
+
+      // Every map step needs the worker's list before it can mark a drain as
+      // testable, and step 1 needs the eligibility check's answer too.
+      if (!scenario.ready && scenario.failure !== null) {
+        return shell(<DrainsUnavailable onRetry={scenario.retry} onFullMap={fullMap} />);
+      }
+      if (!scenario.ready || (step === 'drain' && (eligibility === null || eligibility.nearest === null))) {
+        return shell(<FindingDrains nearAddress={address !== null} />);
+      }
+
+      const panel =
+        step === 'drain' ? null : step === 'result' && outcome !== null ? (
+          <Result
+            outcome={
+              outcome.kind === 'comparison'
+                ? { status: 'successful', band: outcome.band }
+                : { status: 'insufficient-information', reason: outcome.reason }
+            }
+            scenario={session.scenario}
+            positions={positions}
+            measuredShare={measuredShare}
+            onRainfall={(rainfallMm) => {
+              const solved = positions.find((p) => p.rainfallMm === rainfallMm);
+              if (solved === undefined) return;
+              dispatch({ type: 'result-rainfall', rainfallMm, band: solved.band });
+            }}
+            onAction={onAction}
+          />
+        ) : running ? (
+          <Comparing blockage={session.scenario.blockage} onCancel={cancel} />
+        ) : step === 'review' ? (
+          <ScenarioReview
+            address={address}
+            scenario={session.scenario}
+            distanceM={distanceM}
+            onRun={startComparison}
+            onChange={() => dispatch({ type: 'choices-changed' })}
+          />
+        ) : (
+          <ScenarioChoices
+            scenario={session.scenario}
+            distanceM={distanceM}
+            onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
+            onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}
+            onReview={() => dispatch({ type: 'choices-reviewed' })}
+          />
+        );
+
+      return shell(
+        <div className={panel === null ? 'comparison comparison--map-only' : 'comparison'}>
+          {panel !== null && (
+            // Keyed on the step, so each step's panel starts at its top and slides in.
+            <aside key={step === 'result' ? 'result' : running ? 'comparing' : step} className="comparison__panel">
+              {panel}
+            </aside>
+          )}
+          <div className="comparison__map">
+            <ComparisonMapPane
+              loaded={loaded}
+              step={step}
+              addressAt={addressAt}
+              addressLabel={address?.label ?? null}
+              eligibility={eligibility}
+              supported={scenario.supported}
+              withoutGround={scenario.withoutGround}
+              pitId={pitId}
+              difference={differenceShown}
+              fitKey={fit.key}
+              fitPoints={fit.points}
+              locked={running}
+              onChoose={(chosen, suggested) => {
+                dispatch({ type: 'pit-selected', pitId: chosen, suggested });
+              }}
+            />
+          </div>
+        </div>,
       );
     }
 
@@ -1079,108 +1184,86 @@ function HomeNav({
   );
 }
 
-function MapCanvasPane({
+/**
+ * The comparison's map, with the selected drain's recorded downstream path.
+ *
+ * AC 3.1.1.c and 3.1.3.c: the selected drain and its path stay visible while
+ * the choices are made and while a result is on screen. Without them the
+ * difference is highlighted over a map that has forgotten which drain the
+ * person was asking about, and the result reads as a statement about the
+ * whole neighbourhood.
+ */
+function ComparisonMapPane({
   loaded,
-  session,
-  suggestedPitId,
-  scenarioDrains,
+  step,
+  addressAt,
+  addressLabel,
+  eligibility,
+  supported,
+  withoutGround,
+  pitId,
   difference,
-  onPickPit,
-  onRefusePit,
+  fitKey,
+  fitPoints,
+  locked,
+  onChoose,
 }: {
   readonly loaded: Loaded;
-  readonly session: Session;
-  readonly suggestedPitId: string | null;
-  /** The finished comparison's difference cells, or null off the result screen. */
+  readonly step: 'drain' | 'scenario' | 'review' | 'result';
+  readonly addressAt: Local | null;
+  readonly addressLabel: string | null;
+  readonly eligibility: ReturnType<typeof comparableNear> | null;
+  readonly supported: ReadonlySet<string>;
+  readonly withoutGround: ReadonlySet<string>;
+  readonly pitId: string | null;
   readonly difference: DifferenceArea | null;
-  /** Asset numbers the scene places as inlets. Anything else cannot run. */
-  readonly scenarioDrains: ReadonlySet<string>;
-  readonly onPickPit: (pitId: string) => void;
-  /** A pit that cannot be compared was tapped: say why (AC 3.1.1.d). */
-  readonly onRefusePit: (pitId: string) => void;
+  readonly fitKey: string;
+  readonly fitPoints: readonly Local[];
+  readonly locked: boolean;
+  readonly onChoose: (pitId: string, suggested: boolean) => void;
 }) {
-  const pitId = session.scenario.pitId;
   const followed = useMemo(
-    () => (pitId === null ? null : traceDownstream(loaded.trace, pitId)),
-    [loaded.trace, pitId],
+    () => (pitId === null || step === 'drain' ? null : traceDownstream(loaded.trace, pitId)),
+    [loaded.trace, pitId, step],
   );
 
   return (
-    <MapCanvas
-      artefact={loaded.map}
+    <ComparisonMap
+      map={loaded.map}
       derived={loaded.derived}
-      show={EVERYTHING}
-      selectedPit={pitId === null ? null : Number(pitId)}
-      // Shown only while nothing is chosen. A suggestion the panel names by
-      // asset number and the map does not mark leaves the person holding an
-      // identifier with no way to find it — which is what a teammate hit.
-      suggestedPit={pitId === null && suggestedPitId !== null ? Number(suggestedPitId) : null}
-      comparablePits={scenarioDrains}
-      openAt={session.address === null && pitId !== null ? pitPosition(loaded, pitId) : null}
-      address={
-        session.address === null
-          ? null
-          : [session.address.eastingM, session.address.northingM]
-      }
+      step={step}
+      address={addressAt}
+      addressLabel={addressLabel}
+      eligibility={eligibility}
+      supported={supported}
+      withoutGround={withoutGround}
+      selectedPitId={pitId}
       trace={followed}
       difference={difference}
-      onSelect={(hit) => {
-        // Only a pit, and only one the engine can use. Tapping a pipe or a
-        // junction here would silently set a scenario the engine is bound to
-        // reject, which is how a wrong answer looks exactly like a right one.
-        if (hit?.kind !== 'pit') return;
-        const asset = String(hit.feature.asset_number ?? '');
-        if (scenarioDrains.has(asset)) onPickPit(asset);
-        // It used to be ignored in silence, which reads as a map that does not
-        // respond. Saying why is AC 3.1.1.d; saying what it does not mean, e.
-        else onRefusePit(asset);
-      }}
+      fitKey={fitKey}
+      fitPoints={fitPoints}
+      locked={locked}
+      onChoose={onChoose}
     />
   );
 }
 
 /** Where a pit is on the served map, in local metres, or null. */
-function pitPosition(loaded: Loaded, pitId: string): readonly [number, number] | null {
+function pitPosition(loaded: Loaded, pitId: string): Local | null {
   const pit = (loaded.map.layers.pit ?? []).find((p) => String(p.asset_number ?? '') === pitId);
   return pit === undefined ? null : [pit.c[0], pit.c[1]];
 }
 
 /**
- * The nearest inlet to the address, as the setup screen's suggestion.
+ * Every screen of the blocked-drain comparison, for the worker and the layout.
  *
- * A real pit, not a placeholder. The first version of this screen carried
- * `P-14` from the design mock, and because no real pit has that identifier the
- * comparison never reached the engine at all — it fell into the guard for a
- * pit the scene cannot place and reported an unusable inlet. A wrong answer
- * that looked exactly like a right one.
- *
- * Only inlets are offered. A junction or a submerged node cannot carry a
- * surface blockage, and suggesting one would set a scenario the engine is
- * bound to reject.
+ * `no-match` is one of them so that *Try an example address* finds the worker
+ * already holding its list.
  */
-function nearestInlet(
-  loaded: Loaded,
-  address: SupportedAddress | null,
-  usable: ReadonlySet<string>,
-): string | null {
-  const pits = loaded.map.layers.pit ?? [];
-  if (address === null || pits.length === 0 || usable.size === 0) return null;
-
-  // Only what the engine will accept. Reading "is this an inlet?" off the
-  // asset description instead was how a suggestion the scene cannot place
-  // reached the screen, and the comparison then failed on the person rather
-  // than on us.
-
-  let bestId: string | null = null;
-  let bestDistance = Infinity;
-  for (const pit of pits) {
-    const asset = String(pit.asset_number ?? '');
-    if (!usable.has(asset)) continue;
-    const distance = Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestId = asset;
-    }
-  }
-  return bestId;
-}
+const COMPARISON_SCREENS: ReadonlySet<Session['screen']> = new Set<Session['screen']>([
+  'drain',
+  'scenario',
+  'review',
+  'result',
+  'no-match',
+]);

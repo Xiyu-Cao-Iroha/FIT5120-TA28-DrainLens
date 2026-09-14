@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  DEFAULT_RAINFALL_MM,
   EMPTY_SCENARIO,
   INITIAL_SESSION,
   type Session,
@@ -59,11 +58,13 @@ describe('the golden path', () => {
     expect(INITIAL_SESSION.outcome).toBeNull();
   });
 
-  it('sends the follow task to the map and the compare task to the setup', () => {
+  it('sends the follow task to the map and the compare task to choosing a drain', () => {
+    // Step 1 of the comparison since 15 September, not the setup: an address
+    // with no comparable drain has to stop before anything is set up.
     const after = (task: 'follow' | 'compare' | 'full-map') =>
       play([{ type: 'address-accepted', address: GATEHOUSE }, { type: 'task-chosen', task }]).screen;
 
-    expect(after('compare')).toBe('scenario');
+    expect(after('compare')).toBe('drain');
     expect(after('follow')).toBe('explore');
     expect(after('full-map')).toBe('explore');
   });
@@ -77,16 +78,21 @@ describe('scenario inputs', () => {
     expect(canRunComparison(EMPTY_SCENARIO)).toBe(false);
   });
 
-  it('opens on the middle published comparison amount', () => {
-    expect(EMPTY_SCENARIO.rainfallMm).toBe(DEFAULT_RAINFALL_MM);
+  it('leaves the rainfall unchosen too', () => {
+    // It opened on 40 mm until 15 September. The Blockage Flow prototype keeps
+    // *Review your choices* disabled until the amount is chosen, for the reason
+    // the blockage starts unchosen: a pre-selected assumption is the interface's.
+    expect(EMPTY_SCENARIO.rainfallMm).toBeNull();
   });
 
   it('names the missing control in the order the setup asks for them', () => {
     expect(missingScenarioInput(EMPTY_SCENARIO)).toBe('pit');
     expect(missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14' })).toBe('blockage');
+    expect(missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' })).toBe('rainfall');
     expect(
-      missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' }),
+      missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear', rainfallMm: 20 }),
     ).toBeNull();
+    expect(canRunComparison({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' })).toBe(false);
   });
 
   it('remembers whether the pit was suggested or actually chosen', () => {
@@ -104,6 +110,7 @@ describe('scenario inputs', () => {
       { type: 'pit-selected', pitId: 'P-14', suggested: false },
       { type: 'blockage-selected', blockage: 'partly-blocked' },
       { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'no-clear-change' } },
       { type: 'change-scenario' },
     ]);
@@ -186,8 +193,11 @@ describe('going back', () => {
   it.each([
     ['task', 'address'],
     ['explore', 'task'],
-    ['scenario', 'task'],
+    ['drain', 'address'],
+    ['scenario', 'drain'],
+    ['review', 'scenario'],
     ['result', 'scenario'],
+    ['no-match', 'address'],
     ['unsupported', 'address'],
   ] as const)('from %s returns to %s', (from, to) => {
     expect(reduce({ ...INITIAL_SESSION, screen: from }, { type: 'back' }).screen).toBe(to);
@@ -259,6 +269,7 @@ describe('the insufficient-information outcome', () => {
     // answer, "insufficient information" is the absence of one. A single
     // string field for both is how they get confused.
     const end = play([
+      { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'insufficient', reason: 'terrain_unavailable' } },
     ]);
 
@@ -275,7 +286,10 @@ describe('the insufficient-information outcome', () => {
     ] as const;
 
     for (const reason of reasons) {
-      const end = play([{ type: 'comparison-finished', outcome: { kind: 'insufficient', reason } }]);
+      const end = play([
+        { type: 'comparison-started' },
+        { type: 'comparison-finished', outcome: { kind: 'insufficient', reason } },
+      ]);
       expect(end.outcome).toEqual({ kind: 'insufficient', reason });
     }
   });
@@ -807,18 +821,29 @@ describe('a task chosen before there is an address', () => {
     expect(asked.task).toBeNull();
 
     const arrived = play([{ type: 'address-accepted', address: GATEHOUSE }], asked);
-    expect(arrived.screen).toBe('scenario');
+    expect(arrived.screen).toBe('drain');
     expect(arrived.task).toBe('compare');
   });
 
-  it('goes straight there when an address is already in hand', () => {
-    // The homepage is not the only place this can be dispatched from, and
-    // somebody who has already named their street should not be asked twice.
+  it('asks for the address again for the comparison, even with one in hand', () => {
+    // It went straight to the comparison until 15 September. The blocked-drain
+    // flow begins with an address search, and the button that starts it says
+    // so; the address given earlier may have been for something else.
     const end = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'task-wanted', task: 'compare' },
     ]);
-    expect(end.screen).toBe('scenario');
+    expect(end.screen).toBe('address');
+    expect(end.pendingTask).toBe('compare');
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }], end).screen).toBe('drain');
+  });
+
+  it('still goes straight to any other task when an address is in hand', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-wanted', task: 'follow' },
+    ]);
+    expect(end.screen).toBe('explore');
   });
 
   it('still sends an address given for no particular task to the task question', () => {
@@ -884,7 +909,7 @@ describe('a task chosen before there is an address', () => {
       { type: 'task-wanted', task: 'compare' },
       { type: 'address-accepted', address: GATEHOUSE },
     ]);
-    expect(end.screen).toBe('scenario');
+    expect(end.screen).toBe('drain');
     expect(end.task).toBe('compare');
     expect(end.guideSection).toBeNull();
   });
@@ -966,11 +991,292 @@ describe('opening the comparison from a drain on the map', () => {
     expect(reduce(next, { type: 'back' }).screen).toBe('explore');
   });
 
-  it('still goes back to the task question when opened from one', () => {
+  it('starts again at choosing a drain when the task question opens it instead', () => {
+    // It went back to the task question until 15 September, when the
+    // comparison gained a step before the setup: from the task question the
+    // comparison opens on step 1, and Back from step 1 is the address search.
     const address = { id: 'a', label: '46 Gatehouse Drive', eastingM: 1, northingM: 1 };
     const withAddress = { ...INITIAL_SESSION, address, screen: 'task' as const };
     const fromMap = reduce({ ...withAddress, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1' });
     const fromTask = reduce(fromMap, { type: 'task-chosen', task: 'compare' });
-    expect(reduce(fromTask, { type: 'back' }).screen).toBe('task');
+    expect(fromTask.screen).toBe('drain');
+    expect(fromTask.scenarioOrigin).toBe('task');
+    expect(fromTask.scenario.pitId).toBeNull();
+    expect(reduce(fromTask, { type: 'back' }).screen).toBe('address');
+  });
+});
+
+describe('the blocked-drain comparison, step by step', () => {
+  /*
+    The Blockage Flow prototype: address search, the eligibility check, then
+    step 1 (choose a drain), step 2 (choices), step 3 (review), comparing, and
+    the result — or the no-match stop. Each transition is the reducer's, so
+    each is tested here rather than trusted to the buttons.
+  */
+  const AT_STEP_ONE = play([
+    { type: 'task-wanted', task: 'compare', from: 'home' },
+    { type: 'address-accepted', address: GATEHOUSE },
+  ]);
+  const AT_STEP_TWO = play([{ type: 'pit-selected', pitId: '1144908', suggested: true }], AT_STEP_ONE);
+  const CHOSEN = play(
+    [
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 40 },
+    ],
+    AT_STEP_TWO,
+  );
+  const AT_REVIEW = play([{ type: 'choices-reviewed' }], CHOSEN);
+
+  it('lands on step 1 with nothing chosen, even for a drain chosen last time', () => {
+    expect(AT_STEP_ONE.screen).toBe('drain');
+    expect(AT_STEP_ONE.task).toBe('compare');
+    const again = play(
+      [
+        { type: 'another-address-wanted' },
+        { type: 'address-accepted', address: GATEHOUSE },
+      ],
+      AT_REVIEW,
+    );
+    expect(again.screen).toBe('drain');
+    expect(again.scenario.pitId).toBeNull();
+  });
+
+  it('completes step 1 with one click on a drain — no second confirmation', () => {
+    expect(AT_STEP_TWO.screen).toBe('scenario');
+    expect(AT_STEP_TWO.scenario.pitId).toBe('1144908');
+    expect(AT_STEP_TWO.scenario.pitWasSuggested).toBe(true);
+  });
+
+  it('keeps Review closed until the condition and the rainfall are both chosen', () => {
+    const blockageOnly = play([{ type: 'blockage-selected', blockage: 'fully-blocked' }], AT_STEP_TWO);
+    expect(reduce(blockageOnly, { type: 'choices-reviewed' }).screen).toBe('scenario');
+    const rainOnly = play([{ type: 'rainfall-selected', rainfallMm: 40 }], AT_STEP_TWO);
+    expect(reduce(rainOnly, { type: 'choices-reviewed' }).screen).toBe('scenario');
+    expect(AT_REVIEW.screen).toBe('review');
+  });
+
+  it('reviews only from step 2', () => {
+    expect(reduce({ ...CHOSEN, screen: 'drain' }, { type: 'choices-reviewed' }).screen).toBe('drain');
+  });
+
+  it('goes back from the review to the choices with everything still chosen', () => {
+    const back = reduce(AT_REVIEW, { type: 'choices-changed' });
+    expect(back.screen).toBe('scenario');
+    expect(back.scenario).toEqual(CHOSEN.scenario);
+    expect(reduce(AT_STEP_TWO, { type: 'choices-changed' }).screen).toBe('scenario');
+  });
+
+  it('re-runs the drain selection from step 2 and keeps the assumptions', () => {
+    // Decided, and written on `pit-selected`: the condition and the rainfall
+    // are the person's, so a different drain keeps them.
+    const other = reduce(CHOSEN, { type: 'pit-selected', pitId: '1144999', suggested: false });
+    expect(other.screen).toBe('scenario');
+    expect(other.scenario).toEqual({ pitId: '1144999', pitWasSuggested: false, blockage: 'fully-blocked', rainfallMm: 40 });
+  });
+
+  it('re-runs it from the review and the result too, without returning to step 1', () => {
+    const fromReview = reduce(AT_REVIEW, { type: 'pit-selected', pitId: '2', suggested: false });
+    expect(fromReview.screen).toBe('scenario');
+
+    const result = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      ],
+      AT_REVIEW,
+    );
+    const fromResult = reduce(result, { type: 'pit-selected', pitId: '2', suggested: false });
+    expect(fromResult.screen).toBe('scenario');
+    expect(fromResult.outcome).toBeNull();
+    expect(fromResult.scenario.blockage).toBe('fully-blocked');
+  });
+
+  it('shows the progress on step 3 and the answer on the result', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 7 });
+    expect(running.screen).toBe('review');
+    expect(running.running).toBe(true);
+    expect(running.run).toBe(7);
+
+    const done = reduce(running, {
+      type: 'comparison-finished',
+      run: 7,
+      outcome: { kind: 'comparison', band: 'no-clear-change' },
+    });
+    expect(done.screen).toBe('result');
+    expect(done.running).toBe(false);
+    expect(done.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+  });
+
+  it('does not change the drain under a run in progress', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 1 });
+    expect(reduce(running, { type: 'pit-selected', pitId: '2', suggested: false })).toBe(running);
+    expect(reduce(running, { type: 'choices-changed' })).toBe(running);
+  });
+
+  it('cancels back to the review, and ignores the cancelled run’s answer when it comes', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 3 });
+    const cancelled = reduce(running, { type: 'comparison-cancelled' });
+    expect(cancelled.screen).toBe('review');
+    expect(cancelled.running).toBe(false);
+    expect(cancelled.scenario).toEqual(AT_REVIEW.scenario);
+
+    const late = reduce(cancelled, {
+      type: 'comparison-finished',
+      run: 3,
+      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
+    });
+    expect(late).toBe(cancelled);
+    expect(late.screen).toBe('review');
+    expect(late.outcome).toBeNull();
+  });
+
+  it('ignores a cancel with nothing running', () => {
+    expect(reduce(AT_REVIEW, { type: 'comparison-cancelled' })).toBe(AT_REVIEW);
+  });
+
+  it('takes only the newest run’s answer when a second run was started', () => {
+    const second = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-cancelled' },
+        { type: 'comparison-started', run: 2 },
+      ],
+      AT_REVIEW,
+    );
+    const stale = reduce(second, {
+      type: 'comparison-finished',
+      run: 1,
+      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
+    });
+    expect(stale).toBe(second);
+    const fresh = reduce(second, {
+      type: 'comparison-finished',
+      run: 2,
+      outcome: { kind: 'comparison', band: 'no-clear-change' },
+    });
+    expect(fresh.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+  });
+
+  describe('from the result', () => {
+    const RESULT = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      ],
+      AT_REVIEW,
+    );
+
+    it('changes the test on step 2, keeping the drain and the choices', () => {
+      const change = reduce(RESULT, { type: 'change-scenario' });
+      expect(change.screen).toBe('scenario');
+      expect(change.scenario).toEqual(RESULT.scenario);
+    });
+
+    it('returns to the map at step 1, letting the drain go and keeping the assumptions', () => {
+      const map = reduce(RESULT, { type: 'drains-reopened' });
+      expect(map.screen).toBe('drain');
+      expect(map.scenario.pitId).toBeNull();
+      expect(map.scenario.blockage).toBe('fully-blocked');
+      expect(map.scenario.rainfallMm).toBe(40);
+      expect(map.outcome).toBeNull();
+    });
+
+    it('returns to the full map instead when the comparison was opened from one', () => {
+      const fromMap = play(
+        [
+          { type: 'map-opened' },
+          { type: 'lock-passed' },
+          { type: 'scenario-from-map', pitId: '1144908' },
+          { type: 'blockage-selected', blockage: 'partly-blocked' },
+          { type: 'rainfall-selected', rainfallMm: 20 },
+          { type: 'choices-reviewed' },
+          { type: 'comparison-started', run: 1 },
+          { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'no-clear-change' } },
+          { type: 'drains-reopened' },
+        ],
+      );
+      expect(fromMap.screen).toBe('explore');
+      expect(fromMap.task).toBe('full-map');
+      expect(fromMap.mapOpenings).toBe(2);
+    });
+
+    it('moves between solved rainfall amounts without starting a run (AC 3.2.1)', () => {
+      const moved = reduce(RESULT, { type: 'result-rainfall', rainfallMm: 60, band: 'no-clear-change' });
+      expect(moved.screen).toBe('result');
+      expect(moved.running).toBe(false);
+      expect(moved.scenario.pitId).toBe('1144908');
+      expect(moved.scenario.blockage).toBe('fully-blocked');
+      expect(moved.scenario.rainfallMm).toBe(60);
+      expect(moved.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+    });
+
+    it('refuses an amount nobody solved, and refuses off the result', () => {
+      expect(reduce(RESULT, { type: 'result-rainfall', rainfallMm: 35, band: 'no-clear-change' })).toBe(RESULT);
+      expect(reduce(AT_REVIEW, { type: 'result-rainfall', rainfallMm: 60, band: 'no-clear-change' })).toBe(AT_REVIEW);
+    });
+  });
+
+  describe('no drain near the address', () => {
+    const STOPPED = reduce(AT_STEP_ONE, { type: 'drains-none-nearby' });
+
+    it('stops before any setup', () => {
+      expect(STOPPED.screen).toBe('no-match');
+      expect(STOPPED.scenario.pitId).toBeNull();
+    });
+
+    it('only stops step 1, so a late check cannot pull somebody back', () => {
+      expect(reduce(AT_STEP_TWO, { type: 'drains-none-nearby' })).toBe(AT_STEP_TWO);
+      expect(reduce(INITIAL_SESSION, { type: 'drains-none-nearby' })).toBe(INITIAL_SESSION);
+    });
+
+    it('never reaches a drain, an assumption or a rainfall control from the stop', () => {
+      for (const event of [
+        { type: 'choices-reviewed' },
+        { type: 'choices-changed' },
+        { type: 'comparison-cancelled' },
+        { type: 'result-rainfall', rainfallMm: 40, band: 'no-clear-change' },
+      ] as const) {
+        expect(reduce(STOPPED, event).screen).toBe('no-match');
+      }
+    });
+
+    it('tries another address with the comparison still waiting', () => {
+      const search = reduce(STOPPED, { type: 'another-address-wanted' });
+      expect(search.screen).toBe('address');
+      expect(search.pendingTask).toBe('compare');
+      expect(reduce(search, { type: 'address-accepted', address: NEALE }).screen).toBe('drain');
+    });
+
+    it('tries the example address straight into step 1', () => {
+      const example = reduce(STOPPED, { type: 'example-address-chosen', address: NEALE });
+      expect(example.screen).toBe('drain');
+      expect(example.address).toBe(NEALE);
+      expect(example.task).toBe('compare');
+      expect(example.pendingTask).toBeNull();
+    });
+
+    it('opens the full map through the same notice as every other way in', () => {
+      expect(reduce(STOPPED, { type: 'map-opened', from: 'home' }).screen).toBe('locked');
+    });
+  });
+
+  it('keeps the address crumb inside the comparison', () => {
+    const search = reduce(AT_REVIEW, { type: 'another-address-wanted' });
+    expect(search.screen).toBe('address');
+    expect(search.pendingTask).toBe('compare');
+    expect(search.guideSection).toBeNull();
+  });
+
+  it('lands the full map’s drain on step 2 with that drain selected (AC 3.1.1)', () => {
+    const fromMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'scenario-from-map', pitId: '1144908' }]);
+    expect(fromMap.screen).toBe('scenario');
+    expect(fromMap.scenario.pitId).toBe('1144908');
+    expect(fromMap.scenarioOrigin).toBe('map');
+    expect(reduce(fromMap, { type: 'back' }).screen).toBe('explore');
+  });
+
+  it('leaves a pit chosen on the full map where it was', () => {
+    const onMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'pit-selected', pitId: '1', suggested: false }]);
+    expect(onMap.screen).toBe('explore');
   });
 });
