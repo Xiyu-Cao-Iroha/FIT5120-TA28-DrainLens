@@ -167,9 +167,16 @@ const roughly = (metres: number): number =>
 export type NearbyThing =
   | {
       readonly kind: 'direction';
-      /** Already rounded, because the drawing must not claim more than the words. */
+      /** Already rounded, because the words must not claim more than the data. */
       readonly distanceM: number;
+      /** The eighth the words name. */
       readonly bearing: Compass;
+      /**
+       * The true direction to the nearest point, degrees in the map frame (0 east,
+       * 90 north). The figure draws the line to where the thing actually is; the
+       * label carries the rounded distance and the words the rounded direction.
+       */
+      readonly angleDeg: number;
     }
   | { readonly kind: 'very-near' }
   | { readonly kind: 'inside' };
@@ -195,7 +202,13 @@ function report(near: Nearest | null, at: Local): NearbyThing | null {
   if (near === null || near.distanceM > RELEVANT_RADIUS_M) return null;
   if (near.inside === true) return { kind: 'inside' };
   if (near.distanceM < VERY_NEAR_M) return { kind: 'very-near' };
-  return { kind: 'direction', distanceM: roughly(near.distanceM), bearing: bearingFrom(at, near.at) };
+  const angleDeg = (Math.atan2(near.at[1] - at[1], near.at[0] - at[0]) * 180) / Math.PI;
+  return {
+    kind: 'direction',
+    distanceM: roughly(near.distanceM),
+    bearing: bearingFrom(at, near.at),
+    angleDeg: (angleDeg + 360) % 360,
+  };
 }
 
 export function waterNearby(derived: DerivedArtefact, at: Local): WaterNearby | null {
@@ -252,11 +265,11 @@ export function describe(near: WaterNearby): string {
 /**
  * Where a compass point lies, as an angle in the map frame.
  *
- * **The figure points at the reported eighth, not at the true bearing.** The
- * sentence says "to the north-west" because the direction is rounded to an
- * eighth before anybody sees it; an arrow drawn at the unrounded angle beside
- * that label would be a picture asserting a precision the words disclaim, and
- * the two would disagree by up to 22 degrees for no gain.
+ * Used for the ground's arrow, which claims one of eight directions and nothing
+ * finer, so it is drawn at the eighth it names. The dashed lines to a water path
+ * and a low area are not: they point at where the thing is (`angleDeg`), with
+ * the distance left to the label. Terrain handover §3.2: the graphic carries
+ * position, the words carry the rounded figure.
  */
 export const COMPASS_ANGLE: Record<Compass, number> = {
   east: 0,

@@ -54,8 +54,18 @@ describe('what the figure is given', () => {
     // 34 m becomes "about 30 m" in the sentence. A figure handed 34 would
     // label an arrow with a number the caption says we do not have.
     const near = waterNearby(artefact([[[34, 0], [34, 10]]], []), [0, 0]);
-    expect(near?.channel).toEqual({ kind: 'direction', distanceM: 30, bearing: 'east' });
+    expect(near?.channel).toEqual({ kind: 'direction', distanceM: 30, bearing: 'east', angleDeg: 0 });
     expect(30 % DISTANCE_ROUNDING_M).toBe(0);
+  });
+
+  it('carries the true angle for the drawing beside the rounded eighth for the words', () => {
+    // The nearest point is at (30, 10): 18.4° north of east, which the words
+    // round to "east" and the dashed line draws where it is.
+    const near = waterNearby(artefact([[[30, 10], [60, 10]]], []), [0, 0]);
+    expect(near?.channel?.kind).toBe('direction');
+    if (near?.channel?.kind !== 'direction') return;
+    expect(near.channel.bearing).toBe('east');
+    expect(near.channel.angleDeg).toBeCloseTo(18.43, 1);
   });
 
   it('gives nothing to point at for something a metre away', () => {
@@ -92,8 +102,8 @@ describe('what the figure is given', () => {
 
 describe('the sentence and the figure agree', () => {
   const both: WaterNearby = {
-    channel: { kind: 'direction', distanceM: 30, bearing: 'north-west' },
-    low: { kind: 'direction', distanceM: 40, bearing: 'south-east' },
+    channel: { kind: 'direction', distanceM: 30, bearing: 'north-west', angleDeg: 140 },
+    low: { kind: 'direction', distanceM: 40, bearing: 'south-east', angleDeg: 320 },
   };
 
   it('reads the same numbers the arrows are drawn with', () => {
