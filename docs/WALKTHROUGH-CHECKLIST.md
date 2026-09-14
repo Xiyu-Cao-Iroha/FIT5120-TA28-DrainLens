@@ -5,6 +5,8 @@ DrainLens · TA28 · a working sheet for a paired session, **not a record of one
 Fill it in while doing it. An entry written afterwards from memory is worth less than a blank one, and a blank one is honest.
 
 > **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+>
+> **14 September: `develop` has moved well past those three places**, and `drainlens-dev` will show all of it once it is redeployed. The drain-blockage comparison is back, reached from a drain on the *Full map*; the ground height covers the council; the address panel shows which way the ground falls; and the site also stores `drainlens.learned` — guide progress, four `0`/`1` characters and nothing else — which row 1.1.1.e would otherwise mark as a defect. The words this sheet quotes have been brought to the names the copy review settled. **For the Iteration 2 criteria, work from [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md)**; there is no click-order sheet for them yet.
 
 ---
 
@@ -43,7 +45,7 @@ Do not spend the session rediscovering these.
 
 | | |
 |---|---|
-| **The ground surface was broken and is now fixed — confirm the fix** | It was drawn and then erased by the map's own opening fill, and the ramp was fitted to a surface whose buildings are raised 100 m for routing, so 26% of the extent sat at one end of it. Measured after the fix: 100 distinct colours became 210. **Toggling "Ground surface" must produce an obviously different map**, and the only large block of a single colour should be the buildings. |
+| **The ground surface was broken and is now fixed — confirm the fix** | It was drawn and then erased by the map's own opening fill, and the ramp was fitted to a surface whose buildings are raised 100 m for routing, so 26% of the extent sat at one end of it. Measured after the fix: 100 distinct colours became 210. **Toggling "Ground height" must produce an obviously different map**, and the only large block of a single colour should be the buildings. |
 | **The pit pin, click-to-select and the difference layer are all now seen working** | All three were clicked through on the deployed site and on the dev server on 1 September. A chosen pit shows a violet-labelled pin with its asset number, clicking another inlet selects it, and a result that finds a difference paints it on the map. Confirm them, but do not expect to be the first. |
 | **Three inlets, and only three, produce a visible difference** | An earlier sample of 40 found none and that was reported as "none exist" — 3 of 475 is 0.6%, which a sample of 40 misses about four times in five. **Use pit 1363621 to demonstrate the comparison working** (652 cells, 132 m³, and a violet patch about 35 m across immediately north of the pit); 1363588 and 1730246 also work. It sits about 490 m north-east of 46 Gatehouse Drive, so reaching it means panning — worth rehearsing rather than discovering on the day. Any other pit honestly returns *No clear difference*, and the screen should explain why rather than just say it. |
 | **Why those three** | All three have **no recorded downstream pipe** and a large catchment. Blocked, their water has no next inlet to reach; the other 472 sit in a redundant chain. Terminal inlets with small catchments release 0.00–0.04 m³ — three orders of magnitude less. |
@@ -96,11 +98,11 @@ Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 | | What to look at | Result | Note |
 |---|---|---|---|
 | 1.1.3.a | Centred on and marking the address | | |
-| 1.1.3.b | Five controls: pits, pipes, ground surface, water paths, low points | | |
+| 1.1.3.b | Five controls: *Drain pits*, *Drain pipes*, *Ground height*, *Likely water paths*, *Low areas* | | |
 | 1.1.3.c | Each one turns its layer off and on **individually** | | |
 | | **Ground height off → on is obviously different** (see above) | | |
 | 1.1.3.d | Every layer carries *Council record* or *Calculated by DrainLens* | | |
-| 1.1.3.e | The "not enough ground measured" layer is available and legible | | |
+| 1.1.3.e | The *Limited ground data* layer — not enough ground measured — is available and legible | | |
 
 ---
 

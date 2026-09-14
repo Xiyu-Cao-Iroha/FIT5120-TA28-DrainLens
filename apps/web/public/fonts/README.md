@@ -48,3 +48,13 @@ Then rename the family away from the Reserved Font Name before shipping.
 to whatever the reader's system supplies — which is how a careful interface
 ends up with one icon in a different voice from everything around it — the
 interface draws those as inline SVG instead of setting them as text.
+
+> **14 September 2026: that is no longer the whole story.** Checked against the
+> font's own character map and the source, seven characters set as text are not
+> among the 120, and fall back to the system face: `÷` in the flood board's rate
+> arithmetic, `−` on the flood map's zoom-out button and the pit card's minimise
+> button, the `⌃ ⌄` chevrons on folding sections, and `◎ ◯ ⚠` in the comparison
+> setup, which has set them as text since 29 August. Either the subset is
+> rebuilt with them or they are drawn; until then "the 120 characters this
+> interface actually uses" above describes the subset, not every character the
+> interface sets.
