@@ -18,6 +18,7 @@
  * descend.
  */
 
+import { idOf, labelOf } from '../address/search.js';
 import { type Compass, type WaterNearby, describe as describeWater } from './nearby.js';
 
 export type GroundTrend =
@@ -25,50 +26,95 @@ export type GroundTrend =
   | { readonly kind: 'unclear' }
   | { readonly kind: 'edge' };
 
+/**
+ * Version 2: the address index's own street list, and `number=code` per address.
+ *
+ * Keyed by id, the council's 62,397 addresses were about seven megabytes of
+ * repeated strings. The code is `x` for too near the edge of the measured
+ * ground, `u` for unclear, or a compass abbreviation and the fall in
+ * half-metres — `SW3` is south-west, 1.5 m. See `pipeline/address_ground.py`.
+ */
 export interface AddressGroundArtefact {
   readonly artefact: 'address-ground';
-  readonly settings: { readonly areaAcrossM: number };
-  readonly addresses: Readonly<
-    Record<string, { readonly ground: string; readonly bearing?: string; readonly fallM?: number }>
-  >;
+  readonly version: 2;
+  readonly area: string;
+  readonly settings: { readonly areaAcrossM: number; readonly fallRoundingM?: number };
+  readonly on: readonly string[];
+  readonly at: readonly (readonly string[])[];
 }
 
 export class AddressGroundError extends Error {}
 
-const COMPASS_POINTS: readonly string[] = [
-  'east',
-  'north-east',
-  'north',
-  'north-west',
-  'west',
-  'south-west',
-  'south',
-  'south-east',
-];
+const ABBREVIATIONS: Readonly<Record<string, Compass>> = {
+  E: 'east',
+  NE: 'north-east',
+  N: 'north',
+  NW: 'north-west',
+  W: 'west',
+  SW: 'south-west',
+  S: 'south',
+  SE: 'south-east',
+};
 
 export function assertAddressGround(value: unknown): asserts value is AddressGroundArtefact {
   const a = value as Partial<AddressGroundArtefact> | null;
   if (a === null || typeof a !== 'object' || a.artefact !== 'address-ground') {
     throw new AddressGroundError('the address ground artefact is not one');
   }
-  if (!a.addresses || typeof a.addresses !== 'object') {
+  if (a.version !== 2) {
+    throw new AddressGroundError(`the address ground artefact is version ${String(a.version)}, and this reads version 2`);
+  }
+  if (!Array.isArray(a.on) || !Array.isArray(a.at) || a.on.length === 0) {
     throw new AddressGroundError('the address ground artefact carries no addresses');
+  }
+  if (a.on.length !== a.at.length) {
+    throw new AddressGroundError(
+      `the address ground artefact has ${String(a.on.length)} streets and ${String(a.at.length)} groups of answers`,
+    );
+  }
+  if (typeof a.area !== 'string' || a.area === '') {
+    throw new AddressGroundError('the address ground artefact does not say which area its ids belong to');
   }
   if (!((a.settings?.areaAcrossM ?? 0) > 0)) {
     throw new AddressGroundError('the address ground artefact does not say how wide its area is');
   }
 }
 
+/** Every answer by id, built once per artefact on the first lookup. */
+const BY_ID = new WeakMap<AddressGroundArtefact, ReadonlyMap<string, string>>();
+
+function codesOf(artefact: AddressGroundArtefact): ReadonlyMap<string, string> {
+  let codes = BY_ID.get(artefact);
+  if (codes === undefined) {
+    const built = new Map<string, string>();
+    artefact.on.forEach((key, group) => {
+      const [street = '', suburb = ''] = key.split('|');
+      for (const entry of artefact.at[group] ?? []) {
+        const split = entry.lastIndexOf('=');
+        if (split <= 0) continue;
+        built.set(idOf(artefact.area, labelOf(entry.slice(0, split), street, suburb)), entry.slice(split + 1));
+      }
+    });
+    codes = built;
+    BY_ID.set(artefact, codes);
+  }
+  return codes;
+}
+
+/** The trend a code stands for, or null for a code this does not read. */
+export function trendOf(code: string, rounding = 0.5): GroundTrend | null {
+  if (code === 'x') return { kind: 'edge' };
+  if (code === 'u') return { kind: 'unclear' };
+  const match = /^([NSEW]{1,2})(\d+)$/.exec(code);
+  const bearing = match === null ? undefined : ABBREVIATIONS[match[1] ?? ''];
+  if (match === null || bearing === undefined) return { kind: 'unclear' };
+  return { kind: 'falls', bearing, fallM: Number(match[2]) * rounding };
+}
+
 /** The trend for one address, or null when the artefact has nothing for it. */
 export function groundAt(artefact: AddressGroundArtefact, id: string): GroundTrend | null {
-  const record = artefact.addresses[id];
-  if (!record) return null;
-  if (record.ground === 'falls') {
-    if (!COMPASS_POINTS.includes(record.bearing ?? '') || !Number.isFinite(record.fallM)) return { kind: 'unclear' };
-    return { kind: 'falls', bearing: record.bearing as Compass, fallM: record.fallM! };
-  }
-  if (record.ground === 'edge') return { kind: 'edge' };
-  return { kind: 'unclear' };
+  const code = codesOf(artefact).get(id);
+  return code === undefined ? null : trendOf(code, artefact.settings.fallRoundingM ?? 0.5);
 }
 
 export async function loadAddressGround(

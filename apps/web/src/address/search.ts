@@ -41,6 +41,17 @@ export interface AddressIndex {
    * the case while the stand-in is in place.
    */
   readonly streets?: readonly string[];
+  /**
+   * True when the map on screen is smaller than the index, so the addresses
+   * outside it were left out.
+   *
+   * The index covers the City of Melbourne; when the API cannot answer, the
+   * map is the one square kilometre of Kensington the site carries. An address
+   * in Carnegie Street, Carlton is then still a real, covered address — just
+   * not one this map can show — and the search has to be able to say that
+   * rather than call it outside what the product covers.
+   */
+  readonly clipped?: boolean;
 }
 
 /**
@@ -153,6 +164,47 @@ export function shiftInto(
  *
  * On the fallback the two frames are the same extent and the shift is zero.
  */
+/**
+ * Where an index sits against the map it will be drawn on.
+ *
+ * The index inside the map is `shiftInto`'s case, and nothing is left out. The
+ * map inside the index is the fallback: a council-wide index over the one
+ * square kilometre of Kensington, shifted the other way and clipped to it. Any
+ * other overlap is two frames that were never meant to meet, and is refused
+ * for the same reason `shiftInto` refuses.
+ */
+export function placeInto(
+  from: Frame | undefined,
+  to: Frame,
+  area: string,
+): { readonly east: number; readonly north: number; readonly clipped: boolean } {
+  if (from === undefined) return { ...pair(shiftInto(from, to, area)), clipped: false };
+  const mapInside =
+    to.min_e >= from.min_e &&
+    to.min_n >= from.min_n &&
+    to.min_e + to.width_m <= from.min_e + from.width_m &&
+    to.min_n + to.height_m <= from.min_n + from.height_m;
+  const same = from.width_m === to.width_m && from.height_m === to.height_m;
+  if (!mapInside || same) return { ...pair(shiftInto(from, to, area)), clipped: false };
+  return { east: from.min_e - to.min_e, north: from.min_n - to.min_n, clipped: true };
+}
+
+const pair = ([east, north]: readonly [number, number]) => ({ east, north });
+
+/** An address as it is shown: "46 Gatehouse Drive, Kensington". */
+export const labelOf = (number: string, street: string, suburb: string): string =>
+  suburb === '' ? `${number} ${street}` : `${number} ${street}, ${suburb}`;
+
+/**
+ * An address's id, from its area and label.
+ *
+ * One definition, because two artefacts are keyed by it: the index, and the
+ * ground trend published for each address. `pipeline/address_ground.py`
+ * `addresses_of` builds the same string.
+ */
+export const idOf = (area: string, label: string): string =>
+  `${area}/${label.toLowerCase().replace(/ /g, '-').replace(/,/g, '')}`;
+
 export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
   if (!Array.isArray(raw.on) || !Array.isArray(raw.at)) {
     throw new IndexError('the address index carries no addresses');
@@ -163,7 +215,7 @@ export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
     );
   }
 
-  const [east, north] = shiftInto(raw.extent, into, raw.area);
+  const { east, north, clipped } = placeInto(raw.extent, into, raw.area);
 
   const addresses: IndexedAddress[] = [];
   raw.on.forEach((key, group) => {
@@ -171,10 +223,12 @@ export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
     for (const [number, rawE, rawN] of raw.at[group] ?? []) {
       const e = rawE + east;
       const n = rawN + north;
-      const label = suburb === '' ? `${number} ${street ?? ''}` : `${number} ${street ?? ''}, ${suburb}`;
+      // Clipped, an address off the map is left out rather than drawn past its edge.
+      if (clipped && (e < 0 || n < 0 || e > into.width_m || n > into.height_m)) continue;
+      const label = labelOf(number, street ?? '', suburb);
       addresses.push({
         // The same id the pipeline used to write, rebuilt from the same parts.
-        id: `${raw.area}/${label.toLowerCase().replace(/ /g, '-').replace(/,/g, '')}`,
+        id: idOf(raw.area, label),
         label,
         number,
         street: street ?? '',
@@ -185,10 +239,16 @@ export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
     }
   });
 
+  // Normalised now, on load, rather than on the first keystroke: over the
+  // council index that is two hundred milliseconds, and a search box that stalls
+  // on the first letter reads as broken.
+  for (const address of addresses) normalisedOf(address);
+
   return {
     area: raw.area,
     addresses,
     ...(raw.streets === undefined ? {} : { streets: raw.streets }),
+    ...(clipped ? { clipped: true } : {}),
   };
 }
 
@@ -249,9 +309,27 @@ export interface Match {
  */
 export const MAX_SUGGESTIONS = 6;
 
+/**
+ * Each address's label and street, normalised once.
+ *
+ * `normalise` is four regular expressions, and the council index holds 62,397
+ * addresses: run per address per keystroke it is the whole cost of a search.
+ * Held beside the address rather than on it, so `IndexedAddress` stays the
+ * plain record every caller builds.
+ */
+const NORMALISED = new WeakMap<IndexedAddress, { readonly label: string; readonly street: string }>();
+
+function normalisedOf(address: IndexedAddress): { readonly label: string; readonly street: string } {
+  let forms = NORMALISED.get(address);
+  if (forms === undefined) {
+    forms = { label: normalise(address.label), street: normalise(address.street) };
+    NORMALISED.set(address, forms);
+  }
+  return forms;
+}
+
 function scoreOne(address: IndexedAddress, query: string, words: readonly string[]): number {
-  const label = normalise(address.label);
-  const street = normalise(address.street);
+  const { label, street } = normalisedOf(address);
 
   // Whole-query prefix beats everything: the person has typed the address.
   if (label.startsWith(query)) return 1000 - label.length;

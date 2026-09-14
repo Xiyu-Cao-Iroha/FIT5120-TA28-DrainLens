@@ -12,6 +12,7 @@ from drainlens_pipeline.address_ground import (
     addresses_of,
     assess,
     build,
+    code_of,
     compass,
     fit_plane,
     main,
@@ -116,7 +117,11 @@ def test_build_counts_every_answer_and_refuses_another_frame():
     }
     artefact = build(plane(0.02, 0.0), ONES, ZEROS, index)
     assert artefact["counts"] == {"falls": 1, "unclear": 0, "edge": 1}
-    assert artefact["addresses"]["t/1-a-street-t"]["bearing"] == "west"
+    assert artefact["version"] == 2 and artefact["on"] == ["A Street|T"]
+    # West, 3.0 m: six half-metres. The number travels with its code.
+    assert artefact["at"] == [["1=W6", "2=x"]]
+    with pytest.raises(AddressGroundError, match="same shape"):
+        build(plane(0.02, 0.0), ONES, ZEROS, index, np.ones((3, 3), dtype=bool))
     with pytest.raises(AddressGroundError, match="same frame"):
         build(plane(0.02, 0.0), ONES, ZEROS, {**index, "extent": {"width_m": 1000, "height_m": 1000}})
     with pytest.raises(AddressGroundError, match="same shape"):
@@ -137,7 +142,32 @@ def test_main_writes_the_artefact(tmp_path, capsys):
     assert main(["--terrain", str(terrain), "--addresses", str(addresses), "--out", str(out)]) == 0
     written = json.loads(out.read_text(encoding="utf-8"))
     assert written["artefact"] == "address-ground" and written["counts"]["falls"] == 1
+    assert written["at"] == [["1=W6"]]
+
+    # A council terrain carries its holes; one inside the check disc is the edge.
+    holes = ONES.copy()
+    holes[140, 140] = False
+    np.save(terrain / "ground-valid.npy", holes)
+    assert main(["--terrain", str(terrain), "--addresses", str(addresses), "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8"))["at"] == [["1=x"]]
+    (terrain / "ground-valid.npy").unlink()
     assert "falls" in capsys.readouterr().out
 
     addresses.write_text(json.dumps({"area": "t", "extent": {"width_m": 1, "height_m": 1}, "on": [], "at": []}), encoding="utf-8")
     assert main(["--terrain", str(terrain), "--addresses", str(addresses), "--out", str(out)]) == 1
+
+
+def test_a_hole_in_the_measured_extent_is_its_edge():
+    valid = ONES.copy()
+    valid[150 - 90, 150] = False  # 90 m north of the address, inside the 100 m check disc
+    assert assess(plane(0.02, 0.0), ONES, ZEROS, 150.0, 150.0, valid=valid) == {"ground": "edge"}
+    far = ONES.copy()
+    far[0, 0] = False
+    assert assess(plane(0.02, 0.0), ONES, ZEROS, 150.0, 150.0, valid=far)["ground"] == "falls"
+
+
+def test_codes_are_short_and_say_the_fall_in_half_metres():
+    assert code_of({"ground": "edge"}) == "x"
+    assert code_of({"ground": "unclear"}) == "u"
+    assert code_of({"ground": "falls", "bearing": "south-west", "fallM": 1.5}) == "SW3"
+    assert code_of({"ground": "falls", "bearing": "north", "fallM": 0.5}) == "N1"

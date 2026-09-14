@@ -311,14 +311,26 @@ describe('unpacking the shipped index', () => {
     expect([first?.e, first?.n]).toEqual([320.5, 640.25]);
   });
 
-  it('refuses a map the index does not fit inside, rather than drawing it anyway', () => {
-    // A map that does not contain the addressed area is not a map these
-    // addresses belong on. Shifting them into it would put houses outside the
-    // extent, and every "how far is this pit from your address" would go on
-    // answering.
-    const tooSmall = { min_e: 316500, min_n: 5814500, width_m: 500, height_m: 500 };
-    expect(() => unpack(packed, tooSmall)).toThrow(IndexError);
-    expect(() => unpack(packed, tooSmall)).toThrow(/does not fit inside/);
+  it('refuses a map that only partly overlaps the index, rather than drawing it anyway', () => {
+    // A map that neither contains the addressed area nor sits inside it is not
+    // a map these addresses belong on. Shifting them into it would put houses
+    // outside the extent, and every "how far is this pit from your address"
+    // would go on answering.
+    const straddling = { min_e: 316000, min_n: 5814000, width_m: 1000, height_m: 1000 };
+    expect(() => unpack(packed, straddling)).toThrow(IndexError);
+    expect(() => unpack(packed, straddling)).toThrow(/does not fit inside/);
+  });
+
+  it('clips a council-wide index to a smaller map, and says it did', () => {
+    // The fallback since the index became the council's: the map is the
+    // Kensington square kilometre, the index is 8.5 by 9 km around it. The
+    // addresses inside are shifted into the map's frame; the rest are left out,
+    // and `clipped` lets the search say why a covered address was not found.
+    const council = { ...packed, extent: COUNCIL_FRAME, on: ['Gatehouse Drive|Kensington'], at: [[['46', 1820.5, 6640.25], ['1', 10, 10]]] } as unknown as PackedIndex;
+    const clipped = unpack(council, KENSINGTON_FRAME);
+    expect(clipped.addresses.map((a) => [a.number, a.e, a.n])).toEqual([['46', 320.5, 640.25]]);
+    expect(clipped.clipped).toBe(true);
+    expect(unpack(council, COUNCIL_FRAME).clipped).toBeUndefined();
   });
 
   it('refuses an index that does not say which frame it is in', () => {

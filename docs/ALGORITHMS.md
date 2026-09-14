@@ -138,15 +138,18 @@ over the paths reversed failed on every one. `test_never_runs_uphill` in
 
 ### Which way the ground falls at an address — `address_ground.py`
 
-Not part of the water chain, and deliberately so. For each of the 4,089
-addresses a plane is fitted to the **raw** ground within `FIT_RADIUS_M = 75` m,
+Not part of the water chain, and deliberately so. For each of the 62,397
+addresses in the council index (4,089 in Kensington until 14 September) a plane is fitted to the **raw** ground within `FIT_RADIUS_M = 75` m,
 weighted 0 on buildings, 0.35 on interpolated open ground and 1 on measured.
 The plane's downhill direction is given as one of eight compass points only
 when the fall across 150 m is at least 0.5 m, R² is at least 0.30, at least
 35% of the weight is measured, and the 75 m and 100 m fits agree within 22.5°
 — the width of an octant. Otherwise the answer is *unclear*, or *edge* where
-the disc runs off the measured ground: 1,982 falls, 1,640 unclear and 467 edge
-in `apps/web/public/data/terrain/address-ground.json`.
+the disc runs off the measured ground — which over the council includes a
+missing point-cloud tile anywhere within the 100 m check disc. Council-wide:
+38,498 falls, 23,899 unclear and 0 edge in
+`apps/web/public/data/terrain/address-ground.json`; the Kensington-only run had
+given 1,982, 1,640 and 467, and the 3,622 addresses it answered agree 99.9%.
 
 It is a trend over an area about 150 m across, not a path water takes; the
 module's docstring records why the two answer different questions.

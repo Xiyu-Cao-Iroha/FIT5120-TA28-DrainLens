@@ -144,11 +144,12 @@ async function load(): Promise<Loaded> {
   // refuses an index whose groups do not line up rather than repairing it.
   //
   // **Into the frame of the map that was actually served.** The index is the
-  // one artefact that never comes from the API, so it always arrives in the
-  // pilot extent's frame -- and when the API answers, the map under it is the
-  // council's, whose corner is 1.5 km west and 6 km south of Kensington's.
-  // Every pin was landing there: on a real street, inside the extent, looking
-  // like a map. `unpack` refuses if the index does not fit inside the map.
+  // one artefact that never comes from the API, so it arrives in its own
+  // extent's frame whichever map is under it. Unshifted, every pin once landed
+  // 1.5 km west and 6 km south of the house. Since 14 September the index is
+  // the council's: over the council map the shift is zero, and over the
+  // Kensington fallback `unpack` clips it to the square kilometre and marks it
+  // `clipped`, so the search can say why a council address is not found.
   const packed = addresses as PackedIndex & { fixture?: string };
   const index = unpack(packed, map.extent);
 

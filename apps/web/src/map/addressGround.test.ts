@@ -16,18 +16,17 @@ import {
   describeGround,
   groundAt,
   loadAddressGround,
+  trendOf,
 } from './addressGround.js';
 import type { WaterNearby } from './nearby.js';
 
 const artefact = {
   artefact: 'address-ground' as const,
-  settings: { areaAcrossM: 150 },
-  addresses: {
-    'kensington/1-a-street-kensington': { ground: 'falls', bearing: 'north-west', fallM: 1 },
-    'kensington/2-a-street-kensington': { ground: 'unclear' },
-    'kensington/3-a-street-kensington': { ground: 'edge' },
-    'kensington/4-a-street-kensington': { ground: 'falls', bearing: 'up', fallM: 1 },
-  },
+  version: 2 as const,
+  area: 'kensington',
+  settings: { areaAcrossM: 150, fallRoundingM: 0.5 },
+  on: ['A Street|Kensington', 'No Suburb Lane'],
+  at: [['1=NW2', '2=u', '3=x', '4=UP2', '5=bad'], ['7=S5']],
 };
 
 describe('reading the artefact', () => {
@@ -38,8 +37,15 @@ describe('reading the artefact', () => {
     expect(groundAt(artefact, 'nowhere')).toBeNull();
   });
 
+  it('rebuilds the id the address index builds, suburb or none', () => {
+    expect(groundAt(artefact, 'kensington/7-no-suburb-lane')).toEqual({ kind: 'falls', bearing: 'south', fallM: 2.5 });
+  });
+
   it('treats a direction that is not a compass point as unclear, not as a direction', () => {
     expect(groundAt(artefact, 'kensington/4-a-street-kensington')).toEqual({ kind: 'unclear' });
+    expect(groundAt(artefact, 'kensington/5-a-street-kensington')).toEqual({ kind: 'unclear' });
+    expect(trendOf('SE1')).toEqual({ kind: 'falls', bearing: 'south-east', fallM: 0.5 });
+    expect(trendOf('NN3', 0.5)).toEqual({ kind: 'unclear' });
   });
 
   it('refuses something that is not the artefact', async () => {
@@ -47,10 +53,19 @@ describe('reading the artefact', () => {
       assertAddressGround({ artefact: 'derived-layers' });
     }).toThrow(AddressGroundError);
     expect(() => {
-      assertAddressGround({ artefact: 'address-ground', settings: { areaAcrossM: 150 } });
+      assertAddressGround({ ...artefact, version: 1 });
+    }).toThrow(/version 1/);
+    expect(() => {
+      assertAddressGround({ ...artefact, on: [], at: [] });
     }).toThrow(/no addresses/);
     expect(() => {
-      assertAddressGround({ artefact: 'address-ground', addresses: {} });
+      assertAddressGround({ ...artefact, at: [[]] });
+    }).toThrow(/2 streets and 1 groups/);
+    expect(() => {
+      assertAddressGround({ ...artefact, area: '' });
+    }).toThrow(/which area/);
+    expect(() => {
+      assertAddressGround({ ...artefact, settings: {} });
     }).toThrow(/how wide/);
     await expect(loadAddressGround('/x', () => Promise.resolve(artefact))).resolves.toBe(artefact);
     await expect(loadAddressGround('/x', () => Promise.resolve({}))).rejects.toThrow(AddressGroundError);

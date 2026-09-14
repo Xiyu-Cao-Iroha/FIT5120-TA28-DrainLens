@@ -25,14 +25,14 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
 | `/data/derived.json` | 175 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
-| `/data/addresses.json` | 83 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
+| `/data/addresses.json` | 1.33 MB, 490 KB gzipped | `drainlens_pipeline.addresses` | The address index for the City of Melbourne **and the coverage boundary**; clipped in the browser to the Kensington map when that is the map served |
 | `/data/flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` | Recorded flood incidents by named area, and what a count is |
 | `/data/scene-tiles/index.json` | 176 KB | `drainlens_pipeline.scene_tiles` | Which 500 m tiles exist; for every inlet, the window it is calculated in |
 | `/data/scene-tiles/Tile_*/` | ~300 KB each, 64 MB in all | `drainlens_pipeline.scene_tiles` | Pre-gzipped elevation, flow, depressions, rim depth, measured; `tile.json` with the depressions and drains in it |
 | `/data/terrain-tiles/index.json` | 29 KB | `drainlens_pipeline.terrain_tiles` | The *Ground height* layer's tile grid, colour ramp and hillshade settings |
 | `/data/terrain-tiles/overview-colour.webp`, `overview-shade.webp` | 373 KB + 397 KB | `drainlens_pipeline.terrain_tiles` | The whole council at 4 m a pixel, drawn below 0.5 px/m and under any tile still loading |
 | `/data/terrain-tiles/Tile_*/` | ~78 KB each, 17.1 MB in all with the overview | `drainlens_pipeline.terrain_tiles` | `colour.webp`, `shade.webp` and `marks.json` (contours and spot heights), fetched as each 500 m square comes into view |
-| `/data/terrain/address-ground.json` | 467 KB | `drainlens_pipeline.address_ground` | Which way the ground falls around each Kensington address, by address id |
+| `/data/terrain/address-ground.json` | 558 KB, 137 KB gzipped | `drainlens_pipeline.address_ground` | Which way the ground falls around each address: version 2, the index's street list and one `number=code` per address |
 | `/data/sa2-areas.json` | 38 KB | `drainlens_pipeline.flood_history --areas` | All 281 Greater Melbourne areas with their recorded call-outs |
 | `/data/population.json` | 28 KB | `drainlens_pipeline.population` | Residents per area, and the minimum below which no rate is given |
 | `/data/sa2-points.json` | 181 KB | `drainlens_pipeline.area_points` | Each area's simplified boundary and name point |
