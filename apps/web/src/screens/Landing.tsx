@@ -13,7 +13,7 @@
  * three outcomes stay distinct all the way to the screen.
  *
  * The demonstration address is offered directly, because the address search
- * covers Kensington only and most people's own address is outside it. Without that
+ * covers the City of Melbourne only and most people's own address is outside it. Without that
  * offer the honest answer is also a dead end, and a dead end on the first
  * screen is where somebody leaves.
  *
@@ -74,7 +74,7 @@ const SHOWS: readonly string[] = [
 const DOES_NOT: readonly string[] = [
   'It does not predict flooding.',
   'It does not show how deep water would be, or when it would arrive.',
-  COVERAGE.addresses,
+  'It does not cover addresses outside the City of Melbourne.',
 ];
 
 export interface LandingProps {
@@ -495,6 +495,8 @@ function UnsupportedNotice({
   readonly index: AddressIndex;
 }) {
   const demonstration = demonstrationAddress(index);
+  // A council address on the Kensington fallback is covered, just not by this map.
+  const coverage = index.clipped === true ? COVERAGE.addressesFallback : COVERAGE.addresses;
   return (
     <div
       role="alert"
@@ -520,14 +522,21 @@ function UnsupportedNotice({
           : 'We have no record of that address'}
       </strong>
       <span style={{ color: advisory.ink }}>
-        {problem.kind === 'outside-pilot' ? (
+        {problem.kind === 'outside-pilot' && index.clipped === true ? (
+          // On the fallback, a known street is most likely a covered address
+          // this smaller map cannot show, not a number the record lacks.
+          <>
+            <em>{problem.typed}</em> is on a street we know, but not in the part of the address
+            list this map can show. {coverage}
+          </>
+        ) : problem.kind === 'outside-pilot' ? (
           <>
             <em>{problem.typed}</em> is on a street we know, but that number is not in the address
-            list. {COVERAGE.addresses}
+            list. {coverage}
           </>
         ) : (
           <>
-            Nothing in the address list matches <em>{problem.typed}</em>. {COVERAGE.addresses}
+            Nothing in the address list matches <em>{problem.typed}</em>. {coverage}
           </>
         )}
       </span>

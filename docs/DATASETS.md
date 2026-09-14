@@ -16,7 +16,7 @@ Detailed verification of three of them is in their own files: [FLOOD-HISTORY-DAT
 | 2 | Drainpipes | City of Melbourne Open Data Portal | CC BY 4.0 | `drainpipes` | Drainage map, trace |
 | 3 | Road corridors | City of Melbourne Open Data Portal | CC BY 4.0 | `road-corridors` | Map base layer |
 | 4 | Street names | City of Melbourne Open Data Portal | CC BY 4.0 | `street-names` | Map labels, address search |
-| 5 | Street addresses | City of Melbourne Open Data Portal | CC BY 4.0 | `street-addresses` | Address search (Kensington) |
+| 5 | Street addresses | City of Melbourne Open Data Portal | CC BY 4.0 | `street-addresses` | Address search (City of Melbourne) |
 | 6 | 2020 Building Footprints | City of Melbourne Open Data Portal | CC BY 4.0 | `2020-building-footprints` | Terrain: roofs as barriers to water |
 | 7 | City of Melbourne 3D Point Cloud 2018 | City of Melbourne Open Data Portal | CC BY 4.0 | `CoM_Point_Cloud_2018_LAS.zip` | Ground height, contours and spot heights, water paths, low areas, address insight, scenario |
 | 8 | VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015 | Victoria State Emergency Service (via data.vic) | CC BY 4.0 | `victoria-ses-incidents-per-sa1-abs-census-areas-2009-2015` | Flood history board, flood map counts |
@@ -48,7 +48,7 @@ All fetched from the portal's export API, `https://data.melbourne.vic.gov.au/api
 ### 5 · Street addresses
 
 - **Pipeline:** `addresses.py`. **Artefact:** `apps/web/public/data/addresses.json`.
-- 63,721 records in the dataset; the index keeps **4,089 addresses across 132 streets** in the Kensington pilot, and only `street_no`, `str_name`, `suburb` and the point. Every other field is dropped at build time.
+- 63,721 records in the dataset; the index keeps **62,397 addresses across 2,293 streets** inside the City of Melbourne extent (4,089 across 132 streets while it was the Kensington pilot, until 14 September), and only `street_no`, `str_name`, `suburb` and the point. Every other field is dropped at build time.
 - **Bundled, never sent anywhere.** The search runs in the browser; no address or coordinate reaches an endpoint, `localStorage`, the URL or history.
 - Not `property-boundaries`: that dataset is parcels, and was used by mistake until 31 August.
 
@@ -71,7 +71,7 @@ All fetched from the portal's export API, `https://data.melbourne.vic.gov.au/api
   - `apps/web/public/data/derived.json` — Kensington. `scene/` beside it is Kensington's scene pack, which the site no longer reads.
   - `apps/web/public/data/scene-tiles/` — 211 tiles (64 MB) the comparison stitches into a one-kilometre window around the chosen drain.
   - `apps/web/public/data/terrain-tiles/` — the *Ground height* layer for the whole council: 211 tiles of pre-coloured ground, hillshade, contours and spot heights, and a 4 m overview (17.1 MB).
-  - `apps/web/public/data/terrain/address-ground.json` — which way the ground falls around each of the 4,089 Kensington addresses.
+  - `apps/web/public/data/terrain/address-ground.json` — which way the ground falls around each of the 62,397 addresses in the index.
 
 ---
 

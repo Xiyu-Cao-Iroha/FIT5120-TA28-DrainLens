@@ -58,6 +58,12 @@ At 4,089 addresses and 66 KB over the wire there is no technical reason to move
 it either — and since 11 September, when the index began travelling grouped by
 street, it is 83 KB on disk and 31 KB gzipped.
 
+> **14 September 2026: the index is the council's**, 62,397 addresses and 490 KB
+> gzipped, and it stays a file for the same reason. That is a real cost on a
+> first visit; the
+> alternative is a search endpoint that receives every keystroke of a home
+> address, which is the cost this section exists to refuse.
+
 ---
 
 ## What goes in, and what stays a file

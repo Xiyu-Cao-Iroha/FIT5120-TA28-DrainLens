@@ -10,9 +10,10 @@
  *
  * So this is checked here rather than in the unit suite, for two reasons. It
  * is an artefact claim, which is the same reason `tools/docs/check.mjs` is a
- * script rather than a test. And it costs four and a half seconds over 4,089
- * addresses, in a suite the runner already times at six against a five-second
- * gate — buying the assurance at twice the price of the thing it protects.
+ * script rather than a test. And it is a nearest-pit search for every address
+ * in the council, 62,397 of them since the address search reached the whole
+ * City of Melbourne, in a suite the runner already times against a five-second
+ * gate.
  *
  * The rule it enforces is `apps/web/src/tutorial/pit.ts`'s, restated rather
  * than imported, because that module is TypeScript in a browser bundle and
@@ -75,9 +76,20 @@ const links = trace.links ?? {};
  * list. That is the whole reason it is a check and not a comment: a script
  * that read the new shape leniently would have reported success about nothing.
  */
-const addresses = (index.on ?? []).flatMap((key, group) =>
+const everyAddress = (index.on ?? []).flatMap((key, group) =>
   (index.at?.[group] ?? []).map(([number, e, n]) => ({ label: `${number} ${key}`, e, n })),
 );
+
+/*
+ * The bundled map is the Kensington square kilometre; the index is the
+ * council's. `unpack` shifts the index into the map it is drawn on and leaves
+ * out what falls outside it, and this does the same, so the promise below is
+ * checked for exactly the addresses a visitor can search on the fallback.
+ */
+const intoBundled = [index.extent.min_e - map.extent.min_e, index.extent.min_n - map.extent.min_n];
+const addresses = everyAddress
+  .map((address) => ({ ...address, e: address.e + intoBundled[0], n: address.n + intoBundled[1] }))
+  .filter((a) => a.e >= 0 && a.n >= 0 && a.e <= map.extent.width_m && a.n <= map.extent.height_m);
 if ((index.on ?? []).length !== (index.at ?? []).length) {
   note(
     `addresses.json has ${String((index.on ?? []).length)} streets and ` +
@@ -186,11 +198,12 @@ if (offered === undefined) {
       `apps/web/src/address/demonstration.ts.`,
   );
 } else {
+  // Against the bundled map, the smaller of the two it can be drawn on.
   const margin = Math.min(
     offered.e,
     offered.n,
-    index.extent.width_m - offered.e,
-    index.extent.height_m - offered.n,
+    map.extent.width_m - offered.e,
+    map.extent.height_m - offered.n,
   );
   if (margin < DEMONSTRATION_MARGIN_M) {
     note(
@@ -243,41 +256,74 @@ if (
   );
 }
 
+const councilTrace = JSON.parse(
+  await readFile(path.resolve(HERE, '../../apps/api/data/city-of-melbourne/trace.json'), 'utf8'),
+);
+const councilLinks = councilTrace.links ?? {};
 const councilCandidates = (council.layers?.pit ?? []).filter(
   (pit) =>
     pit.asset_number !== undefined &&
-    INLET.test(String(pit.object_type_lupvalue ?? '').toLowerCase()),
+    INLET.test(String(pit.object_type_lupvalue ?? '').toLowerCase()) &&
+    leadsOnward(councilLinks, pit.asset_number),
 );
 
-let councilFurthest = 0;
-let councilFurthestLabel = '';
-for (const address of addresses) {
-  const e = address.e + east;
-  const n = address.n + north;
+/*
+ * Over the council the promise is weaker, and the number says by how much.
+ *
+ * Measured on 14 September: 2,339 of the 62,397 addresses have no teachable
+ * pit within 200 m — docks, rail yards and the edges of Kensington and
+ * Docklands where the recorded inlets thin out. `chooseTeachingPit` falls back
+ * to the nearest pit for those, and the guide's map can be dragged to it, so
+ * the guide still works; what it cannot do is open with the pit already on
+ * screen. The count is asserted exactly, so a release that moves it is looked
+ * at rather than absorbed.
+ */
+const EXPECTED_COUNCIL_BEYOND = 2339;
+
+// Bucketed, because 62,397 addresses against 5,000-odd inlets one by one is
+// the slowest thing in CI for no gain: nothing past a few buckets can be nearer.
+const BUCKET_M = RADIUS_M;
+const buckets = new Map();
+for (const pit of councilCandidates) {
+  const key = `${String(Math.floor(pit.c[0] / BUCKET_M))},${String(Math.floor(pit.c[1] / BUCKET_M))}`;
+  if (!buckets.has(key)) buckets.set(key, []);
+  buckets.get(key).push(pit);
+}
+const nearestWithin = (e, n) => {
+  const cx = Math.floor(e / BUCKET_M);
+  const cy = Math.floor(n / BUCKET_M);
   let nearest = Infinity;
-  for (const pit of councilCandidates) {
-    const d = Math.hypot(e - pit.c[0], n - pit.c[1]);
-    if (d < nearest) nearest = d;
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (const pit of buckets.get(`${String(cx + dx)},${String(cy + dy)}`) ?? []) {
+        nearest = Math.min(nearest, Math.hypot(e - pit.c[0], n - pit.c[1]));
+      }
+    }
   }
-  if (nearest > councilFurthest) {
-    councilFurthest = nearest;
-    councilFurthestLabel = address.label;
-  }
+  return nearest;
+};
+
+let councilBeyond = 0;
+for (const address of everyAddress) {
+  if (nearestWithin(address.e + east, address.n + north) > RADIUS_M) councilBeyond += 1;
 }
 
-if (councilFurthest > RADIUS_M) {
+if (councilCandidates.length === 0) note(`${String(council.extent.name)} has no teachable pit at all`);
+if (councilBeyond !== EXPECTED_COUNCIL_BEYOND) {
   note(
-    `shifted into ${String(council.extent.name)}, ${councilFurthestLabel} is ` +
-      `${councilFurthest.toFixed(1)} m from the nearest inlet, past the ${String(RADIUS_M)} m the ` +
-      `guide allows. If this is a few hundred metres out, the shift is wrong rather than the data.`,
+    `over ${String(council.extent.name)}, ${String(councilBeyond)} of ${String(everyAddress.length)} ` +
+      `addresses have no teachable pit within ${String(RADIUS_M)} m, and this script expects ` +
+      `${String(EXPECTED_COUNCIL_BEYOND)}. If it is tens of thousands, the shift is wrong rather ` +
+      `than the data; otherwise re-measure and say what moved.`,
   );
 }
 
 const summary =
-  `${String(addresses.length)} addresses, ${String(pits.length)} pits, ` +
+  `${String(addresses.length)} addresses on the bundled map, ${String(pits.length)} pits, ` +
   `${String(candidates.length)} of them a recorded inlet that leads somewhere. ` +
   `Furthest any address sits from one: ${furthest.toFixed(1)} m of ${String(RADIUS_M)} m allowed. ` +
-  `Shifted into the council frame, furthest is ${councilFurthest.toFixed(1)} m.`;
+  `Over the council, ${String(councilBeyond)} of ${String(everyAddress.length)} addresses are ` +
+  `past it, and fall back to the nearest pit.`;
 
 if (problems.length > 0) {
   console.error(summary);

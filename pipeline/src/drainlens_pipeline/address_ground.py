@@ -33,6 +33,21 @@ measured, so interpolated open ground still counts, less.
 unstable), and `edge`: the 75 m disc runs off the measured extent, so there is
 no fit to make. That third reason is not "too flat" and not "too little
 measured", and the card says which it is.
+
+**Off the extent includes the holes in it.** Over the whole council the point
+cloud has 211 of the extent's 306 tiles; the ground in the other 95 is not
+low-confidence ground, it is no ground, stored as whatever the grid held. A fit
+that reaches into one would be a plane through numbers nobody measured, so any
+invalid cell within the 100 m check disc makes the answer `edge`, the same as
+the extent's outer boundary.
+
+**Version 2 is one short code per address, in the index's own order.** Keyed by
+id, the council's 62,397 addresses came to about seven megabytes of repeated
+strings. The artefact now carries the index's `on` list and, for each street,
+`number=code` per address in the same order — the code is `x` edge, `u`
+unclear, or a compass abbreviation followed by the fall in half-metres (`SW3` is
+south-west, 1.5 m). The browser rebuilds each id from the street and the number
+exactly as it rebuilds the index's, so the two cannot drift apart by position.
 """
 
 from __future__ import annotations
@@ -54,6 +69,9 @@ FALL_ROUNDING_M = 0.5
 WEIGHT_UNMEASURED = 0.35
 
 COMPASS = ("east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east")
+
+#: The code each compass point is written as in the artefact.
+ABBREVIATION = dict(zip(COMPASS, ("E", "NE", "N", "NW", "W", "SW", "S", "SE")))
 
 
 class AddressGroundError(RuntimeError):
@@ -98,6 +116,25 @@ def fit_plane(
     return a, b, r2
 
 
+def _all_valid(valid: np.ndarray, e: float, n: float, radius_m: float) -> bool:
+    """Whether every cell within `radius_m` of the address holds ground."""
+    rows, cols = valid.shape
+    c0, c1 = max(int(math.floor(e - radius_m)), 0), min(int(math.ceil(e + radius_m)), cols - 1)
+    r0, r1 = max(int(math.floor(rows - n - radius_m)), 0), min(int(math.ceil(rows - n + radius_m)), rows - 1)
+    xx, yy = np.meshgrid(np.arange(c0, c1 + 1) + 0.5 - e, rows - (np.arange(r0, r1 + 1) + 0.5) - n)
+    inside = xx**2 + yy**2 <= radius_m**2
+    return bool(np.asarray(valid[r0 : r1 + 1, c0 : c1 + 1])[inside].all())
+
+
+def code_of(record: dict) -> str:
+    """The short form an answer is published in: `x`, `u`, or e.g. `SW3` for south-west, 1.5 m."""
+    if record["ground"] == "edge":
+        return "x"
+    if record["ground"] == "unclear":
+        return "u"
+    return f"{ABBREVIATION[record['bearing']]}{int(round(record['fallM'] / FALL_ROUNDING_M))}"
+
+
 def weights_of(measured: np.ndarray, buildings: np.ndarray) -> np.ndarray:
     """Nothing on a roof; 0.35 on interpolated open ground; 1 on measured open ground."""
     return (~buildings) * (WEIGHT_UNMEASURED + (1.0 - WEIGHT_UNMEASURED) * measured)
@@ -110,10 +147,17 @@ def assess(
     e: float,
     n: float,
     weights: np.ndarray | None = None,
+    valid: np.ndarray | None = None,
 ) -> dict:
-    """One address's answer, with the numbers that decided it."""
+    """One address's answer, with the numbers that decided it.
+
+    `valid`, where given, marks the cells that hold ground at all. A missing
+    tile inside the check disc is the edge of the extent, and is answered as one.
+    """
     rows, cols = ground.shape
     if e - FIT_RADIUS_M < 0 or n - FIT_RADIUS_M < 0 or e + FIT_RADIUS_M > cols or n + FIT_RADIUS_M > rows:
+        return {"ground": "edge"}
+    if valid is not None and not _all_valid(valid, e, n, CHECK_RADIUS_M):
         return {"ground": "edge"}
 
     if weights is None:
@@ -167,20 +211,31 @@ def addresses_of(index: dict) -> list[tuple[str, float, float]]:
     return out
 
 
-def build(ground: np.ndarray, measured: np.ndarray, buildings: np.ndarray, index: dict) -> dict:
-    if not (ground.shape == measured.shape == buildings.shape):
+def build(
+    ground: np.ndarray,
+    measured: np.ndarray,
+    buildings: np.ndarray,
+    index: dict,
+    valid: np.ndarray | None = None,
+) -> dict:
+    if not (ground.shape == measured.shape == buildings.shape) or (valid is not None and valid.shape != ground.shape):
         raise AddressGroundError("the ground, measured and building grids are not the same shape")
     width, height = ground.shape[1], ground.shape[0]
     if index.get("extent", {}).get("width_m") != width or index.get("extent", {}).get("height_m") != height:
         raise AddressGroundError("the address index is not in the same frame as the ground")
     weights = weights_of(measured, buildings)
-    records = {}
-    for identifier, e, n in addresses_of(index):
-        records[identifier] = assess(ground, measured, buildings, e, n, weights)
-    counts = {state: sum(1 for r in records.values() if r["ground"] == state) for state in ("falls", "unclear", "edge")}
+    counts = {"falls": 0, "unclear": 0, "edge": 0}
+    codes = []
+    for group in index["at"]:
+        street = []
+        for number, e, n in group:
+            record = assess(ground, measured, buildings, float(e), float(n), weights, valid)
+            counts[record["ground"]] += 1
+            street.append(f"{number}={code_of(record)}")
+        codes.append(street)
     return {
         "artefact": "address-ground",
-        "version": 1,
+        "version": 2,
         "basis": "derived",
         "area": index["area"],
         "note": (
@@ -201,7 +256,9 @@ def build(ground: np.ndarray, measured: np.ndarray, buildings: np.ndarray, index
             "weightUnmeasured": WEIGHT_UNMEASURED,
         },
         "counts": counts,
-        "addresses": records,
+        "codes": "number=code per address; code x: too near the edge of the measured ground; u: unclear; otherwise a compass point (E, NE, N, NW, W, SW, S, SE) and the fall in half-metres",
+        "on": list(index["on"]),
+        "at": codes,
     }
 
 
@@ -213,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m drainlens_pipeline.address_ground",
         description="Fit the ground around every address and say which way it falls, where that can be said.",
     )
-    parser.add_argument("--terrain", type=Path, default=Path("../data/terrain"))
+    parser.add_argument("--terrain", type=Path, default=Path("../data/terrain-council"))
     parser.add_argument("--addresses", type=Path, default=Path("../apps/web/public/data/addresses.json"))
     parser.add_argument("--out", type=Path, default=Path("../apps/web/public/data/terrain/address-ground.json"))
     args = parser.parse_args(argv)
@@ -222,9 +279,12 @@ def main(argv: list[str] | None = None) -> int:
     measured = np.load(args.terrain / "ground-observed.npy")
     buildings_path = args.terrain / "barriers.npy"
     buildings = np.load(buildings_path) if buildings_path.exists() else np.zeros(ground.shape, dtype=bool)
+    # Only the council's terrain has holes; a pilot extent is measured end to end.
+    valid_path = args.terrain / "ground-valid.npy"
+    valid = np.load(valid_path) if valid_path.exists() else None
     index = json.loads(args.addresses.read_text(encoding="utf-8"))
     try:
-        artefact = build(ground, measured, buildings, index)
+        artefact = build(ground, measured, buildings, index, valid)
     except AddressGroundError as error:
         print(str(error), file=sys.stderr)
         return 1

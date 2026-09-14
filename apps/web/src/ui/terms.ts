@@ -33,14 +33,17 @@ export const FULL_MAP = 'Full map';
 /**
  * What the site covers, said once.
  *
- * The drainage record, the calculated layers and the ground height cover the
- * City of Melbourne when the database answers, and the Kensington square
- * kilometre bundled with the site when it does not. The address search is
- * Kensington's. The flood history is Greater Melbourne.
+ * The drainage record, the calculated layers, the ground height and the
+ * address search cover the City of Melbourne when the database answers, and the
+ * Kensington square kilometre bundled with the site when it does not. The flood
+ * history is Greater Melbourne.
  */
 export const COVERAGE = {
   map: 'This map covers the City of Melbourne. It does not cover the rest of Greater Melbourne.',
-  addresses: 'Address search covers Kensington only.',
+  addresses: 'Address search covers the City of Melbourne.',
+  /** When the map fell back to Kensington, the addresses beyond it went with it. */
+  addressesFallback:
+    'The full council map is not available right now, so address search covers only one square kilometre of Kensington.',
   history: 'Flood history covers Greater Melbourne.',
 } as const;
 

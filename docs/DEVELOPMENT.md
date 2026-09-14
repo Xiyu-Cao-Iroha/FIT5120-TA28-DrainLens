@@ -122,8 +122,8 @@ Order matters: everything that reads the ground runs after `terrain`, `trace` re
 
 | Name | Size | What it is |
 |---|---|---|
-| `kensington` | 1 × 1 km | The Iteration 1 demonstration extent. The default, the copy bundled with the site, and the only extent the address index covers |
-| `city-of-melbourne` | 8.5 × 9 km | Everywhere the council publishes a drainage record. What the database serves, and what the scenario and terrain tiles are cut from |
+| `kensington` | 1 × 1 km | The Iteration 1 demonstration extent. The default, and the copy bundled with the site. It was the only extent the address index covered until 14 September |
+| `city-of-melbourne` | 8.5 × 9 km | Everywhere the council publishes a drainage record. What the database serves, what the scenario and terrain tiles are cut from, and what the address index and address ground cover |
 
 Both live in `geo.py`'s `EXTENTS`, and `resolve_extent` is shared so four builders cannot come to spell the same extent differently. **An unknown name exits rather than falling back** — a build that quietly produced Kensington when it was asked for the council is a build whose output nobody can tell apart from the right one. `network` also keeps `--bounds MIN_E MIN_N MAX_E MAX_N` for a one-off that is not published under a name; that used to be spelled `--extent`.
 
