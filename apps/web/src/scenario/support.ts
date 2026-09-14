@@ -39,6 +39,24 @@ export const UNSUPPORTED_TEXT: Readonly<Record<Exclude<PitSupport, 'supported'>,
     'This pit cannot be used in the blockage comparison because there is not enough ground data around it for the calculation. This is a data limitation; it does not show whether the pit works or whether the area may flood.',
 };
 
+/**
+ * The one-line reason on a grey drain, shown on hover.
+ *
+ * Short because it is a tooltip over the map; the second sentence is the part
+ * AC 3.1.1.e cannot do without, so it is kept rather than trimmed.
+ */
+export const UNSUPPORTED_SHORT: Readonly<Record<Exclude<PitSupport, 'supported'>, string>> = {
+  'not-an-inlet': 'Can’t be tested: not recorded as a surface inlet. This says nothing about whether it works.',
+  'no-measured-ground': 'Can’t be tested: not enough ground data around it. This says nothing about whether it works.',
+};
+
+/** The comparison map's key, step 1: three marks, three meanings. */
+export const MAP_KEY = {
+  address: 'Your address',
+  comparable: 'Drain available to test',
+  other: 'Other drains (not available for this test)',
+} as const;
+
 /** The legend line on the comparison map. */
 export const SUPPORT_LEGEND =
   'Only teal-ringed drain pits can be used in this comparison. Other pits are missing records or ground data needed by the calculation. This does not show whether those pits work or whether the area may flood.';

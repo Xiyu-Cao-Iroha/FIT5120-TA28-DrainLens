@@ -74,6 +74,34 @@ export function intoMapFrame(
   return cells.map(([east, north]) => [east + de, north + dn] as const);
 }
 
+/**
+ * The two corners of the box around a difference, for fitting the view to it.
+ *
+ * The result refits to the address, the drain and **the whole footprint**, so
+ * the far corner of the last cell counts rather than its south-west key — a
+ * footprint that ends one cell past the edge of the view is a footprint the
+ * person reads as smaller than it is. Empty for no difference, which is the
+ * No clear difference result: nothing to fit, so the view holds the address
+ * and the drain.
+ */
+export function footprintCorners(area: DifferenceArea | null): Local[] {
+  if (area === null || area.cells.length === 0) return [];
+  let minE = Infinity;
+  let minN = Infinity;
+  let maxE = -Infinity;
+  let maxN = -Infinity;
+  for (const [east, north] of area.cells) {
+    minE = Math.min(minE, east);
+    minN = Math.min(minN, north);
+    maxE = Math.max(maxE, east + area.cellSizeM);
+    maxN = Math.max(maxN, north + area.cellSizeM);
+  }
+  return [
+    [minE, minN],
+    [maxE, maxN],
+  ];
+}
+
 export function drawDifference(
   context: CanvasRenderingContext2D,
   area: DifferenceArea,

@@ -10,7 +10,16 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
-import { DAY, LABEL_MIN_SCALE, PIN_DROP, PIN_HEAD_R, PIT_MIN_SCALE, drawMap } from './draw.js';
+import {
+  COMPARISON_MARK_R,
+  DAY,
+  LABEL_MIN_SCALE,
+  OTHER_COMPARABLE_ALPHA,
+  PIN_DROP,
+  PIN_HEAD_R,
+  PIT_MIN_SCALE,
+  drawMap,
+} from './draw.js';
 import { ICON_MIN_SCALE } from './pitIcon.js';
 import { PLACE_FULL_SCALE, PLACE_HIDDEN_SCALE, tracked } from './places.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
@@ -432,5 +441,104 @@ describe('the address marker', () => {
     const context = recorder();
     drawMap(context, FULL, { ...view(4), centre: [100, 100] }, { address: [900, 900] });
     expect(headCalls(context).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the pits while the comparison asks for a drain', () => {
+  /*
+    The Blockage Flow prototype's reading: teal for a drain that can be tested,
+    grey for one that cannot, and nothing hidden. Checked through the calls,
+    with the fill colour and opacity captured at the moment each is painted.
+  */
+  const THREE = artefact({
+    pit: [
+      { g: 'point', c: [400, 500], asset_number: 111 },
+      { g: 'point', c: [500, 500], asset_number: 222 },
+      { g: 'point', c: [600, 500], asset_number: 333 },
+    ],
+  });
+
+  function painted() {
+    const context = recorder();
+    const strokes: { alpha: number; style: string }[] = [];
+    const fills: { alpha: number; style: string }[] = [];
+    const withAlpha = context as typeof context & { globalAlpha: number };
+    withAlpha.globalAlpha = 1;
+    const alphas: number[] = [];
+    context.save = () => {
+      alphas.push(withAlpha.globalAlpha);
+    };
+    context.restore = () => {
+      withAlpha.globalAlpha = alphas.pop() ?? 1;
+    };
+    context.fill = () => {
+      fills.push({ alpha: withAlpha.globalAlpha, style: String(context.fillStyle) });
+    };
+    context.stroke = () => {
+      strokes.push({ alpha: withAlpha.globalAlpha, style: String(context.strokeStyle) });
+    };
+    return { context, strokes, fills };
+  }
+
+  const arcsAt = (context: ReturnType<typeof recorder>, east: number) => {
+    const [x] = toScreen(view(), [east, 500]);
+    return context.calls.filter((call) => call.op === 'arc' && Math.abs((call.args[0] as number) - x) < 0.01);
+  };
+
+  it('keeps a drain the comparison cannot use on the map, grey and smaller', () => {
+    const { context, fills } = painted();
+    drawMap(context, THREE, view(), { comparison: { comparable: new Set(['222']), suggested: null, selected: null } });
+    const grey = arcsAt(context, 400);
+    const teal = arcsAt(context, 500);
+    expect(grey).toHaveLength(1);
+    expect(grey[0]!.args[2] as number).toBeLessThan(teal[0]!.args[2] as number);
+    expect(fills.some((fill) => fill.style === DAY.unavailable)).toBe(true);
+  });
+
+  it('rings the other comparable drains in teal at 40%', () => {
+    const { context, strokes } = painted();
+    drawMap(context, THREE, view(), { comparison: { comparable: new Set(['222']), suggested: null, selected: null } });
+    expect(arcsAt(context, 500)).toHaveLength(2);
+    expect(strokes).toContainEqual({ alpha: OTHER_COMPARABLE_ALPHA, style: DAY.comparable });
+  });
+
+  it('draws the highlighted drain last, with a ripple, so no neighbour covers it', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), {
+      comparison: { comparable: new Set(['111', '222', '333']), suggested: 222, selected: null },
+    });
+    const arcs = context.calls.filter((call) => call.op === 'arc');
+    const [x] = toScreen(view(), [500, 500]);
+    const last = arcs.slice(-3);
+    expect(last.every((call) => Math.abs((call.args[0] as number) - x) < 0.01)).toBe(true);
+    expect(Math.max(...last.map((call) => call.args[2] as number))).toBeGreaterThan(COMPARISON_MARK_R * 2);
+    expect(arcsAt(context, 500)).toHaveLength(3);
+  });
+
+  it('gives the chosen drain a tick and no ripple', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), {
+      comparison: { comparable: new Set(['111', '222', '333']), suggested: 222, selected: 333 },
+    });
+    expect(arcsAt(context, 600)).toHaveLength(1);
+    expect(arcsAt(context, 600)[0]!.args[2]).toBe(COMPARISON_MARK_R);
+    const [x] = toScreen(view(), [600, 500]);
+    const tick = context.calls.filter((call) => call.op === 'lineTo' && Math.abs((call.args[0] as number) - x) < 7);
+    expect(tick.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('uses the council’s grate on a comparable drain when zoomed in', () => {
+    const { context } = painted();
+    drawMap(context, THREE, { ...view(3), centre: [500, 500] }, {
+      comparison: { comparable: new Set(['222']), suggested: null, selected: null },
+    });
+    expect(context.calls.some((call) => call.op === 'translate')).toBe(true);
+  });
+
+  it('leaves the ordinary pit drawing alone when not asked', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), { comparablePits: new Set(['222']) });
+    expect(arcsAt(context, 400)).toHaveLength(1);
+    expect(arcsAt(context, 500)).toHaveLength(2);
   });
 });

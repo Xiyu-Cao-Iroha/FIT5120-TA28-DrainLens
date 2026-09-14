@@ -36,7 +36,8 @@ describe('the tasks this screen offers', () => {
     // wired to the wrong screen fails even though the reducer is right.
     const comparison = GUIDED.find((option) => option.title.includes('blocked'));
     expect(comparison).toBeDefined();
-    expect(screenFor(comparison!.task)).toBe('scenario');
+    // Step 1 of the comparison, choosing a drain, since 15 September.
+    expect(screenFor(comparison!.task)).toBe('drain');
 
     for (const option of GUIDED) expect(screenFor(option.task)).not.toBe(INITIAL_SESSION.screen);
   });

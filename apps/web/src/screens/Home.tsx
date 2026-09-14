@@ -1170,7 +1170,7 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.quiet,
             }}
           >
-            After you choose an address, you pick the drain, how blocked it is and the rainfall.
+            After you choose an address, we find the nearest drain you can test, then you choose how blocked it is and the rainfall.
           </p>
         </div>
       </div>

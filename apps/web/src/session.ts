@@ -106,10 +106,38 @@ export type Screen =
    * done. See `LOCK_NOTICE`.
    */
   | 'locked'
-  /** The comparison: from the task question, or from a drain on the map (`scenario-from-map`). */
+  /**
+   * **The blocked-drain comparison is five screens from 15 September**, one per
+   * step of the Blockage Flow prototype: choose a drain, make the choices,
+   * review them, read the result — and, before any of those, the stop for an
+   * address with no drain the comparison can use.
+   *
+   * It used to be one screen with four numbered sections and a *Use this
+   * drain* confirmation, which let somebody set a condition and an amount of
+   * rain for an address the engine was always going to refuse. A screen per
+   * step is what lets the reducer say which way each step can go, and which it
+   * cannot: nothing leads from `no-match` to a drain, an assumption or a
+   * rainfall control.
+   *
+   * Step 1. The map, the highlighted nearest drain and nothing else.
+   */
+  | 'drain'
+  /**
+   * Step 2: the condition and the rainfall, beside the map. From step 1, or
+   * straight from a drain on the full map (`scenario-from-map`).
+   */
   | 'scenario'
+  /** Step 3: what will be compared, and the button that runs it. The run's progress shows here too. */
+  | 'review'
   /** The comparison's result. */
   | 'result'
+  /**
+   * No drain near this address can be compared, said before any setup.
+   *
+   * Reached only from `drain`, once the eligibility check has answered. The
+   * ways out are another address, the example address and the full map.
+   */
+  | 'no-match'
   | 'unsupported';
 
 /**
@@ -143,7 +171,16 @@ export interface ScenarioInputs {
   readonly pitId: string | null;
   readonly pitWasSuggested: boolean;
   readonly blockage: BlockageSetting | null;
-  readonly rainfallMm: number;
+  /**
+   * Null until chosen, for the reason `blockage` is.
+   *
+   * It defaulted to 40 mm until 15 September. The prototype's step 2 keeps
+   * *Review your choices* disabled until both are chosen, and a rainfall the
+   * interface pre-selected is an assumption the person carries into a result
+   * without having made it — the argument AC 2.1.1 (Aug-27 set) made for the
+   * blockage, which applies to the rain word for word.
+   */
+  readonly rainfallMm: number | null;
 }
 
 export type Outcome =
@@ -224,16 +261,23 @@ export interface Session {
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
+  /**
+   * The run the screen is waiting for, or null.
+   *
+   * **Cancel has to mean the answer is not shown.** The worker cannot be
+   * stopped halfway through a solve, so a cancelled run still replies — and a
+   * reply that arrived after Cancel, or after a second run was started, used to
+   * be indistinguishable from the one being waited for. `comparison-finished`
+   * is taken only from the run named here.
+   */
+  readonly run: number | null;
 }
-
-/** The middle of the three published comparison amounts. */
-export const DEFAULT_RAINFALL_MM = 40;
 
 export const EMPTY_SCENARIO: ScenarioInputs = {
   pitId: null,
   pitWasSuggested: false,
   blockage: null,
-  rainfallMm: DEFAULT_RAINFALL_MM,
+  rainfallMm: null,
 };
 
 export const INITIAL_SESSION: Session = {
@@ -252,6 +296,7 @@ export const INITIAL_SESSION: Session = {
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
+  run: null,
 };
 
 export type SessionEvent =
@@ -304,8 +349,50 @@ export type SessionEvent =
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
   | { readonly type: 'blockage-selected'; readonly blockage: BlockageSetting }
   | { readonly type: 'rainfall-selected'; readonly rainfallMm: number }
-  | { readonly type: 'comparison-started' }
-  | { readonly type: 'comparison-finished'; readonly outcome: Outcome }
+  /**
+   * A run begins. `run` names it, so that only its answer is shown; see
+   * `Session.run`. Starting moves to step 3, where the progress is drawn.
+   */
+  | { readonly type: 'comparison-started'; readonly run?: number }
+  /** A run's answer. Ignored unless it is the run being waited for. */
+  | { readonly type: 'comparison-finished'; readonly outcome: Outcome; readonly run?: number }
+  /** Cancel, while comparing: back to the review, and the answer is dropped when it comes. */
+  | { readonly type: 'comparison-cancelled' }
+  /**
+   * The eligibility check found no comparable drain near the address.
+   *
+   * Dispatched by the screen, because the check needs the worker's list of
+   * comparable drains and the reducer holds no data. What it may do with the
+   * answer is decided here: only step 1 can become the no-match state.
+   */
+  | { readonly type: 'drains-none-nearby' }
+  /** *Review your choices*: step 2 to step 3, only when all three are chosen. */
+  | { readonly type: 'choices-reviewed' }
+  /** *Change my choices*: step 3 back to step 2, with everything still chosen. */
+  | { readonly type: 'choices-changed' }
+  /**
+   * *Return to the map*, or the *Choose a drain* crumb: step 1 again.
+   *
+   * The drain is let go of — step 1 is the question of which drain — and the
+   * condition and rainfall are kept, because they were the person's own. A
+   * comparison opened from the full map has no address to find a drain near,
+   * so it returns to the full map instead.
+   */
+  | { readonly type: 'drains-reopened' }
+  /**
+   * *Try another address*, from the no-match state or the *Address search*
+   * crumb: the address screen with the comparison still waiting, so the next
+   * address lands on step 1 rather than on the task question.
+   */
+  | { readonly type: 'another-address-wanted' }
+  /** *Try an example address*: the demonstration address, straight into step 1. */
+  | { readonly type: 'example-address-chosen'; readonly address: SupportedAddress }
+  /**
+   * The rainfall control on the result: another amount the same run already
+   * solved (AC 3.2.1). Carries that amount's band from the cache, and never
+   * starts a run.
+   */
+  | { readonly type: 'result-rainfall'; readonly rainfallMm: number; readonly band: ComparisonBand }
   | { readonly type: 'back' }
   /**
    * Into the map without answering anything first.
@@ -383,7 +470,29 @@ export type SessionEvent =
  * A second copy of this would be a homepage card that opens a different
  * screen from the card with the same name one step further in.
  */
-const screenForTask = (task: Task): Screen => (task === 'compare' ? 'scenario' : 'explore');
+const screenForTask = (task: Task): Screen => (task === 'compare' ? 'drain' : 'explore');
+
+/**
+ * The comparison's steps, where choosing a drain on the map means something.
+ *
+ * On the full map a pit selection is the map's own business. Here it is the
+ * prototype's pin click: one click completes step 1, and a different drain
+ * clicked later re-runs that same transition from wherever the person is.
+ */
+const CHOOSING_A_DRAIN: ReadonlySet<Screen> = new Set<Screen>(['drain', 'scenario', 'review', 'result']);
+
+/** Starting the comparison over at step 1: no drain, no result, nothing running. */
+const atStepOne = (session: Session): Session => ({
+  ...session,
+  screen: 'drain',
+  task: 'compare',
+  scenarioOrigin: 'task',
+  // The drain belongs to step 1's question. The assumptions are the person's.
+  scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+  outcome: null,
+  running: false,
+  run: null,
+});
 
 const BACK: Readonly<Record<Screen, Screen>> = {
   home: 'home',
@@ -400,8 +509,11 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   guide: 'address',
   locked: 'choose',
   explore: 'task',
-  scenario: 'task',
+  drain: 'address',
+  scenario: 'drain',
+  review: 'scenario',
   result: 'scenario',
+  'no-match': 'address',
   unsupported: 'address',
 };
 
@@ -483,6 +595,15 @@ function step(session: Session, event: SessionEvent): Session {
       };
 
     case 'address-accepted':
+      // The comparison was waiting: step 1, with the eligibility check next.
+      if (session.guideSection === null && session.pendingTask === 'compare') {
+        return atStepOne({
+          ...session,
+          pendingTask: null,
+          address: event.address,
+          rejectedAddress: null,
+        });
+      }
       return {
         ...session,
         // The same screen answers two questions now. It asks for an address
@@ -525,7 +646,15 @@ function step(session: Session, event: SessionEvent): Session {
       // guide they had abandoned. The task is the more recent answer, the same
       // rule `leaves the guide in charge when both are waiting` applies the
       // other way round.
-      return session.address === null
+      //
+      // **The comparison always asks, even with an address in hand**, from 15
+      // September. The team's brief for the blocked-drain flow starts with
+      // searching an address, the homepage button says *Search an address to
+      // start*, and the address given earlier in the tab may have been for a
+      // different reason entirely. The search box is one keystroke from the
+      // same street, and the eligibility check that follows is about the
+      // address the person has just confirmed.
+      return session.address === null || event.task === 'compare'
         ? {
             ...session,
             screen: 'address',
@@ -536,6 +665,9 @@ function step(session: Session, event: SessionEvent): Session {
         : reduce({ ...session, guideSection: null }, { type: 'task-chosen', task: event.task });
 
     case 'task-chosen':
+      if (event.task === 'compare') {
+        return atStepOne({ ...session, pendingTask: null, mapMode: null });
+      }
       return {
         ...session,
         screen: screenForTask(event.task),
@@ -548,9 +680,31 @@ function step(session: Session, event: SessionEvent): Session {
       };
 
     case 'pit-selected':
+      if (!CHOOSING_A_DRAIN.has(session.screen)) {
+        return {
+          ...session,
+          scenario: { ...session.scenario, pitId: event.pitId, pitWasSuggested: event.suggested },
+        };
+      }
+      // Nothing changes under a run in progress: its answer is about the drain it started with.
+      if (session.running) return session;
       return {
         ...session,
+        /*
+          Step 2, from any step. One click completes step 1 — there is no
+          second *Use this drain* — and a different drain chosen on the review
+          or the result is the same transition again, not a trip back to
+          step 1.
+
+          **The condition and the rainfall are kept.** They are the person's
+          assumptions, not facts about the drain, which is the rule a new
+          address already follows; clearing them would make somebody who
+          wanted the same test one drain along set it up again. A result is
+          dropped, because it was about the other drain.
+        */
+        screen: 'scenario',
         scenario: { ...session.scenario, pitId: event.pitId, pitWasSuggested: event.suggested },
+        outcome: null,
       };
 
     case 'blockage-selected':
@@ -564,10 +718,68 @@ function step(session: Session, event: SessionEvent): Session {
       return { ...session, scenario: { ...session.scenario, rainfallMm: event.rainfallMm } };
 
     case 'comparison-started':
-      return { ...session, running: true, outcome: null };
+      return { ...session, screen: 'review', running: true, outcome: null, run: event.run ?? null };
 
     case 'comparison-finished':
+      // Only the answer being waited for. After Cancel nothing is; after a
+      // second start, it is the second run's.
+      if (!session.running || (event.run ?? null) !== session.run) return session;
       return { ...session, running: false, screen: 'result', outcome: event.outcome };
+
+    case 'comparison-cancelled':
+      // The prototype's C5 to C4: back to the review, with every choice intact.
+      if (!session.running) return session;
+      return { ...session, running: false, run: null, screen: 'review' };
+
+    case 'drains-none-nearby':
+      // Only step 1 can become the stop. A late answer about an address the
+      // person has already left must not pull them back to it.
+      return session.screen === 'drain'
+        ? { ...session, screen: 'no-match', scenario: { ...session.scenario, pitId: null, pitWasSuggested: false } }
+        : session;
+
+    case 'choices-reviewed':
+      return session.screen === 'scenario' && canRunComparison(session.scenario)
+        ? { ...session, screen: 'review' }
+        : session;
+
+    case 'choices-changed':
+      return session.screen === 'review' && !session.running ? { ...session, screen: 'scenario' } : session;
+
+    case 'drains-reopened':
+      if (session.address === null) {
+        return { ...session, screen: 'explore', task: 'full-map', outcome: null, running: false, run: null };
+      }
+      return atStepOne(session);
+
+    case 'another-address-wanted':
+      return {
+        ...session,
+        screen: 'address',
+        pendingTask: 'compare',
+        guideSection: null,
+        outcome: null,
+        running: false,
+        run: null,
+      };
+
+    case 'example-address-chosen':
+      return atStepOne({
+        ...session,
+        address: event.address,
+        rejectedAddress: null,
+        pendingTask: null,
+        guideSection: null,
+      });
+
+    case 'result-rainfall':
+      if (session.screen !== 'result' || session.outcome?.kind !== 'comparison') return session;
+      if (!isValidatedRainfall(event.rainfallMm)) return session;
+      return {
+        ...session,
+        scenario: { ...session.scenario, rainfallMm: event.rainfallMm },
+        outcome: { kind: 'comparison', band: event.band },
+      };
 
     case 'back':
       if (session.screen === 'scenario' && session.scenarioOrigin === 'map') {
@@ -696,9 +908,10 @@ function step(session: Session, event: SessionEvent): Session {
  * Returned rather than thrown: the setup screen needs to name the missing
  * choice at the control, and a thrown error would only reach a catch block.
  */
-export function missingScenarioInput(scenario: ScenarioInputs): 'pit' | 'blockage' | null {
+export function missingScenarioInput(scenario: ScenarioInputs): 'pit' | 'blockage' | 'rainfall' | null {
   if (scenario.pitId === null) return 'pit';
   if (scenario.blockage === null) return 'blockage';
+  if (scenario.rainfallMm === null) return 'rainfall';
   return null;
 }
 

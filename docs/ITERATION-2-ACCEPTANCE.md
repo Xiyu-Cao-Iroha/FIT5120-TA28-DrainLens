@@ -71,6 +71,7 @@ What must not happen is the one change that would make the screen look better an
 | **4.2.2.a** | **One event is checked and shown**: the Maribyrnong River flood of October 2022, signed off on 14 September, so Maribyrnong, Kensington and Ascot Vale now show it. The other three are still waiting, and `check-events.mjs` reports *1 checked and shown, 3 waiting* | #137 |
 | Names | The copy review renamed what a resident reads, including terms the criteria use — *Severity Score* among them. See *Names on screen* below | #144 |
 | **4.1.3**, **4.3.2** | The flood history board ranks either by call-outs or by call-outs per 1,000 residents, over the 274 areas that have a rate, with *How the rate is calculated* folded beneath the list | #145 |
+| **3.1.1**, **3.1.2.f**, **3.1.4** | 15 September, `feat/blockage-flow`: the comparison is rebuilt as the *Blockage Flow* prototype's steps — address search, an eligibility check, choose a drain (the nearest comparable inlet within 200 m highlighted; others teal-ringed; unsupported pits grey with a one-line reason), choices, review, result. An address with no comparable drain stops before any setup, so *Terrain unavailable* is no longer reachable as a result; 3.1.4's other reasons still are. A drain on the full map still opens the comparison with that drain chosen | — |
 
 ### Still needs a person
 

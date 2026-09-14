@@ -13,7 +13,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
-import { DAY, drawMap, pressedThePin } from './draw.js';
+import { type ComparisonMarks, DAY, drawMap, pressedThePin } from './draw.js';
+import { fitPadding, fitPoints } from './fitBounds.js';
 import { type Hit, pick, selectableLayers } from './hit.js';
 import {
   MAX_SCALE,
@@ -49,6 +50,39 @@ export interface MapCanvasProps {
   readonly suggestedPit?: number | null;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
+  /**
+   * The blocked-drain comparison's reading of the pits, which replaces the
+   * three props above when given. See `ComparisonMarks` in `draw.ts`.
+   */
+  readonly comparison?: ComparisonMarks | null;
+  /**
+   * Hold these points in view, fitted rather than zoomed to a fixed scale.
+   *
+   * Fitted when the map first has a size, and again whenever `key` changes —
+   * the comparison changes it on a new address and on a returned result, and
+   * nowhere else, so choosing a drain does not throw away a map somebody has
+   * just panned. A resize refits too, until the person moves the map
+   * themselves: the panel sliding in narrows the map, and a fit made for the
+   * wider frame would leave a marker against the new edge.
+   *
+   * `reservePanel` keeps the step-2 panel's width clear on the left while the
+   * map is still full width. See `fitPadding`.
+   */
+  readonly fit?: {
+    readonly key: string;
+    readonly points: readonly Local[];
+    readonly reservePanel: boolean;
+  } | null;
+  /**
+   * What is under the pointer, as it moves: a pit, or nothing.
+   *
+   * Only pits, and only while no button is held. The comparison uses it for
+   * the one-line reason on a drain it cannot use, which is not clickable and
+   * so has no other way to say why.
+   */
+  readonly onHover?: (hit: Hit | null) => void;
+  /** The canvas's cursor. `grab` unless the caller knows better. */
+  readonly cursor?: string;
   /** The terrain tiles, or null when the layer is off or not loaded. */
   readonly terrain?: TerrainTiles | null;
   /**
@@ -135,6 +169,10 @@ export function MapCanvas({
   selectedPit = null,
   suggestedPit = null,
   comparablePits = null,
+  comparison = null,
+  fit: fitTo = null,
+  onHover,
+  cursor = 'grab',
   terrain = null,
   terrainVersion = 0,
   openAcrossM,
@@ -162,6 +200,13 @@ export function MapCanvas({
   // a genuinely different address must, or searching for one from the map
   // leaves you looking at the old neighbourhood with a new name on the panel.
   const movedToRef = useRef<Local | null>(address);
+  // The latest fit request, read by the resize handler without re-running it.
+  const fitRef = useRef(fitTo);
+  fitRef.current = fitTo;
+  const fittedKeyRef = useRef<string | null>(fitTo?.key ?? null);
+  // Whether the person has moved the map since the last fit. A fit is an
+  // opening view, and a resize must not undo somebody's own pan or zoom.
+  const movedRef = useRef(false);
   const bounds = boundsOf(artefact);
 /**
    * How far out zooming may go, for one viewport.
@@ -181,8 +226,11 @@ export function MapCanvas({
     const resize = () => {
       const { width, height } = frame.getBoundingClientRect();
       if (width < 1 || height < 1) return;
+      const wanted = fitRef.current;
       setViewport((current) =>
-        current === null
+        wanted !== null && (current === null || !movedRef.current)
+          ? fitPoints(width, height, bounds, wanted.points, fitPadding(width, wanted.reservePanel))
+          : current === null
           ? openingRef.current === null
             ? fit(width, height, bounds)
             : focus(
@@ -225,6 +273,7 @@ export function MapCanvas({
       selectedPit,
       suggestedPit,
       comparablePits,
+      comparison,
       address,
       showPipes,
       showPits,
@@ -256,7 +305,7 @@ export function MapCanvas({
     // question the person just asked, and a derived layer drawn over it
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
-  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, address, trace,
+  }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
       terrain, terrainVersion, showPipes, showPits, difference, warnings]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
@@ -268,6 +317,7 @@ export function MapCanvas({
     (event: React.WheelEvent) => {
       if (viewport === null) return;
       const factor = Math.exp(-event.deltaY * 0.0015);
+      movedRef.current = true;
       setViewport(clamp(zoomAt(viewport, factor, at(event), bounds, floorOf(viewport)), bounds));
     },
     [viewport, bounds, at],
@@ -281,15 +331,23 @@ export function MapCanvas({
   const onPointerMove = useCallback(
     (event: React.PointerEvent) => {
       const drag = dragRef.current;
-      if (!drag || viewport === null) return;
+      if (!drag) {
+        // Hovering, not dragging: say what is under the pointer.
+        if (onHover && viewport !== null) {
+          onHover(pick(at(event), viewport, { pit: showPits ? (artefact.layers.pit ?? []) : [] }));
+        }
+        return;
+      }
+      if (viewport === null) return;
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
       drag.moved += Math.abs(dx) + Math.abs(dy);
       drag.x = event.clientX;
       drag.y = event.clientY;
+      if (drag.moved > DRAG_SLOP_PX) movedRef.current = true;
       setViewport(clamp(pan(viewport, dx, dy), bounds));
     },
-    [viewport, bounds],
+    [viewport, bounds, onHover, at, showPits, artefact],
   );
 
   const onPointerUp = useCallback(
@@ -349,9 +407,23 @@ export function MapCanvas({
     onViewport?.(viewport);
   }, [viewport, onViewport]);
 
-  // Move when the address actually changes, and only then.
+  // A new fit: a new address, or a result that came back.
   useEffect(() => {
-    if (address === null) return;
+    if (fitTo === null || fittedKeyRef.current === fitTo.key) return;
+    fittedKeyRef.current = fitTo.key;
+    movedRef.current = false;
+    setViewport((current) =>
+      current === null
+        ? current
+        : fitPoints(current.widthPx, current.heightPx, bounds, fitTo.points, fitPadding(current.widthPx, fitTo.reservePanel)),
+    );
+    // Keyed on the key: the points array is a new object every render.
+  }, [fitTo?.key, bounds]);
+
+  // Move when the address actually changes, and only then. A fitted map is
+  // moved by its fit, which already holds the address.
+  useEffect(() => {
+    if (address === null || fitRef.current !== null) return;
     const held = movedToRef.current;
     if (held !== null && held[0] === address[0] && held[1] === address[1]) return;
     movedToRef.current = address;
@@ -365,6 +437,7 @@ export function MapCanvas({
   const zoomBy = useCallback(
     (factor: number) => {
       if (!viewport) return;
+      movedRef.current = true;
       // About the centre of the canvas, not the pointer: somebody pressing a
       // button is looking at the middle of the map, while somebody turning a
       // wheel is looking at whatever is under their cursor.
@@ -405,7 +478,10 @@ export function MapCanvas({
         onPointerCancel={() => {
           dragRef.current = null;
         }}
-        style={{ display: 'block', cursor: 'grab' }}
+        onPointerLeave={() => {
+          onHover?.(null);
+        }}
+        style={{ display: 'block', cursor }}
       />
       {viewport && (
           <MapControls
@@ -419,7 +495,23 @@ export function MapCanvas({
               zoomBy(1 / STEP);
             }}
             onRecentre={
-              address === null
+              fitTo !== null
+                ? () => {
+                    // Back to the fitted view, which holds the address and the drain.
+                    movedRef.current = false;
+                    setViewport((current) =>
+                      current === null
+                        ? current
+                        : fitPoints(
+                            current.widthPx,
+                            current.heightPx,
+                            bounds,
+                            fitTo.points,
+                            fitPadding(current.widthPx, fitTo.reservePanel),
+                          ),
+                    );
+                  }
+                : address === null
                 ? undefined
                 : () => {
                     setViewport((current) =>

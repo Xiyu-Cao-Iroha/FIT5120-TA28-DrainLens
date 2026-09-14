@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference, intoMapFrame } from './difference.js';
+import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference, footprintCorners, intoMapFrame } from './difference.js';
 import type { Local, Viewport } from './viewport.js';
 
 /** 200 px square, one pixel per metre, centred on (100, 100). */
@@ -105,5 +105,24 @@ describe('which map the difference is drawn over', () => {
   it('leaves them where they are on the map they came from', () => {
     const cells = [[10, 20], [11, 20]] as const;
     expect(intoMapFrame(cells, kensington, { min_e: 316_500, min_n: 5_814_500 })).toEqual(cells);
+  });
+});
+
+describe('the box the result refits to', () => {
+  it('reaches the far corner of the last cell, not its south-west key', () => {
+    const cells: Local[] = [[10, 20], [14, 20], [12, 26]];
+    expect(footprintCorners({ cells, cellSizeM: 1 })).toEqual([
+      [10, 20],
+      [15, 27],
+    ]);
+    expect(footprintCorners({ cells: [[0, 0]], cellSizeM: 2 })).toEqual([
+      [0, 0],
+      [2, 2],
+    ]);
+  });
+
+  it('has nothing to fit when there is no difference', () => {
+    expect(footprintCorners(null)).toEqual([]);
+    expect(footprintCorners({ cells: [], cellSizeM: 1 })).toEqual([]);
   });
 });
