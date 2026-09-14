@@ -424,15 +424,22 @@ export interface DrawOptions {
   readonly showPits?: boolean;
   readonly showRoads?: boolean;
   /**
-   * Skip the flat ground fill because something already painted the ground.
+   * Painted over the flat ground and under the roads: the terrain's colour.
    *
-   * `drawMap` opens by filling the whole canvas. With the terrain layer drawn
-   * first and this left false, the fill covered it completely: the layer was
-   * computed, drawn, and then erased before anything else was painted over
-   * it. Toggling it changed 0.1% of the screen, which a teammate reported —
+   * A hook rather than a layer drawn before `drawMap`, because `drawMap` opens
+   * by filling the canvas. The terrain was once drawn first and erased by that
+   * fill before anything else was painted, which a teammate reported —
    * accurately — as "the button does nothing".
    */
-  readonly groundAlreadyDrawn?: boolean;
+  readonly beneathRoads?: (context: CanvasRenderingContext2D) => void;
+  /**
+   * Painted over the roads and under the drainage network: the hillshade.
+   *
+   * Terrain V1.1's order. The shading multiplies over the ground and the
+   * streets together, so a road reads as part of the landform; pipes, pits and
+   * labels go on top and are never darkened by it.
+   */
+  readonly overRoads?: (context: CanvasRenderingContext2D) => void;
 }
 
 /** The address pin: head radius, and the drop from the head's centre to the tip. */
@@ -556,26 +563,26 @@ export function drawMap(
   const palette = options.palette ?? DAY;
   const seen = visibleBounds(viewport);
 
-  if (options.groundAlreadyDrawn !== true) {
-    /*
-      The ground is the extent, not the canvas.
+  /*
+    The ground is the extent, not the canvas.
 
-      Zooming out far enough now leaves margin around the map — see
-      `scaleToContain` — and filling all of it with the ground colour would
-      say the city stops at the council boundary. It does not; the map does.
-    */
-    context.fillStyle = palette.beyond;
-    context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
+    Zooming out far enough now leaves margin around the map — see
+    `scaleToContain` — and filling all of it with the ground colour would
+    say the city stops at the council boundary. It does not; the map does.
+  */
+  context.fillStyle = palette.beyond;
+  context.fillRect(0, 0, viewport.widthPx, viewport.heightPx);
 
-    const [left, top] = toScreen(viewport, [0, artefact.extent.height_m]);
-    const [right, bottom] = toScreen(viewport, [artefact.extent.width_m, 0]);
-    context.fillStyle = palette.ground;
-    context.fillRect(left, top, right - left, bottom - top);
-  }
+  const [left, top] = toScreen(viewport, [0, artefact.extent.height_m]);
+  const [right, bottom] = toScreen(viewport, [artefact.extent.width_m, 0]);
+  context.fillStyle = palette.ground;
+  context.fillRect(left, top, right - left, bottom - top);
 
+  options.beneathRoads?.(context);
   if (options.showRoads !== false) {
     drawRoads(context, viewport, artefact.layers.road ?? [], palette, seen);
   }
+  options.overRoads?.(context);
   if (options.showPipes !== false) {
     drawPipes(context, viewport, artefact.layers.pipe ?? [], palette, seen, options.selectedPipe ?? null);
   }

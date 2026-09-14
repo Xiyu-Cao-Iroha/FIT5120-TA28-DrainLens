@@ -13,7 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { type MapArtefact, boundsOf } from './artefact.js';
 import { type DerivedArtefact, type DerivedVisibility, drawDerived } from './derived.js';
-import { drawMap, pressedThePin } from './draw.js';
+import { DAY, drawMap, pressedThePin } from './draw.js';
 import { type Hit, pick, selectableLayers } from './hit.js';
 import {
   MAX_SCALE,
@@ -30,7 +30,7 @@ import {
 } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
-import { drawTerrain } from './terrain.js';
+import { type PaintedTerrain, ROAD_OVER_TERRAIN, drawTerrain, drawTerrainShade } from './terrain.js';
 import { MapControls, STEP } from './MapControls.js';
 import type { Trace } from '../trace/graph.js';
 
@@ -46,8 +46,8 @@ export interface MapCanvasProps {
   readonly suggestedPit?: number | null;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
-  /** The painted terrain raster, or null when it is off or not loaded. */
-  readonly terrain?: HTMLCanvasElement | null;
+  /** The painted terrain rasters, or null when the layer is off or not loaded. */
+  readonly terrain?: PaintedTerrain | null;
   /**
    * How many metres wide the view is when it opens, instead of `LOCAL_SCALE`.
    *
@@ -211,13 +211,10 @@ export function MapCanvas({
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     // Recorded first, derived over it. A derivation drawn under the network it
     // was calculated from would look like the ground the network sits in.
-    // The ground first: everything else sits on it, and a network drawn under
-    // its own terrain would read as buried rather than as underground.
     //
-    // `drawMap` opens by filling the whole canvas, so it has to be told the
-    // ground is already painted. Without that it erases the terrain before
-    // drawing a single road over it.
-    if (terrain) drawTerrain(context, terrain, viewport, bounds);
+    // With the terrain on, Terrain V1.1's order: its colour under the roads,
+    // the roads translucent over it, the hillshade multiplied over both, then
+    // the network, the derived layers and the address — none of them shaded.
     drawMap(context, artefact, viewport, {
       selectedPit,
       suggestedPit,
@@ -225,7 +222,17 @@ export function MapCanvas({
       address,
       showPipes,
       showPits,
-      groundAlreadyDrawn: terrain !== null,
+      ...(terrain
+        ? {
+            palette: { ...DAY, road: ROAD_OVER_TERRAIN },
+            beneathRoads: (c: CanvasRenderingContext2D) => {
+              drawTerrain(c, terrain, viewport, artefact.extent);
+            },
+            overRoads: (c: CanvasRenderingContext2D) => {
+              drawTerrainShade(c, terrain, viewport, artefact.extent);
+            },
+          }
+        : {}),
     });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // Over the derived layers, under the followed path. The difference is the

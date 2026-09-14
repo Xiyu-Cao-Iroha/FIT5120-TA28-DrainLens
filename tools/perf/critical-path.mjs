@@ -88,7 +88,7 @@ export async function criticalPath(base) {
 
   const assets = [...entry, ...workers];
 
-  const scene = await (await get(base + '/data/scene/scene.json')).json();
+  const terrain = await (await get(base + '/data/terrain/terrain.json')).json();
 
   /**
    * The arrays a reachable screen actually fetches, which is now one.
@@ -108,15 +108,19 @@ export async function criticalPath(base) {
    * this list is checked against `useScenario`'s `enabled` argument rather
    * than trusted. Verified against the source on 5 September.
    */
-  const REACHABLE = ['elevation'];
-  const arrays = REACHABLE.map((name) => `/data/scene/${scene.arrays[name].file}`);
+  //
+  // Since 14 September the map's Terrain layer reads its own display terrain,
+  // `/data/terrain/`, and not the scene: the raw ground, the building mask and
+  // the hillshade. The scenario worker reads `/data/scene-tiles/`.
+  const REACHABLE = ['ground', 'buildings', 'shade'];
+  const arrays = REACHABLE.map((name) => `/data/terrain/${terrain.arrays[name].file}`);
 
   return {
     document: ['/'],
     code: assets,
-    artefacts: [...FIXED, '/data/scene/scene.json'],
+    artefacts: [...FIXED, '/data/terrain/terrain.json'],
     scene: arrays,
-    all: ['/', ...assets, ...FIXED, '/data/scene/scene.json', ...arrays],
+    all: ['/', ...assets, ...FIXED, '/data/terrain/terrain.json', ...arrays],
   };
 }
 

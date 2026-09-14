@@ -386,7 +386,21 @@ python -m drainlens_pipeline.scene_tiles --terrain ../data/terrain-council --map
 - **The window is chosen so the drain sits in its middle quarter** where the four tiles exist: at least 250 m of ground on every side before water leaves.
 - **Pre-gzipped**, decompressed in the worker, and served by nginx as `application/gzip` so it is not compressed twice.
 
-The Kensington scene in `apps/web/public/data/scene/` stays, read only by the map's ground-surface shading.
+The Kensington scene in `apps/web/public/data/scene/` is no longer read by the site: the comparison reads `scene-tiles/`, and since 14 September the Terrain layer reads `terrain/` (below).
+
+## The map's Terrain layer — `terrain_display`
+
+```bash
+python -m drainlens_pipeline.terrain_display --terrain ../data/terrain --out ../apps/web/public/data/terrain
+```
+
+Four seconds. Writes what the Terrain layer draws and nothing the engine reads — Terrain V1.1 from the terrain handover:
+
+- **`ground.bin`**: the **raw** ground surface, centimetres AHD. The scene's `elevation.bin` is the conditioned routing surface — every hollow filled flat, every building raised 100 m — and the layer used to undo that for display, which could not undo the filling.
+- **`buildings.bin`**: the footprint mask, one bit per cell, so buildings are drawn as buildings.
+- **`shade.bin`**: a multi-directional hillshade (altitude 45°, vertical exaggeration 3.2, azimuths 315° × 0.55, 270° × 0.18, 360° × 0.18, 225° × 0.09), stretched between its 1st and 99th percentile over open ground, and pulled towards neutral where less than 35% of the surrounding 25 m was measured (down to 40% strength). The azimuth weights and the strength are the handover's trial values, to be checked on flat ground, a slope and a valley.
+
+2 MB, 125 KB and 1 MB; 1.74 MB gzipped. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
 
 ## Built since this file was first written
 

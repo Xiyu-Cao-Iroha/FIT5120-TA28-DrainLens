@@ -1,288 +1,311 @@
 /**
- * Tests for the ground-surface layer.
+ * Tests for the ground-surface layer, Terrain V1.1.
  *
- * The shading is relative to the extent's own range, so the assertions are
- * about that relativity rather than about particular colours — and about the
- * failures that would produce a plausible-looking surface rather than an
- * error, which is the class of defect this whole map is careful about.
+ * What goes wrong with a terrain layer is rarely an error. It is a surface that
+ * looks plausible and says something false: a ramp that re-fits itself and
+ * changes what a colour means, a shading that brightens and shifts hue, a
+ * raster placed a kilometre from the pipes drawn over it, or a layer painted
+ * and then erased. The tests below are about those.
  */
 
 import { describe, expect, it } from 'vitest';
 
+import type { MapArtefact } from './artefact.js';
+import { DAY, drawMap } from './draw.js';
 import {
-  BARRIER_FLOOR_M,
+  BUILDING_HEX,
+  RAMP,
+  RAMP_GRADIENT,
   RAMP_HIGH_HEX,
   RAMP_LOW_HEX,
-  TERRAIN_ALPHA,
+  ROAD_OVER_TERRAIN,
+  type Rgb,
   TerrainError,
   drawTerrain,
-  groundRange,
+  drawTerrainShade,
+  hexToRgb,
   loadTerrain,
+  placement,
+  rampColour,
   rasterise,
-  shade,
+  shadeFactor,
 } from './terrain.js';
 import { fit } from './viewport.js';
-import { drawMap } from './draw.js';
-import type { MapArtefact } from './artefact.js';
 
-const HEADER = {
-  grid: { rows: 2, cols: 2 },
-  arrays: { elevation: { file: 'elevation.bin', scale: 100 } },
-};
-
-function fixtures(overrides: { header?: unknown; elevation?: Int16Array } = {}) {
-  const elevation = overrides.elevation ?? Int16Array.from([1000, 1100, 1200, 1300]);
-  return loadTerrain('/scene', {
-    fetchJson: async () => overrides.header ?? HEADER,
-    fetchBinary: async () => elevation.buffer,
-  });
+/** CIE L*, for asserting that lightness only ever falls as the ground rises. */
+function lightness([r, g, b]: Rgb): number {
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const y = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
 }
 
-describe('shade', () => {
-  it('puts low ground and high ground at opposite ends', () => {
-    expect(shade(0, 0, 10)).not.toEqual(shade(10, 0, 10));
-  });
-
-  it('ramps monotonically between them', () => {
-    const low = shade(0, 0, 10);
-    const mid = shade(5, 0, 10);
-    const high = shade(10, 0, 10);
-    for (let channel = 0; channel < 3; channel += 1) {
-      const rising = high[channel]! > low[channel]!;
-      expect(rising ? mid[channel]! > low[channel]! : mid[channel]! < low[channel]!).toBe(true);
+describe('the fixed AHD ramp', () => {
+  it('draws every node in the colour the colour card gives it', () => {
+    for (const node of RAMP) {
+      const drawn = rampColour(node.metres);
+      const card = hexToRgb(node.hex);
+      for (let channel = 0; channel < 3; channel += 1) {
+        expect(Math.abs(drawn[channel]! - card[channel]!)).toBeLessThanOrEqual(1);
+      }
     }
   });
 
-  it('clamps rather than running off the ramp', () => {
-    // Both ends stay on the ramp, but the high end has to be tested below
-    // BARRIER_FLOOR_M: above it a cell is a raised building rather than
-    // ground, and is drawn as one instead of as the top of the ramp.
-    expect(shade(-100, 0, 10)).toEqual(shade(0, 0, 10));
-    expect(shade(49, 0, 10)).toEqual(shade(10, 0, 10));
+  it('is fixed: a height has one colour, whatever else is on the map', () => {
+    // The old ramp was fitted between percentiles of the ground in view, so
+    // 3 m was a different colour on a flat street and on a hill.
+    expect(rampColour(3)).toEqual(rampColour(3));
+    expect(rampColour(3)).toEqual(hexToRgb('#e9d180'));
   });
 
-  it('shades a flat extent uniformly instead of dividing by zero', () => {
-    // A uniform surface is uniformly shaded, which is the truthful picture.
-    const colour = shade(5, 5, 5);
-    expect(colour.every(Number.isFinite)).toBe(true);
-    expect(shade(5, 5, 5)).toEqual(shade(5, 5, 5));
+  it('gets darker all the way up, so greyscale still reads high and low', () => {
+    let previous = Infinity;
+    for (let tenths = 0; tenths <= 400; tenths += 1) {
+      const l = lightness(rampColour(tenths / 10));
+      // Within a third of a unit: each channel is rounded to a whole byte, which
+      // alone moves L* by up to about 0.3 between neighbouring heights.
+      expect(l).toBeLessThanOrEqual(previous + 0.3);
+      previous = l;
+    }
+    expect(lightness(rampColour(0)) - lightness(rampColour(40))).toBeGreaterThan(20);
   });
 
-  it('returns whole numbers a canvas can store', () => {
-    for (const value of shade(3.3, 0, 10)) expect(Number.isInteger(value)).toBe(true);
+  it('separates 2 m from 4 m by hue, where most of the pilot ground is', () => {
+    const [r2, g2, b2] = rampColour(2);
+    const [r4, g4, b4] = rampColour(4);
+    // 2 m is yellow-green (green above red), 4 m is orange (red well above green).
+    expect(g2).toBeGreaterThan(r2 - 10);
+    expect(r4 - g4).toBeGreaterThan(40);
+    expect(b2).not.toBe(b4);
+  });
+
+  it('clamps below 0 m and above 40 m rather than running off the ends', () => {
+    expect(rampColour(-3.29)).toEqual(rampColour(0));
+    expect(rampColour(120)).toEqual(rampColour(40));
+    expect(rampColour(Number.NaN)).toEqual(rampColour(0));
+  });
+
+  it('publishes its ends and every node to the legend', () => {
+    expect(RAMP_LOW_HEX).toBe('#d7e4d4');
+    expect(RAMP_HIGH_HEX).toBe('#e08159');
+    for (const node of RAMP) expect(RAMP_GRADIENT).toContain(node.hex);
+    expect(RAMP.map((n) => n.metres)).toEqual([0, 1, 2, 3, 4, 5, 10, 20, 40]);
   });
 });
+
+describe('the hillshade factor', () => {
+  it('only darkens: flat-lit is 1, the deepest shadow 0.81, nothing above 1', () => {
+    // The old 0.5 + 0.5 × mult had a gain of 1.11 and clipped six of the nine
+    // ramp nodes. A multiply that never exceeds 1 cannot clip.
+    expect(shadeFactor(255)).toBeCloseTo(1, 6);
+    expect(shadeFactor(0)).toBeCloseTo(0.81, 6);
+    for (let byte = 0; byte <= 255; byte += 1) expect(shadeFactor(byte)).toBeLessThanOrEqual(1);
+  });
+});
+
+const HEADER = {
+  grid: { rows: 2, cols: 2 },
+  extent: { name: 't', min_e: 316500, min_n: 5814500, width_m: 2, height_m: 2 },
+  arrays: {
+    ground: { file: 'ground.bin', scale: 100 },
+    buildings: { file: 'buildings.bin' },
+    shade: { file: 'shade.bin' },
+  },
+};
+
+function fixtures(
+  overrides: { header?: unknown; ground?: Int16Array; buildings?: Uint8Array; shade?: Uint8Array } = {},
+) {
+  const files: Record<string, ArrayBuffer> = {
+    'ground.bin': (overrides.ground ?? Int16Array.from([100, 250, 400, 3000])).buffer as ArrayBuffer,
+    // Cell 1 is a building: 0b0100_0000.
+    'buildings.bin': (overrides.buildings ?? Uint8Array.from([0b0100_0000])).buffer as ArrayBuffer,
+    'shade.bin': (overrides.shade ?? Uint8Array.from([255, 0, 128, 0])).buffer as ArrayBuffer,
+  };
+  return loadTerrain('/terrain', {
+    fetchJson: () => Promise.resolve(overrides.header ?? HEADER),
+    fetchBinary: (url: string) => Promise.resolve(files[url.split('/').pop()!]!),
+  });
+}
 
 describe('loadTerrain', () => {
-  it('scales centimetres back to metres', async () => {
+  it('reads the raw ground in metres, the building bits and the shade', async () => {
     const terrain = await fixtures();
-    expect(terrain.elevationM[0]).toBeCloseTo(10);
-    expect(terrain.elevationM[3]).toBeCloseTo(13);
+    expect([...terrain.groundM]).toEqual([1, 2.5, 4, 30]);
+    expect([...terrain.building]).toEqual([0, 1, 0, 0]);
+    expect([...terrain.shade]).toEqual([255, 0, 128, 0]);
+    expect(terrain.extent.min_e).toBe(316500);
   });
 
-  it('reports the range actually present, for the ramp to use', async () => {
-    const terrain = await fixtures();
-    expect(terrain.minM).toBeCloseTo(10);
-    expect(terrain.maxM).toBeCloseTo(13);
+  it('refuses arrays of the wrong length, which would be a seam rather than an error', async () => {
+    await expect(fixtures({ ground: Int16Array.from([1, 2, 3]) })).rejects.toThrow(/ground array/);
+    await expect(fixtures({ shade: Uint8Array.from([1]) })).rejects.toThrow(/shade array/);
+    await expect(fixtures({ buildings: Uint8Array.from([0, 0]) })).rejects.toThrow(/building mask/);
   });
 
-  it('refuses an array of the wrong length', async () => {
-    // The failure that produces a terrain rather than an error: a short array
-    // leaves the rest at zero, which is a cliff along the seam.
-    await expect(fixtures({ elevation: Int16Array.from([1, 2, 3]) })).rejects.toThrow(
-      /elevation array/,
+  it('refuses a header that does not say where the terrain is', async () => {
+    // Placed nowhere in particular, the raster lands at the map's own corner:
+    // on the council map, 1.5 km west and 6 km south of Kensington.
+    await expect(fixtures({ header: { ...HEADER, extent: undefined } })).rejects.toThrow(/where it is/);
+  });
+
+  it('refuses a grid with no area, an unscaled ground, or unnamed arrays', async () => {
+    await expect(fixtures({ header: { ...HEADER, grid: { rows: 0, cols: 2 } } })).rejects.toThrow(TerrainError);
+    await expect(
+      fixtures({ header: { ...HEADER, arrays: { ...HEADER.arrays, ground: { file: 'g', scale: 0 } } } }),
+    ).rejects.toThrow(/scale/);
+    await expect(fixtures({ header: { ...HEADER, arrays: { ground: HEADER.arrays.ground } } })).rejects.toThrow(
+      /building and shade/,
     );
-  });
-
-  it('refuses a scene that does not say how to scale its elevations', async () => {
-    const header = { ...HEADER, arrays: { elevation: { file: 'e.bin', scale: 0 } } };
-    await expect(fixtures({ header })).rejects.toThrow(TerrainError);
-  });
-
-  it('refuses a grid with no area', async () => {
-    await expect(fixtures({ header: { ...HEADER, grid: { rows: 0, cols: 2 } } })).rejects.toThrow(
-      /no area/,
-    );
-  });
-
-  it('refuses a scene that does not name its elevation array', async () => {
-    await expect(fixtures({ header: { ...HEADER, arrays: {} } })).rejects.toThrow(/name/);
+    await expect(fixtures({ header: { ...HEADER, arrays: {} } })).rejects.toThrow(/ground array/);
   });
 });
 
-/** A canvas stub that records what was drawn into it. */
+/** A canvas stub whose image data can be read back. */
 function stubCanvas(width: number, height: number) {
   const data = new Uint8ClampedArray(width * height * 4);
-  const calls: { op: string; args: unknown[] }[] = [];
   const context = {
     createImageData: (w: number, h: number) => ({ data, width: w, height: h }),
-    putImageData: (...args: unknown[]) => calls.push({ op: 'putImageData', args }),
-    drawImage: (...args: unknown[]) => calls.push({ op: 'drawImage', args }),
-    save: () => calls.push({ op: 'save', args: [] }),
-    restore: () => calls.push({ op: 'restore', args: [] }),
-    set globalAlpha(value: number) {
-      calls.push({ op: 'globalAlpha', args: [value] });
-    },
-    set imageSmoothingEnabled(value: boolean) {
-      calls.push({ op: 'smoothing', args: [value] });
-    },
+    putImageData: () => undefined,
   };
-  return { data, calls, canvas: { width, height, getContext: () => context } };
+  return { data, canvas: { width, height, getContext: () => context } as unknown as HTMLCanvasElement };
 }
 
 describe('rasterise', () => {
-  it('paints every cell opaque', async () => {
+  it('paints ground on the ramp, buildings grey, and every cell opaque', async () => {
     const terrain = await fixtures();
-    const stub = stubCanvas(2, 2);
-    rasterise(terrain, () => stub.canvas as unknown as HTMLCanvasElement);
-    for (let cell = 0; cell < 4; cell += 1) expect(stub.data[cell * 4 + 3]).toBe(255);
+    const colour = stubCanvas(2, 2);
+    const shade = stubCanvas(2, 2);
+    const made = [colour, shade];
+    rasterise(terrain, () => made.shift()!.canvas);
+
+    expect([...colour.data.slice(0, 3)]).toEqual([...rampColour(1)]);
+    expect([...colour.data.slice(4, 7)]).toEqual([...hexToRgb(BUILDING_HEX)]);
+    for (let cell = 0; cell < 4; cell += 1) expect(colour.data[cell * 4 + 3]).toBe(255);
   });
 
-  it('paints the lowest and highest cells differently', async () => {
+  it('shades ground by the factor and leaves buildings unshaded', async () => {
     const terrain = await fixtures();
-    const stub = stubCanvas(2, 2);
-    rasterise(terrain, () => stub.canvas as unknown as HTMLCanvasElement);
-    const first = [stub.data[0], stub.data[1], stub.data[2]];
-    const last = [stub.data[12], stub.data[13], stub.data[14]];
-    expect(first).not.toEqual(last);
+    const colour = stubCanvas(2, 2);
+    const shade = stubCanvas(2, 2);
+    const made = [colour, shade];
+    rasterise(terrain, () => made.shift()!.canvas);
+
+    expect(shade.data[0]).toBe(255); // lit ground
+    expect(shade.data[4]).toBe(255); // a building, whatever its shade byte says
+    expect(shade.data[12]).toBe(Math.round(255 * shadeFactor(0))); // shadowed ground
   });
 
   it('refuses a canvas that gives no context rather than drawing nothing', async () => {
     const terrain = await fixtures();
-    const noContext = { width: 2, height: 2, getContext: () => null };
-    expect(() => rasterise(terrain, () => noContext as unknown as HTMLCanvasElement)).toThrow(
-      TerrainError,
-    );
+    const noContext = { width: 2, height: 2, getContext: () => null } as unknown as HTMLCanvasElement;
+    expect(() => rasterise(terrain, () => noContext)).toThrow(TerrainError);
   });
 });
 
-describe('drawTerrain', () => {
-  const extent = { widthM: 1000, heightM: 1000 };
+describe('where the raster lands', () => {
+  const kensington = { min_e: 316500, min_n: 5814500, width_m: 1000, height_m: 1000 };
 
-  it('places the raster over the whole extent, corner to corner', () => {
-    const stub = stubCanvas(800, 600);
-    const context = stub.canvas.getContext() as unknown as CanvasRenderingContext2D;
-    const viewport = fit(800, 600, extent);
-    drawTerrain(context, {} as HTMLCanvasElement, viewport, extent);
-
-    const drawn = stub.calls.find((c) => c.op === 'drawImage');
-    const [, left, top, width, height] = drawn!.args as number[];
-    // The whole square kilometre, at the scale that fills the canvas.
-    expect(width).toBeCloseTo(extent.widthM * viewport.scale);
-    expect(height).toBeCloseTo(extent.heightM * viewport.scale);
-    // Row 0 is the northern edge, so the image's top-left is the NW corner.
-    expect(left! + width! / 2).toBeCloseTo(400);
-    expect(top! + height! / 2).toBeCloseTo(300);
+  it('covers the map corner to corner when the map is the same extent', () => {
+    const viewport = fit(800, 800, { widthM: 1000, heightM: 1000 });
+    const at = placement(kensington, kensington, viewport);
+    expect(at.width).toBeCloseTo(1000 * viewport.scale);
+    expect(at.left + at.width / 2).toBeCloseTo(400);
+    expect(at.top + at.height / 2).toBeCloseTo(400);
   });
 
-  it('draws it translucently, as context rather than as the subject', () => {
-    const stub = stubCanvas(800, 600);
-    const context = stub.canvas.getContext() as unknown as CanvasRenderingContext2D;
-    drawTerrain(context, {} as HTMLCanvasElement, fit(800, 600, extent), extent);
-    expect(stub.calls.some((c) => c.op === 'globalAlpha' && c.args[0] === TERRAIN_ALPHA)).toBe(true);
-    expect(TERRAIN_ALPHA).toBeLessThan(1);
-  });
-
-  it('restores the context it saved, so the alpha does not leak into the network', () => {
-    const stub = stubCanvas(800, 600);
-    const context = stub.canvas.getContext() as unknown as CanvasRenderingContext2D;
-    drawTerrain(context, {} as HTMLCanvasElement, fit(800, 600, extent), extent);
-    expect(stub.calls.filter((c) => c.op === 'save')).toHaveLength(
-      stub.calls.filter((c) => c.op === 'restore').length,
-    );
+  it('is offset into the council map rather than stretched over it', () => {
+    // The council extent starts 1,500 m west and 6,000 m south of Kensington.
+    const council = { min_e: 315000, min_n: 5808500 };
+    const viewport = { widthPx: 850, heightPx: 900, scale: 0.1, centre: [4250, 4500] as const };
+    const at = placement(kensington, council, viewport);
+    expect(at.width).toBeCloseTo(100); // 1,000 m at 0.1 px/m, not 8,500 m
+    expect(at.left).toBeCloseTo(425 + (1500 - 4250) * 0.1);
+    expect(at.top).toBeCloseTo(450 - (7000 - 4500) * 0.1);
   });
 });
 
+describe('drawing it', () => {
+  function context() {
+    const calls: { op: string; args: unknown[]; composite: string; alpha: number }[] = [];
+    const state = { composite: 'source-over', alpha: 1 };
+    const c = {
+      calls,
+      save: () => calls.push({ op: 'save', args: [], ...state }),
+      restore: () => {
+        state.composite = 'source-over';
+        state.alpha = 1;
+        calls.push({ op: 'restore', args: [], ...state });
+      },
+      drawImage: (...args: unknown[]) => calls.push({ op: 'drawImage', args, ...state }),
+      set globalCompositeOperation(value: string) {
+        state.composite = value;
+      },
+      get globalCompositeOperation() {
+        return state.composite;
+      },
+      set globalAlpha(value: number) {
+        state.alpha = value;
+      },
+      imageSmoothingEnabled: true,
+    };
+    return c as typeof c & CanvasRenderingContext2D;
+  }
+  const painted = {
+    colour: { id: 'colour' } as unknown as HTMLCanvasElement,
+    shade: { id: 'shade' } as unknown as HTMLCanvasElement,
+    extent: { min_e: 0, min_n: 0, width_m: 1000, height_m: 1000 },
+  };
+  const viewport = fit(800, 600, { widthM: 1000, heightM: 1000 });
+
+  it('draws the colour opaque, not faded to three quarters', () => {
+    const ctx = context();
+    drawTerrain(ctx, painted, viewport, { min_e: 0, min_n: 0 });
+    const drawn = ctx.calls.find((c) => c.op === 'drawImage')!;
+    expect(drawn.args[0]).toBe(painted.colour);
+    expect(drawn.alpha).toBe(1);
+    expect(drawn.composite).toBe('source-over');
+  });
+
+  it('multiplies the shade, and restores the composite so nothing after it is darkened', () => {
+    const ctx = context();
+    drawTerrainShade(ctx, painted, viewport, { min_e: 0, min_n: 0 });
+    const drawn = ctx.calls.find((c) => c.op === 'drawImage')!;
+    expect(drawn.args[0]).toBe(painted.shade);
+    expect(drawn.composite).toBe('multiply');
+    expect(ctx.calls.at(-1)?.op).toBe('restore');
+    expect(ctx.globalCompositeOperation).toBe('source-over');
+  });
+});
 
 /**
- * `elevation.bin` is the routing surface, not the ground. Conditioning raises
- * every building by BARRIER_RAISE_M — a hundred metres — so 26.1% of the real
- * extent sits above 100 m. A ramp fitted to that array's own extremes spends
- * itself on an artefact and draws the ground people stand on as one flat
- * colour, which is what a teammate reported as "the button does nothing".
- */
-describe('the conditioned surface, which is not the ground', () => {
-
-  it('draws a barrier as a building, not as the highest ground', () => {
-    const highGround = shade(29, 1, 28);
-    const barrier = shade(120, 1, 28);
-    expect(barrier).not.toEqual(highGround);
-  });
-
-  it('treats everything above the floor as a barrier', () => {
-    expect(shade(BARRIER_FLOOR_M, 1, 28)).toEqual(shade(129, 1, 28));
-  });
-
-  it('leaves real ground on the ramp', () => {
-    // Kensington's highest real ground is 29.84 m, well under the floor.
-    expect(shade(29.84, 1, 28)).not.toEqual(shade(120, 1, 28));
-  });
-
-  it('fits the range to ground only, ignoring the raised buildings', () => {
-    // A quarter barrier cells, as the real extent has.
-    const cells = new Float32Array(400);
-    for (let i = 0; i < 300; i += 1) cells[i] = 1 + (i / 300) * 29; // 1..30 m
-    for (let i = 300; i < 400; i += 1) cells[i] = 120; // raised buildings
-    const { minM, maxM } = groundRange(cells);
-    expect(maxM).toBeLessThan(BARRIER_FLOOR_M);
-    expect(maxM).toBeGreaterThan(20);
-  });
-
-  it('is robust to a single spike, which was the other way to flatten it', () => {
-    const cells = new Float32Array(1000);
-    for (let i = 0; i < 999; i += 1) cells[i] = 2 + (i / 999) * 8; // 2..10 m
-    cells[999] = 49; // under the barrier floor, so not excluded — just extreme
-    expect(groundRange(cells).maxM).toBeLessThan(20);
-  });
-
-  it('gives the ground a visible spread once fitted', () => {
-    const cells = new Float32Array(1000);
-    for (let i = 0; i < 750; i += 1) cells[i] = 1 + (i / 750) * 28;
-    for (let i = 750; i < 1000; i += 1) cells[i] = 120;
-    const { minM, maxM } = groundRange(cells);
-    const low = shade(minM, minM, maxM);
-    const high = shade(maxM, minM, maxM);
-    const widest = Math.max(...low.map((v, i) => Math.abs(v - high[i]!)));
-    // The defect was a spread of almost nothing across the ground.
-    expect(widest).toBeGreaterThan(60);
-  });
-
-  it('survives an artefact with no ground at all rather than dividing by zero', () => {
-    const allBarrier = new Float32Array(10).fill(120);
-    const { minM, maxM } = groundRange(allBarrier);
-    expect(maxM).toBeGreaterThan(minM);
-  });
-});
-
-
-/**
- * The defect a unit test on `drawMap` alone would have missed.
+ * The order, which is Terrain V1.1's and the opposite of what it replaced.
  *
- * The terrain was drawn first and `drawMap` opened by filling the whole
- * canvas, so the layer was computed, drawn, and erased before a single road
- * went over it. Toggling it changed 0.1% of the screen. Every test passed:
- * `shade` was right, `groundRange` was right, `drawTerrain` issued its
- * `drawImage`. Nothing asserted that what it drew was still there afterwards.
+ * The terrain was once drawn before `drawMap` and erased by its opening fill:
+ * computed, drawn, and gone before a single road went over it, which a
+ * teammate reported as "the button does nothing". Every unit test passed. What
+ * is asserted here is the sequence on one canvas.
  */
-describe('the terrain survives the layers drawn over it', () => {
+describe('the order on the canvas', () => {
   const artefact = {
     artefact: 'map-geometry',
     version: 1,
     extent: { name: 't', min_e: 0, min_n: 0, width_m: 1000, height_m: 1000 },
     coordinates: 'metres',
     crs: 't',
-    sources: [
-      { layer: 'pit', dataset_id: 'd', publisher: 'p', licence: 'l', last_modified: '2023-01-01', features: 0 },
-    ],
-    layers: {},
+    sources: [],
+    layers: {
+      road: [{ g: 'polygon', c: [[[100, 400], [900, 400], [900, 420], [100, 420]]] }],
+      pipe: [{ g: 'line', ref: 1, c: [[100, 500], [900, 500]] }],
+    },
   } as unknown as MapArtefact;
 
-  const extent = { widthM: 1000, heightM: 1000 };
-
-  /** Records the operations that can cover the whole canvas. */
   function recorder() {
-    const calls: { op: string; args: unknown[] }[] = [];
-    const note = (op: string) => (...args: unknown[]) => calls.push({ op, args });
+    const calls: { op: string; fill: string }[] = [];
+    const state = { fillStyle: '' };
+    const note = (op: string) => () => calls.push({ op, fill: state.fillStyle });
     const context = {
       calls,
       save: note('save'), restore: note('restore'),
@@ -293,61 +316,47 @@ describe('the terrain survives the layers drawn over it', () => {
       translate: note('translate'), rotate: note('rotate'), setTransform: note('setTransform'),
       measureText: () => ({ width: 10 }), fillText: note('fillText'), strokeText: note('strokeText'),
       setLineDash: note('setLineDash'),
-      fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', lineJoin: '',
+      get fillStyle() {
+        return state.fillStyle;
+      },
+      set fillStyle(value: string) {
+        state.fillStyle = value;
+      },
+      strokeStyle: '', lineWidth: 0, lineCap: '', lineJoin: '',
       font: '', textAlign: '', textBaseline: '', globalAlpha: 1, imageSmoothingEnabled: true,
     };
     return context as typeof context & CanvasRenderingContext2D;
   }
 
-  it('does not repaint the whole canvas after the terrain is drawn', () => {
-    const context = recorder();
-    const viewport = fit(800, 600, extent);
+  it('paints ground, then terrain, then roads, then shade, then the network', () => {
+    const ctx = recorder();
+    drawMap(ctx, artefact, fit(800, 600, { widthM: 1000, heightM: 1000 }), {
+      palette: { ...DAY, road: ROAD_OVER_TERRAIN },
+      beneathRoads: (c) => {
+        c.drawImage({} as HTMLCanvasElement, 0, 0);
+      },
+      overRoads: (c) => {
+        c.save();
+        c.restore();
+      },
+    });
+    const ops = ctx.calls.map((c) => c.op);
+    const terrainAt = ops.indexOf('drawImage');
+    const lastGroundFill = ops.lastIndexOf('fillRect');
+    const roadFill = ctx.calls.findIndex((c) => c.op === 'fill' && c.fill === ROAD_OVER_TERRAIN);
+    const shadeAt = ops.indexOf('save', roadFill);
+    const pipeStroke = ops.indexOf('stroke', shadeAt);
 
-    drawTerrain(context, {} as HTMLCanvasElement, viewport, extent);
-    drawMap(context, artefact, viewport, { groundAlreadyDrawn: true });
-
-    const terrainAt = context.calls.findIndex((c) => c.op === 'drawImage');
-    expect(terrainAt).toBeGreaterThanOrEqual(0);
-
-    const coveringFillAfter = context.calls.findIndex(
-      (c, i) =>
-        i > terrainAt &&
-        c.op === 'fillRect' &&
-        Number(c.args[2]) >= viewport.widthPx &&
-        Number(c.args[3]) >= viewport.heightPx,
-    );
-    expect(coveringFillAfter).toBe(-1);
+    expect(lastGroundFill).toBeLessThan(terrainAt);
+    expect(terrainAt).toBeLessThan(roadFill);
+    expect(roadFill).toBeLessThan(shadeAt);
+    expect(shadeAt).toBeLessThan(pipeStroke);
   });
 
-  it('still paints the ground when there is no terrain to stand in for it', () => {
-    // The flag is not "never fill" — without a terrain layer the flat ground
-    // is the only thing keeping the map off a transparent canvas.
-    const context = recorder();
-    const viewport = fit(800, 600, extent);
-    drawMap(context, artefact, viewport, {});
-    const covering = context.calls.filter(
-      (c) => c.op === 'fillRect' && Number(c.args[2]) >= viewport.widthPx,
-    );
-    expect(covering.length).toBeGreaterThan(0);
-  });
-});
-
-describe('the ramp the legend draws', () => {
-  it('publishes the same two ends the canvas paints', () => {
-    // The legend used to carry its own hex literals. A key whose colours are a
-    // copy of the map's is one that can quietly stop matching it, so both now
-    // read these.
-    expect(RAMP_LOW_HEX).toBe('#6c8c9e');
-    expect(RAMP_HIGH_HEX).toBe('#e2d4b2');
-  });
-
-  it('agrees with what shade() returns at each end', () => {
-    const low = shade(0, 0, 10);
-    const high = shade(10, 0, 10);
-    const asHex = (c: readonly [number, number, number]) =>
-      `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-
-    expect(asHex(low)).toBe(RAMP_LOW_HEX);
-    expect(asHex(high)).toBe(RAMP_HIGH_HEX);
+  it('still paints the flat ground when there is no terrain', () => {
+    const ctx = recorder();
+    drawMap(ctx, artefact, fit(800, 600, { widthM: 1000, heightM: 1000 }), {});
+    expect(ctx.calls.filter((c) => c.op === 'fillRect').length).toBeGreaterThan(0);
+    expect(ctx.calls.some((c) => c.op === 'drawImage')).toBe(false);
   });
 });

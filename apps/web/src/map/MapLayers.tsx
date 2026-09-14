@@ -23,7 +23,7 @@ import {
   type LayerState,
   PANEL_KEYS,
 } from './modes.js';
-import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from './terrain.js';
+import { RAMP, RAMP_GRADIENT } from './terrain.js';
 import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -119,8 +119,9 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
         <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
           <defs>
             <linearGradient id="dl-ramp" x1="0" x2="1">
-              <stop offset="0" stopColor={RAMP_LOW_HEX} />
-              <stop offset="1" stopColor={RAMP_HIGH_HEX} />
+              {RAMP.map((node, index) => (
+                <stop key={node.metres} offset={index / (RAMP.length - 1)} stopColor={node.hex} />
+              ))}
             </linearGradient>
           </defs>
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
@@ -500,22 +501,19 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
 }
 
 /**
- * The ground surface, as a scale rather than a colour chip.
+ * The ground surface, as a fixed scale in metres.
  *
- * An 18-pixel gradient square says "this layer is a gradient" and nothing
- * else: a reader looking at tan and blue-grey ground has no way to learn which
- * is uphill. The bar is the full width of the legend with both ends named, so
- * the key answers the question the layer raises.
+ * **The whole ramp, always.** A legend that dropped the steps not in view
+ * would change every time the map moved, and a key that changes under a
+ * reader is a key they stop trusting. The ramp is fixed, so the scale is.
  *
- * **Named, not numbered, and the reason is in `terrain.ts`.** The ramp is
- * fitted between the 2nd and 98th percentiles of the ground in *this* extent,
- * so a colour means "low for around here" rather than a height. The surface's
- * own accuracy is about 25 cm, which would not support a scale in metres even
- * if the ramp were absolute — and a metric axis would invite exactly the
- * reading the layer cannot carry. Hence "Lower"/"Higher" and a line saying
- * what they are relative to.
+ * It used to read *Lower* and *Higher* with no numbers, because the ramp was
+ * fitted to the ground in view and a colour meant "low for around here". The
+ * ramp is now fixed to metres AHD, so the numbers are what the colours mean.
+ * `System-derived` is in the words as well as the dot: AC 1.3.1.
  */
 function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
+  const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
     <div style={{ marginTop: space(3) }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: space(2) }}>
@@ -527,30 +525,50 @@ function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
         </span>
       </div>
       <div
-        aria-hidden
-        style={{
-          height: 10,
-          marginTop: space(1),
-          borderRadius: radius.small,
-          border: `1px solid ${line.hair}`,
-          background: `linear-gradient(to right, ${RAMP_LOW_HEX}, ${RAMP_HIGH_HEX})`,
-        }}
-      />
-      <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          marginTop: 2,
-          font: type(text.micro, { leading: 1.4 }),
+          marginTop: space(1),
+          font: type(text.micro, { weight: weight.semibold, leading: 1.4 }),
+          letterSpacing: tracking.caps,
+          textTransform: 'uppercase',
           color: ink.subtle,
         }}
       >
-        <span>Lower</span>
-        <span>Higher</span>
+        <span>Lower ground</span>
+        <span>Higher ground</span>
       </div>
-      <p style={{ margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle }}>
-        Relative to this area, not to sea level.
-      </p>
+      <div
+        aria-hidden
+        style={{
+          height: 10,
+          borderRadius: radius.small,
+          border: `1px solid ${line.hair}`,
+          background: RAMP_GRADIENT,
+        }}
+      />
+      <div
+        aria-label={`Metres above sea level: ${RAMP.map((node) => String(node.metres)).join(', ')}`}
+        style={{ position: 'relative', height: 14, marginTop: 1, font: type(text.micro, { leading: 1.4 }), color: ink.subtle }}
+      >
+        {RAMP.map((node, index) => (
+          <span
+            key={node.metres}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: `${String((index / (RAMP.length - 1)) * 100)}%`,
+              transform:
+                index === 0 ? 'none' : index === RAMP.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+            }}
+          >
+            {node.metres}
+          </span>
+        ))}
+      </div>
+      <p style={micro}>metres above sea level (AHD), fixed everywhere</p>
+      <p style={micro}>Estimated ground height · system-derived</p>
+      <p style={micro}>Shading shows ground shape, not water depth.</p>
     </div>
   );
 }

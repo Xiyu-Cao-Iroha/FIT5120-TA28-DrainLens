@@ -45,7 +45,7 @@ import {
 import { DAY } from '../map/draw.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
-import { RAMP_HIGH_HEX, RAMP_LOW_HEX } from '../map/terrain.js';
+import { RAMP } from '../map/terrain.js';
 import { PilotBadge } from '../ui/Shell.js';
 import {
   basis as basisTone,
@@ -113,7 +113,9 @@ export const PATHS: readonly {
     mode: 'terrain',
     title: 'The shape of the ground',
     body: 'Elevation shading, so you can see which way is downhill.',
-    accent: RAMP_LOW_HEX,
+    // The 20 m node: the ramp's pale low end is close to white and would not
+    // read as an accent at all.
+    accent: RAMP[7]!.hex,
   },
   {
     mode: 'low-areas',
@@ -563,8 +565,9 @@ export function PathThumb({ mode }: { readonly mode: MapMode }) {
       <svg {...common}>
         <defs>
           <linearGradient id="drainlens-thumb-ramp" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0" stopColor={RAMP_LOW_HEX} />
-            <stop offset="1" stopColor={RAMP_HIGH_HEX} />
+            {RAMP.map((node, index) => (
+              <stop key={node.metres} offset={index / (RAMP.length - 1)} stopColor={node.hex} />
+            ))}
           </linearGradient>
         </defs>
         <rect width="200" height="104" fill="url(#drainlens-thumb-ramp)" />
