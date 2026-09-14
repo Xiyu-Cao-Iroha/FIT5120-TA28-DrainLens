@@ -280,6 +280,127 @@ export const LOW_POINT_MIN_PX = 1;
 /** Rings per path when drawing low points. See the note in `drawDerived`. */
 export const LOW_POINTS_PER_PATH = 10;
 
+/** Twice the signed area of a ring, in the map frame: its sign is its winding. */
+function windingOf(ring: readonly Local[]): number {
+  let total = 0;
+  for (let i = 1; i < ring.length; i += 1) {
+    const a = ring[i - 1];
+    const b = ring[i];
+    if (!a || !b) continue;
+    total += a[0] * b[1] - b[0] * a[1];
+  }
+  return total;
+}
+
+/**
+ * How many of these points a ring contains, by even-odd crossings. A point
+ * exactly on the edge may land either side.
+ *
+ * A council outline runs to 7,500 vertices and can hold a hundred holes, so
+ * this is most of what `joinedToPrevious` costs.
+ */
+function countInside(ring: readonly Local[], points: readonly Local[]): number {
+  let count = 0;
+  for (const point of points) {
+    const [px, py] = point;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+      const a = ring[i];
+      const b = ring[j];
+      if (!a || !b) continue;
+      if (a[1] > py !== b[1] > py && px < ((b[0] - a[0]) * (py - a[1])) / (b[1] - a[1]) + a[0]) {
+        inside = !inside;
+      }
+    }
+    if (inside) count += 1;
+  }
+  return count;
+}
+
+/**
+ * For each low-point ring in drawing order, whether it has to go into the same
+ * path as the ring before it.
+ *
+ * **The bug this exists for: a low area whose middle went white one zoom step
+ * in, and filled again one step out.** `derived.py` writes every ring as its
+ * own polygon, holes included — a hollow with a raised patch inside it is an
+ * outline followed by a ring wound the other way. The fill is non-zero, so the
+ * hole is only a hole when both rings are in one path; batched ten to a path,
+ * whether they were depended on how many rings earlier in the list happened to
+ * be on screen, which changes with every pan and zoom. Split, the hole was
+ * filled on its own over an outline that had already filled it, and read as
+ * solid blue; together it was correctly empty and read as the area vanishing.
+ * Measured on the Kensington artefact's largest low area, the 1,119 m² hole in
+ * it flipped between the two going from 1.55 to 2.4 px/m.
+ *
+ * So a hole is tied to the ring around it, and every ring between them, and a
+ * batch may only end where no hole is waiting for its outline. The outline is
+ * the nearest earlier ring of the other winding whose bounds contain the hole's
+ * and which contains most of three of its vertices — "most of", because at a
+ * diagonal pinch a hole's vertex sits on the outline itself. The outlines'
+ * winding is read from the layer rather than assumed: every hole lies inside a
+ * larger outline, so the whole layer's signed area has the outlines' sign.
+ *
+ * Culling cannot split what this joins. A hole's bounds sit inside its
+ * outline's, so whenever the hole is on screen and big enough to draw, so is
+ * the outline. Islands — a hollow inside another's hole — need nothing: each
+ * hollow's rings sum to one winding inside it and none outside, so separate
+ * hollows can share a path or not without changing a pixel.
+ *
+ * Worked out once per artefact. Over the council's 14,926 rings it is 1,951
+ * holes, each a short walk back through the list -- the longest is 162 rings
+ * -- and about 100 ms in Chrome on the first frame that draws the layer,
+ * against 40 to 60 ms for every frame of the council overview after it.
+ */
+const joins = new WeakMap<readonly DerivedPolygon[], Uint8Array>();
+
+export function joinedToPrevious(shapes: readonly DerivedPolygon[]): Uint8Array {
+  const known = joins.get(shapes);
+  if (known) return known;
+
+  const rings: (readonly Local[])[] = [];
+  const joined: number[] = [];
+  for (const shape of shapes) {
+    shape.c.forEach((ring, index) => {
+      rings.push(ring);
+      // Rings written into one polygon are one shape by definition.
+      joined.push(index > 0 ? 1 : 0);
+    });
+  }
+  const flags = Uint8Array.from(joined);
+  const winding = rings.map(windingOf);
+  const outlineSign = Math.sign(winding.reduce((sum, w) => sum + w, 0));
+  // Plain arrays for the walk back, which touches seventy thousand rings over
+  // the council and would otherwise ask the bounds cache for each of them.
+  const isOutline = winding.map((w) => w !== 0 && Math.sign(w) === outlineSign);
+  const boxes = rings.map(extremesOf);
+
+  for (let hole = 0; hole < rings.length; hole += 1) {
+    const w = winding[hole] ?? 0;
+    if (w === 0 || isOutline[hole] === true) continue;
+    const ring = rings[hole] ?? [];
+    const box = boxes[hole];
+    if (!box) continue;
+    const samples = [0, Math.floor(ring.length / 3), Math.floor((2 * ring.length) / 3)]
+      .map((i) => ring[i])
+      .filter((p): p is Local => p !== undefined);
+    for (let outline = hole - 1; outline >= 0; outline -= 1) {
+      if (isOutline[outline] !== true) continue;
+      const around = rings[outline] ?? [];
+      const bounds = boxes[outline];
+      if (!bounds || bounds.minE > box.minE || bounds.maxE < box.maxE || bounds.minN > box.minN || bounds.maxN < box.maxN) {
+        continue;
+      }
+      if (countInside(around, samples) * 2 <= samples.length) continue;
+      for (let between = outline + 1; between <= hole; between += 1) flags[between] = 1;
+      break;
+    }
+  }
+
+  joins.set(shapes, flags);
+  return flags;
+}
+
 const bigEnough = (path: readonly Local[], scale: number): boolean => {
   const box = extremesOf(path);
   return Math.max(box.maxE - box.minE, box.maxN - box.minN) * scale >= LOW_POINT_MIN_PX;
@@ -447,8 +568,10 @@ export function drawDerived(
       every ring is worse: Chrome's cost for filling and dashing a path grows
       faster than its length, and 15,000 rings in one path hung the tab.
       Measured on 2,000 real rings -- one per path 51 ms, 10 per path 12 ms,
-      50 19 ms, 200 24 ms. The rings are separate hollows and never overlap,
-      so batching paints the same pixels, and every edge keeps its dash.
+      50 19 ms, 200 24 ms. Separate hollows never overlap, so batching paints
+      the same pixels and every edge keeps its dash -- **provided a hole is
+      never cut off from its outline**, which is what `joinedToPrevious` holds
+      a batch open for. A batch can run past ten rings to do it.
     */
     context.fillStyle = palette.lowPoint;
     context.strokeStyle = palette.lowPointEdge;
@@ -461,14 +584,20 @@ export function drawDerived(
       context.stroke();
       inPath = 0;
     };
-    for (const shape of artefact.layers['low-point'] ?? []) {
+    const shapes = artefact.layers['low-point'] ?? [];
+    const joined = joinedToPrevious(shapes);
+    let at = -1;
+    for (const shape of shapes) {
       for (const ring of shape.c) {
+        at += 1;
         if (!pathVisible(ring, seen) || !bigEnough(ring, viewport.scale)) continue;
+        // Full, and this ring starts something new rather than finishing a
+        // hollow the path already holds the outline of.
+        if (inPath >= LOW_POINTS_PER_PATH && joined[at] !== 1) flush();
         if (inPath === 0) context.beginPath();
         addRing(context, viewport, ring);
         context.closePath();
         inPath += 1;
-        if (inPath === LOW_POINTS_PER_PATH) flush();
       }
     }
     flush();

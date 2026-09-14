@@ -380,7 +380,7 @@ function Done({ copy, onFinish }: { readonly copy: Finished; readonly onFinish: 
         {copy.unlocked}
       </div>
       <button type="button" onClick={onFinish} style={primary}>
-        Back to the four →
+        Back to guidance page →
       </button>
     </div>
   );
@@ -422,7 +422,7 @@ function NotWritten({
         Terrain guide coming soon.
       </p>
       <button type="button" onClick={onFinish} style={primary}>
-        Back to the four →
+        Back to guidance page →
       </button>
     </div>
   );

@@ -868,6 +868,56 @@ describe('a task chosen before there is an address', () => {
     ]);
     expect(end.screen).toBe('guide');
   });
+
+  it('takes over from a guide section that was abandoned', () => {
+    /*
+      The other order, and the one the homepage's comparison button met: a
+      guide chosen, the address screen backed out of, a trip home — and the
+      section is still set, so an address given for the comparison opened the
+      guide instead. The task is the more recent answer.
+    */
+    const end = play([
+      { type: 'get-started' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-abandoned' },
+      { type: 'go-home' },
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(end.screen).toBe('scenario');
+    expect(end.task).toBe('compare');
+    expect(end.guideSection).toBeNull();
+  });
+
+  it('goes back to the chooser when the chooser asked', () => {
+    // The chooser offers the comparison as a fifth card. Back from the address
+    // screen it sends you to should be the chooser, not the homepage behind it.
+    const fromChooser = play([
+      { type: 'get-started' },
+      { type: 'task-wanted', task: 'compare', from: 'choose' },
+    ]);
+    expect(fromChooser.screen).toBe('address');
+    expect(play([{ type: 'address-abandoned' }], fromChooser).screen).toBe('choose');
+
+    const fromHome = play([{ type: 'task-wanted', task: 'compare' }]);
+    expect(play([{ type: 'address-abandoned' }], fromHome).screen).toBe('home');
+  });
+
+  it('does not count the comparison as a guide finished', () => {
+    // The fifth card is not a lesson. Running the comparison from it must not
+    // move the chooser's "N guides completed".
+    const end = play([
+      { type: 'get-started' },
+      { type: 'task-wanted', task: 'compare', from: 'choose' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'comparison-started' },
+      { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      { type: 'go-home' },
+      { type: 'get-started' },
+    ]);
+    expect(end.screen).toBe('choose');
+    expect(end.learned).toEqual(INITIAL_SESSION.learned);
+  });
 });
 
 describe('the breadcrumb back to the task question', () => {

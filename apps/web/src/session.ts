@@ -209,6 +209,13 @@ export interface Session {
    */
   readonly pendingTask: Task | null;
   /**
+   * Which screen asked for the pending task, so Back from the address screen
+   * returns there. The homepage and the chooser both offer the comparison
+   * since 15 September, and Back from an address asked for by the chooser
+   * landing on the homepage would skip the screen the person was just on.
+   */
+  readonly pendingTaskFrom: 'home' | 'choose';
+  /**
    * Where the comparison was opened from: the task question, or a drain on the
    * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
    * has no task question behind it, and may have no address at all.
@@ -240,6 +247,7 @@ export const INITIAL_SESSION: Session = {
   learned: NOTHING_LEARNED,
   guideSection: null,
   pendingTask: null,
+  pendingTaskFrom: 'home',
   scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
@@ -284,7 +292,7 @@ export type SessionEvent =
    * same choice made one screen earlier — it collects the address first and
    * then does exactly what `task-chosen` does.
    */
-  | { readonly type: 'task-wanted'; readonly task: Task }
+  | { readonly type: 'task-wanted'; readonly task: Task; readonly from?: 'home' | 'choose' }
   /** Back to the task question from a task -- the comparison's breadcrumb. */
   | { readonly type: 'task-reconsidered' }
   /**
@@ -509,9 +517,23 @@ function step(session: Session, event: SessionEvent): Session {
       // With an address already in hand this is `task-chosen`, and saying so
       // by falling through would be cheaper than the recursion. It would also
       // be two cases that have to be kept the same by hand.
+      //
+      // **It takes over from a guide section left pending.** Choosing a guide,
+      // backing out of the address screen and going home leaves
+      // `guideSection` set, and `address-accepted` gives the guide priority —
+      // so the comparison button on the homepage used to deliver somebody to a
+      // guide they had abandoned. The task is the more recent answer, the same
+      // rule `leaves the guide in charge when both are waiting` applies the
+      // other way round.
       return session.address === null
-        ? { ...session, screen: 'address', pendingTask: event.task }
-        : reduce(session, { type: 'task-chosen', task: event.task });
+        ? {
+            ...session,
+            screen: 'address',
+            pendingTask: event.task,
+            pendingTaskFrom: event.from ?? 'home',
+            guideSection: null,
+          }
+        : reduce({ ...session, guideSection: null }, { type: 'task-chosen', task: event.task });
 
     case 'task-chosen':
       return {
@@ -614,8 +636,13 @@ function step(session: Session, event: SessionEvent): Session {
       // then divert the next address somebody gives for an unrelated reason.
       return {
         ...session,
-        screen: session.guideSection === null ? 'home' : 'choose',
+        screen:
+          session.guideSection !== null ||
+          (session.pendingTask !== null && session.pendingTaskFrom === 'choose')
+            ? 'choose'
+            : 'home',
         pendingTask: null,
+        pendingTaskFrom: 'home',
       };
 
     case 'task-reconsidered':

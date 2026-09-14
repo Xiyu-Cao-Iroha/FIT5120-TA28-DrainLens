@@ -11,6 +11,9 @@
  * recording context, because it is a property of the calls, not of the pixels.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
@@ -25,9 +28,10 @@ import {
   arrowsAlong,
   assertDerived,
   drawDerived,
+  joinedToPrevious,
 } from './derived.js';
 import { drawMap } from './draw.js';
-import { type Bounds, fit, toScreen } from './viewport.js';
+import { type Bounds, type Local, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
 const view = fit(1000, 1000, KENSINGTON);
@@ -81,6 +85,45 @@ function recorder() {
     measureText: (text: string) => ({ width: text.length * 6 }),
   };
   return context as typeof context & CanvasRenderingContext2D;
+}
+
+/**
+ * How many recorded fills paint this screen point, under the non-zero rule.
+ *
+ * Replays the path calls rather than trusting their count, because what went
+ * wrong was not the number of fills but which rings shared one: a hole in a
+ * path without its outline is painted, and with it is not.
+ */
+function fillsCovering(calls: readonly Call[], point: readonly [number, number]): number {
+  let rings: [number, number][][] = [];
+  let current: [number, number][] = [];
+  let painted = 0;
+  const [px, py] = point;
+  for (const call of calls) {
+    const [x, y] = call.args as [number, number];
+    if (call.op === 'beginPath') {
+      rings = [];
+      current = [];
+    } else if (call.op === 'moveTo') {
+      current = [[x, y]];
+      rings.push(current);
+    } else if (call.op === 'lineTo') {
+      current.push([x, y]);
+    } else if (call.op === 'fill') {
+      let winding = 0;
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length; i += 1) {
+          const [ax, ay] = ring[i]!;
+          const [bx, by] = ring[(i + 1) % ring.length]!;
+          const side = (bx - ax) * (py - ay) - (px - ax) * (by - ay);
+          if (ay <= py && by > py && side > 0) winding += 1;
+          else if (ay > py && by <= py && side < 0) winding -= 1;
+        }
+      }
+      if (winding !== 0) painted += 1;
+    }
+  }
+  return painted;
 }
 
 const line = (points: readonly (readonly [number, number])[]) =>
@@ -330,6 +373,72 @@ describe('what is drawn and what is not', () => {
     const strokes = context.calls.filter((call) => call.op === 'stroke');
     expect(strokes).toHaveLength(3);
     for (const stroke of strokes) expect(stroke.dash.length).toBeGreaterThan(0);
+  });
+
+  it('never cuts a hole off from its outline, whatever else is on screen', () => {
+    /*
+     * The report: a large low area filled blue at one zoom, and white inside
+     * one step further in. The pipeline writes a hole as its own ring, wound
+     * the other way, and the non-zero fill only leaves it empty when the
+     * outline is in the same path. Nine small hollows before the outline put
+     * the batch boundary exactly between the two while they are on screen,
+     * and zooming in past them moved it away -- so the hole was painted over
+     * in one view and correctly empty in the next.
+     */
+    const clockwise = (e0: number, n0: number, e1: number, n1: number) =>
+      polygon([[e0, n0], [e0, n1], [e1, n1], [e1, n0], [e0, n0]]);
+    const specks = Array.from({ length: LOW_POINTS_PER_PATH - 1 }, (_, i) =>
+      clockwise(20, 100 + i * 90, 60, 140 + i * 90),
+    );
+    const outline = clockwise(200, 200, 900, 900);
+    const hole = polygon([[450, 450], [650, 450], [650, 650], [450, 650], [450, 450]]);
+    const artefact = derived({ 'low-point': [...specks, outline, hole] });
+    const show = { channel: false, lowPoint: true, unavailable: false };
+
+    for (const viewport of [
+      { ...view, scale: 1, centre: [500, 500] as const }, // the specks in view
+      { ...view, scale: 2.4, centre: [550, 550] as const }, // zoomed past them
+    ]) {
+      const context = recorder();
+      drawDerived(context, artefact, viewport, { show });
+      expect(fillsCovering(context.calls, toScreen(viewport, [550, 550]))).toBe(0);
+      expect(fillsCovering(context.calls, toScreen(viewport, [400, 400]))).toBe(1);
+    }
+  });
+
+  it('finds the outline a hole belongs to past other pieces of the same hollow', () => {
+    // At a diagonal pinch the pipeline can close an outline early and trace
+    // the rest as a second ring, between the outline and its hole.
+    const clockwise = (e0: number, n0: number, e1: number, n1: number) =>
+      polygon([[e0, n0], [e0, n1], [e1, n1], [e1, n0], [e0, n0]]);
+    const shapes = [
+      clockwise(0, 0, 10, 10),
+      clockwise(100, 100, 900, 900),
+      clockwise(910, 910, 990, 990),
+      polygon([[400, 400], [600, 400], [600, 600], [400, 600], [400, 400]]),
+    ];
+    expect([...joinedToPrevious(shapes)]).toEqual([0, 0, 1, 1]);
+    // Anticlockwise outlines work the same way: the winding is read, not assumed.
+    const flipped = shapes.map((shape) => ({ ...shape, c: shape.c.map((ring) => [...ring].reverse()) }));
+    expect([...joinedToPrevious(flipped)]).toEqual([0, 0, 1, 1]);
+  });
+
+  it('keeps every hole of the published low areas unfilled at every zoom', () => {
+    // The shape from the report, measured on the committed artefact: the
+    // largest low area in Kensington and the 1,119 m² hole in it.
+    const published = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../public/data/derived.json'), 'utf8'),
+    ) as DerivedArtefact;
+    const inHole: Local = [450, 640];
+    const inArea: Local = [450, 680];
+    const show = { channel: false, lowPoint: true, unavailable: false };
+    for (const scale of [0.7, 1, 1.55, 2.4, 3.7]) {
+      const viewport = { widthPx: 1000, heightPx: 700, scale, centre: inHole };
+      const context = recorder();
+      drawDerived(context, published, viewport, { show });
+      expect(fillsCovering(context.calls, toScreen(viewport, inHole))).toBe(0);
+      expect(fillsCovering(context.calls, toScreen(viewport, inArea))).toBe(1);
+    }
   });
 
   it('leaves out vertices closer together on screen than a couple of pixels, but never the ends', () => {

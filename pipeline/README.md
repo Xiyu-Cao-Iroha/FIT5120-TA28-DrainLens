@@ -53,6 +53,15 @@ It got here in two steps on 13 September, Kensington plus the central city first
 
 The site's bundled fallback stays Kensington's own build, so the two copies are not compared shape for shape — a catchment cut off at Kensington's edge is whole in the council run. `node tools/data/check-derived.mjs` checks what they must share: the same settings, and nothing drawn outside the extent or inside a missing tile. **It exists because the copies drifted once**: on 13 September the coverage-gap thresholds changed, the Kensington copy was regenerated, and the database went on loading the old council copy with every test passing.
 
+**The warning signs on especially deep low areas** (15 September, the industry mentor's request) come from the same terrain runs, one static file per extent under `apps/web/public/data/warnings/` — the site loads them itself, because the API serves only map, derived, trace and flood history:
+
+```bash
+python -m drainlens_pipeline.low_area_warnings --terrain ../data/terrain --out ../apps/web/public/data/warnings/kensington.json
+python -m drainlens_pipeline.low_area_warnings --terrain ../data/terrain-council --extent city-of-melbourne --out ../apps/web/public/data/warnings/city-of-melbourne.json
+```
+
+A hollow gets a sign at its deepest cell when it is at least **1 m** below its spill level and at least **100 m²**: 11 of Kensington's 273 drawn low areas (its top 4% by depth) and 764 of the council's 12,791. The distribution behind the two numbers is in `low_area_warnings.py`. `node tools/data/check-warnings.mjs` checks every sign still sits on a drawn low area of the matching `derived.json`; 9 of the council's sit within half a metre outside an outline, where simplifying it to a metre cut the corner their cell is in.
+
 No `flood-history.json` beside them: that board is Greater Melbourne's, not any pilot extent's, and `apps/api/src/load.ts` reads the bundled copy whichever extent it is loading. A second, byte-identical copy here would be two files that must stay equal with nothing to notice when they stop.
 
 ## What the graph builder does, and what it refuses to do

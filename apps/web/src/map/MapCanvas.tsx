@@ -34,6 +34,7 @@ import { ROAD_OVER_TERRAIN } from './terrain.js';
 import { drawTerrainMarks } from './terrainMarks.js';
 import { type TerrainTiles, drawTerrainColour, drawTerrainShade, marksInView } from './terrainTiles.js';
 import { MapControls, STEP } from './MapControls.js';
+import { type WarningPoint, drawWarnings, pickWarning, warningsVisible } from './warnings.js';
 import type { Trace } from '../trace/graph.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
@@ -94,6 +95,16 @@ export interface MapCanvasProps {
    * that has been asked, not a property of the map.
    */
   readonly difference?: DifferenceArea | null;
+  /**
+   * The signs on especially deep low areas, or null when Low areas is off.
+   *
+   * Drawn only from `WARNING_MIN_SCALE` in, and the zoom is the canvas's to
+   * judge rather than the caller's: it is the one place that knows the scale
+   * it is about to draw at. See `map/warnings.ts`.
+   */
+  readonly warnings?: readonly WarningPoint[] | null;
+  /** A sign was pressed. Tested before the pits, and only where a sign is drawn. */
+  readonly onWarningPress?: (point: WarningPoint) => void;
   readonly onSelect?: (hit: Hit | null) => void;
   /**
    * The address pin was pressed.
@@ -133,6 +144,8 @@ export function MapCanvas({
   openAt = null,
   trace = null,
   difference = null,
+  warnings = null,
+  onWarningPress,
   onSelect,
   onAddressPress,
   onViewport,
@@ -231,6 +244,9 @@ export function MapCanvas({
         : {}),
     });
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
+    // Over the low areas they mark and the pits beside them: a press on a sign
+    // goes to the sign, so the sign has to be the thing on top.
+    if (warnings && warningsVisible(true, viewport.scale)) drawWarnings(context, warnings, viewport);
     // Over the derived layers, under the followed path. The difference is the
     // answer to the question that was just asked, so nothing calculated
     // beforehand should cover it — but a trace the person is actively
@@ -241,7 +257,7 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, address, trace,
-      terrain, terrainVersion, showPipes, showPits, difference]);
+      terrain, terrainVersion, showPipes, showPits, difference, warnings]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -295,6 +311,16 @@ export function MapCanvas({
         return;
       }
 
+      // Then a warning sign, which is painted over the pits. Its target is its
+      // own triangle and no wider, so a pit beside it keeps its presses.
+      if (warnings && onWarningPress && warningsVisible(true, viewport.scale)) {
+        const sign = pickWarning(press, viewport, warnings);
+        if (sign !== null) {
+          onWarningPress(sign);
+          return;
+        }
+      }
+
       /*
         Only what is drawn can be selected.
 
@@ -313,7 +339,7 @@ export function MapCanvas({
         ),
       );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes],
+    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes, warnings, onWarningPress],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and
