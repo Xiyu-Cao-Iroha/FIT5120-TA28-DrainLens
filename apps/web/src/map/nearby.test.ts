@@ -14,10 +14,12 @@ import {
   DISTANCE_ROUNDING_M,
   NEARBY_BASIS,
   RELEVANT_RADIUS_M,
+  VERY_NEAR_M,
   bearingFrom,
   describeWaterNearby,
   nearestOnLines,
   nearestOnRings,
+  waterNearby,
 } from './nearby.js';
 
 function derivedWith(layers: Partial<DerivedArtefact['layers']>): DerivedArtefact {
@@ -77,12 +79,60 @@ describe('nearestOnLines', () => {
   it('survives a segment of zero length', () => {
     expect(nearestOnLines([line([[3, 4], [3, 4]])], [0, 0])?.distanceM).toBeCloseTo(5);
   });
+
+  it('gives the nearest point itself, so the direction is to where the distance was measured', () => {
+    /*
+      The defect this replaced: the direction was taken to the segment's
+      middle. Here the nearest point is due north at (0, 10), and the middle of
+      the segment, (40, 10), is north-east — a different compass point for the
+      same path.
+    */
+    const near = nearestOnLines([line([[-20, 10], [100, 10]])], [0, 0]);
+    expect(near?.at[0]).toBeCloseTo(0);
+    expect(near?.at[1]).toBeCloseTo(10);
+    expect(bearingFrom([0, 0], near!.at)).toBe('north');
+  });
+
+  it('uses an end of the segment when the foot of the perpendicular is past it', () => {
+    const near = nearestOnLines([line([[30, 40], [90, 40]])], [0, 0]);
+    expect(near?.at).toEqual([30, 40]);
+    expect(near?.distanceM).toBeCloseTo(50);
+  });
 });
 
 describe('nearestOnRings', () => {
-  it('finds the closest vertex of the closest ring', () => {
-    const near = nearestOnRings([ring([[0, 30], [10, 30]]), ring([[0, 12], [4, 14]])], [0, 0]);
-    expect(near?.distanceM).toBeCloseTo(12);
+  it('measures to the nearest edge, not the nearest corner', () => {
+    // A square whose corners are all over 28 m away and whose bottom edge is 20 m.
+    const square = ring([[-40, 20], [40, 20], [40, 60], [-40, 60]]);
+    const near = nearestOnRings([square], [0, 0]);
+    expect(near?.distanceM).toBeCloseTo(20);
+    expect(near?.at).toEqual([0, 20]);
+  });
+
+  it('includes the edge that closes the ring', () => {
+    // The only near edge runs from the last vertex back to the first.
+    const open = ring([[-10, 5], [-10, 50], [10, 50], [10, 5]]);
+    expect(nearestOnRings([open], [0, 0])?.distanceM).toBeCloseTo(5);
+  });
+
+  it('says when the address is inside, rather than measuring to its own boundary', () => {
+    const around = ring([[-10, -10], [10, -10], [10, 10], [-10, 10]]);
+    const near = nearestOnRings([ring([[100, 100], [110, 100], [110, 110]]), around], [0, 0]);
+    expect(near?.inside).toBe(true);
+    expect(near?.distanceM).toBe(0);
+  });
+
+  it('treats a ring inside a ring as a hole', () => {
+    const holed = {
+      g: 'polygon' as const,
+      c: [
+        [[-20, -20], [20, -20], [20, 20], [-20, 20]] as Local[],
+        [[-10, -10], [10, -10], [10, 10], [-10, 10]] as Local[],
+      ],
+    };
+    const near = nearestOnRings([holed], [0, 0]);
+    expect(near?.inside).toBeUndefined();
+    expect(near?.distanceM).toBeCloseTo(10);
   });
 
   it('returns nothing when there are no low areas', () => {
@@ -93,15 +143,16 @@ describe('nearestOnRings', () => {
 describe('describeWaterNearby', () => {
   const at: Local = [500, 500];
 
-  it('names both the path and the low area it runs towards', () => {
+  it('names the path and the low area as two separate facts', () => {
     const derived = derivedWith({
       channel: [line([[520, 500], [540, 500]])],
       'low-point': [ring([[500, 560], [510, 560]])],
     });
     const sentence = describeWaterNearby(derived, at)!;
-    expect(sentence).toContain('to the east');
-    expect(sentence).toContain('to the north');
-    expect(sentence).toMatch(/low area/);
+    expect(sentence).toContain('about 20 m to the east');
+    expect(sentence).toContain('about 60 m to the north');
+    // Nothing measured says the path runs into that low area.
+    expect(sentence).not.toMatch(/towards/);
   });
 
   it('says "may", never "will"', () => {
@@ -120,9 +171,23 @@ describe('describeWaterNearby', () => {
     expect(sentence).not.toContain('37');
   });
 
-  it('never rounds a nearby path down to zero metres', () => {
-    const derived = derivedWith({ channel: [line([[501, 500], [520, 500]])] });
-    expect(describeWaterNearby(derived, at)).toContain(`about ${DISTANCE_ROUNDING_M} m`);
+  it('gives no distance or direction for a path closer than the very-near limit', () => {
+    const derived = derivedWith({ channel: [line([[501, 400], [501, 600]])] });
+    const sentence = describeWaterNearby(derived, at)!;
+    expect(sentence).toContain('at or very near this address');
+    expect(sentence).not.toMatch(/about \d+ m to the/);
+  });
+
+  it('gives a distance again at the very-near limit, rounded to ten metres', () => {
+    const derived = derivedWith({ channel: [line([[500 + VERY_NEAR_M, 400], [500 + VERY_NEAR_M, 600]])] });
+    expect(describeWaterNearby(derived, at)).toContain(`about ${String(DISTANCE_ROUNDING_M)} m to the east`);
+  });
+
+  it('says an address inside a low area is inside it', () => {
+    const derived = derivedWith({ 'low-point': [ring([[480, 480], [520, 480], [520, 520], [480, 520]])] });
+    const near = waterNearby(derived, at);
+    expect(near?.low).toEqual({ kind: 'inside' });
+    expect(describeWaterNearby(derived, at)).toContain('This address is within a mapped low area');
   });
 
   it('says nothing at all when nothing derived is near enough', () => {
@@ -137,14 +202,15 @@ describe('describeWaterNearby', () => {
 
   it('admits it when a path is near but no low area was measured', () => {
     const derived = derivedWith({ channel: [line([[520, 500], [540, 500]])] });
-    expect(describeWaterNearby(derived, at)).toMatch(/No low area .* was measured nearby/);
+    expect(describeWaterNearby(derived, at)).toMatch(/No mapped low area .* is within 150 m/);
   });
 
   it('describes a low area on its own when no path is near', () => {
     const derived = derivedWith({ 'low-point': [ring([[500, 540], [510, 540]])] });
     const sentence = describeWaterNearby(derived, at)!;
-    expect(sentence).toMatch(/low area where surface water may collect/);
+    expect(sentence).toMatch(/nearest mapped low area, where water may collect/);
     expect(sentence).toContain('to the north');
+    expect(sentence).toMatch(/No mapped path .* is within 150 m/);
   });
 
   it('treats the relevance radius as the boundary it claims to be', () => {

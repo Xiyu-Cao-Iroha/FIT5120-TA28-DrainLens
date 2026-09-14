@@ -21,7 +21,7 @@
  * card.
  */
 
-import { COMPASS_ANGLE, type WaterNearby, describe } from './nearby.js';
+import { COMPASS_ANGLE, type NearbyThing, type WaterNearby, describe } from './nearby.js';
 import { DERIVED_DAY } from './derived.js';
 
 /**
@@ -36,6 +36,8 @@ import { DERIVED_DAY } from './derived.js';
  */
 const WIDTH = 250;
 const HEIGHT = 146;
+/** Each thing with no direction to draw gets a line of words instead. */
+const NOTE_LINE = 14;
 const CX = WIDTH / 2;
 const CY = 62;
 
@@ -125,10 +127,30 @@ function Ray({
   );
 }
 
+/**
+ * What to write for something with no direction, or null for something that has one.
+ *
+ * An address inside a low area, or with a path through its front garden, has
+ * nothing to point at: an arrow would point at its own boundary. Leaving the
+ * figure silent about it would lose the fact from the screen entirely, because
+ * the sentence is only the figure's accessible name.
+ */
+function noteFor(thing: NearbyThing | null, what: 'path' | 'low'): string | null {
+  if (thing === null || thing.kind === 'direction') return null;
+  if (thing.kind === 'inside') return 'This address is inside a mapped low area';
+  return what === 'path'
+    ? 'A path where water may run is at or very near'
+    : 'A low area is at or very near this address';
+}
+
 export function WaterCompass({ near }: { readonly near: WaterNearby }) {
+  const notes = [noteFor(near.channel, 'path'), noteFor(near.low, 'low')].filter(
+    (note): note is string => note !== null,
+  );
+  const height = HEIGHT + notes.length * NOTE_LINE;
   return (
     <svg
-      viewBox={`0 0 ${String(WIDTH)} ${String(HEIGHT)}`}
+      viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
       role="img"
       aria-label={describe(near)}
       style={{ width: '100%', height: 'auto', display: 'block', margin: '4px 0 2px' }}
@@ -145,7 +167,7 @@ export function WaterCompass({ near }: { readonly near: WaterNearby }) {
         N
       </text>
 
-      {near.channel !== null && (
+      {near.channel?.kind === 'direction' && (
         <Ray
           bearing={near.channel.bearing}
           distanceM={near.channel.distanceM}
@@ -153,7 +175,7 @@ export function WaterCompass({ near }: { readonly near: WaterNearby }) {
           label="water may run"
         />
       )}
-      {near.low !== null && (
+      {near.low?.kind === 'direction' && (
         <Ray
           bearing={near.low.bearing}
           distanceM={near.low.distanceM}
@@ -165,9 +187,22 @@ export function WaterCompass({ near }: { readonly near: WaterNearby }) {
       {/* The address, last, so nothing is drawn over the person's own mark. */}
       <circle cx={CX} cy={CY} r="5" fill={ADDRESS} stroke="#ffffff" strokeWidth="2" />
 
+      {notes.map((note, index) => (
+        <text
+          key={note}
+          x={CX}
+          y={HEIGHT - 6 + index * NOTE_LINE}
+          fontSize="11"
+          fill={INK}
+          textAnchor="middle"
+        >
+          {note}
+        </text>
+      ))}
+
       <text
         x={CX}
-        y={HEIGHT - 6}
+        y={height - 6}
         fontSize={CAPTION_PX}
         fill={CAPTION}
         textAnchor="middle"

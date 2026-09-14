@@ -54,21 +54,28 @@ describe('what the figure is given', () => {
     // 34 m becomes "about 30 m" in the sentence. A figure handed 34 would
     // label an arrow with a number the caption says we do not have.
     const near = waterNearby(artefact([[[34, 0], [34, 10]]], []), [0, 0]);
-    expect(near?.channel?.distanceM).toBe(30);
-    expect(near?.channel?.distanceM! % DISTANCE_ROUNDING_M).toBe(0);
+    expect(near?.channel).toEqual({ kind: 'direction', distanceM: 30, bearing: 'east' });
+    expect(30 % DISTANCE_ROUNDING_M).toBe(0);
   });
 
-  it('never reports zero metres for something a metre away', () => {
-    // `roughly` floors at the rounding step: "0 m away" would read as being
-    // on top of it, and the measurement cannot support that.
-    const near = waterNearby(artefact([[[1, 0], [1, 4]]], []), [0, 0]);
-    expect(near?.channel?.distanceM).toBe(DISTANCE_ROUNDING_M);
+  it('gives nothing to point at for something a metre away', () => {
+    // It used to say "about 10 m" in some direction. At a metre the direction
+    // is noise and the distance is a floor, so neither is given.
+    const near = waterNearby(artefact([[[1, -4], [1, 4]]], []), [0, 0]);
+    expect(near?.channel).toEqual({ kind: 'very-near' });
+  });
+
+  it('gives nothing to point at for an address inside a low area', () => {
+    const near = waterNearby(artefact([], [[[-5, -5], [5, -5], [5, 5], [-5, 5]]]), [0, 0]);
+    expect(near?.low).toEqual({ kind: 'inside' });
   });
 
   it('carries the bearing as one of the eight, so the arrow has an angle', () => {
     const near = waterNearby(artefact([[[0, 40], [10, 40]]], []), [0, 0]);
-    expect(near?.channel?.bearing).toBeDefined();
-    expect(COMPASS_ANGLE[near!.channel!.bearing]).toBeTypeOf('number');
+    expect(near?.channel?.kind).toBe('direction');
+    if (near?.channel?.kind !== 'direction') return;
+    expect(near.channel.bearing).toBe('north');
+    expect(COMPASS_ANGLE[near.channel.bearing]).toBeTypeOf('number');
   });
 
   it('says nothing at all when nothing is within the radius', () => {
@@ -85,8 +92,8 @@ describe('what the figure is given', () => {
 
 describe('the sentence and the figure agree', () => {
   const both: WaterNearby = {
-    channel: { distanceM: 30, bearing: 'north-west' },
-    low: { distanceM: 40, bearing: 'south-east' },
+    channel: { kind: 'direction', distanceM: 30, bearing: 'north-west' },
+    low: { kind: 'direction', distanceM: 40, bearing: 'south-east' },
   };
 
   it('reads the same numbers the arrows are drawn with', () => {
@@ -99,12 +106,19 @@ describe('the sentence and the figure agree', () => {
 
   it('still says a low area was not found when there is no second arrow', () => {
     const said = sentence({ channel: both.channel, low: null });
-    expect(said).toContain('No low area');
+    expect(said).toContain('No mapped low area');
   });
 
   it('describes a low area on its own when there is no path', () => {
     const said = sentence({ channel: null, low: both.low });
     expect(said).toContain('low area');
     expect(said).toContain('40 m');
+  });
+
+  it('says inside and very near in words, with no compass point', () => {
+    const said = sentence({ channel: { kind: 'very-near' }, low: { kind: 'inside' } });
+    expect(said).toContain('at or very near this address');
+    expect(said).toContain('within a mapped low area');
+    expect(said).not.toMatch(/north|south|east|west/);
   });
 });
