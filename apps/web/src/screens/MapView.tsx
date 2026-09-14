@@ -52,7 +52,7 @@ import type { MapNow } from '../tutorial/lesson.js';
 import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
-import { loadTerrain, rasterise } from '../map/terrain.js';
+import { type PaintedTerrain, loadTerrain, rasterise } from '../map/terrain.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import {
@@ -228,7 +228,7 @@ export function MapView({
    */
   const [minimised, setMinimised] = useState(false);
   const [following, setFollowing] = useState<string | null>(null);
-  const [terrain, setTerrain] = useState<HTMLCanvasElement | null>(null);
+  const [terrain, setTerrain] = useState<PaintedTerrain | null>(null);
   // The transform the canvas drew with, reported upward so a callout can be
   // put at a feature rather than beside the map.
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -248,7 +248,7 @@ export function MapView({
   // the recorded network is what the person came for.
   useEffect(() => {
     let live = true;
-    loadTerrain('/data/scene')
+    loadTerrain('/data/terrain')
       .then((raster) =>
         rasterise(raster, (w, h) => {
           const canvas = document.createElement('canvas');

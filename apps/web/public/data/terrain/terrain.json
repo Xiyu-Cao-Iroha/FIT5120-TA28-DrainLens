@@ -1,0 +1,90 @@
+{
+ "artefact": "terrain-display",
+ "version": 1,
+ "basis": "derived",
+ "note": "The ground surface for the map's Terrain layer only. It is the raw, unfilled surface; the scenario engine routes on a separate conditioned one. Heights are estimated from filtered aerial photography, about 25 cm vertically, and interpolated under roofs and canopy.",
+ "source": {
+  "dataset": "City of Melbourne 3D Point Cloud 2018",
+  "publisher": "City of Melbourne Open Data Portal",
+  "licence": "CC BY 4.0",
+  "crs": "EPSG:28355 (MGA Zone 55)",
+  "vertical_datum": "AHD"
+ },
+ "grid": {
+  "rows": 1000,
+  "cols": 1000,
+  "cellSizeM": 1.0,
+  "origin": "north-west"
+ },
+ "extent": {
+  "name": "kensington",
+  "min_e": 316500.0,
+  "min_n": 5814500.0,
+  "width_m": 1000.0,
+  "height_m": 1000.0
+ },
+ "arrays": {
+  "ground": {
+   "file": "ground.bin",
+   "type": "int16",
+   "unit": "centimetres",
+   "scale": 100.0,
+   "note": "Divide by the scale for metres AHD. The raw surface: not filled, buildings not raised."
+  },
+  "buildings": {
+   "file": "buildings.bin",
+   "type": "bitmask",
+   "note": "One bit per cell, most significant first, 1 inside a building footprint."
+  },
+  "shade": {
+   "file": "shade.bin",
+   "type": "uint8",
+   "note": "Hillshade, 0 to 255 for 0 to 1, already attenuated towards 0.5 where the ground was not measured. Multiply, never lighten."
+  }
+ },
+ "settings": {
+  "altitudeDeg": 45.0,
+  "verticalExaggeration": 3.2,
+  "azimuthWeights": [
+   [
+    315.0,
+    0.55
+   ],
+   [
+    270.0,
+    0.18
+   ],
+   [
+    360.0,
+    0.18
+   ],
+   [
+    225.0,
+    0.09
+   ]
+  ],
+  "stretchPercentiles": [
+   1.0,
+   99.0
+  ],
+  "stretch": [
+   0.079974,
+   0.902026
+  ],
+  "coverageWindowM": 25,
+  "coverageSigmaM": 6.0,
+  "coverage": [
+   0.35,
+   0.7
+  ],
+  "amplitudeMin": 0.4
+ },
+ "stats": {
+  "groundM": {
+   "min": -3.29,
+   "max": 29.84
+  },
+  "buildingFraction": 0.2588,
+  "measuredFraction": 0.5207
+ }
+}
