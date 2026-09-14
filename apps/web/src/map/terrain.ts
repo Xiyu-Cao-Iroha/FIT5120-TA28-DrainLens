@@ -50,6 +50,7 @@
  * to 16°. A multiply with nothing above 1 cannot clip.
  */
 
+import type { TerrainMarks } from './terrainMarks.js';
 import { type Viewport, toScreen } from './viewport.js';
 
 export class TerrainError extends Error {}
@@ -265,6 +266,8 @@ export interface PaintedTerrain {
   readonly colour: HTMLCanvasElement;
   readonly shade: HTMLCanvasElement;
   readonly extent: TerrainExtent;
+  /** Contours and spot heights, when they loaded. The layer still draws without them. */
+  readonly marks?: TerrainMarks;
 }
 
 /**

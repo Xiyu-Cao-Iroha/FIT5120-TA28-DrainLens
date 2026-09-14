@@ -53,6 +53,7 @@ import { legibility } from '../map/legibility.js';
 import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
 import { WaterCompass } from '../map/WaterCompass.js';
 import { type PaintedTerrain, loadTerrain, rasterise } from '../map/terrain.js';
+import { loadTerrainMarks } from '../map/terrainMarks.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import {
@@ -248,6 +249,9 @@ export function MapView({
   // the recorded network is what the person came for.
   useEffect(() => {
     let live = true;
+    // The contours and spot heights are optional to the layer: if they fail to
+    // load the ground is still drawn, just without its numbers.
+    const marks = loadTerrainMarks('/data/terrain').catch(() => undefined);
     loadTerrain('/data/terrain')
       .then((raster) =>
         rasterise(raster, (w, h) => {
@@ -257,8 +261,9 @@ export function MapView({
           return canvas;
         }),
       )
-      .then((painted) => {
-        if (live) setTerrain(painted);
+      .then(async (painted) => {
+        const loaded = await marks;
+        if (live) setTerrain(loaded === undefined ? painted : { ...painted, marks: loaded });
       })
       .catch(() => {
         if (live) setTerrain(null);

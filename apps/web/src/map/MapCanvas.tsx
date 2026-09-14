@@ -31,6 +31,7 @@ import {
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
 import { type PaintedTerrain, ROAD_OVER_TERRAIN, drawTerrain, drawTerrainShade } from './terrain.js';
+import { drawTerrainMarks } from './terrainMarks.js';
 import { MapControls, STEP } from './MapControls.js';
 import type { Trace } from '../trace/graph.js';
 
@@ -230,6 +231,8 @@ export function MapCanvas({
             },
             overRoads: (c: CanvasRenderingContext2D) => {
               drawTerrainShade(c, terrain, viewport, artefact.extent);
+              // Contours and spot heights over the shading, under the network.
+              if (terrain.marks) drawTerrainMarks(c, terrain.marks, viewport, artefact.extent);
             },
           }
         : {}),

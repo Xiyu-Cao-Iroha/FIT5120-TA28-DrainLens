@@ -569,6 +569,7 @@ function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
       <p style={micro}>metres above sea level (AHD), fixed everywhere</p>
       <p style={micro}>Estimated ground height · system-derived</p>
       <p style={micro}>Shading shows ground shape, not water depth.</p>
+      <p style={micro}>Contours: 1 m; bold every 5 m. ≈ numbers are spot heights, to 0.5 m.</p>
     </div>
   );
 }
