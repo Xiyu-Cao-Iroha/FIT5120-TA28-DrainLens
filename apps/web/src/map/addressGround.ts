@@ -126,18 +126,43 @@ export async function loadAddressGround(
   return value;
 }
 
-/** The ground sentences, from the structure the figure is drawn from. */
+/**
+ * Where a slope is called steep: a fall of 7.5 m across the 150 m-wide area.
+ *
+ * The fit gives the fall across an area 150 m wide, so this is a gradient of
+ * 1 in 20 (5%) — the gradient past which AS 1428.1 stops calling a path a
+ * walkway and calls it a ramp, about where a person on foot notices the ground
+ * rising. Team review item 16 asked the card to say where there is a steep
+ * slope rather than print a fall for every address. Over the council, 12,495 of
+ * the 38,498 addresses with a direction (32.5%) are at or past it; the median
+ * is 5.5 m. Below it the card says only that the ground slopes gently, and
+ * prints no number.
+ */
+export const STEEP_FALL_M = 7.5;
+
+/** Whether a fall across the 150 m-wide area is a steep slope. */
+export const isSteep = (fallM: number): boolean => fallM >= STEEP_FALL_M;
+
+/** A fall as the card writes it: whole metres bare, half-metres to one decimal. */
+export const metresOf = (fallM: number): string => (Number.isInteger(fallM) ? String(fallM) : fallM.toFixed(1));
+
+/**
+ * The ground sentences, from the structure the figure is drawn from.
+ *
+ * Plain words, and still the trend of an area rather than a walk: *slopes down
+ * to the north-west*, never *over the next 150 m*, and never *towards* anything.
+ */
 export function describeGround(trend: GroundTrend): string {
   if (trend.kind === 'falls') {
-    return (
-      `Nearby ground generally falls ${trend.bearing}. ` +
-      `The fitted ground level changes by about ${trend.fallM.toFixed(1)} m across the surrounding 150 m-wide area.`
-    );
+    const change = `The ground level changes by about ${metresOf(trend.fallM)} m across the surrounding 150 m-wide area.`;
+    return isSteep(trend.fallM)
+      ? `The ground around this address slopes down to the ${trend.bearing}, and the slope is steep. ${change}`
+      : `The ground around this address slopes gently down to the ${trend.bearing}. ${change}`;
   }
   if (trend.kind === 'edge') {
-    return 'No overall ground direction is given here: this address is too close to the edge of the measured ground to fit the 150 m-wide area around it.';
+    return 'No slope direction is given here: this address is too close to the edge of the measured ground.';
   }
-  return 'No reliable overall ground direction could be identified around this address.';
+  return 'No clear slope direction could be found around this address.';
 }
 
 /**

@@ -76,6 +76,14 @@ describe('fitting an address and its drain', () => {
     expect(view.scale).toBeLessThanOrEqual(MAX_SCALE);
   });
 
+  it('measures the minimum along the longer side, so a wide short room is not opened 300 m across', () => {
+    // A laptop's step-1 room: 1400 - 320 - 80 = 1000 px by 780 - 160 = 620 px.
+    // Held on both axes, 180 m had to fit 620 px and the view was 290 m wide.
+    const view = fitPoints(1400, 780, COUNCIL, [[3000, 3000], [3012, 3016]], fitPadding(1400, true));
+    expect(view.scale).toBeCloseTo(Math.min(1000 / MIN_FIT_ACROSS_M, MAX_SCALE), 6);
+    expect((1400 - 400) / view.scale).toBeGreaterThanOrEqual(MIN_FIT_ACROSS_M - 1e-6);
+  });
+
   it('centres a single point in the room, for a drain opened from the full map', () => {
     const view = fitPoints(960, 600, COUNCIL, [[4000, 4000]], fitPadding(960, false));
     const [x, y] = toScreen(view, [4000, 4000]);

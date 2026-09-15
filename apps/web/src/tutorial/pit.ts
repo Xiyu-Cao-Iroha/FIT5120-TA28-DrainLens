@@ -14,8 +14,14 @@
  *   card uses, so "water enters here" means one thing in both places;
  * - **with a downstream path**, so pressing *Show connected pipe* draws
  *   something;
- * - **the longest such path within reach**, because a one-pipe trace teaches
- *   less than a nine-pipe one, and 48 of the 378 candidates are one hop.
+ * - **the nearest such pit to the address** (review of 15 September, item
+ *   14). It was the longest path within reach, on the reasoning that a
+ *   one-pipe trace teaches less than a nine-pipe one. The review found the
+ *   other cost was the one people paid: at 10 Leonard Crescent the ringed pit
+ *   sat far up Langs Road with nearer pits between it and the pin, and the
+ *   step read as pointing somewhere else. The nearest pit that leads somewhere
+ *   is the one a resident recognises as theirs, and the guide frames the
+ *   address and the pit together on the step that asks for it.
  *
  * **Every one of the 4,089 published addresses has a candidate.** Measured
  * across the whole index rather than sampled: the furthest any address sits
@@ -62,10 +68,8 @@ export function chooseTeachingPit(
   address: Local,
   pits: readonly Pit[],
   trace: TraceArtefact,
-  radiusM: number = TEACHING_RADIUS_M,
 ): TeachingPit | null {
-  const candidates: TeachingPit[] = [];
-  let fallback: TeachingPit | null = null;
+  let nearest: TeachingPit | null = null;
 
   for (const pit of pits) {
     if (pit.asset_number === undefined) continue;
@@ -76,20 +80,22 @@ export function chooseTeachingPit(
 
     const found: TeachingPit = { pit, distanceM: distance(address, pit.c), steps };
 
-    // Kept whatever the radius says, so a future artefact that pushes every
-    // candidate past 200 m degrades to "the nearest one" rather than to
-    // "there isn't one" -- which is the failure that would look like a bug.
-    if (fallback === null || found.distanceM < fallback.distanceM) fallback = found;
-    if (found.distanceM <= radiusM) candidates.push(found);
+    // The nearest wins; the longer path breaks a tie, so one address always
+    // rings the same pit rather than whichever the artefact listed first.
+    if (
+      nearest === null ||
+      found.distanceM < nearest.distanceM ||
+      (found.distanceM === nearest.distanceM && found.steps > nearest.steps)
+    ) {
+      nearest = found;
+    }
   }
 
-  if (candidates.length === 0) return fallback;
-
-  // The longest path wins; the nearest breaks the tie. Deliberately in that
-  // order: within a couple of hundred metres the walk is the same walk, and
-  // what differs is how much of the network the person gets to see.
-  return candidates.reduce((best, found) => {
-    if (found.steps !== best.steps) return found.steps > best.steps ? found : best;
-    return found.distanceM < best.distanceM ? found : best;
-  });
+  /*
+    No radius cut: a future artefact that pushes every candidate past
+    `TEACHING_RADIUS_M` degrades to "the nearest one, further away" rather than
+    to "there isn't one" -- which is the failure that would look like a bug.
+    The radius is what `check-guide.mjs` holds the published index to.
+  */
+  return nearest;
 }

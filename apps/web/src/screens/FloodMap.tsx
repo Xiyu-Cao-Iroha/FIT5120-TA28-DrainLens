@@ -18,7 +18,7 @@
  * population; dividing by it is the opposite of counting people.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   EMPTY_FILL,
@@ -58,6 +58,7 @@ import {
   noEventsText,
 } from '../history/events.js';
 import { financialYear, yearRange } from '../history/artefact.js';
+import { LEGEND_INSET_PX, legendBox, legendOpen } from '../history/legendFold.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
 import { FLOOD } from '../ui/terms.js';
 import {
@@ -311,7 +312,13 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
             aria-label={`${String(areas.length)} statistical areas, ${QUESTIONS[mode].asks}`}
             style={{ display: 'block', cursor: 'grab', background: GROUND, touchAction: 'none' }}
           />
-          <Legend mode={mode} years={years} minimumResidents={population.minimumResidents} />
+          <Legend
+            mode={mode}
+            years={years}
+            minimumResidents={population.minimumResidents}
+            frameWidth={viewport?.widthPx ?? null}
+            frameHeight={viewport?.heightPx ?? null}
+          />
           <Zoom
             onZoom={(by) => {
               setViewport((current) =>
@@ -730,76 +737,125 @@ function Section({ title, children }: { readonly title: string; readonly childre
   );
 }
 
-/** The key, over the map rather than beside it, because the map is the page. */
+/**
+ * The key, over the map rather than beside it, because the map is the page.
+ *
+ * **It folds to its title**, and starts folded when the map is narrow; the
+ * rules for both, and for how much of the map an open key may take, are in
+ * `history/legendFold.ts` where they are tested. The title stays in the
+ * header row outside the scrolling part, so a capped key that scrolls still
+ * says which question its colours answer.
+ */
 function Legend({
   mode,
   years,
   minimumResidents,
+  frameWidth,
+  frameHeight,
 }: {
   readonly mode: MapMode;
   readonly years: readonly string[];
   readonly minimumResidents: number;
+  /** The map frame's size, or null before it is measured. */
+  readonly frameWidth: number | null;
+  readonly frameHeight: number | null;
 }) {
+  // Null until somebody presses the control; until then the frame decides.
+  const [choice, setChoice] = useState<boolean | null>(null);
+  const open = legendOpen(frameWidth, choice);
+  const box = legendBox(frameWidth, frameHeight);
+  const bodyId = useId();
+
   return (
     <div
       style={{
         position: 'absolute',
-        top: space(4),
-        right: space(4),
-        maxWidth: 260,
-        padding: space(4),
+        top: LEGEND_INSET_PX,
+        right: LEGEND_INSET_PX,
+        maxWidth: box.maxWidth,
+        ...(box.maxHeight === null ? {} : { maxHeight: box.maxHeight }),
+        display: 'flex',
+        flexDirection: 'column',
+        padding: `${String(space(3))}px ${String(space(4))}px`,
         background: surface.raised,
         border: `1px solid ${line.base}`,
         borderRadius: radius.base,
       }}
     >
-      <p
-        style={{
-          margin: `0 0 ${String(space(3))}px`,
-          font: type(text.micro, { weight: weight.semibold }),
-          letterSpacing: tracking.caps,
-          textTransform: 'uppercase',
-          color: ink.subtle,
-        }}
-      >
-        {QUESTIONS[mode].tab}
-      </p>
-      {/*
-        AC 4.1.3.c and e, 4.3.3.d: what the numbers are, over what years, and
-        who produced them. A band name without its unit is a judgement with
-        the workings hidden; a rate without "calculated" borrows the SES's
-        authority.
-      */}
-      <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.4 }), color: ink.muted }}>
-        {mode === 'activity'
-          ? `SES crew call-outs, ${yearRange(years)}`
-          : `Call-outs per 1,000 residents, ${yearRange(years)}`}
-      </p>
-      <Badge kind={mode === 'activity' ? 'recorded' : 'calculated'} />
-      {legendFor(mode, minimumResidents).map((entry) => (
-        <div
-          key={entry.label}
-          style={{ display: 'flex', gap: space(3), alignItems: 'center', marginBottom: space(2) }}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: space(3), flexShrink: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            font: type(text.micro, { weight: weight.semibold }),
+            letterSpacing: tracking.caps,
+            textTransform: 'uppercase',
+            color: ink.subtle,
+          }}
         >
-          <span
-            aria-hidden
-            style={{
-              width: 16,
-              height: 12,
-              flexShrink: 0,
-              borderRadius: 2,
-              // The same hatch the map draws over a floor: 45°, six pixels apart.
-              background: entry.hatched
-                ? `repeating-linear-gradient(135deg, rgba(30, 43, 54, 0.55) 0 1px, transparent 1px 6px), ${entry.fill ?? EMPTY_FILL}`
-                : (entry.fill ?? EMPTY_FILL),
-              border: `1px ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
-            }}
-          />
-          <span style={{ font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>
-            {entry.label}
-          </span>
-        </div>
-      ))}
+          {QUESTIONS[mode].tab}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setChoice(!open);
+          }}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          // The visible word is kept at the start of the name, so a person
+          // using voice control can say what they see.
+          aria-label={open ? 'Hide map key' : 'Show map key'}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.micro, { weight: weight.medium }),
+            color: ink.muted,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '‹ Hide' : '› Show'}
+        </button>
+      </div>
+
+      <div id={bodyId} hidden={!open} style={{ marginTop: space(3), minHeight: 0, overflowY: 'auto' }}>
+        {/*
+          AC 4.1.3.c and e, 4.3.3.d: what the numbers are, over what years, and
+          who produced them. A band name without its unit is a judgement with
+          the workings hidden; a rate without "calculated" borrows the SES's
+          authority.
+        */}
+        <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.4 }), color: ink.muted }}>
+          {mode === 'activity'
+            ? `SES crew call-outs, ${yearRange(years)}`
+            : `Call-outs per 1,000 residents, ${yearRange(years)}`}
+        </p>
+        <Badge kind={mode === 'activity' ? 'recorded' : 'calculated'} />
+        {legendFor(mode, minimumResidents).map((entry) => (
+          <div
+            key={entry.label}
+            style={{ display: 'flex', gap: space(3), alignItems: 'center', marginBottom: space(2) }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 16,
+                height: 12,
+                flexShrink: 0,
+                borderRadius: 2,
+                // The same hatch the map draws over a floor: 45°, six pixels apart.
+                background: entry.hatched
+                  ? `repeating-linear-gradient(135deg, rgba(30, 43, 54, 0.55) 0 1px, transparent 1px 6px), ${entry.fill ?? EMPTY_FILL}`
+                  : (entry.fill ?? EMPTY_FILL),
+                border: `1px ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
+              }}
+            />
+            <span style={{ font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>
+              {entry.label}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

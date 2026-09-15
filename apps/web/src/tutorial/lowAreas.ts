@@ -39,7 +39,7 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'low-areas-on',
-    prompt: `Select ${LAYER.lowAreas} to show calculated dips in the ground near the address.`,
+    prompt: `Click the ${LAYER.lowAreas} button on the map to show calculated dips in the ground near the address.`,
     hint: 'The map starts with all optional layers turned off.',
     requires: 'low-areas-on',
   },
@@ -53,12 +53,12 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
     kind: 'read',
     id: 'deep-hollow-sign',
     prompt:
-      'Where a low area is especially deep, a warning sign marks its deepest point on a street once the map is zoomed in. Select the sign to read what it means. If none is in view, drag the map to look nearby.',
+      'Where a low area is especially deep, a warning sign marks its deepest point on a street once the map is zoomed in. Click the sign to read what it means. If none is in view, drag the map to look nearby.',
   },
   {
     kind: 'do',
     id: 'water-flow-on',
-    prompt: `Select ${LAYER.paths} to compare them with calculated low areas.`,
+    prompt: `Click the ${LAYER.paths} button on the map to compare them with calculated low areas.`,
     requires: 'water-flow-on',
   },
   {
@@ -70,7 +70,7 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: `Select ${LAYER.pits} to see where council records show a pit inside a calculated low area.`,
+    prompt: `Click the ${LAYER.pits} button on the map to see where council records show a pit inside a calculated low area.`,
     hint: 'A recorded pit does not show whether the drain is clear or how much water it can take.',
     requires: 'pits-on',
   },
