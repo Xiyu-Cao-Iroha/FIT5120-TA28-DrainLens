@@ -133,6 +133,19 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
   const step = steps[index0];
   const done = finished(steps, now, teachingId, acknowledged);
 
+  /*
+    The ringed pit appears on the step that asks for it, not before.
+
+    It was ringed from the first step, so the step explaining what the symbols
+    are was read beside one of them already marked with a council ID -- an
+    answer on screen before the question (review of 15 September, item 14).
+    And on that step the view is fitted to the address and the pit together:
+    the pit is the nearest one that leads somewhere, which is not always
+    inside the 300 m the guide opens on.
+  */
+  const pitStep = steps.findIndex((s) => s.kind === 'do' && s.requires === 'pit-selected');
+  const pitAsked = teaching !== null && pitStep >= 0 && (done || index0 >= pitStep);
+
   return (
     /*
       A framed map on the left and the question on the right, as the design
@@ -210,7 +223,16 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
             when the frame was full-screen and the tightness was cosmetic.
           */
           openAcrossM={300}
-          highlightPit={teaching?.pit.asset_number ?? null}
+          highlightPit={pitAsked ? (teaching.pit.asset_number ?? null) : null}
+          fit={
+            pitAsked
+              ? {
+                  key: `teaching:${teachingId ?? ''}`,
+                  points: [[address.eastingM, address.northingM], teaching.pit.c],
+                  reservePanel: false,
+                }
+              : null
+          }
           onMapNow={report}
         />
       </div>
@@ -304,8 +326,8 @@ function Coach({
 
             {step.kind === 'do' && step.requires === 'pit-selected' && teaching !== null && (
               <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-                Select the ringed pit about {String(Math.round(teaching.metres / 10) * 10)} m from
-                the address. Council ID {teaching.id}.
+                It is about {String(Math.max(10, Math.round(teaching.metres / 10) * 10))} m from your
+                address. Council ID {teaching.id}.
               </p>
             )}
 

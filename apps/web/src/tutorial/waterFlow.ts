@@ -24,7 +24,7 @@ export const WATER_FLOW_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'water-flow-on',
-    prompt: `Select ${LAYER.paths} to show calculated paths near the address.`,
+    prompt: `Click the ${LAYER.paths} button on the map to show calculated paths near the address.`,
     hint: 'The map starts with all optional layers turned off.',
     requires: 'water-flow-on',
   },
@@ -37,7 +37,7 @@ export const WATER_FLOW_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: `Select ${LAYER.pits} to compare calculated paths with pit locations in council records.`,
+    prompt: `Click the ${LAYER.pits} button on the map to compare calculated paths with pit locations in council records.`,
     hint: 'Water paths are calculated by DrainLens. Drain pits come from council records.',
     requires: 'pits-on',
   },
@@ -50,7 +50,7 @@ export const WATER_FLOW_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'unmeasured-on',
-    prompt: `Select ${LAYER.limited} to see where there was not enough reliable ground information.`,
+    prompt: `Click the ${LAYER.limited} button on the map to see where there was not enough reliable ground information.`,
     requires: 'unmeasured-on',
   },
   {

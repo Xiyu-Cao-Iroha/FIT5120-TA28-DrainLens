@@ -72,18 +72,17 @@ describe('what makes a pit worth pointing at', () => {
 });
 
 describe('choosing between candidates', () => {
-  it('prefers the longer path over the nearer pit', () => {
-    // A one-pipe trace teaches less than a three-pipe one, and within a couple
-    // of hundred metres the walk is the same walk.
+  it('prefers the nearer pit over the longer path', () => {
+    // Review of 15 September, item 14: a ringed pit further up the street
+    // than the ones beside the pin reads as pointing somewhere else.
     const near = pit(3, [1, 0]); // one hop
     const far = pit(1, [50, 0]); // three hops
-    expect(chooseTeachingPit([0, 0], [near, far], CHAIN)?.pit.asset_number).toBe(1);
+    expect(chooseTeachingPit([0, 0], [near, far], CHAIN)?.pit.asset_number).toBe(3);
   });
 
-  it('breaks a tie on distance', () => {
-    const tie = traceOf({ '1': [{ pipe: 'a', to: '9' }], '2': [{ pipe: 'b', to: '9' }], '9': [] });
-    const chosen = chooseTeachingPit([0, 0], [pit(1, [30, 0]), pit(2, [10, 0])], tie);
-    expect(chosen?.pit.asset_number).toBe(2);
+  it('breaks a tie on distance with the longer path', () => {
+    const chosen = chooseTeachingPit([0, 0], [pit(3, [0, 10]), pit(1, [10, 0])], CHAIN);
+    expect(chosen?.pit.asset_number).toBe(1);
   });
 
   it('ignores the long path outside the radius when a shorter one is inside', () => {

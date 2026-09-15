@@ -10,12 +10,19 @@
  * > **An arrow is a trend or a movement. A line with an end mark is a thing
  * > that is there.**
  *
- * | Mark | Meaning |
- * |---|---|
- * | Orange arrow | which way the ground around the address generally falls |
- * | Blue dashed line, short bar at the end | the nearest mapped likely water path |
- * | Lighter blue dashed line, oval at the end | the nearest mapped low area |
- * | Orange dot | the address |
+ * | Mark | Meaning | Label |
+ * |---|---|---|
+ * | Orange arrow | which way the ground around the address generally falls | *Steep slope down* or *Gentle slope downhill this way* |
+ * | Blue dashed line, short bar at the end | the nearest mapped likely water path | *Water may flow* |
+ * | Lighter blue dashed line, oval at the end | the nearest mapped low area | *Water may collect* |
+ * | Orange dot | the address | |
+ *
+ * **The labels say what a resident wants to know, not what was calculated.**
+ * Team review item 16: *likely water path*, *low area*, *ground falls ≈ 4.0 m
+ * over 150 m* and a three-line key (*Arrow = …, Dashed = …*) were not
+ * understood. Each label now says where water may flow, where it may collect
+ * and where the ground slopes steeply, hedged with *may* as everywhere else, so
+ * the marks need no key.
  *
  * **Orange is no longer the address's alone.** It was reserved for the address
  * because no map layer used it; the ground's arrow is about the address, and is
@@ -26,14 +33,15 @@
  * the eighth its sentence names, because the fit claims no more than that. The
  * dashed lines point at where the nearest path and low area actually are; the
  * rounded distance is on the label, and every line is the same length whatever
- * that distance. The caption says so: *distances rounded · not to scale*.
+ * that distance. The caption says so in one plain line: *Directions and
+ * distances are approximate.*
  *
  * The figure's accessible name is `describeAddress`, the same structure the
  * marks are drawn from, so the picture and what a screen reader hears cannot
  * disagree.
  */
 
-import { type GroundTrend, describeAddress } from './addressGround.js';
+import { type GroundTrend, describeAddress, isSteep } from './addressGround.js';
 import { DERIVED_DAY } from './derived.js';
 import { COMPASS_ANGLE, type NearbyThing, type WaterNearby } from './nearby.js';
 
@@ -65,8 +73,10 @@ const NOTE_LINE = 13;
 const ORANGE = '#c2410c';
 const FAINT = '#dfe5da';
 const INK = '#4d5f6e';
-/** 5.9:1 on white at 10 px; the not-to-scale line has to be readable. */
+/** 5.9:1 on white at 10 px; the caption line has to be readable. */
 const CAPTION = '#5b6e7e';
+/** The figure is not to scale and its distances are rounded; this is that, in plain words. */
+export const CAPTION_TEXT = 'Directions and distances are approximate.';
 
 const point = (cy: number, degrees: number, radius: number): readonly [number, number] => {
   const radians = (degrees * Math.PI) / 180;
@@ -357,35 +367,54 @@ function Pointer({
 export function figureFor(ground: GroundTrend | null, near: WaterNearby | null): FigureLayout {
   const items: { key: string; degrees: number; mark: Mark; lines: readonly [string, string] }[] = [];
   if (ground?.kind === 'falls') {
-    items.push({
-      key: 'ground',
-      degrees: COMPASS_ANGLE[ground.bearing],
-      mark: 'arrow',
-      lines: ['ground falls', `≈ ${ground.fallM.toFixed(1)} m over 150 m`],
-    });
+    items.push({ key: 'ground', degrees: COMPASS_ANGLE[ground.bearing], mark: 'arrow', lines: groundLines(ground.fallM) });
   }
   if (near?.channel?.kind === 'direction') {
     items.push({
       key: 'path',
       degrees: near.channel.angleDeg,
       mark: 'bar',
-      lines: ['likely water path', `about ${String(near.channel.distanceM)} m away`],
+      lines: ['Water may flow', `about ${String(near.channel.distanceM)} m away`],
     });
   }
   if (near?.low?.kind === 'direction') {
-    items.push({ key: 'low', degrees: near.low.angleDeg, mark: 'oval', lines: ['low area', `about ${String(near.low.distanceM)} m away`] });
+    items.push({
+      key: 'low',
+      degrees: near.low.angleDeg,
+      mark: 'oval',
+      lines: ['Water may collect', `about ${String(near.low.distanceM)} m away`],
+    });
   }
   return layoutFigure(items);
+}
+
+/**
+ * The ground arrow's words: a number only for a steep slope.
+ *
+ * Team review item 16 found *ground falls / ≈ 4.0 m over 150 m* meant nothing to
+ * a resident. The arrow now says the ground slopes down its way, and the fall is
+ * printed only where it is steep enough to matter (`STEEP_FALL_M`, 1 in 20);
+ * a gentler fall is called gentle and given no number to read too much into.
+ *
+ * Every label line is kept to 20 characters or fewer. `layoutFigure` measures
+ * a line at 5.8 px a character, and a label much wider than about 110 px no
+ * longer fits beside the ring on the east or west: it is pushed round above or
+ * below and the card grows. So the steep fall is whole metres, *about*, which
+ * is as much as a fitted plane rounded to half a metre supports anyway, and the
+ * sweep in the tests runs the widest one the artefact holds.
+ */
+export function groundLines(fallM: number): readonly [string, string] {
+  return isSteep(fallM) ? ['Steep slope down', `about ${String(Math.round(fallM))} m in 150 m`] : ['Gentle slope', 'downhill this way'];
 }
 
 /** Words for the facts that have nothing to point at. */
 export function notesFor(ground: GroundTrend | null, near: WaterNearby | null): readonly string[] {
   const notes: string[] = [];
-  if (ground?.kind === 'unclear') notes.push('No reliable overall ground direction');
-  if (ground?.kind === 'edge') notes.push('No ground direction: too near the edge of the data');
-  if (near?.channel?.kind === 'very-near') notes.push('A likely water path is at or very near');
-  if (near?.low?.kind === 'inside') notes.push('This address is inside a mapped low area');
-  if (near?.low?.kind === 'very-near') notes.push('A low area is at or very near this address');
+  if (ground?.kind === 'unclear') notes.push('No clear slope direction here');
+  if (ground?.kind === 'edge') notes.push('No slope direction: too near the edge of the data');
+  if (near?.channel?.kind === 'very-near') notes.push('Water may flow at or very near this address');
+  if (near?.low?.kind === 'inside') notes.push('Water may collect where this address is');
+  if (near?.low?.kind === 'very-near') notes.push('Water may collect at or very near this address');
   return notes;
 }
 
@@ -399,9 +428,9 @@ export function AddressInsight({
   const notes = notesFor(ground, near);
   const figure = figureFor(ground, near);
   const { cy } = figure;
-  // The notes start under the drawing, and the caption's three lines under them.
+  // The notes start under the drawing, and the caption's one line under them.
   const notesY = figure.drawingBottom + 12;
-  const height = figure.drawingBottom + 32 + notes.length * NOTE_LINE + 12;
+  const height = figure.drawingBottom + 20 + notes.length * NOTE_LINE;
   return (
     <svg
       viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
@@ -429,14 +458,8 @@ export function AddressInsight({
           {note}
         </text>
       ))}
-      <text x={CX} y={height - 28} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Arrow = which way the ground falls
-      </text>
-      <text x={CX} y={height - 16} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Dashed = direction to a nearby calculated feature
-      </text>
       <text x={CX} y={height - 4} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Distances rounded · not to scale
+        {CAPTION_TEXT}
       </text>
     </svg>
   );

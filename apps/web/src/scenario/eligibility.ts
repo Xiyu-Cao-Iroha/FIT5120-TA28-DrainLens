@@ -100,3 +100,32 @@ export function comparableNear(
 export function aboutMetres(distanceM: number): number {
   return Math.max(10, Math.round(distanceM / 10) * 10);
 }
+
+/**
+ * How many drains the map offers after a search: the nearest and the next four.
+ *
+ * Every comparable drain within the 200 m radius was offered before, and on
+ * 46 Gatehouse Drive that put a teal ring on nearly every pit in the opening
+ * view, which is what the review saw. Five is a choice on one street and its
+ * corners rather than a census of the neighbourhood, and the nearest is
+ * always among them.
+ */
+export const OFFERED_DRAIN_COUNT = 5;
+
+/**
+ * The drains the map offers once an address has been searched.
+ *
+ * **The nearest few, not every drain the engine can calculate** (review of 15
+ * September, item 17). The map ringed every comparable drain in the council,
+ * so step 2 of a search in Kensington was drawn over teal rings a street and
+ * a suburb away, each offering a comparison about somebody else's address.
+ * These are the first `OFFERED_DRAIN_COUNT` that `comparableNear` found, in
+ * its order; every other drain is drawn as one this test cannot use, and says
+ * why when pressed.
+ */
+export function offeredDrains(eligibility: Eligibility): readonly ComparableDrain[] {
+  return [...(eligibility.nearest === null ? [] : [eligibility.nearest]), ...eligibility.others].slice(
+    0,
+    OFFERED_DRAIN_COUNT,
+  );
+}

@@ -23,7 +23,7 @@ export const DRAINAGE_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: `Select ${LAYER.pits} to show nearby pits listed in council records.`,
+    prompt: `Click the ${LAYER.pits} button on the map to show drain pits near your address.`,
     hint: 'The map starts with all optional layers turned off.',
     requires: 'pits-on',
   },
@@ -31,12 +31,12 @@ export const DRAINAGE_STEPS: Lesson['steps'] = [
     kind: 'read',
     id: 'pits-shown',
     prompt:
-      'These symbols mark features in council records. They may be kerb grates, footpath lids or pipe junctions.',
+      'These symbols show where drainage pits are located near your address.',
   },
   {
     kind: 'do',
     id: 'pipes-on',
-    prompt: `Select ${LAYER.pipes} to show the underground connections listed in council records.`,
+    prompt: `Click the ${LAYER.pipes} button on the map to show the underground pipes that connect them.`,
     requires: 'pipes-on',
   },
   {
@@ -48,14 +48,14 @@ export const DRAINAGE_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pit-selected',
-    prompt: 'Select the pit marked on the map.',
+    prompt: 'Click the ringed pit on the map.',
     hint: 'This pit has a connected pipe in the council data. Some pits do not.',
     requires: 'pit-selected',
   },
   {
     kind: 'do',
     id: 'trace-following',
-    prompt: 'Select Show connected drain pipe to follow the recorded pipes downstream.',
+    prompt: 'Click the Show connected drain pipe button on the map to follow the pipes downstream.',
     requires: 'trace-following',
   },
 ];

@@ -37,6 +37,7 @@ import {
   search,
 } from '../address/search.js';
 import { demonstrationAddress } from '../address/demonstration.js';
+import { suburbsOf } from '../address/suburbs.js';
 import type { Task } from '../session.js';
 import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
 import { COVERAGE, LAYER } from '../ui/terms.js';
@@ -157,6 +158,7 @@ export function Landing({
   );
 
   const demonstration = demonstrationAddress(index);
+  const suburbs = suburbsOf(index);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -264,6 +266,7 @@ export function Landing({
             }}
             placeholder="Start typing an address"
             autoComplete="off"
+            aria-describedby={suburbs.length > 0 ? 'address-suburbs' : undefined}
             style={{
               flex: '1 1 260px',
               minWidth: 0,
@@ -298,6 +301,24 @@ export function Landing({
             {copy.submit}
           </button>
         </div>
+
+        {/*
+          Straight under the box, from the review of 15 September: which
+          suburbs the search knows, so somebody in Brunswick finds out before
+          typing rather than after. Read off the index -- see `suburbsOf`.
+        */}
+        {suburbs.length > 0 && (
+          <p
+            id="address-suburbs"
+            style={{
+              margin: `${String(space(2))}px 0 0`,
+              font: type(text.small, { leading: 1.5 }),
+              color: ink.muted,
+            }}
+          >
+            Supported suburbs: {suburbs.join(', ')}
+          </p>
+        )}
 
         {suggestions.length > 0 && (
           <ul

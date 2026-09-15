@@ -36,7 +36,7 @@ import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
 import { PIT_SUMMARY, publicLabelOf, surfaceEntryOf } from '../crosssection/section.js';
-import { MapCanvas } from '../map/MapCanvas.js';
+import { MapCanvas, type MapCanvasProps } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
 import {
@@ -170,6 +170,13 @@ export interface MapViewProps {
   /** How wide the opening view is, in metres. See `MapCanvas`. */
   readonly openAcrossM?: number | undefined;
   /**
+   * Points to fit the view to, refitted when `key` changes. See `MapCanvas`.
+   *
+   * The guide's step that asks for its ringed pit frames the address and that
+   * pit together, because the pit is not always inside the opening view.
+   */
+  readonly fit?: MapCanvasProps['fit'] | undefined;
+  /**
    * The map legend, off in the guide.
    *
    * It sits in the top right and is 260 pixels wide, which in the guide's
@@ -213,6 +220,7 @@ export function MapView({
   onMapNow,
   addressCard = true,
   openAcrossM,
+  fit = null,
   legend = true,
   scenarioSupport = null,
   onCompare,
@@ -436,6 +444,7 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
+        fit={fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={pitsDrawn}
@@ -718,7 +727,7 @@ export function MapView({
           }}
         >
           {explanation === null && groundTrend === null ? (
-            'No surface-water path or low area was measured close enough to this address to say anything about it.'
+            'No place where water may flow or collect was found close to this address.'
           ) : (
             <>
               <AddressInsight ground={groundTrend} near={explanation} />
