@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { type MapNow, NOTHING_ON_MAP, satisfied, stepIndex } from './lesson.js';
+import { type MapNow, NOTHING_ON_MAP, chipFor, satisfied, stepIndex } from './lesson.js';
 import { GUIDED_SECTIONS, LESSONS, lessonFor } from './lessons.js';
 import { SECTION_ORDER, SECTIONS } from './sections.js';
 import { CHIP_KEYS, PANEL_KEYS } from '../map/modes.js';
@@ -97,7 +97,32 @@ describe.each(written)('%s', (id, lesson) => {
       const key = wanted[step.requires];
       if (key === undefined) return; // pit-selected and trace-following are not chips
       expect(lesson.chips(at, NOTHING_ON_MAP)).toContain(key);
+      // And the chip the guide outlines while this step waits is that same
+      // chip, so the outline never points at one that is not on screen
+      // (copy audit v2, #21).
+      expect(chipFor(step.requires)).toBe(key);
     });
+  });
+
+  it('keeps to the audit writing rules', () => {
+    /*
+     * Copy audit v2, appendix A: an instruction is one sentence of at most 16
+     * words; the feedback after a correct press starts with praise and stays
+     * within 12 words; no em dashes; the finish page says well done.
+     */
+    const words = (s: string) => s.trim().split(/\s+/).length;
+    lesson.steps.forEach((step, at) => {
+      expect(step.prompt).not.toContain('—');
+      if (step.kind === 'do') {
+        expect(words(step.prompt)).toBeLessThanOrEqual(16);
+        expect(step.prompt).not.toMatch(/^Select\b/);
+      } else if (lesson.steps[at - 1]?.kind === 'do') {
+        expect(step.prompt).toMatch(/^(Great|Nice|Good)\b/);
+        expect(words(step.prompt)).toBeLessThanOrEqual(12);
+      }
+    });
+    expect(lesson.finished.headline).toMatch(/^Well done! You finished the .+ guide\.$/);
+    expect(lesson.finished.body).toBeUndefined();
   });
 
   it('never takes away the chip for a layer that is on', () => {

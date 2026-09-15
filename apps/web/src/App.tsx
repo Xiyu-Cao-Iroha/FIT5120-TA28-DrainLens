@@ -469,6 +469,8 @@ export function App() {
             fixtureNote={loaded.fixtureNote}
             // The comparison's own words when it is the task waiting.
             task={session.pendingTask}
+            // The title follows the guide card that was pressed (copy audit v2, #16).
+            section={session.guideSection}
             onFound={(address) =>
               dispatch({
                 type: 'address-accepted',

@@ -102,7 +102,7 @@ describe('what the card says', () => {
   });
 
   it('tells an unclear ground from an address too near the edge of the data', () => {
-    expect(describeGround({ kind: 'unclear' })).toBe('No clear slope direction could be found around this address.');
+    expect(describeGround({ kind: 'unclear' })).toBe('No clear downhill direction could be found around this address.');
     expect(describeGround({ kind: 'edge' })).toMatch(/too close to the edge of the measured ground/);
   });
 
@@ -117,18 +117,18 @@ describe('what the card says', () => {
     expect(said).toContain('about 30 m to the south');
     expect(said).not.toMatch(/towards/);
     expect(describeAddress(null, null)).toBeNull();
-    expect(describeAddress({ kind: 'unclear' }, null)).toMatch(/^No clear slope direction/);
+    expect(describeAddress({ kind: 'unclear' }, null)).toMatch(/^No clear downhill direction/);
   });
 });
 
 describe('what the figure writes when it has nothing to point at', () => {
   it('notes an unclear or edge ground, a very near path, and a house inside a low area', () => {
-    expect(notesFor({ kind: 'unclear' }, null)).toEqual(['No clear slope direction here']);
+    expect(notesFor({ kind: 'unclear' }, null)).toEqual(['No clear downhill direction here']);
     expect(notesFor({ kind: 'edge' }, null)[0]).toMatch(/edge of the data/);
     expect(
       notesFor({ kind: 'falls', bearing: 'east', fallM: 1 }, { channel: { kind: 'very-near' }, low: { kind: 'inside' } }),
-    ).toEqual(['Water may flow at or very near this address', 'Water may collect where this address is']);
-    expect(notesFor(null, { channel: null, low: { kind: 'very-near' } })).toEqual(['Water may collect at or very near this address']);
+    ).toEqual(['Water may flow at or near this address', 'Water may pool at this address']);
+    expect(notesFor(null, { channel: null, low: { kind: 'very-near' } })).toEqual(['Water may pool at or near this address']);
   });
 });
 
@@ -145,10 +145,10 @@ describe('what the figure’s labels say', () => {
   const linesOf = (ground: GroundTrend | null) =>
     Object.fromEntries(figureFor(ground, near).labels.map((l) => [l.key, l.lines]));
 
-  it('says where water may flow and where it may collect, hedged with "may"', () => {
+  it('says where water may flow and where it may pool, hedged with "may"', () => {
     const lines = linesOf(null);
     expect(lines.path).toEqual(['Water may flow', 'about 60 m away']);
-    expect(lines.low).toEqual(['Water may collect', 'about 10 m away']);
+    expect(lines.low).toEqual(['Water may pool', 'about 10 m away']);
   });
 
   it('prints a fall only for a steep slope', () => {

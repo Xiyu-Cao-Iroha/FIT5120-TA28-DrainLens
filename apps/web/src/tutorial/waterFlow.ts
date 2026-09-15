@@ -20,61 +20,64 @@
 import { FULL_MAP, LAYER } from '../ui/terms.js';
 import { type Lesson, unlockingChips } from './lesson.js';
 
+/*
+  Copy audit v2 of 15 September, #35 to #42. Praise first after a correct
+  press, one action per instruction. Who calculated the paths and where the
+  pits come from (#38), and that ground height comes from aerial photography
+  (#41), are left to the map's More information. The one caveat kept is the small print
+  under step two, because a reader who has just seen lines down their street
+  is the reader most likely to take them for a warning.
+*/
 export const WATER_FLOW_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'water-flow-on',
-    prompt: `Click the ${LAYER.paths} button on the map to show calculated paths near the address.`,
-    hint: 'The map starts with all optional layers turned off.',
+    prompt: `Click ${LAYER.paths} to see where rain may flow.`,
     requires: 'water-flow-on',
   },
   {
     kind: 'read',
     id: 'paths-shown',
-    prompt:
-      'These paths are calculated from ground-height data. They are not council records or flood predictions. The arrows show which way water runs downhill on the calculated ground.',
+    prompt: 'Great! Arrows show which way rain may flow downhill.',
+    note: 'These are estimates, not flood warnings.',
   },
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: `Click the ${LAYER.pits} button on the map to compare calculated paths with pit locations in council records.`,
-    hint: 'Water paths are calculated by DrainLens. Drain pits come from council records.',
+    prompt: `Now click ${LAYER.pits} to see drains along these paths.`,
     requires: 'pits-on',
   },
   {
     kind: 'read',
     id: 'paths-and-pits',
-    prompt:
-      'Some calculated paths appear near recorded drain pits. This map does not show how much water a pit can take.',
+    prompt: 'Great! Some water paths lead towards street drains.',
   },
   {
     kind: 'do',
     id: 'unmeasured-on',
-    prompt: `Click the ${LAYER.limited} button on the map to see where there was not enough reliable ground information.`,
+    prompt: `Click ${LAYER.limited} to see where we cannot map water.`,
     requires: 'unmeasured-on',
   },
   {
     kind: 'read',
     id: 'gaps-shown',
-    prompt:
-      'Ground-height data comes from aerial photography. Hatched areas did not have enough reliable measurements, so DrainLens does not show a water path there.',
+    prompt: 'Good. Striped areas are gaps, so no water paths show there.',
   },
 ];
 
 export const WATER_FLOW_DONE: Lesson['finished'] = {
-  headline: 'That is where rainwater may move.',
-  body: 'You viewed calculated water paths, council drain records and areas with limited ground data.',
-  unlocked: `You can now use ${LAYER.paths} on the ${FULL_MAP.toLowerCase()}.`,
+  headline: 'Well done! You finished the water paths guide.',
+  unlocked: `${LAYER.paths} is also on the ${FULL_MAP.toLowerCase()}.`,
 };
 
 export const WATER_FLOW: Lesson = {
   steps: WATER_FLOW_STEPS,
   finished: WATER_FLOW_DONE,
   /*
-    Likely water paths, then Drain pits at step 2, then Limited ground data at
+    Likely water paths, then Drain pits at step 2, then Ground data gaps at
     step 4.
 
-    `Limited ground data` is behind the Layers button on the unguided map, because
+    `Ground data gaps` is behind the Layers button on the unguided map, because
     it is the switch people change least. Here it is a chip, because it is the
     thing this section ends on and a lesson that asked somebody to go looking
     for a control would be teaching the control rather than the point.

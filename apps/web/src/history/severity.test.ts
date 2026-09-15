@@ -193,9 +193,9 @@ describe('what an area is worth saying', () => {
 
   it('says each completeness state in its own words', () => {
     expect(completenessText(area(), 'exact', 'Flood').label).toBe('Complete published total.');
-    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').label).toBe('Minimum total.');
+    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').label).toBe('Some counts hidden.');
     expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').body).toContain('2 of its 46');
-    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood call-out');
+    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood emergency response here');
   });
 
   it('reads the mode’s own number off the area', () => {

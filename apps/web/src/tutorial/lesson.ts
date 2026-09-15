@@ -44,7 +44,18 @@ export type Step =
       readonly hint?: string;
       readonly requires: Requirement;
     }
-  | { readonly kind: 'read'; readonly id: string; readonly prompt: string };
+  | {
+      readonly kind: 'read';
+      readonly id: string;
+      readonly prompt: string;
+      /**
+       * One short line of small print under the prompt, where a step keeps a
+       * caveat. The prompt is the feedback after a correct press and starts
+       * *Great!*; a caveat folded into it turned the heading into a disclaimer
+       * (copy audit v2, #36, #50).
+       */
+      readonly note?: string;
+    };
 
 /** What the map is showing, as far as a step needs to know. */
 export interface MapNow {
@@ -77,11 +88,13 @@ export const NOTHING_ON_MAP: MapNow = {
  * What the guide says when a section is finished.
  *
  * `unlocked` is one sentence: where the section's layer can be used on the
- * full map.
+ * full map. `body` is optional and no lesson sets one now: the paragraph
+ * between the two retold the data the reader had just worked with, where a
+ * finish page is there to say well done (copy audit v2, #31, #42, #51).
  */
 export interface Finished {
   readonly headline: string;
-  readonly body: string;
+  readonly body?: string;
   readonly unlocked: string;
 }
 
@@ -110,6 +123,33 @@ export interface Lesson {
    * reads.
    */
   readonly teachingPit: boolean;
+}
+
+/**
+ * The chip a requirement is waiting on, or null when it is not a chip.
+ *
+ * The guide outlines this chip while the step waits. It replaced the line
+ * *Waiting for you to try it* under every `do` step, which read like a system
+ * log and said nothing about where to press (copy audit v2, #21). The pit and
+ * the connected-pipe button are not chips: the pit has its ring, and the
+ * button is on the pit's own card.
+ */
+export function chipFor(requires: Requirement): LayerKey | null {
+  switch (requires) {
+    case 'pits-on':
+      return 'pit';
+    case 'pipes-on':
+      return 'pipe';
+    case 'water-flow-on':
+      return 'channel';
+    case 'low-areas-on':
+      return 'lowPoint';
+    case 'unmeasured-on':
+      return 'unavailable';
+    case 'pit-selected':
+    case 'trace-following':
+      return null;
+  }
 }
 
 /**

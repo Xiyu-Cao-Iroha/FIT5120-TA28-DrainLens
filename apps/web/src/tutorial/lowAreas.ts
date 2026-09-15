@@ -18,74 +18,80 @@
  * `pipeline/README.md` and the two are not the same number, so this one is
  * named for what it is.
  *
- * The 0.25 m floor in step two is the reason there are not thousands: the
- * ground surface is quoted at about 25 cm accuracy and the median untrimmed
- * hollow is 5 cm, which is the surface's own noise.
+ * The 0.25 m floor is the reason there are not thousands: the ground surface
+ * is quoted at about 25 cm accuracy and the median untrimmed hollow is 5 cm,
+ * which is the surface's own noise. Step two used to say so; since copy audit
+ * v2 (#44) it says only what the blue is.
  *
  * **The warning sign comes straight after the shapes**, while the reader is
  * still looking at blue, because it is a mark on those shapes and means
  * nothing without them. A `read` step rather than a `do`: the guide opens
  * 300 m across on 46 Gatehouse Drive, and the nearest sign is on the street
- * 18 m east and 181 m north of it -- just outside that view. A step that
- * waited for a press on it would wait for a drag the reader was never asked
- * to make, so the step says to make it instead. Kensington has 2 signs; see
+ * 18 m east and 181 m north of it -- just outside that view, and signs only
+ * draw once the map is zoomed in. A step that waited for a press on it would
+ * wait for a zoom and a drag the reader was never asked to make. Copy audit
+ * v2 (#45) cut the step to two short sentences and suggested zooming the
+ * guide to a sign and making the step a press; that needs the guide to move
+ * the map's view to a sign and the map to report an opened sign, and is not
+ * built yet. Kensington has 2 signs; see
  * `map/warnings.ts` for which hollows get one and from what zoom.
  */
 
 import { FULL_MAP, LAYER } from '../ui/terms.js';
 import { type Lesson, unlockingChips } from './lesson.js';
 
+/*
+  Copy audit v2 of 15 September, #43 to #51. Praise first after a correct
+  press, one action per instruction. The 25 cm floor, the outlet level and the
+  ground data's uncertainty (#44), and that a recorded pit says nothing about
+  whether the drain is clear (#49), are left to the map's More information. The one
+  safety line kept is the small print on the last step (#50).
+*/
 export const LOW_AREAS_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'low-areas-on',
-    prompt: `Click the ${LAYER.lowAreas} button on the map to show calculated dips in the ground near the address.`,
-    hint: 'The map starts with all optional layers turned off.',
+    prompt: `Click ${LAYER.lowAreas} to see dips where water may pool.`,
     requires: 'low-areas-on',
   },
   {
     kind: 'read',
     id: 'hollows-shown',
-    prompt:
-      'Each blue shape is a calculated dip at least 25 cm below its estimated outlet level. Water may collect there. Shallower changes are not shown because they are within the uncertainty of the ground-height data.',
+    prompt: 'Great! Blue areas are dips where rainwater may pool.',
   },
   {
     kind: 'read',
     id: 'deep-hollow-sign',
-    prompt:
-      'Where a low area is especially deep, a warning sign marks its deepest point on a street once the map is zoomed in. Click the sign to read what it means. If none is in view, drag the map to look nearby.',
+    prompt: 'Warning signs mark the deepest spots. Zoom in to find one.',
   },
   {
     kind: 'do',
     id: 'water-flow-on',
-    prompt: `Click the ${LAYER.paths} button on the map to compare them with calculated low areas.`,
+    prompt: `Now click ${LAYER.paths} to see where water flows into these dips.`,
     requires: 'water-flow-on',
   },
   {
     kind: 'read',
     id: 'paths-into-hollows',
-    prompt:
-      'A low area connected to several calculated paths may receive water from a wider area.',
+    prompt: 'Great! Where many arrows meet, more water can pool.',
   },
   {
     kind: 'do',
     id: 'pits-on',
-    prompt: `Click the ${LAYER.pits} button on the map to see where council records show a pit inside a calculated low area.`,
-    hint: 'A recorded pit does not show whether the drain is clear or how much water it can take.',
+    prompt: `Now click ${LAYER.pits} to find drains inside the blue areas.`,
     requires: 'pits-on',
   },
   {
     kind: 'read',
     id: 'what-this-is-not',
-    prompt:
-      'Blue areas show where water may collect. They do not predict flooding. Rainfall and drain performance are not included in this view.',
+    prompt: 'Great! Now you can see drains inside the low areas.',
+    note: 'This is not a flood forecast.',
   },
 ];
 
 export const LOW_AREAS_DONE: Lesson['finished'] = {
-  headline: 'That is where water can collect.',
-  body: 'You viewed calculated low areas, likely water paths and pit locations from council records. These layers do not predict flooding.',
-  unlocked: `You can now use ${LAYER.lowAreas} on the ${FULL_MAP.toLowerCase()}.`,
+  headline: 'Well done! You finished the low areas guide.',
+  unlocked: `${LAYER.lowAreas} is also on the ${FULL_MAP.toLowerCase()}.`,
 };
 
 export const LOW_AREAS: Lesson = {

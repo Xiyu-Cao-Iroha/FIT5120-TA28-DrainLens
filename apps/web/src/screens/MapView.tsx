@@ -51,7 +51,7 @@ import {
 } from '../map/modes.js';
 import type { MapNow } from '../tutorial/lesson.js';
 import { legibility } from '../map/legibility.js';
-import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
+import { waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
@@ -129,6 +129,8 @@ export interface MapViewProps {
    */
   readonly chipKeys?: readonly LayerKey[] | undefined;
   readonly layersButton?: boolean | undefined;
+  /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
+  readonly pulseChip?: LayerKey | null | undefined;
   /**
    * What is on when the map opens, overriding the mode and the task.
    *
@@ -215,6 +217,7 @@ export function MapView({
   onClearAddress,
   chipKeys,
   layersButton = true,
+  pulseChip = null,
   openWith,
   highlightPit = null,
   onMapNow,
@@ -513,6 +516,7 @@ export function MapView({
               onToggle={toggle}
               unavailableKeys={notYet}
               layersButton={layersButton}
+              pulse={pulseChip}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
           </div>
@@ -600,7 +604,8 @@ export function MapView({
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={publicLabelOf(hit.feature)}
-          basis="Council record"
+          // No source badge (copy audit v2, #30). Where the record comes from
+          // is said once, under View technical details in `PitDetail`.
           action={
             followed === null
               ? {
@@ -655,7 +660,7 @@ export function MapView({
           at={toScreen(viewport, midpoint(hit.feature.c))}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
-          basis="Council record"
+          // No source badge, as on the pit card (copy audit v2, #30).
           onClose={() => {
             setHit(null);
           }}
@@ -730,8 +735,8 @@ export function MapView({
             'No place where water may flow or collect was found close to this address.'
           ) : (
             <>
+              {/* No source badge: copy audit v2, #60. The legend's About this data says it once. */}
               <AddressInsight ground={groundTrend} near={explanation} />
-              <Badge basis={NEARBY_BASIS} />
             </>
           )}
           {guided && (
@@ -972,25 +977,6 @@ function MapSearch({
         </ul>
       )}
     </div>
-  );
-}
-
-function Badge({ basis }: { readonly basis: string }) {
-  const tone = basis === 'Council record' ? basisTone.recorded : basisTone.derived;
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        marginTop: space(2),
-        padding: `1px ${String(space(2))}px`,
-        borderRadius: radius.pill,
-        font: type(text.micro, { leading: 1.5 }),
-        background: tone.fill,
-        color: tone.ink,
-      }}
-    >
-      {basis}
-    </span>
   );
 }
 

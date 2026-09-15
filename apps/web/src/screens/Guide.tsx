@@ -32,6 +32,7 @@ import {
   type MapNow,
   NOTHING_ON_MAP,
   type Step,
+  chipFor,
   finished,
   stepIndex,
 } from '../tutorial/lesson.js';
@@ -139,12 +140,25 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
     It was ringed from the first step, so the step explaining what the symbols
     are was read beside one of them already marked with a council ID -- an
     answer on screen before the question (review of 15 September, item 14).
+    The ring no longer carries the council ID either, and the coach no longer
+    names it (copy audit v2, #23, #28): the step says *the drain with the
+    orange ring*, and an internal number is nothing a resident can use.
     And on that step the view is fitted to the address and the pit together:
     the pit is the nearest one that leads somewhere, which is not always
     inside the 300 m the guide opens on.
   */
   const pitStep = steps.findIndex((s) => s.kind === 'do' && s.requires === 'pit-selected');
   const pitAsked = teaching !== null && pitStep >= 0 && (done || index0 >= pitStep);
+
+  /*
+    The chip the current step is waiting on, outlined on the map.
+
+    It replaced *Waiting for you to try it* under every `do` step (copy audit
+    v2, #21): the line read like a system log, and the reader's question at
+    that moment is where to press, which an outline answers and a sentence
+    beside the map does not.
+  */
+  const pulseChip = !done && step?.kind === 'do' ? chipFor(step.requires) : null;
 
   return (
     /*
@@ -195,6 +209,7 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
           // already pressed it. See `openWith` in MapView.
           openWith={NOTHING_ON}
           chipKeys={lesson.chips(index0, now)}
+          pulseChip={pulseChip}
           layersButton={false}
           // 260 pixels of the top right, over the number badge on the very pit
           // the guide is asking for -- and repeating the sentence the step
@@ -244,7 +259,6 @@ export function Guide({ map, derived, trace, index, address, section, onFinish }
         stepNumber={index0}
         total={steps.length}
         done={done}
-        teaching={teaching === null ? null : { id: teachingId ?? '', metres: teaching.distanceM }}
         onNext={() => {
           setAcknowledged(index0 + 1);
         }}
@@ -261,7 +275,6 @@ function Coach({
   stepNumber,
   total,
   done,
-  teaching,
   onNext,
   onFinish,
 }: {
@@ -271,7 +284,6 @@ function Coach({
   readonly stepNumber: number;
   readonly total: number;
   readonly done: boolean;
-  readonly teaching: { readonly id: string; readonly metres: number } | null;
   readonly onNext: () => void;
   readonly onFinish: () => void;
 }) {
@@ -324,30 +336,31 @@ function Coach({
               </p>
             )}
 
-            {step.kind === 'do' && step.requires === 'pit-selected' && teaching !== null && (
-              <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-                It is about {String(Math.max(10, Math.round(teaching.metres / 10) * 10))} m from your
-                address. Council ID {teaching.id}.
+            {/*
+              Small print under the heading, for the one caveat a step keeps
+              (copy audit v2, #36, #50).
+            */}
+            {step.kind === 'read' && step.note !== undefined && (
+              <p style={{ margin: 0, font: type(text.label, { leading: 1.5 }), color: ink.muted }}>
+                {step.note}
               </p>
             )}
 
-            {step.kind === 'read' ? (
+            {/*
+              The pit step's second line -- its distance and council ID -- is
+              gone (copy audit v2, #27, #28). The ring on the map says which
+              one, and the ID was an internal number.
+
+              A `do` step has no button, and not a disabled one either: the
+              step is finished by working the map, and a greyed-out Next beside
+              that reads as the way forward being broken. What used to sit here
+              was *Waiting for you to try it*; the outlined chip on the map
+              says it instead (#21).
+            */}
+            {step.kind === 'read' && (
               <button type="button" onClick={onNext} style={primary}>
                 Next →
               </button>
-            ) : (
-              /*
-                Not a disabled button. There is nothing here to press: the step
-                is finished by working the map, and a greyed-out Next beside
-                that reads as the way forward being broken rather than as the
-                way forward being somewhere else.
-              */
-              <p
-                aria-live="polite"
-                style={{ margin: 0, font: type(text.label), color: ink.subtle }}
-              >
-                Waiting for you to try it.
-              </p>
             )}
           </>
         )
@@ -385,9 +398,11 @@ function Done({ copy, onFinish }: { readonly copy: Finished; readonly onFinish: 
       <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
         {copy.headline}
       </h2>
-      <p style={{ margin: 0, font: type(text.body, { leading: 1.5 }), color: ink.base }}>
-        {copy.body}
-      </p>
+      {copy.body !== undefined && (
+        <p style={{ margin: 0, font: type(text.body, { leading: 1.5 }), color: ink.base }}>
+          {copy.body}
+        </p>
+      )}
       <div
         style={{
           padding: space(4),

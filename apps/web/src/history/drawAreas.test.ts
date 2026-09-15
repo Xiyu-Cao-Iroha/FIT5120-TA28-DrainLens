@@ -26,6 +26,7 @@ import {
 } from './drawAreas.js';
 import { type MapArea, completenessOf } from './severity.js';
 import { type Bounds, fit, toScreen } from '../map/viewport.js';
+import { FLOOD } from '../ui/terms.js';
 
 const MELBOURNE: Bounds = { widthM: 138_000, heightM: 148_000 };
 const viewport = fit(800, 600, MELBOURNE);
@@ -245,21 +246,22 @@ describe('the legend', () => {
       score and no complete zeros at all, because every area the SES was never
       called to is an area almost nobody lives in.
     */
-    const activity = legendFor('activity', 1000).map((e) => e.label);
-    const severity = legendFor('severity', 1000).map((e) => e.label);
-    expect(activity.some((l) => l.includes('No recorded call-outs'))).toBe(true);
-    expect(activity.some((l) => l.includes('No rate'))).toBe(false);
-    expect(severity.some((l) => l.includes('No rate'))).toBe(true);
-    expect(severity.some((l) => l.includes('No recorded call-outs'))).toBe(false);
-    // The threshold is the population artefact's, passed in rather than typed.
-    expect(severity).toContain('No rate — fewer than 1,000 residents');
-    expect(legendFor('severity', 500).map((e) => e.label)).toContain('No rate — fewer than 500 residents');
-    expect(activity).toContain('Minimum total — at least one exact count was not published');
+    const activity = legendFor('activity').map((e) => e.label);
+    const severity = legendFor('severity').map((e) => e.label);
+    // Copy audit v2, #82 and #90: short entries, no dashes.
+    expect(activity).toContain('None recorded');
+    expect(activity).not.toContain('Too few residents to compare');
+    expect(severity).toContain('Too few residents to compare');
+    expect(severity).not.toContain('None recorded');
+    expect(activity).toContain(FLOOD.atLeast);
+    expect(severity).toContain(FLOOD.atLeast);
+    expect(severity.slice(0, 3)).toEqual(['Low (1.3 or less)', 'Medium (over 1.3, up to 3)', 'High (over 3)']);
+    for (const label of [...activity, ...severity]) expect(label).not.toContain('—');
   });
 
   it('carries the floor in both, because both can show one', () => {
     for (const mode of ['activity', 'severity'] as const) {
-      expect(legendFor(mode, 1000).some((e) => e.hatched)).toBe(true);
+      expect(legendFor(mode).some((e) => e.hatched)).toBe(true);
     }
   });
 
@@ -267,15 +269,15 @@ describe('the legend', () => {
     // AC 4.1.2.d. A band named without its range is a judgement with the
     // workings hidden.
     // Four bands, the hatched floor, the withheld zero, and no recorded activity.
-    expect(legendFor('activity', 1000)).toHaveLength(4 + 3);
+    expect(legendFor('activity')).toHaveLength(4 + 3);
     // The two areas published as zero because everything in them was withheld
     // draw hatched over no colour, and had no legend entry for it.
-    const withheldZero = legendFor('activity', 1000).find((e) => e.label === 'Exact total not published');
+    const withheldZero = legendFor('activity').find((e) => e.label === 'Count not available');
     expect(withheldZero?.fill).toBeNull();
     expect(withheldZero?.hatched).toBe(true);
     expect(fillFor(area({ total: 0, complete: false, suppressedRegions: 1 }), 'activity', 'minimum')).toBeNull();
-    expect(legendFor('severity', 1000)).toHaveLength(3 + 2);
-    for (const entry of legendFor('severity', 1000).slice(0, 3)) {
+    expect(legendFor('severity')).toHaveLength(3 + 2);
+    for (const entry of legendFor('severity').slice(0, 3)) {
       expect(entry.label).toMatch(/[\d.]/);
     }
   });

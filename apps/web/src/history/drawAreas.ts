@@ -30,6 +30,7 @@
 import type { Break, Completeness, MapArea, MapMode } from './severity.js';
 import { bandOf, breaksFor, valueOf } from './severity.js';
 import { type Viewport, toLocal, toScreen } from '../map/viewport.js';
+import { FLOOD } from '../ui/terms.js';
 
 /** The two ramps, palest first. Four for counts, three for the rate. */
 export const RAMPS: Readonly<Record<MapMode, readonly string[]>> = {
@@ -296,8 +297,13 @@ export interface LegendEntry {
  * without a score and none with a complete zero, because every area the SES
  * was never called to is an area almost nobody lives in. An entry for a state
  * a mode cannot produce is a key to a colour that appears nowhere.
+ *
+ * **Short entries** (copy audit v2, #82, #90): the floor is `FLOOD.atLeast`,
+ * the withheld zero *Count not available*, the complete zero *None recorded*
+ * and the unscored area *Too few residents to compare*. The threshold is no
+ * longer in the entry, so it is not passed in; it is under More information.
  */
-export function legendFor(mode: MapMode, minimumResidents: number): readonly LegendEntry[] {
+export function legendFor(mode: MapMode): readonly LegendEntry[] {
   const bands: LegendEntry[] = breaksFor(mode).map((band: Break, index) => ({
     label: band.label,
     fill: RAMPS[mode][index] ?? null,
@@ -307,7 +313,7 @@ export function legendFor(mode: MapMode, minimumResidents: number): readonly Leg
   }));
 
   bands.push({
-    label: 'Minimum total — at least one exact count was not published',
+    label: FLOOD.atLeast,
     fill: RAMPS[mode][1] ?? null,
     stroke: RAMPS[mode][1] ?? NOTHING_RECORDED,
     dashed: false,
@@ -318,14 +324,14 @@ export function legendFor(mode: MapMode, minimumResidents: number): readonly Leg
     // Two areas have a published total of zero because every region in them
     // was withheld. They draw hatched over no colour.
     bands.push({
-      label: 'Exact total not published',
+      label: 'Count not available',
       fill: null,
       stroke: NOTHING_RECORDED,
       dashed: false,
       hatched: true,
     });
     bands.push({
-      label: 'No recorded call-outs',
+      label: 'None recorded',
       fill: null,
       stroke: NOTHING_RECORDED,
       dashed: false,
@@ -333,7 +339,7 @@ export function legendFor(mode: MapMode, minimumResidents: number): readonly Leg
     });
   } else {
     bands.push({
-      label: `No rate — fewer than ${minimumResidents.toLocaleString('en-AU')} residents`,
+      label: 'Too few residents to compare',
       fill: null,
       stroke: NO_SCORE,
       dashed: true,

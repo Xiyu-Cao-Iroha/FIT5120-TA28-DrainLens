@@ -4,10 +4,13 @@
  * **A disclosure, not a gate.** This is the one moment in the product where
  * somebody is about to read the drainage data without having been told what
  * it is, and the four lines from `lockNotice` are the four things they would
- * otherwise have to work out: the extent, that a line ending may be the record
- * ending, where the calculated layers are drawn, and that none of it is a
- * forecast. *Open the full map* works at once — the five-second countdown that
- * stood in front of it was removed in the copy review of 14 September.
+ * otherwise have to work out: the extent, that none of it is a live flood
+ * warning, that a line ending may be the record ending, and where the
+ * calculated layers are drawn. The first two are said; the last two are behind
+ * *More information*, because four lines in front of a button were skipped
+ * whole (copy audit v2, #52). *Open the full map* works at once — the
+ * five-second countdown that stood in front of it was removed in the copy
+ * review of 14 September.
  *
  * **The map is drawn behind, dimmed and inert.** A notice over a blank page says
  * "there is nothing here"; a notice over the streets says "this is what is here,
@@ -61,6 +64,7 @@ export function LockedMap({
 }: LockedMapProps) {
   const done = countLearned(learned);
   const fullMap = FULL_MAP.toLowerCase();
+  const notice = lockNotice(extentName);
 
   // The next section that has a guide, which is not always the next section.
   const suggested = nextSection(learned);
@@ -119,10 +123,37 @@ export function LockedMap({
               color: ink.base,
             }}
           >
-            {lockNotice(extentName).map((sentence) => (
+            {notice.said.map((sentence) => (
               <li key={sentence}>{sentence}</li>
             ))}
           </ul>
+
+          <details>
+            <summary
+              style={{
+                cursor: 'pointer',
+                font: type(text.label, { weight: weight.semibold }),
+                color: ink.strong,
+              }}
+            >
+              More information
+            </summary>
+            <ul
+              style={{
+                margin: `${String(space(3))}px 0 0`,
+                paddingLeft: space(5),
+                display: 'flex',
+                flexDirection: 'column',
+                gap: space(2),
+                font: type(text.label, { leading: 1.5 }),
+                color: ink.muted,
+              }}
+            >
+              {notice.more.map((sentence) => (
+                <li key={sentence}>{sentence}</li>
+              ))}
+            </ul>
+          </details>
 
           <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
             {done === 0

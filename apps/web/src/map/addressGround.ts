@@ -159,10 +159,11 @@ export function describeGround(trend: GroundTrend): string {
       ? `The ground around this address slopes down to the ${trend.bearing}, and the slope is steep. ${change}`
       : `The ground around this address slopes gently down to the ${trend.bearing}. ${change}`;
   }
+  // *Downhill*, as the card's own note says it (copy audit v2, #58).
   if (trend.kind === 'edge') {
-    return 'No slope direction is given here: this address is too close to the edge of the measured ground.';
+    return 'No downhill direction is given here: this address is too close to the edge of the measured ground.';
   }
-  return 'No clear slope direction could be found around this address.';
+  return 'No clear downhill direction could be found around this address.';
 }
 
 /**

@@ -79,10 +79,14 @@ export const SURFACE_ENTRY_NOTE: Record<SurfaceEntry, string> = {
  *
  * Kept beside `SURFACE_ENTRY_NOTE` so the card and the figure cannot come to
  * disagree about the same pit.
+ *
+ * The inlet sentence dropped "Council records list this pit as a way in",
+ * which read as a data field translated into English (copy audit v2, #30).
+ * It still says only what the recorded type says, a way in from the street,
+ * and where the record comes from is said in the card's More information.
  */
 export const PIT_SUMMARY: Record<SurfaceEntry, string> = {
-  'recorded-inlet':
-    'Council records list this pit as a way in for water from the street, connected to the public drain network.',
+  'recorded-inlet': 'Rain from the street flows in here and joins the drain network.',
   'not-an-inlet':
     'The record calls this a join in the drainage network rather than a way into it: water reaches it through the pipes rather than off the street.',
   'not-recorded':

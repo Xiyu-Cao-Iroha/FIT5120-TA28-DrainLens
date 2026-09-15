@@ -8,7 +8,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { COVERAGE } from '../ui/terms.js';
 import {
   NOTHING_LEARNED,
   SECTIONS,
@@ -34,40 +33,43 @@ describe('the disclosure before the full map', () => {
      * reader is about to look at opened by telling them it was seventy-five
      * times smaller than it is.
      */
-    expect(lockNotice('city-of-melbourne')[0]).toBe(COVERAGE.map);
-    expect(lockNotice('city-of-melbourne')[0]).not.toContain('one square kilometre');
-    expect(lockNotice('kensington')[0]).toContain('one square kilometre');
+    expect(lockNotice('city-of-melbourne').said[0]).toBe('The map covers the City of Melbourne.');
+    expect(lockNotice('kensington').said[0]).toContain('one square kilometre of Kensington');
+    expect(lockNotice('kensington').said[0]).not.toContain('City of Melbourne');
   });
 
   it('says the calculated layers are drawn only where the ground data allows', () => {
     // A reader looking at a street with no water paths on it has to be able to
     // tell "no water goes here" from "there was not enough ground data here".
     for (const name of ['kensington', 'city-of-melbourne']) {
-      const ground = lockNotice(name).find((s) => s.includes('ground data')) ?? '';
+      const ground = lockNotice(name).more.find((s) => s.includes('ground data')) ?? '';
       expect(ground).toContain('only where enough ground data is available');
       expect(ground).not.toContain('drainage record');
     }
   });
 
-  it('keeps the two sentences that are true of any extent', () => {
+  it('says the safety line up front and folds the record line, for any extent', () => {
+    // Copy audit v2, #52: the extent and "not a flood warning" are the two
+    // said before the button; the other two are behind More information.
     for (const name of ['kensington', 'city-of-melbourne', 'something-else']) {
-      const notice = lockNotice(name);
-      expect(notice.some((s) => s.includes('may mean the council record ends there'))).toBe(true);
-      expect(notice.some((s) => s.includes('not a flood warning'))).toBe(true);
+      const { said, more } = lockNotice(name);
+      expect(said[1]).toContain('not live flood warnings');
+      expect(more.some((s) => s.includes('may mean the council record ends there'))).toBe(true);
     }
   });
 
-  it('is always four lines, whatever the extent', () => {
+  it('is two lines said and two folded, whatever the extent', () => {
     // Short enough to read before pressing the button beside it.
     for (const name of ['kensington', 'city-of-melbourne', 'unknown']) {
-      expect(lockNotice(name)).toHaveLength(4);
+      expect(lockNotice(name).said).toHaveLength(2);
+      expect(lockNotice(name).more).toHaveLength(2);
     }
   });
 
   it('falls back to the narrower claim for an extent it does not know', () => {
     // Claiming less ground than is on screen is the safe direction to be wrong
     // in; claiming more is the direction that misleads.
-    expect(lockNotice('unknown')[0]).toContain('one square kilometre');
+    expect(lockNotice('unknown').said[0]).toContain('one square kilometre');
   });
 });
 

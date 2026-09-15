@@ -234,22 +234,10 @@ function Callout() {
         Drain pit
       </text>
 
-      <rect
-        x={x + 60}
-        y={y + 40}
-        width="118"
-        height="18"
-        rx="9"
-        fill={basis.recorded.fill}
-      />
-      <text x={x + 70} y={y + 53} fontSize="10.5" fontWeight={weight.medium} fill={basis.recorded.ink}>
-        Council record
-      </text>
-
+      {/* No "Council record" badge on the hero's card: copy audit v2, #3. */}
       <g fontSize="12.5" fill={ink.muted}>
-        <text x={x + 20} y={y + 86}>Council records show this pit</text>
-        <text x={x + 20} y={y + 104}>connected to the public drain</text>
-        <text x={x + 20} y={y + 122}>network.</text>
+        <text x={x + 20} y={y + 86}>Rain from the street enters</text>
+        <text x={x + 20} y={y + 104}>the drain network here.</text>
       </g>
 
       <path

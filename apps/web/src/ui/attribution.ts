@@ -46,7 +46,7 @@ export const BOARD_CHANGES_NOTICE =
 
 /** What the flood map adds to its sources, the same clause as `CHANGES_NOTICE`. */
 export const FLOOD_CHANGES_NOTICE =
-  'The call-out rate and where each area is drawn are calculated from this data by DrainLens, not published by the sources.';
+  'The emergency response rate and where each area is drawn are calculated from this data by DrainLens, not published by the sources.';
 
 interface NamedSource {
   readonly publisher: string;

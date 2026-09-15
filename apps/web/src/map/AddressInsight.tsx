@@ -14,15 +14,16 @@
  * |---|---|---|
  * | Orange arrow | which way the ground around the address generally falls | *Steep slope down* or *Gentle slope downhill this way* |
  * | Blue dashed line, short bar at the end | the nearest mapped likely water path | *Water may flow* |
- * | Lighter blue dashed line, oval at the end | the nearest mapped low area | *Water may collect* |
+ * | Lighter blue dashed line, oval at the end | the nearest mapped low area | *Water may pool* |
  * | Orange dot | the address | |
  *
  * **The labels say what a resident wants to know, not what was calculated.**
  * Team review item 16: *likely water path*, *low area*, *ground falls ≈ 4.0 m
  * over 150 m* and a three-line key (*Arrow = …, Dashed = …*) were not
- * understood. Each label now says where water may flow, where it may collect
+ * understood. Each label now says where water may flow, where it may pool
  * and where the ground slopes steeply, hedged with *may* as everywhere else, so
- * the marks need no key.
+ * the marks need no key. (*Pool* rather than *collect* from copy audit v2, #58,
+ * so the card and the low-areas guide use one word.)
  *
  * **Orange is no longer the address's alone.** It was reserved for the address
  * because no map layer used it; the ground's arrow is about the address, and is
@@ -33,13 +34,17 @@
  * the eighth its sentence names, because the fit claims no more than that. The
  * dashed lines point at where the nearest path and low area actually are; the
  * rounded distance is on the label, and every line is the same length whatever
- * that distance. The caption says so in one plain line: *Directions and
- * distances are approximate.*
+ * that distance. One plain line says so: *Directions and distances are
+ * approximate.* It sits behind a small ⓘ in the figure's corner rather than
+ * printed under it (copy audit v2, #59), and the ⓘ is only there when the
+ * figure draws a direction for it to qualify.
  *
  * The figure's accessible name is `describeAddress`, the same structure the
  * marks are drawn from, so the picture and what a screen reader hears cannot
  * disagree.
  */
+
+import { useId, useState } from 'react';
 
 import { type GroundTrend, describeAddress, isSteep } from './addressGround.js';
 import { DERIVED_DAY } from './derived.js';
@@ -382,7 +387,7 @@ export function figureFor(ground: GroundTrend | null, near: WaterNearby | null):
       key: 'low',
       degrees: near.low.angleDeg,
       mark: 'oval',
-      lines: ['Water may collect', `about ${String(near.low.distanceM)} m away`],
+      lines: ['Water may pool', `about ${String(near.low.distanceM)} m away`],
     });
   }
   return layoutFigure(items);
@@ -410,11 +415,12 @@ export function groundLines(fallM: number): readonly [string, string] {
 /** Words for the facts that have nothing to point at. */
 export function notesFor(ground: GroundTrend | null, near: WaterNearby | null): readonly string[] {
   const notes: string[] = [];
-  if (ground?.kind === 'unclear') notes.push('No clear slope direction here');
-  if (ground?.kind === 'edge') notes.push('No slope direction: too near the edge of the data');
-  if (near?.channel?.kind === 'very-near') notes.push('Water may flow at or very near this address');
-  if (near?.low?.kind === 'inside') notes.push('Water may collect where this address is');
-  if (near?.low?.kind === 'very-near') notes.push('Water may collect at or very near this address');
+  // Copy audit v2, #58: *downhill* and *pool*, the words the guides now use.
+  if (ground?.kind === 'unclear') notes.push('No clear downhill direction here');
+  if (ground?.kind === 'edge') notes.push('No downhill direction: too near the edge of the data');
+  if (near?.channel?.kind === 'very-near') notes.push('Water may flow at or near this address');
+  if (near?.low?.kind === 'inside') notes.push('Water may pool at this address');
+  if (near?.low?.kind === 'very-near') notes.push('Water may pool at or near this address');
   return notes;
 }
 
@@ -425,42 +431,75 @@ export function AddressInsight({
   readonly ground: GroundTrend | null;
   readonly near: WaterNearby | null;
 }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const aboutId = useId();
   const notes = notesFor(ground, near);
   const figure = figureFor(ground, near);
   const { cy } = figure;
-  // The notes start under the drawing, and the caption's one line under them.
+  // The notes start under the drawing; the last one's descender ends the figure.
   const notesY = figure.drawingBottom + 12;
-  const height = figure.drawingBottom + 20 + notes.length * NOTE_LINE;
+  const height = notes.length === 0 ? figure.drawingBottom + 4 : notesY + (notes.length - 1) * NOTE_LINE + 4;
+  // Only a figure that draws a direction has directions and distances to qualify.
+  const drawsDirection = figure.labels.length > 0;
   return (
-    <svg
-      viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
-      role="img"
-      aria-label={describeAddress(ground, near) ?? ''}
-      style={{ width: '100%', height: 'auto', display: 'block', margin: '4px 0 2px' }}
-    >
-      <circle cx={CX} cy={cy} r={RING} fill="none" stroke={FAINT} strokeWidth="1" />
-      <text x={CX} y={figure.northY} fontSize="11" fill={CAPTION} fontWeight="600" textAnchor="middle">
-        N
-      </text>
-
-      {near?.low?.kind === 'direction' && <Pointer thing={near.low} colour={DERIVED_DAY.lowPointEdge} end="oval" cy={cy} />}
-      {near?.channel?.kind === 'direction' && <Pointer thing={near.channel} colour={DERIVED_DAY.channel} end="bar" cy={cy} />}
-      {ground?.kind === 'falls' && <GroundArrow trend={ground} cy={cy} />}
-      {figure.labels.map((label) => (
-        <Label key={label.key} label={label} />
-      ))}
-
-      {/* The address, last, so nothing is drawn over the person's own mark. */}
-      <circle cx={CX} cy={cy} r="4.5" fill={ORANGE} stroke="#ffffff" strokeWidth="2" />
-
-      {notes.map((note, index) => (
-        <text key={note} x={CX} y={notesY + index * NOTE_LINE} fontSize="10.5" fill={INK} textAnchor="middle">
-          {note}
+    <div style={{ margin: '4px 0 2px' }}>
+      <svg
+        viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
+        role="img"
+        aria-label={describeAddress(ground, near) ?? ''}
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+      >
+        <circle cx={CX} cy={cy} r={RING} fill="none" stroke={FAINT} strokeWidth="1" />
+        <text x={CX} y={figure.northY} fontSize="11" fill={CAPTION} fontWeight="600" textAnchor="middle">
+          N
         </text>
-      ))}
-      <text x={CX} y={height - 4} fontSize="10" fill={CAPTION} textAnchor="middle">
-        {CAPTION_TEXT}
-      </text>
-    </svg>
+
+        {near?.low?.kind === 'direction' && <Pointer thing={near.low} colour={DERIVED_DAY.lowPointEdge} end="oval" cy={cy} />}
+        {near?.channel?.kind === 'direction' && <Pointer thing={near.channel} colour={DERIVED_DAY.channel} end="bar" cy={cy} />}
+        {ground?.kind === 'falls' && <GroundArrow trend={ground} cy={cy} />}
+        {figure.labels.map((label) => (
+          <Label key={label.key} label={label} />
+        ))}
+
+        {/* The address, last, so nothing is drawn over the person's own mark. */}
+        <circle cx={CX} cy={cy} r="4.5" fill={ORANGE} stroke="#ffffff" strokeWidth="2" />
+
+        {notes.map((note, index) => (
+          <text key={note} x={CX} y={notesY + index * NOTE_LINE} fontSize="10.5" fill={INK} textAnchor="middle">
+            {note}
+          </text>
+        ))}
+      </svg>
+      {drawsDirection && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, minHeight: 18 }}>
+          {aboutOpen && (
+            <span id={aboutId} style={{ fontSize: 11, lineHeight: 1.3, color: CAPTION }}>
+              {CAPTION_TEXT}
+            </span>
+          )}
+          {/*
+            Drawn, not typed: the site's font subset has no ⓘ (public/fonts/README.md).
+            A press rather than hover alone, so it opens on a phone as well.
+          */}
+          <button
+            type="button"
+            title={CAPTION_TEXT}
+            aria-label="About this figure"
+            aria-expanded={aboutOpen}
+            aria-controls={aboutOpen ? aboutId : undefined}
+            onClick={() => {
+              setAboutOpen((open) => !open);
+            }}
+            style={{ display: 'inline-flex', padding: 1, background: 'none', border: 'none', color: CAPTION, cursor: 'pointer' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+              <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <circle cx="8" cy="4.8" r="1" fill="currentColor" />
+              <path d="M8 7.2v4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
