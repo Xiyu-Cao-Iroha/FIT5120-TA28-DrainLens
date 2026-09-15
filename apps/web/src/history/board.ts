@@ -14,7 +14,7 @@
  */
 
 import { FLOOD } from '../ui/terms.js';
-import { financialYear } from './artefact.js';
+import { yearLabel } from './artefact.js';
 import { type MapArea, SEVERITY_BREAKS, bandOf } from './severity.js';
 
 /** A number and the unit written after it, kept apart so the unit can be quieter. */
@@ -30,11 +30,11 @@ export const figureText = (figure: Figure): string =>
   `${figure.value}${figure.minimum ? '+' : ''} ${figure.unit}`;
 
 /**
- * A count of call-outs, with its unit.
+ * A count of emergency responses, with its unit.
  *
- * Singular at one, because a sparkline year with a single call-out is common
- * in the lower rows and "1 call-outs" is the kind of slip that makes a reader
- * doubt the number beside it.
+ * Singular at one, because a sparkline year with a single response is common
+ * in the lower rows and "1 emergency responses" is the kind of slip that makes
+ * a reader doubt the number beside it.
  */
 export function countFigure(count: number, complete: boolean): Figure {
   return {
@@ -57,13 +57,13 @@ export function rateFigure(area: Pick<MapArea, 'rate' | 'complete'>): Figure | n
 }
 
 /**
- * One sparkline bar, as its tooltip reads: `2010–11: 120 call-outs`.
+ * One sparkline bar, as its tooltip reads: `2010/11: 120 emergency responses`.
  *
  * A year inside an area with a withheld count is a minimum as well, which the
  * flood map's panel already says; the tooltip keeps the same `+`.
  */
 export function yearTip(year: string | undefined, count: number, complete: boolean): string {
-  return `${financialYear(year)}: ${figureText(countFigure(count, complete))}`;
+  return `${yearLabel(year)}: ${figureText(countFigure(count, complete))}`;
 }
 
 /** Every bar at once, for the sparkline's accessible name. */
@@ -82,6 +82,16 @@ export function bandLabel(rate: number | null): string | null {
   return index === null ? null : (SEVERITY_BREAKS[index]?.label ?? null);
 }
 
+/**
+ * The band's name alone, "High", for the badge on a list row (copy audit v2,
+ * #76). The row already shows the rate, and the ranges are in the rules.
+ */
+export function bandName(rate: number | null): string | null {
+  const index = bandOf(rate, SEVERITY_BREAKS);
+  const band = index === null ? undefined : SEVERITY_BREAKS[index];
+  return band === undefined ? null : (band.name ?? band.label);
+}
+
 /** The band thresholds as the rules list them, read from the constants rather than retyped. */
 export const bandRules = (): readonly string[] => SEVERITY_BREAKS.map((band) => band.label);
 
@@ -90,6 +100,7 @@ export interface RankedRate {
   readonly area: MapArea & { readonly rate: number; readonly persons: number };
   /** True where a neighbour shows the same rate to two decimals. */
   readonly tied: boolean;
+  /** The band's name alone, for the row's badge. */
   readonly band: string | null;
 }
 
@@ -122,7 +133,7 @@ export function rankByRate(areas: readonly MapArea[]): RateRanking {
     rank: i + 1,
     area,
     tied: shown[i] === shown[i - 1] || shown[i] === shown[i + 1],
-    band: bandLabel(area.rate),
+    band: bandName(area.rate),
   }));
   return {
     ranked,
@@ -181,7 +192,7 @@ export function workedExample(areas: readonly MapArea[], preferred: readonly str
   };
 }
 
-/** `209 call-outs ÷ 18,055 residents × 1,000 = 11.58 call-outs per 1,000 residents` */
+/** `209 emergency responses ÷ 18,055 people × 1,000 = 11.58 emergency responses per 1,000 people` */
 export function exampleSum(example: WorkedExample): string {
   const count = figureText(countFigure(example.total, example.complete));
   const rate = figureText({
@@ -189,7 +200,7 @@ export function exampleSum(example: WorkedExample): string {
     minimum: !example.complete,
     unit: FLOOD.rateUnit,
   });
-  return `${count} ÷ ${example.persons.toLocaleString('en-AU')} residents × 1,000 = ${rate}`;
+  return `${count} ÷ ${example.persons.toLocaleString('en-AU')} people × 1,000 = ${rate}`;
 }
 
 /**
@@ -220,4 +231,61 @@ export function readableDate(iso: string): string {
   const month = months[Number(match[2]) - 1];
   if (month === undefined) return iso;
   return `${String(Number(match[3]))} ${month} ${String(match[1])}`;
+}
+
+/**
+ * What a `+` means, as the tooltip on a number that carries one.
+ *
+ * Copy audit v2, #70: the row's *exact count not published* badge is gone and
+ * the `+` stays, with this sentence behind it. The value is written as the row
+ * writes it, so the tooltip and the number cannot disagree.
+ */
+export const atLeastTip = (value: string): string => `At least ${value}. Some counts were hidden for privacy.`;
+
+/**
+ * The division behind one row's rate, for its tooltip.
+ *
+ * Copy audit v2, #76: the division was a line under every bar, a formula in
+ * the main list. It is now behind the number, and the worked example under
+ * *How the rate is calculated* still divides one area out in full.
+ */
+export function rateTip(area: Pick<MapArea, 'total' | 'complete' | 'rate' | 'persons'>): string | null {
+  if (area.rate === null || area.persons === null) return null;
+  const sum = `${figureText(countFigure(area.total, area.complete))} ÷ ${area.persons.toLocaleString('en-AU')} people × 1,000`;
+  return area.complete ? sum : `${atLeastTip(area.rate.toFixed(2))} ${sum}`;
+}
+
+/**
+ * The line under a list: "Top 5 of 30 areas." (copy audit v2, #71, #77).
+ *
+ * Both numbers are counted, not typed. The longer sentences it replaced named
+ * the minimums and the ties hidden past the cut; the rows mark both now, with
+ * a `+` and *Same count*.
+ */
+export function topNote(shown: number, of: number): string {
+  return shown >= of ? `All ${String(of)} areas.` : `Top ${String(shown)} of ${String(of)} areas.`;
+}
+
+/** Why some areas are not in the rate ranking, with the threshold read from the population file. */
+export const unratedNote = (minimumResidents: number): string =>
+  `Areas with under ${minimumResidents.toLocaleString('en-AU')} people are not ranked.`;
+
+/**
+ * The sentence over the yearly chart (copy audit v2, #67).
+ *
+ * The audit's wording, *almost half*, is right for the published board, where
+ * 2010/11 is 44.5% of the total. It is only said while it is true: a share
+ * from 40% up to half is *almost half*, and anything else is written as its
+ * rounded percentage, so a rebuilt board cannot make the sentence wrong.
+ */
+export function wetYearNote(totals: readonly number[], years: readonly string[]): string {
+  const sum = totals.reduce((n, v) => n + v, 0);
+  if (sum <= 0 || totals.length === 0) return '';
+  const peak = Math.max(...totals);
+  const year = yearLabel(years[totals.indexOf(peak)]);
+  const share = peak / sum;
+  if (share >= 0.4 && share < 0.5) {
+    return `Almost half of these ${FLOOD.unit} came in one wet year, ${year}.`;
+  }
+  return `${String(Math.round(share * 100))}% of these ${FLOOD.unit} came in one year, ${year}.`;
 }

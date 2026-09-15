@@ -21,7 +21,7 @@ Detailed verification of three of them is in their own files: [FLOOD-HISTORY-DAT
 | 7 | City of Melbourne 3D Point Cloud 2018 | City of Melbourne Open Data Portal | CC BY 4.0 | `CoM_Point_Cloud_2018_LAS.zip` | Ground height, contours and spot heights, water paths, low areas, address insight, scenario |
 | 8 | VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015 | Victoria State Emergency Service (via data.vic) | CC BY 4.0 | `victoria-ses-incidents-per-sa1-abs-census-areas-2009-2015` | Flood history board, flood map counts |
 | 9 | ASGS 2011, Volume 1 — SA1 and SA2 | Australian Bureau of Statistics | CC BY 2.5 AU | 1270.0.55.001 | Area names, SA2 boundaries on the flood map, suburb-name positions on the Full map |
-| 10 | Population Estimates by SA2, 2005 to 2015 | Australian Bureau of Statistics | CC BY 2.5 AU | 3218.0 | Denominator of *SES flood call-outs per 1,000 residents* |
+| 10 | Population Estimates by SA2, 2005 to 2015 | Australian Bureau of Statistics | CC BY 2.5 AU | 3218.0 | Denominator of *Emergency responses per 1,000 people* |
 
 Licence deeds: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [CC BY 2.5 AU](https://creativecommons.org/licenses/by/2.5/au/). The footer links each credit to its own licence (`apps/web/src/ui/attribution.ts`); the ABS is **not** CC BY 4.0.
 
@@ -63,7 +63,7 @@ All fetched from the portal's export API, `https://data.melbourne.vic.gov.au/api
 
 - **Source file:** `CoM_Point_Cloud_2018_LAS.zip`, on the portal's attachment store (`opendatasoft-s3…/attachments/`). 215 tiles of 500 m, about 4.3 GB. EPSG:28355, heights in AHD.
 - **Read in place.** `archive.py` range-reads individual tiles from the ZIP rather than downloading it; `las.py` parses LAS 1.2 by hand.
-- **Photogrammetric, not LiDAR.** Every point is matched between aerial photographs, quoted at about 25 cm. Ground under dense canopy was never seen and is interpolated — which is why the map hatches *Limited ground data*, and why a comparison never reports millimetres.
+- **Photogrammetric, not LiDAR.** Every point is matched between aerial photographs, quoted at about 25 cm. Ground under dense canopy was never seen and is interpolated — which is why the map hatches *Ground data gaps*, and why a comparison never reports millimetres.
 - **Coverage:** 211 of the 306 tiles in the City of Melbourne extent exist in the archive. The other 95 are missing, and nothing is drawn or claimed there. No pit or pipe lies in a missing tile.
 - **Pipeline:** `ground.py` (SMRF ground filter), `terrain.py`, `hydrology.py` (fill, D8 flow, depressions), `derived.py`, `scene.py`, `scene_tiles.py`, `terrain_tiles.py` (with `terrain_display.py` and `terrain_marks.py`), `address_ground.py`.
 - **Artefacts, all calculated:**
@@ -80,7 +80,7 @@ All fetched from the portal's export API, `https://data.melbourne.vic.gov.au/api
 ### 8 · VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015
 
 - **Catalogue:** data.vic, `victoria-ses-incidents-per-sa1-abs-census-areas-2009-2015`. **The catalogue's download link is dead**; the live ZIP (workbook and Data Quality Statement) is at `https://www.ses.vic.gov.au/documents/d/www/incidents-per-sa1-abs-census-areas?download=true`.
-- **What it counts:** SES crew dispatches by ABS 2011 SA1 — shown on the site as *call-outs* — per financial year 2009-10 to 2014-15 (1 July 2009 – 30 June 2015). **Only the `Flood` incident type is used.** A dispatch is not a flood event, not a measure of severity, and flash flooding is mostly recorded under storms.
+- **What it counts:** SES crew dispatches by ABS 2011 SA1 — shown on the site as *emergency responses* — per financial year 2009-10 to 2014-15 (1 July 2009 – 30 June 2015). **Only the `Flood` incident type is used.** A dispatch is not a flood event, not a measure of severity, and flash flooding is mostly recorded under storms.
 - **Withheld counts:** 144 of 13,339 SA1 regions were suppressed for privacy. Suppressed is kept as unknown, never zero, so 80 of the 281 Greater Melbourne SA2 totals are minimums, shown with `+`.
 - **Pipeline:** `flood_history.py`. **Artefacts:** `flood-history.json` (the board's top 30) and `sa2-areas.json` (all 281 areas, 9,906 dispatches).
 - Verified against its own Data Quality Statement in [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md).
@@ -105,7 +105,7 @@ Two files from 1270.0.55.001, both the **2011 edition**, which is the edition th
 ### 10 · Population Estimates by Statistical Area Level 2, 2005 to 2015
 
 - **Catalogue:** 3218.0 Regional Population Growth, Australia, 2014-15, released 30 March 2016. File `32180ds0001_2005-15.xls`, Table 2 (Victoria).
-- **Used:** estimated resident population at 30 June 2009 to 2015; **30 June 2012 is the denominator of *SES flood call-outs per 1,000 residents*** — the Severity Score of SEVERITY-SCORE.md, renamed on screen on 14 September. Areas under 1,000 residents get no rate (7 of 281), which leaves 274 in the board's ranking per 1,000 residents.
+- **Used:** estimated resident population at 30 June 2009 to 2015; **30 June 2012 is the denominator of *Emergency responses per 1,000 people*** — the Severity Score of SEVERITY-SCORE.md, renamed on screen on 14 September. Areas under 1,000 residents get no rate (7 of 281), which leaves 274 in the board's ranking per 1,000 residents.
 - **Pipeline:** `population.py`. **Artefact:** `population.json`, and the `population` table.
 - Verified in [POPULATION-DATA.md](./POPULATION-DATA.md); the score is defined in [SEVERITY-SCORE.md](./SEVERITY-SCORE.md).
 
@@ -135,12 +135,12 @@ The pages are cited and linked, not copied: summaries are the team's own sentenc
 
 ## What DrainLens calculates
 
-Everything below is marked *Calculated by DrainLens* where it appears, and is not published by any of the sources above:
+Everything below is described as estimated by DrainLens on the site, and is not published by any of the sources above:
 
 - the drainage trace between pits and pipes;
-- the ground surface, water paths, low areas and *Limited ground data* areas;
+- the ground surface, water paths, low areas and *Ground data gaps* areas;
 - the *Ground height* colours, hillshade, contours and spot heights;
 - which way the ground falls around an address;
 - the blockage comparison (*No clear difference* / *More water than with a clear drain*);
-- *SES flood call-outs per 1,000 residents* (the Severity Score, in the model's own documents);
+- *Emergency responses per 1,000 people* (the Severity Score, in the model's own documents);
 - where each statistical area is drawn, its simplified boundary, and where the suburb names sit.

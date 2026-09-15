@@ -45,10 +45,13 @@ export interface WarningsArtefact {
 
 export class WarningsError extends Error {}
 
-/** The card, word for word as requested. */
+/**
+ * The card. The title is as requested; the body is the request's advice alone
+ * (copy audit v2, #62), since its first sentence repeated the title word for
+ * word and its dash broke the site's writing rules.
+ */
 export const WARNING_TITLE = 'Water collects here easily';
-export const WARNING_BODY =
-  "Water collects here easily when it rains. Avoid this spot — for example, don't park your car here when heavy rain is coming.";
+export const WARNING_BODY = 'Avoid parking here when heavy rain is coming.';
 
 /**
  * Pixels per metre at or above which the signs are drawn.

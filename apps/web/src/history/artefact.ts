@@ -219,6 +219,27 @@ export function yearRange(years: readonly string[]): string {
 }
 
 /**
+ * A financial year as a chart label writes it: "2010/11".
+ *
+ * Copy audit v2 (appendix A, #67): the flood screens write financial years
+ * with a slash and a span as calendar years, "2009 to 2015". `financialYear`
+ * and `yearRange` stay for the pages that still use them.
+ */
+export const yearLabel = (label: string | undefined): string => (label ?? '').replace('-', '/');
+
+/**
+ * The calendar years a run of financial years spans: "2009 to 2015".
+ *
+ * `FLOOD.period` is what the screens write; this is how a test checks that the
+ * words still match the data's own years.
+ */
+export function yearSpan(years: readonly string[]): string {
+  const first = (years[0] ?? '').slice(0, 4);
+  const lastStart = Number((years.at(-1) ?? '').slice(0, 4));
+  return Number.isFinite(lastStart) && first !== '' ? `${first} to ${String(lastStart + 1)}` : '';
+}
+
+/**
  * Areas hidden by the cut that recorded the same total as the last one shown.
  *
  * The reason this exists: ranks five and six both recorded 133, so a default

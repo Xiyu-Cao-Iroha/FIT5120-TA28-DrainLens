@@ -469,6 +469,8 @@ export function App() {
             fixtureNote={loaded.fixtureNote}
             // The comparison's own words when it is the task waiting.
             task={session.pendingTask}
+            // The title follows the guide card that was pressed (copy audit v2, #16).
+            section={session.guideSection}
             onFound={(address) =>
               dispatch({
                 type: 'address-accepted',
@@ -744,10 +746,13 @@ export function App() {
       /*
         What the view is fitted to, and when it is fitted again.
 
-        On a new address, the address and the nearest comparable drain. On a
-        returned result, the address, the drain and the whole footprint. From
-        the full map, the drain alone. Choosing a drain is not a refit: the
-        person chose it on the map they were looking at.
+        On a new address, the address and the nearest comparable drain. Once a
+        drain is chosen, the address and that drain, fitted again for the
+        narrower map beside the step-2 panel: the review of 15 September found
+        step 2 still at whatever zoom step 1 had been left on, with the chosen
+        drain small among rings a street away. On a returned result, the
+        address, the drain and the whole footprint. From the full map, the
+        drain alone.
       */
       const fit: { key: string; points: Local[] } =
         session.screen === 'result' && session.run !== null
@@ -759,6 +764,8 @@ export function App() {
                 ...footprintCorners(differenceShown),
               ],
             }
+          : address !== null && session.screen !== 'drain' && pitAt !== null
+            ? { key: `address:${address.id}:drain:${pitId ?? ''}`, points: [addressAt!, pitAt] }
           : address !== null
             ? {
                 key: `address:${address.id}`,

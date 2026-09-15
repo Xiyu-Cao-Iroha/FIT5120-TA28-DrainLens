@@ -133,7 +133,6 @@ export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: 
                 done={learned[path.mode]}
                 ready={ready}
                 status={ready ? SECTIONS[path.mode].locked : 'Terrain guide coming soon'}
-                caption={SECTIONS[path.mode].label}
                 onStart={() => {
                   onStart(path.mode);
                 }}
@@ -152,7 +151,6 @@ export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: 
             done={false}
             ready
             status="Start comparison"
-            caption={COMPARE_CARD.caption}
             onStart={onCompare}
           />
         </div>
@@ -169,7 +167,6 @@ function Card({
   done,
   ready,
   status,
-  caption,
   onStart,
 }: {
   readonly thumb: ReactNode;
@@ -180,12 +177,10 @@ function Card({
   readonly ready: boolean;
   /** Over the picture while the card is not done: what pressing it does. */
   readonly status: string;
-  /** The chip under the card. */
-  readonly caption: string;
   readonly onStart: () => void;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: space(3) }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <button
         type="button"
         onClick={ready ? onStart : undefined}
@@ -217,6 +212,30 @@ function Card({
         */}
         <span style={{ position: 'relative', display: 'block' }}>
           {thumb}
+          {/*
+            Finished is said in the card's corner, not in a chip under it (copy
+            audit v2, #13). The chip carried a second name for the same guide,
+            and readers could not tell a label from a button or another feature.
+            Hidden from a screen reader, which already hears *Guide completed*.
+          */}
+          {done && (
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: space(2),
+                right: space(2),
+                padding: `${String(space(1))}px ${String(space(2))}px`,
+                borderRadius: radius.pill,
+                background: 'rgba(245, 248, 247, 0.95)',
+                boxShadow: shadow.resting,
+                font: type(text.small, { weight: weight.semibold, leading: 1.2 }),
+                color: '#1a5d4d',
+              }}
+            >
+              Done ✓
+            </span>
+          )}
           {!done && (
             <span
               aria-hidden
@@ -260,24 +279,7 @@ function Card({
             {body}
           </span>
         </span>
-
       </button>
-
-      <span
-        style={{
-          alignSelf: 'center',
-          padding: `${String(space(1))}px ${String(space(3))}px`,
-          borderRadius: radius.pill,
-          // Over the landscape, not the page: see `.choose__backdrop`.
-          background: 'rgba(245, 248, 247, 0.9)',
-          font: type(text.label, { weight: weight.medium }),
-          color: done ? '#1a5d4d' : ink.base,
-          textAlign: 'center',
-        }}
-      >
-        {done ? '✓ ' : ''}
-        {caption}
-      </span>
     </div>
   );
 }

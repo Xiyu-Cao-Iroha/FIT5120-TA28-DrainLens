@@ -60,14 +60,16 @@ The plain-English copy pass on `develop` gave each thing one name, held in `apps
 
 | The criteria say | `iteration-1-frozen` shows | `develop` shows |
 | --- | --- | --- |
-| official recorded data (1.1.4.g, 1.1.7.d, 1.2.1.c) | *Official recorded data* | *Council record* |
-| system-derived information (1.1.4.g, 1.1.7.d, 1.3.1.e) | *System-derived result* | *Calculated by DrainLens* |
+| official recorded data (1.1.4.g, 1.1.7.d, 1.2.1.c) | *Official recorded data* | *Drain and pipe locations come from City of Melbourne records.* (legend, *About this data*) |
+| system-derived information (1.1.4.g, 1.1.7.d, 1.3.1.e) | *System-derived result* | *Water paths, low areas and ground height are estimated by DrainLens.* (same place) |
 | Drainage pits, Drainage pipes (1.1.5) | *Pits*, *Pipes* | *Drain pits*, *Drain pipes* |
 | Water Flow (1.1.4.d) | *Water flow* | *Likely water paths* |
 | Terrain (1.1.4.e, 1.3.1) | *Terrain*, *Ground surface* in Layers | *Ground height* |
 | Low Areas (1.1.4.f, 1.3.2) | *Low areas* | *Low areas* |
-| terrain information missing (1.3.1.f) | *Not enough ground measured* | *Limited ground data* |
-| recorded incident count (2.1.1, 2.2.1) | incidents | *call-outs*, under *Recorded SES flood call-outs* |
+| terrain information missing (1.3.1.f) | *Not enough ground measured* | *Ground data gaps* |
+| recorded incident count (2.1.1, 2.2.1) | incidents | *emergency responses*, under *Total emergency responses* |
+
+**15 September, copy audit v2: the source badges came off.** The team's second copy audit found a *Council record* or *Calculated by DrainLens* pill on nearly every card, and asked for them to go from the pit card, the address card, the Layers panel, the legend rows and the flood pages. They are gone, and the team owner decided the legend's tags go too. The distinction 1.1.4.g, 1.1.7.d and 1.3.1.e ask for is now said once, as the two sentences in the table above, in a closed *About this data* at the foot of the map legend (`PROVENANCE` in `ui/terms.ts`), and the pit card's recorded fields keep *Drain and pipe locations come from City of Melbourne records* inside *View technical details*. Whether a sentence in a fold meets *distinguish* as well as a tag on every row did is a judgement a marker may make differently; this is the trade the team chose for readability.
 
 **No criterion's outcome moves with its name.** Each still asks for a distinction or a layer, and each is still there under the new word. Three things did change in behaviour on `develop` and contradict a note below, and each of those notes carries its own dated line: the advisory banner is gone, Terrain draws contour lines, and the comparison is back in the interface.
 
@@ -232,7 +234,7 @@ Nine of eleven points from the mentor review are in. None of them changes a crit
 >
 > **14 September 2026, on `develop`: the reason above no longer applies, and Terrain draws contour lines.** The layer stopped reading the conditioned routing surface. It is now the raw ground, coloured at build time on a fixed AHD ramp into 500 m tiles for the whole council, and the legend is in metres, because a fixed ramp gives a metre the same colour everywhere, which a percentile fit never could. At tile scale it draws ground-height lines at 1 m, bold every 5 m, smoothed first so the 25 cm noise is not drawn as rings round every kerb, and spot heights written with ≈ to the nearest 0.5 m (`pipeline/.../terrain_marks.py`, `map/terrainMarks.ts`). So on `develop` 1.1.4.e and 1.3.1.a are met by contour lines as written, not by an equivalent. `iteration-1-frozen` is the shading described above.
 >
-> **1.1.4.g is the legend's job.** Every layer currently drawn appears in it with *Official recorded data* or *System-derived result* beside it. It used to sit under each control; with the controls compressed into chips there is no room, and a tooltip is not something a layer *carries*. On `develop` since 14 September the two tags read *Council record* and *Calculated by DrainLens* — see the names table at the top of this file.
+> **1.1.4.g is the legend's job.** On `iteration-1-frozen`, every layer currently drawn appears in it with *Official recorded data* or *System-derived result* beside it; from 15 September on `develop` the legend says it once, in *About this data* — see the note under the names table. It used to sit under each control; with the controls compressed into chips there is no room, and a tooltip is not something a layer *carries*. On `develop` since 14 September the two tags read *Council record* and *Calculated by DrainLens* — see the names table at the top of this file.
 >
 > **From 10 September the full map opens with every chip off, and no box above changes.** Each of a to h is of the form *when X is selected, do Y*, and each still holds the moment X is selected; what changed is only what is selected on arrival, which no sub-criterion names. It is worth writing down because a marker who opens the full map and sees no pits will reach for 1.1.4.d before reading this: press *Water flow* and the paths are there. **The homepage cards are untouched** — AC 1.1.2 requires a card to open the map showing what it named, so `openingLayers` still turns on exactly the layer of the card that was pressed, and only the unguided *Explore the map* entry starts empty. **From 11 September the ground surface is off there too**: the unguided map opens with nothing on, and every layer on it is one the person turned on. 1.1.4.e is unaffected for the same reason as the rest — it asks what happens *when Terrain is selected*, and the elevation shading is one press away in the Layers panel. The cards still bring the ground with them.
 

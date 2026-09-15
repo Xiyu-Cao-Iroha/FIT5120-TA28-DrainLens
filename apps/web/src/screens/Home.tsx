@@ -47,7 +47,6 @@ import {
   type FloodHistoryArtefact,
   barScale,
   defaultView,
-  yearRange,
 } from '../history/artefact.js';
 import { HATCH_ON_LIGHT, RAMPS } from '../history/drawAreas.js';
 import { ACTIVITY_BREAKS } from '../history/severity.js';
@@ -57,7 +56,7 @@ import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
 import { CoverageBadge } from '../ui/Shell.js';
-import { COVERAGE, FLOOD, FULL_MAP, LAYER, TOTAL_RAINFALL } from '../ui/terms.js';
+import { FLOOD, FULL_MAP, LAYER, PROVENANCE, TOTAL_RAINFALL } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -94,10 +93,13 @@ export const SECTIONS = {
  * **One sentence each, from 4 September.** These carried two or three, and the
  * mentor review's fourth point was that nobody reads them — which is worse
  * than it sounds, because the sentences being skipped were the careful ones.
- * The qualifications are not gone: what a layer is and is not stays on the map
- * beside the layer (*Council record* / *Calculated by DrainLens*), and
- * *DrainLens does not provide* further down this page still says, in full, that
- * there are no forecasts and no depths. A caveat nobody reads is not a caveat.
+ *
+ * **What a person will see, not where it came from** (copy audit v2, #5 and
+ * #14). *Shown in council records* and *calculated from ground-height data*
+ * answered a question nobody pressing a card asks. The qualifications are not
+ * gone: where each layer comes from is said once in the map legend's *About
+ * this data*, and *More information* at the bottom of this page still says
+ * there are no forecasts and no depths.
  */
 /**
  * Exported so the chooser draws the same four cards from the same definition.
@@ -113,19 +115,19 @@ export const PATHS: readonly {
   {
     mode: 'drainage',
     title: 'Recorded drainage',
-    body: 'Drain pits and pipes shown in council records.',
+    body: 'Street drains near you and the pipes that join them.',
     accent: DAY.pit,
   },
   {
     mode: 'water-flow',
     title: 'Where rainwater may move',
-    body: 'Likely paths rainwater may follow, calculated from ground-height data.',
+    body: 'Arrows show which way rain may flow downhill.',
     accent: DERIVED_DAY.channel,
   },
   {
     mode: 'terrain',
     title: 'The shape of the ground',
-    body: 'Colour shows higher and lower ground. Shading shows the shape of the land.',
+    body: 'Colours show which parts of your street sit higher or lower.',
     // The 20 m node: the ramp's pale low end is close to white and would not
     // read as an accent at all.
     accent: RAMP[7]!.hex,
@@ -133,31 +135,35 @@ export const PATHS: readonly {
   {
     mode: 'low-areas',
     title: 'Low areas',
-    body: `Calculated ${LAYER.lowAreas.toLowerCase()} where water may collect.`,
+    body: 'Dips in the ground where rainwater may pool.',
     accent: DERIVED_DAY.lowPointEdge,
   },
 ];
 
-const STEPS: readonly { readonly title: string; readonly body: string }[] = [
-  {
-    title: 'Open the map',
-    body: 'Open the map. No address is selected until you search for one.',
-  },
-  {
-    title: 'Find a street',
-    body: `Search an address from the top of the map. ${COVERAGE.addresses} The search happens on your device. Your address is not sent or saved.`,
-  },
-  {
-    title: 'Read what is recorded',
-    body: `Use the map buttons to show drain records, ${LAYER.paths.toLowerCase()}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()}. Each layer says whether it comes from council records or DrainLens calculations.`,
-  },
+/**
+ * Three steps, one short action each (copy audit v2, #10).
+ *
+ * The third step used to say where each layer's data comes from, which is not
+ * something to do; the map legend says that once now. The privacy promise stays
+ * in the second step because the code keeps it: the address index is searched
+ * on the device and the address is written nowhere.
+ */
+const STEPS: readonly { readonly title: string; readonly body?: string }[] = [
+  { title: 'Open the map' },
+  { title: 'Search your address', body: 'Your address stays on your device.' },
+  { title: 'Turn on the layers you want to see' },
 ];
 
+/**
+ * What the product gives and does not, folded under *More information* at the
+ * bottom of the page (copy audit v2, #11). *A plain-English note on every layer
+ * saying whether it is recorded or calculated* went with the source badges;
+ * where the data comes from is said here and in the legend instead.
+ */
 const PROVIDES: readonly string[] = [
-  'Council records of public drain pits and pipes, including gaps where the record ends',
-  `${LAYER.paths}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()} calculated from available ground data`,
-  'A plain-English note on every layer saying whether it is recorded or calculated',
-  'Recorded flood-incident counts by area across Greater Melbourne, 2009-10 to 2014-15',
+  `Street drains and the pipes that join them, including gaps where the record ends. ${PROVENANCE.recorded}`,
+  `${LAYER.paths}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()}. ${PROVENANCE.derived}`,
+  `Past flood emergency responses by area across Greater Melbourne, ${FLOOD.period}`,
 ];
 
 const WITHHOLDS: readonly string[] = [
@@ -230,7 +236,6 @@ export function Home({
       </div>
       <Flow />
       <Limits />
-      <ClosingNote />
     </div>
   );
 }
@@ -471,8 +476,8 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Search an address to view council drain records, ground height and likely paths
-            rainwater may follow nearby.
+            Search your address to see nearby street drains, how the ground slopes and where rain
+            may flow.
           </p>
 
           {/*
@@ -764,7 +769,9 @@ function PathCard({
  * **Two things travel with the numbers or the numbers do not go.** The period
  * and the source, because a league table of suburbs with nothing qualifying it
  * is the one shape this data must never take — the same rule
- * `assertFloodHistory` enforces at load. And the `+` on an incomplete total,
+ * `assertFloodHistory` enforces at load. Both are in the section's heading, which
+ * names the SES in full, so the note under the list no longer repeats the
+ * publisher (copy audit v2, #8). And the `+` on an incomplete total,
  * because nine of the thirty areas contain a count the publisher withheld, and
  * a floor shown as an exact figure is a wrong number rather than a rounded one.
  *
@@ -866,8 +873,7 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
           color: ink.subtle,
         }}
       >
-        Recorded by {artefact.source.publisher}. <strong>+</strong> means the exact count was not
-        published, so the total is at least the number shown.
+        <strong>+</strong> means at least this many.
       </p>
     </div>
   );
@@ -941,7 +947,7 @@ function Paths({
 }
 
 /**
- * Which areas had the most flood call-outs: the ranking, and the map beside it.
+ * Which areas had the most flood emergencies: the ranking, and the map beside it.
  *
  * **The fifth kind of information AC 1.1.1.b names, and the only one that is
  * not a map layer.** It keeps a section of its own rather than a fifth card
@@ -969,18 +975,25 @@ function FloodSection({
   readonly onOpenHistory: () => void;
   readonly onOpenFloodMap: () => void;
 }) {
-  const period = yearRange(history.reportingPeriod.years);
   return (
     <Band tone="photo" id={SECTIONS.flood}>
+      {/*
+        The first place this page names the SES, so in full, with what one
+        emergency response is beside it (copy audit v2, #6). `FLOOD.explain`
+        rather than the audit's *each crew sent counts as one*, which the
+        publisher's data quality statement contradicts. The scope stays in the
+        sentence: the four cards above are the City of Melbourne, and this is
+        Greater Melbourne.
+      */}
       <SectionHeading
         onPhoto
         eyebrow="Flood history"
-        title="Which area is under most flood incidents? Get to know here!"
-        body={`SES flood call-outs by area across ${history.geography.scope}, ${period}. They count past call-outs, not flood depth, damage or future risk.`}
+        title="Which areas had the most flood emergencies?"
+        body={`How often the ${FLOOD.ses} sent crews to help with flooding across ${history.geography.scope}, ${FLOOD.period}. ${FLOOD.explain}`}
       />
       <div className="home__split">
         <article style={{ ...floodCard, padding: space(5) }}>
-          <h3 style={cardTitle}>Most call-outs, top five areas</h3>
+          <h3 style={cardTitle}>Top 5 areas</h3>
           <FloodPreview artefact={history} />
           <div style={{ marginTop: 'auto', paddingTop: space(5) }}>
             <PrimaryButton label="See flood history →" onPress={onOpenHistory} />
@@ -988,7 +1001,6 @@ function FloodSection({
         </article>
 
         <FloodMapCard
-          period={period}
           scope={history.geography.scope}
           onOpen={onOpenFloodMap}
         />
@@ -1022,11 +1034,9 @@ const cardTitle = {
  * something anyone discovers by looking at it.
  */
 function FloodMapCard({
-  period,
   scope,
   onOpen,
 }: {
-  readonly period: string;
   readonly scope: string;
   readonly onOpen: () => void;
 }) {
@@ -1041,7 +1051,7 @@ function FloodMapCard({
       onClick={onOpen}
       // One sentence rather than everything inside read out in a row: the
       // legend is a key to colours, which a screen reader has no use for.
-      aria-label={`Open the area map: ${scope} areas shaded by recorded SES flood call-outs, ${period}`}
+      aria-label={`Open the area map: ${scope} areas shaded by ${FLOOD.legend}`}
       onMouseEnter={() => {
         setRaised(true);
       }}
@@ -1106,7 +1116,7 @@ function FloodMapCard({
             color: ink.base,
           }}
         >
-          {FLOOD.callouts}, {period}
+          {FLOOD.legend}
         </span>
         <span
           style={{
@@ -1131,7 +1141,7 @@ function FloodMapCard({
                 background: `repeating-linear-gradient(135deg, ${HATCH_ON_LIGHT} 0 1.5px, ${RAMPS.activity[1] ?? line.base} 1.5px 4px)`,
               }}
             />
-            Minimum total (+)
+            At least (+)
           </span>
         </span>
         <span
@@ -1256,9 +1266,11 @@ function Flow() {
             >
               {step.title}
             </h3>
-            <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-              {step.body}
-            </p>
+            {step.body !== undefined && (
+              <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
+                {step.body}
+              </p>
+            )}
           </li>
         ))}
       </ol>
@@ -1266,23 +1278,70 @@ function Flow() {
   );
 }
 
+/**
+ * The line the whole site is built around, said once more on the way out, with
+ * the two lists folded under it.
+ *
+ * **One visible line, and the lists one press away** (copy audit v2, #11). The
+ * seven items used to stand open in two cards above a separate closing note,
+ * and the audit found nobody reads seven caveats at the bottom of a page. The
+ * line that must survive a quick read is the one kept open: this is not a
+ * warning service, and where the warnings are. *More information* is closed
+ * by default and says in its summary what is inside.
+ *
+ * The footer says the same on every screen. This repeats it at the bottom of
+ * the page somebody reads before deciding to trust the thing, which is the
+ * other moment it can change what they expect.
+ */
 function Limits() {
   return (
-    <Band id={SECTIONS.limits}>
-      <SectionHeading
-        title="What DrainLens can and cannot show"
-      />
+    <section
+      id={SECTIONS.limits}
+      style={{
+        background: basisTone.derived.fill,
+        borderTop: `1px solid ${line.base}`,
+      }}
+    >
       <div
         style={{
-          display: 'grid',
-          gap: space(5),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+          maxWidth: 1080,
+          margin: '0 auto',
+          padding: `${String(space(8))}px ${String(space(6))}px`,
         }}
       >
-        <ClaimCard title="DrainLens provides" items={PROVIDES} tone="recorded" />
-        <ClaimCard title="DrainLens does not provide" items={WITHHOLDS} tone="withheld" />
+        <p
+          style={{
+            margin: 0,
+            font: type(text.body, { weight: weight.semibold, leading: 1.6 }),
+            color: basisTone.derived.ink,
+          }}
+        >
+          DrainLens is not a live flood warning. For current warnings, check VicEmergency.
+        </p>
+        <details style={{ marginTop: space(4) }}>
+          <summary
+            style={{
+              cursor: 'pointer',
+              font: type(text.label, { weight: weight.semibold }),
+              color: ink.strong,
+            }}
+          >
+            More information
+          </summary>
+          <div
+            style={{
+              display: 'grid',
+              gap: space(5),
+              gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+              marginTop: space(5),
+            }}
+          >
+            <ClaimCard title="DrainLens provides" items={PROVIDES} tone="recorded" />
+            <ClaimCard title="DrainLens does not provide" items={WITHHOLDS} tone="withheld" />
+          </div>
+        </details>
       </div>
-    </Band>
+    </section>
   );
 }
 
@@ -1342,37 +1401,6 @@ function ClaimCard({
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-/**
- * The line the whole site is built around, said once more on the way out.
- *
- * The footer says it on every screen. This repeats it at the bottom of
- * the page somebody reads before deciding to trust the thing, which is the
- * other moment it can change what they expect.
- */
-function ClosingNote() {
-  return (
-    <section
-      style={{
-        background: basisTone.derived.fill,
-        borderTop: `1px solid ${line.base}`,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1080,
-          margin: '0 auto',
-          padding: `${String(space(6))}px ${String(space(6))}px`,
-          font: type(text.label, { leading: 1.6 }),
-          color: basisTone.derived.ink,
-        }}
-      >
-        DrainLens is not a live warning service. For current emergencies and warnings, use official
-        channels.
-      </div>
     </section>
   );
 }

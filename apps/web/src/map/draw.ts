@@ -229,8 +229,11 @@ function drawPits(
 
     // A ring around, not a different fill: the suggestion has to read as
     // "this one, if you want it" rather than as an already-made choice.
+    // No asset-number label on it: the guide is the only thing that suggests
+    // a pit, and it says "the drain with the orange ring", so the number was
+    // an internal ID beside a ring that already answered (copy audit v2, #23).
     if (suggestedAsset !== null && pit.asset_number === suggestedAsset) {
-      drawPin(context, x, y, palette.suggested, String(pit.asset_number ?? ''));
+      drawPin(context, x, y, palette.suggested, '');
       context.lineWidth = 1.5;
     }
     if (isSelected) {
@@ -393,9 +396,10 @@ function drawComparisonPits(
  *
  * A pit is drawn at two to seven pixels, which is right for eight hundred of
  * them and useless for the one that matters: a teammate reported not being
- * able to find the pit the panel had just named. So the chosen and suggested
- * pits get a stem, a ring and their asset number — the same identifier the
- * panel shows, so the two can be matched without counting dots.
+ * able to find the pit the panel had just named. So the chosen pit gets a
+ * stem, a ring and its asset number — the same identifier the panel shows, so
+ * the two can be matched without counting dots. The guide's suggested pit gets
+ * the ring alone (copy audit v2, #23).
  *
  * Drawn upward from the pit, because the label belongs to the point below it
  * and a label centred on the point hides the thing it names.
@@ -410,19 +414,21 @@ function drawPin(
   const stem = 22;
 
   context.beginPath();
-  context.moveTo(x, y - 3);
-  context.lineTo(x, y - stem);
-  context.lineWidth = 2;
-  context.strokeStyle = colour;
-  context.stroke();
-
-  context.beginPath();
   context.arc(x, y, 9, 0, Math.PI * 2);
   context.lineWidth = 2.5;
   context.strokeStyle = colour;
   context.stroke();
 
+  // Without a label there is nothing for the stem to hold up, so the ring is
+  // drawn alone: the guide's suggested pit (copy audit v2, #23).
   if (label === '') return;
+
+  context.beginPath();
+  context.moveTo(x, y - 3);
+  context.lineTo(x, y - stem);
+  context.lineWidth = 2;
+  context.strokeStyle = colour;
+  context.stroke();
 
   context.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
   context.textAlign = 'center';

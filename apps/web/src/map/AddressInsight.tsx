@@ -10,12 +10,20 @@
  * > **An arrow is a trend or a movement. A line with an end mark is a thing
  * > that is there.**
  *
- * | Mark | Meaning |
- * |---|---|
- * | Orange arrow | which way the ground around the address generally falls |
- * | Blue dashed line, short bar at the end | the nearest mapped likely water path |
- * | Lighter blue dashed line, oval at the end | the nearest mapped low area |
- * | Orange dot | the address |
+ * | Mark | Meaning | Label |
+ * |---|---|---|
+ * | Orange arrow | which way the ground around the address generally falls | *Steep slope down* or *Gentle slope downhill this way* |
+ * | Blue dashed line, short bar at the end | the nearest mapped likely water path | *Water may flow* |
+ * | Lighter blue dashed line, oval at the end | the nearest mapped low area | *Water may pool* |
+ * | Orange dot | the address | |
+ *
+ * **The labels say what a resident wants to know, not what was calculated.**
+ * Team review item 16: *likely water path*, *low area*, *ground falls ≈ 4.0 m
+ * over 150 m* and a three-line key (*Arrow = …, Dashed = …*) were not
+ * understood. Each label now says where water may flow, where it may pool
+ * and where the ground slopes steeply, hedged with *may* as everywhere else, so
+ * the marks need no key. (*Pool* rather than *collect* from copy audit v2, #58,
+ * so the card and the low-areas guide use one word.)
  *
  * **Orange is no longer the address's alone.** It was reserved for the address
  * because no map layer used it; the ground's arrow is about the address, and is
@@ -26,14 +34,19 @@
  * the eighth its sentence names, because the fit claims no more than that. The
  * dashed lines point at where the nearest path and low area actually are; the
  * rounded distance is on the label, and every line is the same length whatever
- * that distance. The caption says so: *distances rounded · not to scale*.
+ * that distance. One plain line says so: *Directions and distances are
+ * approximate.* It sits behind a small ⓘ in the figure's corner rather than
+ * printed under it (copy audit v2, #59), and the ⓘ is only there when the
+ * figure draws a direction for it to qualify.
  *
  * The figure's accessible name is `describeAddress`, the same structure the
  * marks are drawn from, so the picture and what a screen reader hears cannot
  * disagree.
  */
 
-import { type GroundTrend, describeAddress } from './addressGround.js';
+import { useId, useState } from 'react';
+
+import { type GroundTrend, describeAddress, isSteep } from './addressGround.js';
 import { DERIVED_DAY } from './derived.js';
 import { COMPASS_ANGLE, type NearbyThing, type WaterNearby } from './nearby.js';
 
@@ -65,8 +78,10 @@ const NOTE_LINE = 13;
 const ORANGE = '#c2410c';
 const FAINT = '#dfe5da';
 const INK = '#4d5f6e';
-/** 5.9:1 on white at 10 px; the not-to-scale line has to be readable. */
+/** 5.9:1 on white at 10 px; the caption line has to be readable. */
 const CAPTION = '#5b6e7e';
+/** The figure is not to scale and its distances are rounded; this is that, in plain words. */
+export const CAPTION_TEXT = 'Directions and distances are approximate.';
 
 const point = (cy: number, degrees: number, radius: number): readonly [number, number] => {
   const radians = (degrees * Math.PI) / 180;
@@ -357,35 +372,55 @@ function Pointer({
 export function figureFor(ground: GroundTrend | null, near: WaterNearby | null): FigureLayout {
   const items: { key: string; degrees: number; mark: Mark; lines: readonly [string, string] }[] = [];
   if (ground?.kind === 'falls') {
-    items.push({
-      key: 'ground',
-      degrees: COMPASS_ANGLE[ground.bearing],
-      mark: 'arrow',
-      lines: ['ground falls', `≈ ${ground.fallM.toFixed(1)} m over 150 m`],
-    });
+    items.push({ key: 'ground', degrees: COMPASS_ANGLE[ground.bearing], mark: 'arrow', lines: groundLines(ground.fallM) });
   }
   if (near?.channel?.kind === 'direction') {
     items.push({
       key: 'path',
       degrees: near.channel.angleDeg,
       mark: 'bar',
-      lines: ['likely water path', `about ${String(near.channel.distanceM)} m away`],
+      lines: ['Water may flow', `about ${String(near.channel.distanceM)} m away`],
     });
   }
   if (near?.low?.kind === 'direction') {
-    items.push({ key: 'low', degrees: near.low.angleDeg, mark: 'oval', lines: ['low area', `about ${String(near.low.distanceM)} m away`] });
+    items.push({
+      key: 'low',
+      degrees: near.low.angleDeg,
+      mark: 'oval',
+      lines: ['Water may pool', `about ${String(near.low.distanceM)} m away`],
+    });
   }
   return layoutFigure(items);
+}
+
+/**
+ * The ground arrow's words: a number only for a steep slope.
+ *
+ * Team review item 16 found *ground falls / ≈ 4.0 m over 150 m* meant nothing to
+ * a resident. The arrow now says the ground slopes down its way, and the fall is
+ * printed only where it is steep enough to matter (`STEEP_FALL_M`, 1 in 20);
+ * a gentler fall is called gentle and given no number to read too much into.
+ *
+ * Every label line is kept to 20 characters or fewer. `layoutFigure` measures
+ * a line at 5.8 px a character, and a label much wider than about 110 px no
+ * longer fits beside the ring on the east or west: it is pushed round above or
+ * below and the card grows. So the steep fall is whole metres, *about*, which
+ * is as much as a fitted plane rounded to half a metre supports anyway, and the
+ * sweep in the tests runs the widest one the artefact holds.
+ */
+export function groundLines(fallM: number): readonly [string, string] {
+  return isSteep(fallM) ? ['Steep slope down', `about ${String(Math.round(fallM))} m in 150 m`] : ['Gentle slope', 'downhill this way'];
 }
 
 /** Words for the facts that have nothing to point at. */
 export function notesFor(ground: GroundTrend | null, near: WaterNearby | null): readonly string[] {
   const notes: string[] = [];
-  if (ground?.kind === 'unclear') notes.push('No reliable overall ground direction');
-  if (ground?.kind === 'edge') notes.push('No ground direction: too near the edge of the data');
-  if (near?.channel?.kind === 'very-near') notes.push('A likely water path is at or very near');
-  if (near?.low?.kind === 'inside') notes.push('This address is inside a mapped low area');
-  if (near?.low?.kind === 'very-near') notes.push('A low area is at or very near this address');
+  // Copy audit v2, #58: *downhill* and *pool*, the words the guides now use.
+  if (ground?.kind === 'unclear') notes.push('No clear downhill direction here');
+  if (ground?.kind === 'edge') notes.push('No downhill direction: too near the edge of the data');
+  if (near?.channel?.kind === 'very-near') notes.push('Water may flow at or near this address');
+  if (near?.low?.kind === 'inside') notes.push('Water may pool at this address');
+  if (near?.low?.kind === 'very-near') notes.push('Water may pool at or near this address');
   return notes;
 }
 
@@ -396,48 +431,75 @@ export function AddressInsight({
   readonly ground: GroundTrend | null;
   readonly near: WaterNearby | null;
 }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const aboutId = useId();
   const notes = notesFor(ground, near);
   const figure = figureFor(ground, near);
   const { cy } = figure;
-  // The notes start under the drawing, and the caption's three lines under them.
+  // The notes start under the drawing; the last one's descender ends the figure.
   const notesY = figure.drawingBottom + 12;
-  const height = figure.drawingBottom + 32 + notes.length * NOTE_LINE + 12;
+  const height = notes.length === 0 ? figure.drawingBottom + 4 : notesY + (notes.length - 1) * NOTE_LINE + 4;
+  // Only a figure that draws a direction has directions and distances to qualify.
+  const drawsDirection = figure.labels.length > 0;
   return (
-    <svg
-      viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
-      role="img"
-      aria-label={describeAddress(ground, near) ?? ''}
-      style={{ width: '100%', height: 'auto', display: 'block', margin: '4px 0 2px' }}
-    >
-      <circle cx={CX} cy={cy} r={RING} fill="none" stroke={FAINT} strokeWidth="1" />
-      <text x={CX} y={figure.northY} fontSize="11" fill={CAPTION} fontWeight="600" textAnchor="middle">
-        N
-      </text>
-
-      {near?.low?.kind === 'direction' && <Pointer thing={near.low} colour={DERIVED_DAY.lowPointEdge} end="oval" cy={cy} />}
-      {near?.channel?.kind === 'direction' && <Pointer thing={near.channel} colour={DERIVED_DAY.channel} end="bar" cy={cy} />}
-      {ground?.kind === 'falls' && <GroundArrow trend={ground} cy={cy} />}
-      {figure.labels.map((label) => (
-        <Label key={label.key} label={label} />
-      ))}
-
-      {/* The address, last, so nothing is drawn over the person's own mark. */}
-      <circle cx={CX} cy={cy} r="4.5" fill={ORANGE} stroke="#ffffff" strokeWidth="2" />
-
-      {notes.map((note, index) => (
-        <text key={note} x={CX} y={notesY + index * NOTE_LINE} fontSize="10.5" fill={INK} textAnchor="middle">
-          {note}
+    <div style={{ margin: '4px 0 2px' }}>
+      <svg
+        viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
+        role="img"
+        aria-label={describeAddress(ground, near) ?? ''}
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+      >
+        <circle cx={CX} cy={cy} r={RING} fill="none" stroke={FAINT} strokeWidth="1" />
+        <text x={CX} y={figure.northY} fontSize="11" fill={CAPTION} fontWeight="600" textAnchor="middle">
+          N
         </text>
-      ))}
-      <text x={CX} y={height - 28} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Arrow = which way the ground falls
-      </text>
-      <text x={CX} y={height - 16} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Dashed = direction to a nearby calculated feature
-      </text>
-      <text x={CX} y={height - 4} fontSize="10" fill={CAPTION} textAnchor="middle">
-        Distances rounded · not to scale
-      </text>
-    </svg>
+
+        {near?.low?.kind === 'direction' && <Pointer thing={near.low} colour={DERIVED_DAY.lowPointEdge} end="oval" cy={cy} />}
+        {near?.channel?.kind === 'direction' && <Pointer thing={near.channel} colour={DERIVED_DAY.channel} end="bar" cy={cy} />}
+        {ground?.kind === 'falls' && <GroundArrow trend={ground} cy={cy} />}
+        {figure.labels.map((label) => (
+          <Label key={label.key} label={label} />
+        ))}
+
+        {/* The address, last, so nothing is drawn over the person's own mark. */}
+        <circle cx={CX} cy={cy} r="4.5" fill={ORANGE} stroke="#ffffff" strokeWidth="2" />
+
+        {notes.map((note, index) => (
+          <text key={note} x={CX} y={notesY + index * NOTE_LINE} fontSize="10.5" fill={INK} textAnchor="middle">
+            {note}
+          </text>
+        ))}
+      </svg>
+      {drawsDirection && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, minHeight: 18 }}>
+          {aboutOpen && (
+            <span id={aboutId} style={{ fontSize: 11, lineHeight: 1.3, color: CAPTION }}>
+              {CAPTION_TEXT}
+            </span>
+          )}
+          {/*
+            Drawn, not typed: the site's font subset has no ⓘ (public/fonts/README.md).
+            A press rather than hover alone, so it opens on a phone as well.
+          */}
+          <button
+            type="button"
+            title={CAPTION_TEXT}
+            aria-label="About this figure"
+            aria-expanded={aboutOpen}
+            aria-controls={aboutOpen ? aboutId : undefined}
+            onClick={() => {
+              setAboutOpen((open) => !open);
+            }}
+            style={{ display: 'inline-flex', padding: 1, background: 'none', border: 'none', color: CAPTION, cursor: 'pointer' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+              <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <circle cx="8" cy="4.8" r="1" fill="currentColor" />
+              <path d="M8 7.2v4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

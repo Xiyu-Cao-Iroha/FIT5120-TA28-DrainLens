@@ -107,8 +107,9 @@ export function fitPoints(
   }
   const centreE = (minE + maxE) / 2;
   const centreN = (minN + maxN) / 2;
-  const spanE = Math.max(maxE - minE, minAcrossM);
-  const spanN = Math.max(maxN - minN, minAcrossM);
+  // At least a metre, so a single point divides by something.
+  const spanE = Math.max(maxE - minE, 1);
+  const spanN = Math.max(maxN - minN, 1);
 
   const shrinkX = Math.min(1, (widthPx * 0.75) / Math.max(padding.left + padding.right, 1));
   const shrinkY = Math.min(1, (heightPx * 0.75) / Math.max(padding.top + padding.bottom, 1));
@@ -119,7 +120,18 @@ export function fitPoints(
   const roomX = widthPx - left - right;
   const roomY = heightPx - top - bottom;
 
-  const scale = Math.min(Math.max(Math.min(roomX / spanE, roomY / spanN), floor), MAX_SCALE);
+  /*
+    The minimum extent is measured along the room's longer side.
+
+    It was applied to both axes, so on a laptop -- a room about 1,000 px wide
+    and 600 px tall -- the 180 m had to fit the height, and the view opened
+    some 300 m wide with the address and its drain small in the middle of it
+    (review of 15 September, item 17). Along the longer side, the view is
+    still never narrower than 180 m, and the pair is not lost in it.
+  */
+  const fitted = Math.min(roomX / spanE, roomY / spanN);
+  const closest = Math.max(roomX, roomY) / minAcrossM;
+  const scale = Math.min(Math.max(Math.min(fitted, closest), floor), MAX_SCALE);
 
   // The room's centre, in canvas pixels, and how far it sits from the canvas's.
   const offsetX = left + roomX / 2 - widthPx / 2;
