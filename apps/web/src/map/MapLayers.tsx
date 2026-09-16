@@ -15,7 +15,7 @@
  * has a switch of its own — which is the substance those criteria protect,
  * whichever control happens to sit where.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   CHIP_KEYS,
@@ -228,6 +228,16 @@ export interface LayerChipsProps {
    * see where to press (copy audit v2, #21). Null or absent everywhere else.
    */
   readonly pulse?: LayerKey | null;
+  /**
+   * The same outline on the Layers button, or on one switch inside its panel.
+   *
+   * The ground height guide's first and second steps, Figma Terrain Tutorial,
+   * 16 September: its layer is behind the button, so that is where to press.
+   */
+  readonly pulseLayers?: boolean;
+  readonly pulsePanelKey?: LayerKey | null;
+  /** Told whenever the panel opens or shuts. The guide's first step waits on it. */
+  readonly onPanelChange?: (open: boolean) => void;
 }
 
 /**
@@ -244,8 +254,20 @@ export function LayerChips({
   keys = CHIP_KEYS,
   layersButton = true,
   pulse = null,
+  pulseLayers = false,
+  pulsePanelKey = null,
+  onPanelChange,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    onPanelChange?.(open);
+  }, [open, onPanelChange]);
+  /*
+    With no chips the button is the first thing in the row, at the map's left
+    edge, and a panel hung from its right edge opened off the side of the map
+    -- clipped away inside the guide's frame. It hangs from the left then.
+  */
+  const panelSide = keys.length === 0 ? { left: 0 } : { right: 0 };
 
   return (
     <div
@@ -279,6 +301,7 @@ export function LayerChips({
         <button
           type="button"
           data-tour="layers"
+          className={pulseLayers ? 'chip--pulse' : undefined}
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -312,7 +335,7 @@ export function LayerChips({
           <div
             style={{
               position: 'absolute',
-              right: 0,
+              ...panelSide,
               top: 'calc(100% + 6px)',
               zIndex: 5,
               width: 288,
@@ -341,11 +364,15 @@ export function LayerChips({
                 <label
                   key={key}
                   title={disabled ? `${spec.label} is still loading` : spec.label}
+                  className={pulsePanelKey === key ? 'chip--pulse' : undefined}
                   style={{
                     display: 'flex',
                     gap: space(3),
                     alignItems: 'flex-start',
                     marginBottom: space(3),
+                    // Room for the outline, which is drawn as a shadow.
+                    padding: `${String(space(1))}px ${String(space(2))}px`,
+                    borderRadius: radius.small,
                     font: type(text.label, { leading: 1.5 }),
                     color: disabled ? ink.subtle : ink.base,
                   }}
@@ -398,7 +425,18 @@ export function LayerChips({
  * wrap on a narrow window — pinned to a corner it would simply be underneath
  * them — and it is why the caller owns the position now.
  */
-export function MapLegend({ state }: { readonly state: LayerState }) {
+export function MapLegend({
+  state,
+  pulseTerrain = false,
+}: {
+  readonly state: LayerState;
+  /**
+   * The ground-height scale outlined: the guide's steps about the colours and
+   * about AHD point at it. While the legend is folded, its Show button is
+   * outlined instead, since the scale is not there to outline.
+   */
+  readonly pulseTerrain?: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
@@ -436,6 +474,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
             setOpen((v) => !v);
           }}
           aria-expanded={open}
+          className={pulseTerrain && !open && state.terrain ? 'chip--pulse' : undefined}
           style={{
             marginLeft: 'auto',
             background: 'none',
@@ -454,7 +493,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
         <>
           {shown.map((spec) =>
             spec.swatch === 'ramp' ? (
-              <TerrainScale key={spec.key} spec={spec} />
+              <TerrainScale key={spec.key} spec={spec} pulse={pulseTerrain} />
             ) : (
               <div
                 key={spec.key}
@@ -526,10 +565,21 @@ const TERRAIN_DETAILS: readonly string[] = [
  * ramp is now fixed to metres AHD, so the numbers are what the colours mean.
  * That it is calculated, AC 1.3.1, is said under the legend's *About this data*.
  */
-function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
+function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly pulse: boolean }) {
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
-    <div style={{ marginTop: space(3) }}>
+    <div
+      className={pulse ? 'chip--pulse' : undefined}
+      style={{
+        marginTop: space(3),
+        // Room for the outline without moving the scale: padded by as much as
+        // it is pulled out.
+        padding: space(1),
+        marginLeft: -space(1),
+        marginRight: -space(1),
+        borderRadius: radius.small,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: space(2) }}>
         <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
           {spec.label}

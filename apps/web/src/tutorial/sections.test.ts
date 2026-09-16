@@ -14,6 +14,7 @@ import {
   SECTION_ORDER,
   allLearned,
   countLearned,
+  guideTitleOf,
   lockNotice,
   nextSection,
 } from './sections.js';
@@ -100,5 +101,15 @@ describe('what has been finished', () => {
       expect(SECTIONS[id].label.length).toBeGreaterThan(3);
     }
     expect(SECTION_ORDER).toHaveLength(4);
+  });
+});
+
+describe('what the header calls a guide', () => {
+  it('is the card label, except where the design names the guide', () => {
+    expect(guideTitleOf('terrain')).toBe('Ground height guide');
+    expect(SECTIONS.terrain.label).toBe('The shape of the ground');
+    for (const id of ['drainage', 'water-flow', 'low-areas'] as const) {
+      expect(guideTitleOf(id)).toBe(SECTIONS[id].label);
+    }
   });
 });

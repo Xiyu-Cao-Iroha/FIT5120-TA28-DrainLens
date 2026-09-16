@@ -26,7 +26,7 @@ import {
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
@@ -49,7 +49,9 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
-import type { MapNow } from '../tutorial/lesson.js';
+import type { Highlight, MapNow } from '../tutorial/lesson.js';
+import { GuideMarks } from '../map/GuideOverlayView.js';
+import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
 import { waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
@@ -131,6 +133,24 @@ export interface MapViewProps {
   readonly layersButton?: boolean | undefined;
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
+  /**
+   * Something else the guide's step points at: the Layers button, the Ground
+   * height switch in its panel, or the legend's ground-height scale.
+   */
+  readonly highlight?: Highlight | null | undefined;
+  /**
+   * Marks the guide draws over the map, in the map's frame.
+   *
+   * The ground height guide's lettered markers and highlighted contour (Figma
+   * Terrain Tutorial, 16 September). Drawn over the canvas and under the
+   * controls, and moved with the view. See `map/guideMarks.ts`.
+   */
+  readonly overlay?: GuideOverlay | null | undefined;
+  /**
+   * The canvas's viewport, whenever it changes. The guide reads the first
+   * one to choose points inside the view it opens on.
+   */
+  readonly onViewport?: ((viewport: Viewport | null) => void) | undefined;
   /**
    * What is on when the map opens, overriding the mode and the task.
    *
@@ -218,6 +238,9 @@ export function MapView({
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  highlight = null,
+  overlay = null,
+  onViewport,
   openWith,
   highlightPit = null,
   onMapNow,
@@ -250,6 +273,14 @@ export function MapView({
   // The transform the canvas drew with, reported upward so a callout can be
   // put at a feature rather than beside the map.
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  useEffect(() => {
+    onViewport?.(viewport);
+  }, [viewport, onViewport]);
+  // Whether the Layers panel is open, which the guide's first step waits on.
+  const [layersOpen, setLayersOpen] = useState(false);
+  const panelChanged = useCallback((open: boolean) => {
+    setLayersOpen(open);
+  }, []);
   // Dismissed by the person, not by the address changing: picking a new
   // address should say something about the new one.
   const [addressCardOpen, setAddressCardOpen] = useState(addressCard);
@@ -414,6 +445,7 @@ export function MapView({
   const channelOn = layers.channel;
   const lowPointsOn = layers.lowPoint;
   const unmeasuredOn = layers.unavailable;
+  const terrainOn = layers.terrain;
   const selectedId = selected === null ? null : String(selected);
   useEffect(() => {
     onMapNow?.({
@@ -424,8 +456,15 @@ export function MapView({
       unmeasured: unmeasuredOn,
       selectedPit: selectedId,
       followingPit: following,
+      terrain: terrainOn,
+      layersOpen,
+      // The map says what is true now; the guide latches these (`latch`).
+      layersOpened: layersOpen,
+      terrainShown: terrainOn,
     });
   }, [
+    terrainOn,
+    layersOpen,
     pitsOn,
     pipesOn,
     channelOn,
@@ -487,6 +526,8 @@ export function MapView({
         }}
       />
 
+      {viewport !== null && overlay !== null && <GuideMarks overlay={overlay} viewport={viewport} />}
+
       {panel && (
         <div
           style={{
@@ -517,6 +558,9 @@ export function MapView({
               unavailableKeys={notYet}
               layersButton={layersButton}
               pulse={pulseChip}
+              pulseLayers={highlight === 'layers'}
+              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
+              onPanelChange={panelChanged}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
           </div>
@@ -530,7 +574,7 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          {legend && <MapLegend state={layers} />}
+          {legend && <MapLegend state={layers} pulseTerrain={highlight === 'terrain-legend'} />}
         </div>
       )}
 

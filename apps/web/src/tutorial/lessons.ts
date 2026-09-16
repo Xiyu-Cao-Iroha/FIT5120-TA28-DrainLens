@@ -6,21 +6,25 @@
  * from the lessons it was describing, which is two places to remember when a
  * third one lands. Here a lesson is offered because a lesson exists.
  *
- * `terrain` has none yet, so its card stays *Terrain guide coming soon* and
- * its section cannot be started. That is the honest state rather than a stub:
- * a fourth lesson that walked somebody through nothing would teach nothing.
+ * All four have one since 16 September, when the ground height guide was
+ * built from the Figma Terrain Tutorial. Until then `terrain` was left out and
+ * its card said *Terrain guide coming soon*, which was the honest state rather
+ * than a stub: a lesson that walked somebody through nothing would teach
+ * nothing.
  */
 
 import type { Lesson } from './lesson.js';
 import { SECTION_ORDER, type SectionId } from './sections.js';
 import { DRAINAGE } from './drainage.js';
 import { LOW_AREAS } from './lowAreas.js';
+import { TERRAIN } from './terrain.js';
 import { WATER_FLOW } from './waterFlow.js';
 
 export const LESSONS: Partial<Record<SectionId, Lesson>> = {
   drainage: DRAINAGE,
   'water-flow': WATER_FLOW,
   'low-areas': LOW_AREAS,
+  terrain: TERRAIN,
 };
 
 /**

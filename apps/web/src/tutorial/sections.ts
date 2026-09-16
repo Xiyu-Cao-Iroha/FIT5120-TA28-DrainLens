@@ -15,6 +15,7 @@
  */
 
 import type { MapMode } from '../map/modes.js';
+import { LAYER } from '../ui/terms.js';
 
 /** A section of the guide. One per map mode, and the ids are the modes. */
 export type SectionId = MapMode;
@@ -33,7 +34,19 @@ export interface Section {
   readonly label: string;
   /** Shown on a card whose guide has not been finished yet. */
   readonly locked: string;
+  /**
+   * The guide's name in the header, where it is not `label`.
+   *
+   * The ground height guide's design titles it *Ground height guide*, while
+   * its card keeps *The shape of the ground*. A field of its own rather than a
+   * renamed label, because the label is the card's and the other three guides
+   * are titled by it.
+   */
+  readonly guideTitle?: string;
 }
+
+/** What the header calls a section's guide. */
+export const guideTitleOf = (id: SectionId): string => SECTIONS[id].guideTitle ?? SECTIONS[id].label;
 
 export const SECTIONS: Record<SectionId, Section> = {
   drainage: {
@@ -55,6 +68,7 @@ export const SECTIONS: Record<SectionId, Section> = {
     id: 'terrain',
     label: 'The shape of the ground',
     locked: 'Start guide',
+    guideTitle: `${LAYER.ground} guide`,
   },
 };
 

@@ -23,6 +23,7 @@
  */
 
 import type { LayerKey } from '../map/modes.js';
+import type { TerrainPoints } from './terrainPoints.js';
 
 
 /** What a `do` step is waiting for. */
@@ -33,18 +34,98 @@ export type Requirement =
   | 'trace-following'
   | 'water-flow-on'
   | 'low-areas-on'
-  | 'unmeasured-on';
+  | 'unmeasured-on'
+  /*
+    The ground height guide's three, Figma Terrain Tutorial, 16 September.
+
+    The first two are *latched*: true once the thing has happened during this
+    lesson, whatever the map shows now. They have to be, because step nine asks
+    for the opposite of step two -- Ground height off -- and `stepIndex` walks
+    the steps in order: a step two that read the map as it is would send the
+    reader back to it the moment they did what step nine asked. The guide
+    accumulates them with `latch`. The third is read as the map is now.
+  */
+  | 'layers-opened'
+  | 'terrain-shown'
+  | 'terrain-off';
+
+/**
+ * A control on the map the guide can outline, besides a chip.
+ *
+ * `layers` is the Layers button, `terrain-toggle` the Ground height checkbox
+ * inside its panel, and `terrain-legend` the ground-height scale in the map
+ * legend.
+ */
+export type Highlight = 'layers' | 'terrain-toggle' | 'terrain-legend';
+
+/**
+ * What the guide draws over the map for a step, in the map's own frame.
+ *
+ * Named rather than carried as coordinates, because the step is copy and the
+ * points are data: `tutorial/terrainPoints.ts` chooses them near the address,
+ * and the guide turns the name into marks. A step whose data is missing has
+ * no mark rather than an invented one.
+ */
+export type GuideMark = 'height-pair' | 'height-spot' | 'height-compare' | 'contour' | 'slope-example';
+
+/** A box under a step's heading, as the ground height guide draws them. */
+export type StepCard =
+  | { readonly kind: 'ramp' }
+  | { readonly kind: 'height'; readonly value: string; readonly text: string }
+  | {
+      readonly kind: 'reading';
+      readonly value: string;
+      readonly note: string;
+      readonly compare: string | null;
+    }
+  | { readonly kind: 'warning'; readonly title: string; readonly text: string };
+
+export interface QuizOption {
+  readonly label: string;
+  readonly correct: boolean;
+}
+
+/** A folded card under a quiz, with a line sample beside each sentence. */
+export interface MoreInfo {
+  readonly title: string;
+  readonly items: readonly { readonly sample: 'thin' | 'bold'; readonly text: string }[];
+}
+
+/** What every kind of step can carry besides its heading. */
+interface StepExtras {
+  /**
+   * One line under the heading. The ground height guide has a heading and a
+   * sentence on every step; the other three lessons put their one sentence
+   * in `prompt` and leave this out.
+   */
+  readonly body?: string;
+  readonly card?: StepCard;
+  readonly mark?: GuideMark;
+  /** Outlined on the map while this step is shown. `do` steps derive theirs. */
+  readonly highlight?: Highlight;
+}
 
 export type Step =
-  | {
+  | (StepExtras & {
       readonly kind: 'do';
       readonly id: string;
       readonly prompt: string;
       /** Said under the prompt, where it needs a second sentence. */
       readonly hint?: string;
       readonly requires: Requirement;
-    }
-  | {
+      /**
+       * Said once the action is done, and shown for a `do` step looked back
+       * at with Previous.
+       */
+      readonly done?: string;
+      /**
+       * Hold on this step once it is done, until Next is pressed, so `done`
+       * is read. Without it the step moves on the moment the map matches,
+       * which for a last step means its `done` line is never seen.
+       */
+      readonly confirm?: true;
+    })
+  | (StepExtras & {
       readonly kind: 'read';
       readonly id: string;
       readonly prompt: string;
@@ -55,7 +136,28 @@ export type Step =
        * (copy audit v2, #36, #50).
        */
       readonly note?: string;
-    };
+    })
+  /**
+   * A question about the map, with one right answer.
+   *
+   * Passed the way a `read` step is, by Next, and Next only appears once the
+   * right answer has been chosen. A wrong answer says why and leaves the
+   * options open. No greyed-out Next beside the options: the lesson's rule
+   * that a disabled button reads as the way forward being broken (copy audit
+   * v2, #21) holds here too.
+   */
+  | (StepExtras & {
+      readonly kind: 'quiz';
+      readonly id: string;
+      readonly prompt: string;
+      /** In a box above the options. */
+      readonly question?: string;
+      readonly questionHint?: string;
+      readonly options: readonly QuizOption[];
+      readonly right: string;
+      readonly wrong: string;
+      readonly more?: MoreInfo;
+    });
 
 /** What the map is showing, as far as a step needs to know. */
 export interface MapNow {
@@ -71,6 +173,14 @@ export interface MapNow {
   readonly selectedPit: string | null;
   /** The pit whose downstream path is drawn, or null. */
   readonly followingPit: string | null;
+  /** Ground height, drawn now. */
+  readonly terrain: boolean;
+  /** The Layers panel, open now. */
+  readonly layersOpen: boolean;
+  /** Latched: the Layers panel has been open during this lesson. See `latch`. */
+  readonly layersOpened: boolean;
+  /** Latched: Ground height has been on during this lesson. */
+  readonly terrainShown: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -82,7 +192,25 @@ export const NOTHING_ON_MAP: MapNow = {
   unmeasured: false,
   selectedPit: null,
   followingPit: null,
+  terrain: false,
+  layersOpen: false,
+  layersOpened: false,
+  terrainShown: false,
 };
+
+/**
+ * The map's new report, with the latched facts kept from the old one.
+ *
+ * The map reports what it shows; it does not know what it showed a minute
+ * ago, and it should not have to. The guide keeps that, here, so a panel
+ * closed again or a layer turned back off does not undo a step that asked for
+ * it to be opened or turned on.
+ */
+export const latch = (before: MapNow, next: MapNow): MapNow => ({
+  ...next,
+  layersOpened: before.layersOpened || next.layersOpened || next.layersOpen,
+  terrainShown: before.terrainShown || next.terrainShown || next.terrain,
+});
 
 /**
  * What the guide says when a section is finished.
@@ -96,6 +224,30 @@ export interface Finished {
   readonly headline: string;
   readonly body?: string;
   readonly unlocked: string;
+  /**
+   * A small label over the headline. Set only by the ground height guide,
+   * whose design draws a *Guide complete* chip, a heading and one line, with
+   * a way back to the last step.
+   */
+  readonly badge?: string;
+}
+
+/** The screen before step one, where a lesson has one. */
+export interface LessonIntro {
+  /** How long it takes, as a chip. */
+  readonly duration: string;
+  readonly heading: string;
+  readonly body: string;
+}
+
+/** How the guide's map is dressed for a lesson that is not the default. */
+export interface MapChrome {
+  /** The Layers button, for a lesson whose layer lives behind it. */
+  readonly layersButton: boolean;
+  /** The map legend, for a lesson that points at it. */
+  readonly legend: boolean;
+  /** A wider frame, so the legend does not cover half the map. */
+  readonly wide: boolean;
 }
 
 /**
@@ -123,6 +275,24 @@ export interface Lesson {
    * reads.
    */
   readonly teachingPit: boolean;
+  /** An entry screen before step one. Only the ground height guide has one. */
+  readonly intro?: LessonIntro;
+  /**
+   * Previous, to look back at a step already passed. Opt-in: the three
+   * older lessons were designed without it. See `stepBack`.
+   */
+  readonly previous?: boolean;
+  readonly mapChrome?: MapChrome;
+  /**
+   * The steps, given the ground near the address.
+   *
+   * The ground height guide names real heights, and which it can name depends
+   * on the data near the address, so its steps are a function of that. Null
+   * means none could be chosen (or not yet): the steps then use general
+   * wording and no marks. The step count and ids do not change with it, so
+   * the data arriving mid-lesson cannot move the reader.
+   */
+  readonly withGround?: (points: TerrainPoints | null) => readonly Step[];
 }
 
 /**
@@ -148,7 +318,30 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'unavailable';
     case 'pit-selected':
     case 'trace-following':
+    case 'layers-opened':
+    case 'terrain-shown':
+    case 'terrain-off':
       return null;
+  }
+}
+
+/**
+ * What to outline on the map for a step, besides a chip.
+ *
+ * A `do` step that needs the Layers panel outlines the button while the panel
+ * is shut and the checkbox once it is open, so the outline is always on
+ * something that can be pressed. Other steps say what they point at.
+ */
+export function highlightFor(step: Step, now: MapNow): Highlight | null {
+  if (step.kind !== 'do') return step.highlight ?? null;
+  switch (step.requires) {
+    case 'layers-opened':
+      return 'layers';
+    case 'terrain-shown':
+    case 'terrain-off':
+      return now.layersOpen ? 'terrain-toggle' : 'layers';
+    default:
+      return step.highlight ?? null;
   }
 }
 
@@ -183,6 +376,12 @@ export function satisfied(
       return teachingPit !== null && now.selectedPit === teachingPit;
     case 'trace-following':
       return teachingPit !== null && now.followingPit === teachingPit;
+    case 'layers-opened':
+      return now.layersOpened || now.layersOpen;
+    case 'terrain-shown':
+      return now.terrainShown || now.terrain;
+    case 'terrain-off':
+      return !now.terrain;
   }
 }
 
@@ -195,7 +394,8 @@ export function satisfied(
  *
  * `read` steps are the exception and have to be: nothing about the map says
  * whether their sentence has been read, so they hold until Next is pressed —
- * which is what `acknowledged` carries.
+ * which is what `acknowledged` carries. A `quiz` holds the same way, and so
+ * does a `do` step marked `confirm`, once its action is done.
  */
 export function stepIndex(
   steps: readonly Step[],
@@ -207,9 +407,11 @@ export function stepIndex(
   while (index < steps.length) {
     const step = steps[index];
     if (step === undefined) break;
-    if (step.kind === 'read') {
+    if (step.kind !== 'do') {
       if (acknowledged <= index) break;
     } else if (!satisfied(step.requires, now, teachingPit)) {
+      break;
+    } else if (step.confirm === true && acknowledged <= index) {
       break;
     }
     index += 1;
@@ -237,3 +439,20 @@ export function unlockingChips(
 ): (index: number, now: MapNow) => readonly LayerKey[] {
   return (index, now) => order.filter((l) => index >= l.at || l.on(now)).map((l) => l.key);
 }
+
+/**
+ * The step Previous shows, from the one on screen.
+ *
+ * Previous is a view cursor over the derived step, not a way of undoing it:
+ * the map stays as it is, and the reader looks back at what an earlier step
+ * said. From the finish page (`shown` equal to the step count) it goes to the
+ * last step.
+ */
+export const stepBack = (shown: number): number => Math.max(0, shown - 1);
+
+/**
+ * The step Next shows while looking back, or null once it reaches the step
+ * the map is actually on, which is where the cursor lets go.
+ */
+export const stepForward = (shown: number, live: number): number | null =>
+  shown + 1 >= live ? null : shown + 1;

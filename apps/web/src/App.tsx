@@ -22,7 +22,7 @@ import { Guide } from './screens/Guide.js';
 import { Choose } from './screens/Choose.js';
 import { Home } from './screens/Home.js';
 import { LockedMap } from './screens/LockedMap.js';
-import { SECTIONS, type SectionId } from './tutorial/sections.js';
+import { type SectionId, guideTitleOf } from './tutorial/sections.js';
 import { progress } from './tutorial/progress.js';
 import { GUIDED_SECTIONS } from './tutorial/lessons.js';
 import { Landing } from './screens/Landing.js';
@@ -572,7 +572,9 @@ export function App() {
               dispatch({ type: 'back' });
             },
           }}
-          crumbs={crumb(SECTIONS[session.guideSection ?? 'drainage'].label, undefined, true)}
+          // The guide's own title where it has one: *Ground height guide*
+          // (Figma Terrain Tutorial, 16 September). The others are their card's.
+          crumbs={crumb(guideTitleOf(session.guideSection ?? 'drainage'), undefined, true)}
           trailing={
             // The way out of the guide, which is a different thing from the
             // way back one step. Asked for by name: somebody three steps in
@@ -606,6 +608,9 @@ export function App() {
               section={session.guideSection}
               onFinish={() => {
                 dispatch({ type: 'guide-finished' });
+              }}
+              onLeave={() => {
+                dispatch({ type: 'guide-left' });
               }}
             />
           )}

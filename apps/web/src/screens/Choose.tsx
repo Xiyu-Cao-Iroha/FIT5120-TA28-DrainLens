@@ -108,7 +108,7 @@ export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: 
           }}
         >
           {done === 0
-            ? `Each guide takes about two minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
+            ? `Each guide takes a few minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
             : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${FULL_MAP.toLowerCase()}.`}
         </p>
 
