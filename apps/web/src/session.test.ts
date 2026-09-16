@@ -588,6 +588,19 @@ describe('starting and finishing a section of the guide', () => {
     expect(reduce(start, { type: 'guide-finished' })).toBe(start);
   });
 
+  it('goes back to the four without marking anything when a section is skipped', () => {
+    // *Skip for now* on the ground height guide's entry screen.
+    const end = play([
+      { type: 'guide-chosen', section: 'terrain' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'guide-left' },
+    ]);
+    expect(end.screen).toBe('choose');
+    expect(end.guideSection).toBeNull();
+    expect(countLearned(end.learned)).toBe(0);
+    expect(reduce(INITIAL_SESSION, { type: 'guide-left' })).toBe(INITIAL_SESSION);
+  });
+
   it('carries the section through as the map mode', () => {
     // So that finishing the guide and then opening the map shows the thing
     // just taught rather than whatever was last looked at.

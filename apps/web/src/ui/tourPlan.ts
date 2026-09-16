@@ -50,6 +50,11 @@ export interface TourStep {
  * recorded pits function as catching the water flow"* and *"low areas where
  * are prone to have water catchments"*. Rewritten to say what those layers
  * are, in the vocabulary the map itself uses.
+ *
+ * **Steps 3 to 5 were cut again by copy audit v2** (#54, #55, #56): each had a
+ * second sentence about the data's source or limits, and a coach mark is
+ * there to say how to read one control. The limits are said beside the
+ * layers, in More information.
  */
 export const TOUR_STEPS: readonly TourStep[] = [
   {
@@ -73,15 +78,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     target: 'chip-pit',
-    body: 'These are drain-related structures in council records. Some may let surface water enter the underground network.',
+    body: `${LAYER.pits} are street drains. Rain from the road flows into them.`,
   },
   {
     target: 'chip-pipe',
-    body: `${LAYER.pipes} are underground connections shown in council records. A line ending may mean the council record ends there.`,
+    body: `${LAYER.pipes} are the underground pipes that join the drains.`,
   },
   {
     target: 'chip-channel',
-    body: `${LAYER.paths} are calculated from ground-height data. The arrows show which way water runs downhill on the calculated ground. They do not show water volume or depth.`,
+    body: 'Arrows show which way rain may flow downhill.',
   },
   {
     target: 'chip-lowPoint',

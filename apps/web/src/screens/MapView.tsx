@@ -26,7 +26,7 @@ import {
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
@@ -36,7 +36,7 @@ import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
 import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
 import { PIT_SUMMARY, publicLabelOf, surfaceEntryOf } from '../crosssection/section.js';
-import { MapCanvas } from '../map/MapCanvas.js';
+import { MapCanvas, type MapCanvasProps } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { LayerChips, MapLegend } from '../map/MapLayers.js';
 import {
@@ -49,9 +49,11 @@ import {
   openingLayers,
   visibilityOf,
 } from '../map/modes.js';
-import type { MapNow } from '../tutorial/lesson.js';
+import type { Highlight, MapNow } from '../tutorial/lesson.js';
+import { GuideMarks } from '../map/GuideOverlayView.js';
+import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
-import { NEARBY_BASIS, waterNearby } from '../map/nearby.js';
+import { waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
@@ -129,6 +131,26 @@ export interface MapViewProps {
    */
   readonly chipKeys?: readonly LayerKey[] | undefined;
   readonly layersButton?: boolean | undefined;
+  /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
+  readonly pulseChip?: LayerKey | null | undefined;
+  /**
+   * Something else the guide's step points at: the Layers button, the Ground
+   * height switch in its panel, or the legend's ground-height scale.
+   */
+  readonly highlight?: Highlight | null | undefined;
+  /**
+   * Marks the guide draws over the map, in the map's frame.
+   *
+   * The ground height guide's lettered markers and highlighted contour (Figma
+   * Terrain Tutorial, 16 September). Drawn over the canvas and under the
+   * controls, and moved with the view. See `map/guideMarks.ts`.
+   */
+  readonly overlay?: GuideOverlay | null | undefined;
+  /**
+   * The canvas's viewport, whenever it changes. The guide reads the first
+   * one to choose points inside the view it opens on.
+   */
+  readonly onViewport?: ((viewport: Viewport | null) => void) | undefined;
   /**
    * What is on when the map opens, overriding the mode and the task.
    *
@@ -170,6 +192,13 @@ export interface MapViewProps {
   /** How wide the opening view is, in metres. See `MapCanvas`. */
   readonly openAcrossM?: number | undefined;
   /**
+   * Points to fit the view to, refitted when `key` changes. See `MapCanvas`.
+   *
+   * The guide's step that asks for its ringed pit frames the address and that
+   * pit together, because the pit is not always inside the opening view.
+   */
+  readonly fit?: MapCanvasProps['fit'] | undefined;
+  /**
    * The map legend, off in the guide.
    *
    * It sits in the top right and is 260 pixels wide, which in the guide's
@@ -208,11 +237,16 @@ export function MapView({
   onClearAddress,
   chipKeys,
   layersButton = true,
+  pulseChip = null,
+  highlight = null,
+  overlay = null,
+  onViewport,
   openWith,
   highlightPit = null,
   onMapNow,
   addressCard = true,
   openAcrossM,
+  fit = null,
   legend = true,
   scenarioSupport = null,
   onCompare,
@@ -239,6 +273,14 @@ export function MapView({
   // The transform the canvas drew with, reported upward so a callout can be
   // put at a feature rather than beside the map.
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  useEffect(() => {
+    onViewport?.(viewport);
+  }, [viewport, onViewport]);
+  // Whether the Layers panel is open, which the guide's first step waits on.
+  const [layersOpen, setLayersOpen] = useState(false);
+  const panelChanged = useCallback((open: boolean) => {
+    setLayersOpen(open);
+  }, []);
   // Dismissed by the person, not by the address changing: picking a new
   // address should say something about the new one.
   const [addressCardOpen, setAddressCardOpen] = useState(addressCard);
@@ -403,6 +445,7 @@ export function MapView({
   const channelOn = layers.channel;
   const lowPointsOn = layers.lowPoint;
   const unmeasuredOn = layers.unavailable;
+  const terrainOn = layers.terrain;
   const selectedId = selected === null ? null : String(selected);
   useEffect(() => {
     onMapNow?.({
@@ -413,8 +456,15 @@ export function MapView({
       unmeasured: unmeasuredOn,
       selectedPit: selectedId,
       followingPit: following,
+      terrain: terrainOn,
+      layersOpen,
+      // The map says what is true now; the guide latches these (`latch`).
+      layersOpened: layersOpen,
+      terrainShown: terrainOn,
     });
   }, [
+    terrainOn,
+    layersOpen,
     pitsOn,
     pipesOn,
     channelOn,
@@ -436,6 +486,7 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
+        fit={fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={pitsDrawn}
@@ -475,6 +526,8 @@ export function MapView({
         }}
       />
 
+      {viewport !== null && overlay !== null && <GuideMarks overlay={overlay} viewport={viewport} />}
+
       {panel && (
         <div
           style={{
@@ -504,6 +557,10 @@ export function MapView({
               onToggle={toggle}
               unavailableKeys={notYet}
               layersButton={layersButton}
+              pulse={pulseChip}
+              pulseLayers={highlight === 'layers'}
+              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
+              onPanelChange={panelChanged}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
           </div>
@@ -517,7 +574,7 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          {legend && <MapLegend state={layers} />}
+          {legend && <MapLegend state={layers} pulseTerrain={highlight === 'terrain-legend'} />}
         </div>
       )}
 
@@ -591,7 +648,8 @@ export function MapView({
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={publicLabelOf(hit.feature)}
-          basis="Council record"
+          // No source badge (copy audit v2, #30). Where the record comes from
+          // is said once, under View technical details in `PitDetail`.
           action={
             followed === null
               ? {
@@ -646,7 +704,7 @@ export function MapView({
           at={toScreen(viewport, midpoint(hit.feature.c))}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
-          basis="Council record"
+          // No source badge, as on the pit card (copy audit v2, #30).
           onClose={() => {
             setHit(null);
           }}
@@ -718,11 +776,11 @@ export function MapView({
           }}
         >
           {explanation === null && groundTrend === null ? (
-            'No surface-water path or low area was measured close enough to this address to say anything about it.'
+            'No place where water may flow or collect was found close to this address.'
           ) : (
             <>
+              {/* No source badge: copy audit v2, #60. The legend's About this data says it once. */}
               <AddressInsight ground={groundTrend} near={explanation} />
-              <Badge basis={NEARBY_BASIS} />
             </>
           )}
           {guided && (
@@ -963,25 +1021,6 @@ function MapSearch({
         </ul>
       )}
     </div>
-  );
-}
-
-function Badge({ basis }: { readonly basis: string }) {
-  const tone = basis === 'Council record' ? basisTone.recorded : basisTone.derived;
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        marginTop: space(2),
-        padding: `1px ${String(space(2))}px`,
-        borderRadius: radius.pill,
-        font: type(text.micro, { leading: 1.5 }),
-        background: tone.fill,
-        color: tone.ink,
-      }}
-    >
-      {basis}
-    </span>
   );
 }
 

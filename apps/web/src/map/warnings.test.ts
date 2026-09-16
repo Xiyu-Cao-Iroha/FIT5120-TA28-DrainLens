@@ -111,9 +111,8 @@ describe('pressing a sign', () => {
 describe('the sign and its card', () => {
   it('says exactly what was asked for', () => {
     expect(WARNING_TITLE).toBe('Water collects here easily');
-    expect(WARNING_BODY).toBe(
-      "Water collects here easily when it rains. Avoid this spot — for example, don't park your car here when heavy rain is coming.",
-    );
+    // Copy audit v2, #62: the advice alone, without repeating the title.
+    expect(WARNING_BODY).toBe('Avoid parking here when heavy rain is coming.');
   });
 
   it('is drawn with paths, never with a glyph the font does not have', () => {

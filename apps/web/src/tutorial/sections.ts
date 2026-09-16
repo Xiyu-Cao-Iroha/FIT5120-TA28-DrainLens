@@ -14,9 +14,8 @@
  * button works at once, and the guides are optional.
  */
 
-import { COVERAGE } from '../ui/terms.js';
-
 import type { MapMode } from '../map/modes.js';
+import { LAYER } from '../ui/terms.js';
 
 /** A section of the guide. One per map mode, and the ids are the modes. */
 export type SectionId = MapMode;
@@ -35,7 +34,19 @@ export interface Section {
   readonly label: string;
   /** Shown on a card whose guide has not been finished yet. */
   readonly locked: string;
+  /**
+   * The guide's name in the header, where it is not `label`.
+   *
+   * The ground height guide's design titles it *Ground height guide*, while
+   * its card keeps *The shape of the ground*. A field of its own rather than a
+   * renamed label, because the label is the card's and the other three guides
+   * are titled by it.
+   */
+  readonly guideTitle?: string;
 }
+
+/** What the header calls a section's guide. */
+export const guideTitleOf = (id: SectionId): string => SECTIONS[id].guideTitle ?? SECTIONS[id].label;
 
 export const SECTIONS: Record<SectionId, Section> = {
   drainage: {
@@ -57,6 +68,7 @@ export const SECTIONS: Record<SectionId, Section> = {
     id: 'terrain',
     label: 'The shape of the ground',
     locked: 'Start guide',
+    guideTitle: `${LAYER.ground} guide`,
   },
 };
 
@@ -95,13 +107,23 @@ export function nextSection(learned: Learned): SectionId | null {
  * told what it is. Each line is a claim this repository can back:
  *
  * - the extent is the served map's own;
- * - 215 of 895 pits have no recorded downstream, which is why the second line
+ * - the map is records and estimates, and not a live flood warning -- the
+ *   sentence this product has refused to stop saying;
+ * - 215 of 895 pits have no recorded downstream, which is why the third line
  *   exists and why it says *record* rather than *network*;
  * - the paths and low areas are `derived.json`, calculated here and published
- *   by nobody, and drawn only where the ground data allows;
- * - and the fourth is the sentence this product has refused to stop saying.
+ *   by nobody, and drawn only where the ground data allows.
+ *
+ * **Two said, two folded** (copy audit v2, #52). Four lines in front of a
+ * button were skipped whole, so the extent and the safety line are `said` and
+ * the other two are `more`, behind *More information*.
  */
-export function lockNotice(extentName: string): readonly string[] {
+export interface LockNotice {
+  readonly said: readonly [string, string];
+  readonly more: readonly [string, string];
+}
+
+export function lockNotice(extentName: string): LockNotice {
   /*
     The first line depends on which extent is on screen, and it has to.
 
@@ -115,16 +137,22 @@ export function lockNotice(extentName: string): readonly string[] {
     other sentence in this product is hedged; these four are the ones that say
     plainly what the thing is, and a plain sentence that is false is not a
     smaller error than a hedged one.
+
+    The audit's wording is "The map covers the City of Melbourne." It is said
+    only when that is the extent on screen; any other extent, including one
+    this does not know, gets the narrower Kensington sentence, because claiming
+    less ground than is shown is the safe direction to be wrong in.
   */
   const where =
     extentName === 'city-of-melbourne'
-      ? COVERAGE.map
-      : 'This is one square kilometre of Kensington, not all of Melbourne.';
+      ? 'The map covers the City of Melbourne.'
+      : 'The map covers one square kilometre of Kensington, not all of Melbourne.';
 
-  return [
-    where,
-    'Drain pits and pipes come from council records. A line that ends may mean the council record ends there.',
-    'Calculated water paths and low areas are shown only where enough ground data is available.',
-    'It is not a flood warning and not a forecast.',
-  ];
+  return {
+    said: [where, 'It shows records and estimates, not live flood warnings.'],
+    more: [
+      'Drain pits and pipes come from council records. A line that ends may mean the council record ends there.',
+      'Calculated water paths and low areas are shown only where enough ground data is available.',
+    ],
+  };
 }

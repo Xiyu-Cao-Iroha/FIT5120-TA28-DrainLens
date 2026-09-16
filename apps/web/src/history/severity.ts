@@ -18,6 +18,8 @@
  * code change anything else would notice.
  */
 
+import { FLOOD } from '../ui/terms.js';
+
 export class AreaDataError extends Error {}
 
 function fail(what: string): never {
@@ -316,19 +318,21 @@ export function completenessText(
   state: Completeness,
   incidentType: string,
 ): { readonly label: string; readonly body: string } {
-  const withheld = `At least one exact count within this area was not published, for privacy — ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
+  // Copy audit v2: no "Minimum total", no call-outs, no dashes. The section
+  // this fills, "How complete this is", is tier 3 (#88) and stays.
+  const withheld = `Some counts in this area were hidden for privacy: ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
   switch (state) {
     case 'minimum':
-      return { label: 'Minimum total.', body: `${withheld} — so the real total may be higher.` };
+      return { label: 'Some counts hidden.', body: `${withheld}, so the real total may be higher.` };
     case 'none':
       return {
-        label: 'No recorded call-outs.',
-        body: `The SES recorded no ${incidentType.toLowerCase()} call-out here across the whole period. That is different from a small number.`,
+        label: 'None recorded.',
+        body: `The SES recorded no ${incidentType.toLowerCase()} ${FLOOD.unitOne} here across the whole period. That is different from a small number.`,
       };
     case 'unavailable':
       return {
         label: 'Not available.',
-        body: `${area.complete ? 'The published total is complete' : `${withheld}, so the total is a minimum`}; there is no rate because the area has too few residents to divide by.`,
+        body: `${area.complete ? 'The published total is complete' : `${withheld}, so the total is a minimum`}; there is no rate because the area has too few residents to compare.`,
       };
     case 'exact':
       return { label: 'Complete published total.', body: 'No count within this area was withheld.' };
@@ -340,7 +344,10 @@ export interface Break {
   readonly from: number;
   /** Inclusive upper bound, or null for "and above". */
   readonly to: number | null;
+  /** The legend's words: the name and its range. */
   readonly label: string;
+  /** The name alone, for a list row that already shows the number. */
+  readonly name?: string;
 }
 
 /**
@@ -367,13 +374,18 @@ export const ACTIVITY_BREAKS: readonly Break[] = [
  * hundred — so three bands hold it. 1.3 and 3.0 are the first and third
  * quartiles to one decimal place, and the ranges are on the legend because a
  * band name without its numbers is a judgement with the workings hidden.
+ *
+ * **Low, Medium and High, the range in brackets** (copy audit v2, #76, #90),
+ * replacing *Lower / Moderate / Higher* and their dashes. The words follow the
+ * boundary as `bandOf` draws it: a rate of exactly 1.3 or 3 is in the lower band,
+ * so the brackets say "or less" and "up to" rather than the audit's "under", and one area shows as 1.30
+ * (Oakleigh - Huntingdale, 1.2995) and is Low. The list rows show the name
+ * alone, beside the number.
  */
 export const SEVERITY_BREAKS: readonly Break[] = [
-  // "up to" and "above", because `bandOf` puts a boundary value in the lower
-  // band: a rate of exactly 1.3 is Lower, and the legend said "under 1.3".
-  { from: 0, to: 1.3, label: 'Lower — up to 1.3' },
-  { from: 1.3, to: 3, label: 'Moderate — above 1.3, up to 3.0' },
-  { from: 3, to: null, label: 'Higher — above 3.0' },
+  { from: 0, to: 1.3, label: 'Low (1.3 or less)', name: 'Low' },
+  { from: 1.3, to: 3, label: 'Medium (over 1.3, up to 3)', name: 'Medium' },
+  { from: 3, to: null, label: 'High (over 3)', name: 'High' },
 ];
 
 export const breaksFor = (mode: MapMode): readonly Break[] =>

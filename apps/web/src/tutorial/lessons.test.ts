@@ -14,27 +14,49 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { type MapNow, NOTHING_ON_MAP, satisfied, stepIndex } from './lesson.js';
+import {
+  type MapNow,
+  type Step,
+  NOTHING_ON_MAP,
+  chipFor,
+  highlightFor,
+  latch,
+  satisfied,
+  stepBack,
+  stepForward,
+  stepIndex,
+} from './lesson.js';
 import { GUIDED_SECTIONS, LESSONS, lessonFor } from './lessons.js';
 import { SECTION_ORDER, SECTIONS } from './sections.js';
 import { CHIP_KEYS, PANEL_KEYS } from '../map/modes.js';
 
 const now = (over: Partial<MapNow> = {}): MapNow => ({ ...NOTHING_ON_MAP, ...over });
 
+/**
+ * Whether the step after this one is the feedback for it.
+ *
+ * It is after a `do` step, unless that step says its own `done` line, which
+ * the ground height guide's do: the step after one of those is the next thing
+ * to learn, not praise for the last press.
+ */
+const isPressFeedback = (before: Step | undefined): boolean =>
+  before?.kind === 'do' && before.done === undefined;
+
 /** The lessons as pairs, so a failure names the section it is in. */
 const written = GUIDED_SECTIONS.map((id) => [id, LESSONS[id]!] as const);
 
 describe('which sections are on offer', () => {
   it('offers exactly the sections that have a lesson', () => {
-    expect(GUIDED_SECTIONS).toEqual(['drainage', 'water-flow', 'low-areas']);
+    expect(GUIDED_SECTIONS).toEqual(['drainage', 'water-flow', 'low-areas', 'terrain']);
     for (const id of GUIDED_SECTIONS) expect(lessonFor(id)).toBeDefined();
   });
 
-  it('leaves terrain out rather than offering an empty room', () => {
-    // A fourth lesson that walked somebody through nothing would count as
+  it('offers terrain now that it has steps, and every section has one', () => {
+    // It was left out until 16 September rather than offered as an empty
+    // room: a lesson that walked somebody through nothing would count as
     // finished and teach nothing.
-    expect(GUIDED_SECTIONS).not.toContain('terrain');
-    expect(lessonFor('terrain')).toBeUndefined();
+    expect(lessonFor('terrain')?.steps.length).toBeGreaterThan(0);
+    expect(GUIDED_SECTIONS).toEqual(SECTION_ORDER);
   });
 
   it('offers them in the order the cards sit in', () => {
@@ -73,11 +95,21 @@ describe.each(written)('%s', (id, lesson) => {
     expect(lesson.finished.unlocked.length).toBeGreaterThan(0);
   });
 
-  it('offers only one chip on the first step', () => {
+  it('offers at most one chip on the first step', () => {
     // The section narrows the map to its layers; the step narrows it to the
     // one being taught. Step one beside a control for step three is an
-    // invitation to press the wrong thing.
-    expect(lesson.chips(0, NOTHING_ON_MAP)).toHaveLength(1);
+    // invitation to press the wrong thing. Ground height offers none: its
+    // layer is behind the Layers button, which its map shows instead.
+    const chips = lesson.chips(0, NOTHING_ON_MAP);
+    expect(chips.length).toBeLessThanOrEqual(1);
+    if (chips.length === 0) expect(lesson.mapChrome?.layersButton).toBe(true);
+  });
+
+  it('shows the Layers button exactly when a step asks for something behind it', () => {
+    const behind = lesson.steps.some(
+      (s) => s.kind === 'do' && ['layers-opened', 'terrain-shown', 'terrain-off'].includes(s.requires),
+    );
+    expect(lesson.mapChrome?.layersButton ?? false).toBe(behind);
   });
 
   it('offers a chip for every layer its steps ask for, by the step that asks', () => {
@@ -97,7 +129,39 @@ describe.each(written)('%s', (id, lesson) => {
       const key = wanted[step.requires];
       if (key === undefined) return; // pit-selected and trace-following are not chips
       expect(lesson.chips(at, NOTHING_ON_MAP)).toContain(key);
+      // And the chip the guide outlines while this step waits is that same
+      // chip, so the outline never points at one that is not on screen
+      // (copy audit v2, #21).
+      expect(chipFor(step.requires)).toBe(key);
     });
+  });
+
+  it('keeps to the audit writing rules', () => {
+    /*
+     * Copy audit v2, appendix A: an instruction is one sentence of at most 16
+     * words; the feedback after a correct press starts with praise and stays
+     * within 12 words; no em dashes; the finish page says well done.
+     *
+     * The ground height guide's finish page is its design's (Figma Terrain
+     * Tutorial, frame 10): a *Guide complete* chip and a heading, not the
+     * well-done sentence. It is the one lesson with a `badge`.
+     */
+    const words = (s: string) => s.trim().split(/\s+/).length;
+    lesson.steps.forEach((step, at) => {
+      expect(step.prompt).not.toContain('—');
+      expect(step.body ?? '').not.toContain('—');
+      if (step.kind === 'do') {
+        expect(words(step.prompt)).toBeLessThanOrEqual(16);
+        expect(step.prompt).not.toMatch(/^Select\b/);
+      } else if (isPressFeedback(lesson.steps[at - 1])) {
+        expect(step.prompt).toMatch(/^(Great|Nice|Good)\b/);
+        expect(words(step.prompt)).toBeLessThanOrEqual(12);
+      }
+    });
+    if (lesson.finished.badge === undefined) {
+      expect(lesson.finished.headline).toMatch(/^Well done! You finished the .+ guide\.$/);
+    }
+    expect(lesson.finished.body).toBeUndefined();
   });
 
   it('never takes away the chip for a layer that is on', () => {
@@ -138,6 +202,8 @@ describe.each(written)('%s', (id, lesson) => {
       if (step.kind === 'do') {
         state = turnOn(state, step.requires, pit);
         expect(satisfied(step.requires, state, pit)).toBe(true);
+        // A step that holds for its done line is still here until Next.
+        if (step.confirm === true) expect(stepIndex(lesson.steps, state, pit, at)).toBe(at);
       }
     });
     expect(stepIndex(lesson.steps, state, pit, lesson.steps.length)).toBe(lesson.steps.length);
@@ -165,6 +231,12 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return { ...state, selectedPit: pit };
     case 'trace-following':
       return { ...state, followingPit: pit };
+    case 'layers-opened':
+      return latch(state, { ...state, layersOpen: true });
+    case 'terrain-shown':
+      return latch(state, { ...state, terrain: true });
+    case 'terrain-off':
+      return latch(state, { ...state, terrain: false });
     default:
       throw new Error(`no way to satisfy ${requires}`);
   }
@@ -177,6 +249,7 @@ describe('only drainage points at a particular pit', () => {
     expect(lessonFor('drainage')?.teachingPit).toBe(true);
     expect(lessonFor('water-flow')?.teachingPit).toBe(false);
     expect(lessonFor('low-areas')?.teachingPit).toBe(false);
+    expect(lessonFor('terrain')?.teachingPit).toBe(false);
   });
 
   it('and it is the only one whose steps ask for a feature', () => {
@@ -187,5 +260,84 @@ describe('only drainage points at a particular pit', () => {
       if (id === 'drainage') expect(featureSteps.length).toBeGreaterThan(0);
       else expect(featureSteps).toHaveLength(0);
     }
+  });
+});
+
+describe('what the ground height guide added to every lesson', () => {
+  const doStep = (requires: Parameters<typeof satisfied>[0], extra: Partial<Step> = {}): Step =>
+    ({ kind: 'do', id: requires, prompt: 'Do it', requires, ...extra }) as Step;
+  const quiz: Step = {
+    kind: 'quiz',
+    id: 'q',
+    prompt: 'Which?',
+    options: [
+      { label: 'A', correct: true },
+      { label: 'B', correct: false },
+    ],
+    right: 'Yes.',
+    wrong: 'No.',
+  };
+
+  it('latches an opened panel and a shown layer, and nothing else', () => {
+    const opened = latch(NOTHING_ON_MAP, now({ layersOpen: true, terrain: true }));
+    expect(opened).toMatchObject({ layersOpened: true, terrainShown: true });
+    const closed = latch(opened, now({ layersOpen: false, terrain: false, pits: true }));
+    expect(closed).toMatchObject({
+      layersOpen: false,
+      terrain: false,
+      pits: true,
+      layersOpened: true,
+      terrainShown: true,
+    });
+    expect(latch(NOTHING_ON_MAP, NOTHING_ON_MAP)).toEqual(NOTHING_ON_MAP);
+  });
+
+  it('reads the three new requirements', () => {
+    expect(satisfied('layers-opened', NOTHING_ON_MAP, null)).toBe(false);
+    expect(satisfied('layers-opened', now({ layersOpen: true }), null)).toBe(true);
+    expect(satisfied('layers-opened', now({ layersOpened: true }), null)).toBe(true);
+    expect(satisfied('terrain-shown', now({ terrain: true }), null)).toBe(true);
+    expect(satisfied('terrain-shown', now({ terrainShown: true }), null)).toBe(true);
+    expect(satisfied('terrain-shown', NOTHING_ON_MAP, null)).toBe(false);
+    expect(satisfied('terrain-off', NOTHING_ON_MAP, null)).toBe(true);
+    expect(satisfied('terrain-off', now({ terrain: true, terrainShown: true }), null)).toBe(false);
+    for (const r of ['layers-opened', 'terrain-shown', 'terrain-off'] as const) expect(chipFor(r)).toBeNull();
+  });
+
+  it('lets step two stay done while a later step asks for the opposite', () => {
+    const steps = [doStep('terrain-shown'), doStep('terrain-off')];
+    const shownThenOff = latch(latch(NOTHING_ON_MAP, now({ terrain: true })), now({ terrain: false }));
+    expect(stepIndex(steps, now({ terrain: true }), null, 0)).toBe(1);
+    expect(stepIndex(steps, shownThenOff, null, 0)).toBe(2);
+    // Without the latch, turning it off would go back to the first step.
+    expect(stepIndex(steps, now({ terrain: false }), null, 0)).toBe(0);
+  });
+
+  it('holds a question until Next, like a read step', () => {
+    expect(stepIndex([quiz], NOTHING_ON_MAP, null, 0)).toBe(0);
+    expect(stepIndex([quiz], NOTHING_ON_MAP, null, 1)).toBe(1);
+  });
+
+  it('outlines the Layers button until the panel is open, then the switch', () => {
+    const show = doStep('terrain-shown');
+    expect(highlightFor(doStep('layers-opened'), NOTHING_ON_MAP)).toBe('layers');
+    expect(highlightFor(show, NOTHING_ON_MAP)).toBe('layers');
+    expect(highlightFor(show, now({ layersOpen: true }))).toBe('terrain-toggle');
+    expect(highlightFor(doStep('terrain-off'), now({ layersOpen: true }))).toBe('terrain-toggle');
+    expect(highlightFor(doStep('pits-on'), NOTHING_ON_MAP)).toBeNull();
+    expect(highlightFor(doStep('pits-on', { highlight: 'terrain-legend' }), NOTHING_ON_MAP)).toBe('terrain-legend');
+    expect(highlightFor(quiz, NOTHING_ON_MAP)).toBeNull();
+    expect(highlightFor({ ...quiz, highlight: 'terrain-legend' }, NOTHING_ON_MAP)).toBe('terrain-legend');
+  });
+
+  it('walks Previous back, and Next forward to where the map is', () => {
+    expect(stepBack(0)).toBe(0);
+    expect(stepBack(4)).toBe(3);
+    // From the finish page of nine steps, to the last step.
+    expect(stepBack(9)).toBe(8);
+    expect(stepForward(2, 5)).toBe(3);
+    // Reaching the live step lets go of the cursor.
+    expect(stepForward(4, 5)).toBeNull();
+    expect(stepForward(8, 9)).toBeNull();
   });
 });

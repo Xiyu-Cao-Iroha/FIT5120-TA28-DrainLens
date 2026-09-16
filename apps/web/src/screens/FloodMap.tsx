@@ -6,9 +6,9 @@
  * position, the zoom and the selected area for free, where two screens would
  * make retaining any of them into work.
  *
- * The mode switch carries the *question* rather than a label — *how many
- * call-outs were recorded* against *how many per 1,000 residents* — because
- * they are different questions and neither ranking is the correct one. That is
+ * The mode switch carries the *question* rather than a label -- *how many
+ * emergency responses* against *how many per 1,000 people* -- because they
+ * are different questions and neither ranking is the correct one. That is
  * the mentor review's fifth point, and the size of it is measured: Dandenong
  * is 5th by count and 24th by rate, and the rate's top area is not in the
  * count's top twelve at all.
@@ -16,9 +16,15 @@
  * **What is deliberately not on it.** No forecast, no probability, no depth,
  * and no claim about who was affected. The rate's denominator is the
  * population; dividing by it is the opposite of counting people.
+ *
+ * **Short on the surface, the rest under More information** (copy audit v2,
+ * 15 September, #79 to #87). The header spells the SES out once, says how to
+ * read the colours and what one count is, and keeps one safety line. The panel
+ * shows an area's numbers with one sentence each; the method, the coverage and
+ * who recorded what are folded below it, and the source badges are gone.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   EMPTY_FILL,
@@ -40,12 +46,11 @@ import {
   totalLabel,
 } from '../history/severity.js';
 import {
-  AREAS_NOTE,
   INFORMATION_TYPES,
+  NOT_A_FORECAST,
   type Point,
   activityEvidence,
   coverageEvidence,
-  notAPrediction,
   severityEvidence,
 } from '../history/evidence.js';
 import {
@@ -57,7 +62,9 @@ import {
   eventsFor,
   noEventsText,
 } from '../history/events.js';
-import { financialYear, yearRange } from '../history/artefact.js';
+import { yearLabel, yearRange } from '../history/artefact.js';
+import { atLeastTip } from '../history/board.js';
+import { LEGEND_INSET_PX, legendBox, legendOpen } from '../history/legendFold.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
 import { FLOOD } from '../ui/terms.js';
 import {
@@ -73,16 +80,24 @@ import {
   weight,
 } from '../ui/theme.js';
 
-/** The question each mode answers, which is the thing being switched. */
-const QUESTIONS: Readonly<Record<MapMode, { readonly tab: string; readonly asks: string }>> = {
+/**
+ * The question each mode answers, which is the thing being switched.
+ *
+ * `asks` is how to read the colours (copy audit v2, #81): the question as a
+ * sentence about darker areas. `legend` is the key's title (#82), the unit
+ * and the years, since the page has spelled the SES out above it.
+ */
+const QUESTIONS: Readonly<Record<MapMode, { readonly tab: string; readonly asks: string; readonly legend: string }>> = {
   activity: {
     // AC 4.1.1.a names the mode.
     tab: FLOOD.callouts,
-    asks: 'How many SES flood call-outs were recorded in each area?',
+    asks: 'Darker areas had more SES emergency responses.',
+    legend: FLOOD.legend,
   },
   severity: {
     tab: FLOOD.rate,
-    asks: 'How many SES flood call-outs were recorded per 1,000 residents?',
+    asks: 'Darker areas had more SES emergency responses for every 1,000 people.',
+    legend: `SES ${FLOOD.rateUnit}, ${FLOOD.period}`,
   },
 };
 
@@ -204,8 +219,9 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
           >
             Flood history across {scope.geography.scope}
           </h1>
+          {/* Copy audit v2, #79: the first time this page names the SES. */}
           <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
-            {FLOOD.callouts} · {yearRange(years)} · {scope.geography.scope} statistical areas
+            Emergency responses to floods by the {FLOOD.ses}, by area, {FLOOD.period}
           </p>
 
           <div
@@ -258,7 +274,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
             {QUESTIONS[mode].asks}
           </p>
           <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.5 }), color: ink.subtle }}>
-            {notAPrediction(scope)} {AREAS_NOTE}
+            {FLOOD.explain} {NOT_A_FORECAST}
           </p>
         </header>
 
@@ -308,10 +324,14 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
                     ),
               );
             }}
-            aria-label={`${String(areas.length)} statistical areas, ${QUESTIONS[mode].asks}`}
+            aria-label={`Map of ${String(areas.length)} areas. ${QUESTIONS[mode].asks}`}
             style={{ display: 'block', cursor: 'grab', background: GROUND, touchAction: 'none' }}
           />
-          <Legend mode={mode} years={years} minimumResidents={population.minimumResidents} />
+          <Legend
+            mode={mode}
+            frameWidth={viewport?.widthPx ?? null}
+            frameHeight={viewport?.heightPx ?? null}
+          />
           <Zoom
             onZoom={(by) => {
               setViewport((current) =>
@@ -364,6 +384,10 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
  *
  * It says what pressing an area gives, rather than sitting empty. An empty
  * panel beside a full map reads as a panel that failed to load.
+ *
+ * **One sentence, and More information folded** (copy audit v2, #83). The
+ * evidence used to open here by default, fifteen paragraphs down the densest
+ * column on the site; it now starts closed, as it already did inside an area.
  */
 function Nothing({
   mode,
@@ -380,18 +404,14 @@ function Nothing({
     <div style={{ color: ink.muted, font: type(text.label, { leading: 1.6 }) }}>
       <h2
         style={{
-          margin: `0 0 ${String(space(2))}px`,
+          margin: 0,
           font: type(text.lead, { weight: weight.semibold }),
           color: ink.strong,
         }}
       >
-        Select an area
+        Click an area to see its flood history.
       </h2>
-      <p style={{ margin: 0 }}>
-        See its yearly call-outs, population, the calculated rate and how complete the published
-        data is.
-      </p>
-      <Evidence mode={mode} scope={scope} population={population} areas={areas} open />
+      <Evidence mode={mode} scope={scope} population={population} areas={areas} />
     </div>
   );
 }
@@ -399,9 +419,14 @@ function Nothing({
 /**
  * The evidence behind the map, AC 4.3.1 to 4.3.4 and 4.1.4.h.
  *
- * Open beside the map before anything is chosen, and one press away inside an
- * area's record: "learn more" is not a link to a document somebody will not
- * open, it is the sentences, here.
+ * One press away, before anything is chosen and inside an area's record:
+ * "learn more" is not a link to a document somebody will not open, it is the
+ * sentences, here. Closed by default everywhere since copy audit v2 (#83), and
+ * named *More information* like the flood history page's fold.
+ *
+ * **Who recorded what is said here, once** (#85). The three kinds of
+ * information are kept apart in words rather than by coloured badges on every
+ * section of the panel and in the key.
  */
 function Evidence({
   mode,
@@ -436,7 +461,7 @@ function Evidence({
           cursor: 'pointer',
         }}
       >
-        About the data, the calculation and its limits
+        More information
       </button>
       {shown && (
         <div style={{ marginTop: space(3) }}>
@@ -444,12 +469,9 @@ function Evidence({
           <Points heading="Coverage and uncertainty" points={coverageEvidence(scope, population, areas)} />
           <h4 style={headingStyle}>Three kinds of information</h4>
           {INFORMATION_TYPES.map((kind) => (
-            <div key={kind.key} style={{ marginBottom: space(3) }}>
-              <Badge kind={kind.key} />
-              <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
-                <strong style={{ color: ink.strong }}>{kind.what}.</strong> {kind.purpose} {kind.limits}
-              </p>
-            </div>
+            <p key={kind.key} style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
+              <strong style={{ color: ink.strong }}>{kind.what}.</strong> {kind.from} {kind.purpose} {kind.limits}
+            </p>
           ))}
         </div>
       )}
@@ -475,32 +497,6 @@ function Points({ heading, points }: { readonly heading: string; readonly points
         </p>
       ))}
     </>
-  );
-}
-
-const BADGES = {
-  recorded: { label: 'Recorded by the SES', background: '#dcece6', color: '#1f5b4e' },
-  calculated: { label: 'Calculated by DrainLens', background: '#dde8f2', color: '#2a5678' },
-  written: { label: 'Written by the DrainLens team', background: '#f3e8f6', color: '#6a3a78' },
-} as const;
-
-/** AC 4.3.4.a: the three kinds of information carry three different marks. */
-function Badge({ kind }: { readonly kind: keyof typeof BADGES }) {
-  const badge = BADGES[kind];
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        marginBottom: space(2),
-        padding: '1px 7px',
-        borderRadius: 999,
-        font: type(text.micro, { weight: weight.semibold }),
-        background: badge.background,
-        color: badge.color,
-      }}
-    >
-      {badge.label}
-    </span>
   );
 }
 
@@ -542,13 +538,19 @@ function Detail({
         Statistical area · {yearRange(years)}
       </p>
 
+      {/*
+        Copy audit v2, #86: the number and its unit, with what one count is
+        behind an information button rather than a sentence under the bars.
+      */}
       <Section title={FLOOD.callouts}>
-        <Badge kind="recorded" />
         <p style={{ margin: `0 0 ${String(space(3))}px` }}>
-          <strong style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}>
+          <strong
+            style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}
+            {...(area.complete ? {} : { title: atLeastTip(String(area.total)) })}
+          >
             {totalLabel(area)}
           </strong>{' '}
-          recorded SES {scope.incidentType.toLowerCase()} call-outs
+          {area.total === 1 ? FLOOD.unitOne : FLOOD.unit} <InfoTip text={FLOOD.explain} />
         </p>
         {area.byYear.map((count, index) => (
           <div
@@ -556,7 +558,7 @@ function Detail({
             style={{ display: 'flex', alignItems: 'center', gap: space(3), marginBottom: space(1) }}
           >
             <span style={{ width: 62, font: type(text.micro), color: ink.subtle }}>
-              {financialYear(years[index])}
+              {yearLabel(years[index])}
             </span>
             <span
               style={{
@@ -582,21 +584,22 @@ function Detail({
             </span>
           </div>
         ))}
-        <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
-          Each count is one SES crew response, not one flood event.
-          {area.complete
-            ? ''
-            : ' At least one exact count within this area was not published, so each year is a minimum as well as the total.'}
-        </p>
       </Section>
 
+      {/*
+        Copy audit v2, #87: the rate and how many people live here, one line
+        each. Where the population figure comes from, what the rate is not and
+        that DrainLens calculated it are under More information.
+      */}
       <Section title={FLOOD.rate}>
-        <Badge kind="calculated" />
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>
-          <strong style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}>
+          <strong
+            style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}
+            {...(area.rate === null || area.complete ? {} : { title: atLeastTip(area.rate.toFixed(2)) })}
+          >
             {scoreLabel(area)}
           </strong>{' '}
-          {area.rate === null ? '' : 'call-outs per 1,000 residents'}
+          {area.rate === null ? '' : FLOOD.rateUnit}
         </p>
         <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
           {/*
@@ -608,25 +611,14 @@ function Detail({
           */}
           {area.persons === null ? (
             <>
-              No rate: this area had{' '}
+              Too few residents to compare:{' '}
               {(area.personsByYear[population.asAt.indexOf(population.denominator)] ?? 0).toLocaleString('en-AU')}{' '}
-              residents on {population.denominator}, fewer than{' '}
-              {population.minimumResidents.toLocaleString('en-AU')}, and small populations can make
-              the result unstable. It is not a low rate.
+              people lived here, under {population.minimumResidents.toLocaleString('en-AU')}. It is not
+              a low rate.
             </>
           ) : (
-            <>
-              {area.persons.toLocaleString('en-AU')} residents at {population.denominator}, from{' '}
-              {population.source.publisher}. It is not a count of people affected.
-              {area.complete
-                ? ''
-                : ' Because at least one exact count was not published, the rate is a minimum too.'}
-            </>
+            <>{area.persons.toLocaleString('en-AU')} people live here.</>
           )}
-        </p>
-        <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro, { leading: 1.55 }), color: ink.subtle }}>
-          Calculated by DrainLens from recorded SES flood call-outs and ABS population. This rate
-          does not measure flood depth, damage, probability or current risk.
         </p>
       </Section>
 
@@ -637,7 +629,6 @@ function Detail({
       </Section>
 
       <Section title="Verified flood events">
-        <Badge kind="written" />
         <Events area={area} events={events} period={scope.reportingPeriod} />
       </Section>
       <Evidence mode={mode} scope={scope} population={population} areas={areas} />
@@ -730,77 +721,158 @@ function Section({ title, children }: { readonly title: string; readonly childre
   );
 }
 
-/** The key, over the map rather than beside it, because the map is the page. */
+/**
+ * The key, over the map rather than beside it, because the map is the page.
+ *
+ * **It folds to its title**, and starts folded when the map is narrow; the
+ * rules for both, and for how much of the map an open key may take, are in
+ * `history/legendFold.ts` where they are tested. The title stays in the
+ * header row outside the scrolling part, so a capped key that scrolls still
+ * says which question its colours answer.
+ */
 function Legend({
   mode,
-  years,
-  minimumResidents,
+  frameWidth,
+  frameHeight,
 }: {
   readonly mode: MapMode;
-  readonly years: readonly string[];
-  readonly minimumResidents: number;
+  /** The map frame's size, or null before it is measured. */
+  readonly frameWidth: number | null;
+  readonly frameHeight: number | null;
 }) {
+  // Null until somebody presses the control; until then the frame decides.
+  const [choice, setChoice] = useState<boolean | null>(null);
+  const open = legendOpen(frameWidth, choice);
+  const box = legendBox(frameWidth, frameHeight);
+  const bodyId = useId();
+
   return (
     <div
       style={{
         position: 'absolute',
-        top: space(4),
-        right: space(4),
-        maxWidth: 260,
-        padding: space(4),
+        top: LEGEND_INSET_PX,
+        right: LEGEND_INSET_PX,
+        maxWidth: box.maxWidth,
+        ...(box.maxHeight === null ? {} : { maxHeight: box.maxHeight }),
+        display: 'flex',
+        flexDirection: 'column',
+        padding: `${String(space(3))}px ${String(space(4))}px`,
         background: surface.raised,
         border: `1px solid ${line.base}`,
         borderRadius: radius.base,
       }}
     >
-      <p
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: space(3), flexShrink: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            font: type(text.micro, { weight: weight.semibold }),
+            letterSpacing: tracking.caps,
+            textTransform: 'uppercase',
+            color: ink.subtle,
+          }}
+        >
+          {QUESTIONS[mode].legend}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setChoice(!open);
+          }}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          // The visible word is kept at the start of the name, so a person
+          // using voice control can say what they see.
+          aria-label={open ? 'Hide map key' : 'Show map key'}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.micro, { weight: weight.medium }),
+            color: ink.muted,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '‹ Hide' : '› Show'}
+        </button>
+      </div>
+
+      <div id={bodyId} hidden={!open} style={{ marginTop: space(3), minHeight: 0, overflowY: 'auto' }}>
+        {/*
+          AC 4.1.3.c and e, 4.3.3.d: what the numbers are and over what years
+          is the title above, which stays visible when the key is folded. Who
+          produced them was a badge here; copy audit v2 (#82, #85) removed it
+          and the repeated subtitle, and More information in the panel says
+          who recorded the counts and who calculated the rate.
+        */}
+        {legendFor(mode).map((entry) => (
+          <div
+            key={entry.label}
+            style={{ display: 'flex', gap: space(3), alignItems: 'center', marginBottom: space(2) }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 16,
+                height: 12,
+                flexShrink: 0,
+                borderRadius: 2,
+                // The same hatch the map draws over a floor: 45°, six pixels apart.
+                background: entry.hatched
+                  ? `repeating-linear-gradient(135deg, rgba(30, 43, 54, 0.55) 0 1px, transparent 1px 6px), ${entry.fill ?? EMPTY_FILL}`
+                  : (entry.fill ?? EMPTY_FILL),
+                border: `1px ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
+              }}
+            />
+            <span style={{ font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>
+              {entry.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * An information button beside a number, opening the sentence that explains it.
+ *
+ * Copy audit v2, #86: *what one count is* matters but need not sit under every
+ * area. A hover title alone would be out of reach on a phone and to a
+ * keyboard, so it is a button: the title shows on hover, and pressing it
+ * shows the sentence under the number.
+ */
+function InfoTip({ text: sentence }: { readonly text: string }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="What is an emergency response?"
+        aria-expanded={shown}
+        title={sentence}
+        onClick={() => {
+          setShown((now) => !now);
+        }}
         style={{
-          margin: `0 0 ${String(space(3))}px`,
-          font: type(text.micro, { weight: weight.semibold }),
-          letterSpacing: tracking.caps,
-          textTransform: 'uppercase',
-          color: ink.subtle,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          color: brand.ink,
+          font: type(text.label, { weight: weight.semibold }),
+          cursor: 'pointer',
+          verticalAlign: 'baseline',
         }}
       >
-        {QUESTIONS[mode].tab}
-      </p>
-      {/*
-        AC 4.1.3.c and e, 4.3.3.d: what the numbers are, over what years, and
-        who produced them. A band name without its unit is a judgement with
-        the workings hidden; a rate without "calculated" borrows the SES's
-        authority.
-      */}
-      <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.4 }), color: ink.muted }}>
-        {mode === 'activity'
-          ? `SES crew call-outs, ${yearRange(years)}`
-          : `Call-outs per 1,000 residents, ${yearRange(years)}`}
-      </p>
-      <Badge kind={mode === 'activity' ? 'recorded' : 'calculated'} />
-      {legendFor(mode, minimumResidents).map((entry) => (
-        <div
-          key={entry.label}
-          style={{ display: 'flex', gap: space(3), alignItems: 'center', marginBottom: space(2) }}
-        >
-          <span
-            aria-hidden
-            style={{
-              width: 16,
-              height: 12,
-              flexShrink: 0,
-              borderRadius: 2,
-              // The same hatch the map draws over a floor: 45°, six pixels apart.
-              background: entry.hatched
-                ? `repeating-linear-gradient(135deg, rgba(30, 43, 54, 0.55) 0 1px, transparent 1px 6px), ${entry.fill ?? EMPTY_FILL}`
-                : (entry.fill ?? EMPTY_FILL),
-              border: `1px ${entry.dashed ? 'dashed' : 'solid'} ${entry.stroke}`,
-            }}
-          />
-          <span style={{ font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>
-            {entry.label}
-          </span>
-        </div>
-      ))}
-    </div>
+        ⓘ
+      </button>
+      {shown && (
+        <span style={{ display: 'block', marginTop: space(1), font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
+          {sentence}
+        </span>
+      )}
+    </>
   );
 }
 

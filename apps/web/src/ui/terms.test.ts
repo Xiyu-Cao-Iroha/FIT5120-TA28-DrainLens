@@ -51,7 +51,7 @@ describe('the names the site uses', () => {
       'Likely water paths',
       'Low areas',
       'Ground height',
-      'Limited ground data',
+      'Ground data gaps',
     ]);
     expect(FULL_MAP).toBe('Full map');
   });

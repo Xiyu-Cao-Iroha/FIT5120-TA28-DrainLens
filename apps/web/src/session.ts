@@ -441,6 +441,13 @@ export type SessionEvent =
    * done. Carrying straight on to the next section would decide for them.
    */
   | { readonly type: 'guide-finished' }
+  /**
+   * Left a section from its entry screen without starting it.
+   *
+   * *Skip for now* on the ground height guide's first screen. Back to the
+   * four, like finishing, but nothing is marked learned: nothing was.
+   */
+  | { readonly type: 'guide-left' }
   /** The notice was read and the wait is over. */
   | { readonly type: 'lock-passed' }
   /** Back out of the map, to whichever page opened it — AC 1.1.10. */
@@ -584,6 +591,11 @@ function step(session: Session, event: SessionEvent): Session {
         learned: { ...session.learned, [section]: true },
       };
     }
+
+    case 'guide-left':
+      return session.guideSection === null
+        ? session
+        : { ...session, screen: 'choose', guideSection: null };
 
     case 'address-cleared':
       return {

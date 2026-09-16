@@ -101,8 +101,8 @@ Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 | 1.1.3.b | Five controls: *Drain pits*, *Drain pipes*, *Ground height*, *Likely water paths*, *Low areas* | | |
 | 1.1.3.c | Each one turns its layer off and on **individually** | | |
 | | **Ground height off → on is obviously different** (see above) | | |
-| 1.1.3.d | Every layer carries *Council record* or *Calculated by DrainLens* | | |
-| 1.1.3.e | The *Limited ground data* layer — not enough ground measured — is available and legible | | |
+| 1.1.3.d | The legend's *About this data* says which layers are City of Melbourne records and which are estimated by DrainLens | | |
+| 1.1.3.e | The *Ground data gaps* layer — not enough ground measured — is available and legible | | |
 
 ---
 
@@ -115,7 +115,7 @@ Select a pit near the address. **Pit 1145091 is a good one** — 33 pipes, 15 st
 | 1.2.1.a | The selected pit is visibly highlighted | | |
 | 1.2.1.b | Its recorded fields are shown | | |
 | | A field the record does not hold says **Not recorded**, not blank | | |
-| 1.2.1.c | Labelled *Council record* | | |
+| 1.2.1.c | The pit card's technical details say the record is City of Melbourne's | | |
 | 1.2.1.d | A follow-downstream action is offered | | |
 | 1.2.2.a | The path highlights the pit and its pipes | | |
 | 1.2.2.b | Arrows show which way water runs — **check one against the map** | | |

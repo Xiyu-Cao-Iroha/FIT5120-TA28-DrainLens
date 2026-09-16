@@ -58,7 +58,7 @@ What must not happen is the one change that would make the screen look better an
 | | What was done | PR |
 |---|---|---|
 | **4.1.1**, **4.1.2** | All 281 areas as marks, two modes (*Historical Flood Activity*, *Severity Score*), named breaks with ranges, *0+* for areas published as zero because everything was withheld, drag to pan | earlier, #132 |
-| **4.1.3**, **4.3.2** | Dispatches per 1,000 residents at 30 June 2012, labelled *Calculated by DrainLens* on the legend and in every area record. SEVERITY-SCORE.md | earlier, #132 |
+| **4.1.3**, **4.3.2** | Dispatches per 1,000 residents at 30 June 2012, labelled *Calculated by DrainLens* on the legend and in every area record until the copy audit of 15 September, which removed the badges; *More information* on both flood pages now says which figures are published and which are calculated. SEVERITY-SCORE.md | earlier, #132 |
 | **4.1.4–4.1.6** | Area record with per-year counts, floors marked `+`, *No score* with the area's residents, completeness in words | earlier, #128, #132 |
 | **4.3.1–4.3.4** | Every evidence sentence, with its numbers read from the artefacts — **80 of the 281 areas** hold a withheld count, 7 have no score — and three marks for three kinds of information | #132 |
 | **4.2.1–4.2.3** | `flood-events.json`, four events with two or three sources each. **None is shown until a team member checks it** and fills in `checkedBy` and `checkedOn`; until then every area shows the 4.2.3 empty state | #133 |
@@ -488,6 +488,8 @@ From *Iteration 2 Requirements*.
 - [ ] **4.3.4.d** Avoid presenting any of the information as current or future flood prediction
 - [ ] **4.3.4.e** Allow the user to understand the source and limitations of each information type separately
 
+> **15 September:** the copy audit removed the per-section source badges from the flood pages. The three kinds are now told apart in words: counts are *emergency responses* recorded by the Victoria State Emergency Service, the rate is explained under *How the rate is calculated*, and events sit under their own heading. See the names note in ITERATION-1-ACCEPTANCE.md.
+>
 > **Three kinds of thing on one map, and they are not equally solid.** A dispatch count is a published record. An event summary is a person writing. A Severity Score is arithmetic we did. The map legend already separates *recorded by the council* from *calculated by DrainLens*; this needs a third mark, and the three have to stay distinguishable when an area shows all of them at once.
 
 ---

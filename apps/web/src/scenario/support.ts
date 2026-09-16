@@ -50,6 +50,15 @@ export const UNSUPPORTED_SHORT: Readonly<Record<Exclude<PitSupport, 'supported'>
   'no-measured-ground': 'Can’t be tested: not enough ground data around it. This says nothing about whether it works.',
 };
 
+/**
+ * On a drain the engine could compare, but not for the address searched.
+ *
+ * The map offers only the nearest few drains to the address
+ * (`offeredDrains`), and a press on any other says so rather than doing
+ * nothing. Worded as distance, not as a fault in the drain.
+ */
+export const TOO_FAR_SHORT = 'Not offered for this address: other drains are nearer. Choose a ringed drain.';
+
 /** The comparison map's key, step 1: three marks, three meanings. */
 export const MAP_KEY = {
   address: 'Your address',

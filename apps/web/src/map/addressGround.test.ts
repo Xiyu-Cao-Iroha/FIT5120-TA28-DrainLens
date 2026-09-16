@@ -8,15 +8,18 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { type PlacedLabel, figureFor, layoutFigure, notesFor } from './AddressInsight.js';
+import { CAPTION_TEXT, type PlacedLabel, figureFor, groundLines, layoutFigure, notesFor } from './AddressInsight.js';
 import {
   AddressGroundError,
   type GroundTrend,
+  STEEP_FALL_M,
   assertAddressGround,
   describeAddress,
   describeGround,
   groundAt,
+  isSteep,
   loadAddressGround,
+  metresOf,
   trendOf,
 } from './addressGround.js';
 import { COMPASS_ANGLE, type NearbyThing, type WaterNearby } from './nearby.js';
@@ -74,19 +77,32 @@ describe('reading the artefact', () => {
 });
 
 describe('what the card says', () => {
-  it('uses the handover wording for a reliable direction, to one decimal', () => {
+  it('says a gentle slope in plain words, and a steep one as steep', () => {
     expect(describeGround({ kind: 'falls', bearing: 'north-west', fallM: 1 })).toBe(
-      'Nearby ground generally falls north-west. The fitted ground level changes by about 1.0 m across the surrounding 150 m-wide area.',
+      'The ground around this address slopes gently down to the north-west. The ground level changes by about 1 m across the surrounding 150 m-wide area.',
+    );
+    expect(describeGround({ kind: 'falls', bearing: 'east', fallM: 8.5 })).toBe(
+      'The ground around this address slopes down to the east, and the slope is steep. The ground level changes by about 8.5 m across the surrounding 150 m-wide area.',
     );
   });
 
+  it('calls a slope steep from 1 in 20 across the 150 m area, and not before', () => {
+    expect(STEEP_FALL_M / 150).toBe(1 / 20);
+    expect(isSteep(7)).toBe(false);
+    expect(isSteep(7.5)).toBe(true);
+    expect(metresOf(4)).toBe('4');
+    expect(metresOf(12.5)).toBe('12.5');
+  });
+
   it('never says "over the next 150 m", which would be a walk rather than an area', () => {
-    const said = describeGround({ kind: 'falls', bearing: 'south', fallM: 2.5 });
-    expect(said).not.toMatch(/over the next|towards/);
+    for (const fallM of [2.5, 15]) {
+      const said = describeGround({ kind: 'falls', bearing: 'south', fallM });
+      expect(said).not.toMatch(/over the next|towards/);
+    }
   });
 
   it('tells an unclear ground from an address too near the edge of the data', () => {
-    expect(describeGround({ kind: 'unclear' })).toBe('No reliable overall ground direction could be identified around this address.');
+    expect(describeGround({ kind: 'unclear' })).toBe('No clear downhill direction could be found around this address.');
     expect(describeGround({ kind: 'edge' })).toMatch(/too close to the edge of the measured ground/);
   });
 
@@ -96,23 +112,68 @@ describe('what the card says', () => {
       low: { kind: 'direction', distanceM: 30, bearing: 'south', angleDeg: 270 },
     };
     const said = describeAddress({ kind: 'falls', bearing: 'north-west', fallM: 1 }, water)!;
-    expect(said.startsWith('Nearby ground generally falls north-west.')).toBe(true);
+    expect(said.startsWith('The ground around this address slopes gently down to the north-west.')).toBe(true);
     expect(said).toContain('about 10 m to the north-east');
     expect(said).toContain('about 30 m to the south');
     expect(said).not.toMatch(/towards/);
     expect(describeAddress(null, null)).toBeNull();
-    expect(describeAddress({ kind: 'unclear' }, null)).toMatch(/^No reliable/);
+    expect(describeAddress({ kind: 'unclear' }, null)).toMatch(/^No clear downhill direction/);
   });
 });
 
 describe('what the figure writes when it has nothing to point at', () => {
   it('notes an unclear or edge ground, a very near path, and a house inside a low area', () => {
-    expect(notesFor({ kind: 'unclear' }, null)).toEqual(['No reliable overall ground direction']);
+    expect(notesFor({ kind: 'unclear' }, null)).toEqual(['No clear downhill direction here']);
     expect(notesFor({ kind: 'edge' }, null)[0]).toMatch(/edge of the data/);
     expect(
       notesFor({ kind: 'falls', bearing: 'east', fallM: 1 }, { channel: { kind: 'very-near' }, low: { kind: 'inside' } }),
-    ).toEqual(['A likely water path is at or very near', 'This address is inside a mapped low area']);
-    expect(notesFor(null, { channel: null, low: { kind: 'very-near' } })).toEqual(['A low area is at or very near this address']);
+    ).toEqual(['Water may flow at or near this address', 'Water may pool at this address']);
+    expect(notesFor(null, { channel: null, low: { kind: 'very-near' } })).toEqual(['Water may pool at or near this address']);
+  });
+});
+
+/**
+ * Team review item 16: the labels say where water may flow, where it may
+ * collect and where the ground slopes steeply, in words a resident reads
+ * without a key — and none of the words they replaced.
+ */
+describe('what the figure’s labels say', () => {
+  const near: WaterNearby = {
+    channel: { kind: 'direction', distanceM: 60, bearing: 'north', angleDeg: 90 },
+    low: { kind: 'direction', distanceM: 10, bearing: 'south', angleDeg: 270 },
+  };
+  const linesOf = (ground: GroundTrend | null) =>
+    Object.fromEntries(figureFor(ground, near).labels.map((l) => [l.key, l.lines]));
+
+  it('says where water may flow and where it may pool, hedged with "may"', () => {
+    const lines = linesOf(null);
+    expect(lines.path).toEqual(['Water may flow', 'about 60 m away']);
+    expect(lines.low).toEqual(['Water may pool', 'about 10 m away']);
+  });
+
+  it('prints a fall only for a steep slope', () => {
+    // 10 Leonard Crescent: north-east, 4 m — gentle, so no number.
+    expect(linesOf({ kind: 'falls', bearing: 'north-east', fallM: 4 }).ground).toEqual(['Gentle slope', 'downhill this way']);
+    expect(groundLines(7)).toEqual(['Gentle slope', 'downhill this way']);
+    expect(groundLines(7.5)).toEqual(['Steep slope down', 'about 8 m in 150 m']);
+    expect(groundLines(129.5)).toEqual(['Steep slope down', 'about 130 m in 150 m']);
+  });
+
+  it('keeps the old calculated-feature words and the key out of the figure', () => {
+    const labels = [
+      ...[1, 15, 129.5].flatMap((fallM) => linesOf({ kind: 'falls', bearing: 'west', fallM }).ground ?? []),
+      ...Object.values(linesOf(null)).flat(),
+    ];
+    const notes = [
+      ...notesFor({ kind: 'unclear' }, { channel: { kind: 'very-near' }, low: { kind: 'inside' } }),
+      ...notesFor({ kind: 'edge' }, { channel: null, low: { kind: 'very-near' } }),
+    ];
+    expect([...labels, ...notes, CAPTION_TEXT].join(' | ')).not.toMatch(
+      /likely water path|low area|ground falls|≈|Arrow =|Dashed =|not to scale|feature/i,
+    );
+    expect(CAPTION_TEXT).toBe('Directions and distances are approximate.');
+    // Short enough to sit beside the ring; see `groundLines`.
+    expect(labels.filter((line) => line.length > 20)).toEqual([]);
   });
 });
 
@@ -232,7 +293,7 @@ describe('where the figure puts its labels', () => {
   });
 
   it('keeps a label pointing north off the N above the ring, and the N out from under the oval', () => {
-    const figure = layoutFigure([{ key: 'k', degrees: 95, mark: 'oval', lines: ['low area', 'about 40 m away'] }]);
+    const figure = layoutFigure([{ key: 'k', degrees: 95, mark: 'oval', lines: ['Water may collect', 'about 40 m away'] }]);
     const north = northBox(figure.northY);
     expect(apart(box(figure.labels[0]!), north)).toBe(true);
     expect(apart(ovalBox(figure.cy, 95), north)).toBe(true);
@@ -281,8 +342,13 @@ describe('where the figure puts its labels', () => {
       null,
       { kind: 'unclear' },
       { kind: 'edge' },
-      ...(Object.keys(COMPASS_ANGLE) as (keyof typeof COMPASS_ANGLE)[]).map(
-        (bearing): GroundTrend => ({ kind: 'falls', bearing, fallM: 15 }),
+      ...(Object.keys(COMPASS_ANGLE) as (keyof typeof COMPASS_ANGLE)[]).flatMap(
+        (bearing): GroundTrend[] => [
+          { kind: 'falls', bearing, fallM: 15 },
+          { kind: 'falls', bearing, fallM: 2 },
+          // The widest ground label the artefact holds: "about 130 m in 150 m".
+          { kind: 'falls', bearing, fallM: 129.5 },
+        ],
       ),
     ];
     const angles = Array.from({ length: 12 }, (_, i) => i * 30);

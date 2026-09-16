@@ -161,12 +161,12 @@ export function againstRecord(event: FloodEvent, period: { readonly start: strin
   if (month < period.start.slice(0, 7)) {
     return `This happened before the SES record on this map begins (${period.start}), so none of it is in the counts above.`;
   }
-  return 'This falls inside the SES record on this map, but the counts above do not say which call-outs, if any, belong to it.';
+  return 'This falls inside the SES record on this map, but the counts above do not say which emergency responses, if any, belong to it.';
 }
 
 /** AC 4.2.3 a–c: an area with no verified event. */
 export function noEventsText(areaName: string): string {
-  return `DrainLens has not added a verified flood event for ${areaName}. This list is incomplete, so this does not mean flooding has never occurred there. The call-out counts and rate above still apply.`;
+  return `DrainLens has not added a verified flood event for ${areaName}. This list is incomplete, so this does not mean flooding has never occurred there. The emergency response counts and rate above still apply.`;
 }
 
 /** AC 4.2.3.c, under a list that is not empty. */

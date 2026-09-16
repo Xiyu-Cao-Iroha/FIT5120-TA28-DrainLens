@@ -20,8 +20,7 @@ import { sectionFor } from '../crosssection/section.js';
 import { CrossSection, SectionNotes } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
-
-const RECORDED_BADGE = 'Council record';
+import { PROVENANCE } from '../ui/terms.js';
 
 /**
  * The fields the pit layer carries, in the order a person reads them.
@@ -59,6 +58,18 @@ export const ENDING_LABELS: Readonly<Record<string, string>> = {
 export const NO_OUTLET_NOTE =
   'No outfall is recorded in this area. The displayed path therefore ends where ' +
   'the council pipe record ends; this may not be where water leaves the real system.';
+
+/**
+ * What the followed path is, said on the card by default.
+ *
+ * The counts, the reasons each branch stops and the outfall sentence used to
+ * sit here, open, as five sentences and two engineering words (*downstream*,
+ * *outfall*). They are all still on the card, under *View technical details*
+ * (copy audit v2, #33). This is the one a resident reads: what the line is,
+ * and that it is not the end of the real system.
+ */
+export const FOLLOWED_PATH_SHORT =
+  'The highlighted line shows where water from this drain may flow. It stops where the council’s pipe record stops.';
 
 /** How many recorded pipes the followed path shows, as a sentence. */
 export function pipesShown(count: number): string {
@@ -104,15 +115,6 @@ export const PLAIN_LIMITS: readonly {
 ];
 
 const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#61707c' };
-
-const BADGE: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '1px 7px',
-  borderRadius: 999,
-  fontSize: 11,
-  background: '#dcece6',
-  color: '#1f5b4e',
-};
 
 export interface PitDetailProps {
   readonly pit: Pit;
@@ -185,9 +187,14 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
       {sectionOpen && (
         <div style={{ marginBottom: 12 }}>
           <span style={LABEL}>SELECTED PIT</span>
-          <div style={{ margin: '4px 0 8px' }}>
-            <span style={BADGE}>{RECORDED_BADGE}</span>
-          </div>
+          {/*
+            Where the record comes from, as a sentence rather than the *Council
+            record* badge that sat here and on the card above (copy audit v2,
+            #30). Said once, here.
+          */}
+          <p style={{ margin: '4px 0 8px', fontSize: 12, color: '#5b6e7e' }}>
+            {PROVENANCE.recorded}
+          </p>
 
           <dl
             style={{
@@ -222,6 +229,8 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
           <p style={{ margin: '0 0 12px', fontSize: 12, color: '#5b6e7e' }}>{DEPTH_NOTE}</p>
 
           <SectionNotes outcome={outcome} />
+
+          {trace !== null && <TraceDetails trace={trace} />}
         </div>
       )}
 
@@ -242,7 +251,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
               cursor: followable ? 'pointer' : 'default',
             }}
           >
-            Follow the recorded downstream path
+            Show connected drain pipe
           </button>
           {!followable && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: '#61707c' }}>
@@ -253,27 +262,57 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
           )}
         </>
       ) : (
-        <TraceSummary trace={trace} onClear={onClear} />
+        <TraceSummary onClear={onClear} />
       )}
     </div>
   );
 }
 
 /**
- * What the followed path did.
+ * The followed path, on the card: one short sentence and the way to clear it.
+ *
+ * The detail that used to follow here moved to `TraceDetails`, under *View
+ * technical details* (copy audit v2, #33).
+ */
+function TraceSummary({ onClear }: { readonly onClear: () => void }) {
+  return (
+    <div style={{ paddingTop: 10, borderTop: '1px solid #e6ebe4' }}>
+      <span style={LABEL}>FOLLOWED PATH</span>
+      <p style={{ margin: '6px 0 10px' }}>{FOLLOWED_PATH_SHORT}</p>
+
+      <button
+        type="button"
+        onClick={onClear}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          color: '#1f6f5c',
+          cursor: 'pointer',
+        }}
+      >
+        Clear the followed path
+      </button>
+    </div>
+  );
+}
+
+/**
+ * What the followed path did, in full, for whoever opens the technical details.
  *
  * The count of stops is given before the reasons, because "it ends in four
  * places" is the fact that changes how much of this path a person should
  * trust, and the reasons only qualify it.
  */
-function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onClear: () => void }) {
+function TraceDetails({ trace }: { readonly trace: Trace }) {
   const reasons = endingsByReason(trace);
   const brokenRecord = trace.endings.filter((ending) =>
     stoppedBecauseOfTheRecord(ending.reason),
   ).length;
 
   return (
-    <div style={{ paddingTop: 10, borderTop: '1px solid #e6ebe4' }}>
+    <div style={{ marginTop: 12 }}>
       <span style={LABEL}>FOLLOWED PATH</span>
       <p style={{ margin: '6px 0 8px' }}>
         <strong>{pipesShown(trace.pipes.length)}</strong>
@@ -300,22 +339,7 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
         </>
       )}
 
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
-
-      <button
-        type="button"
-        onClick={onClear}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          font: 'inherit',
-          color: '#1f6f5c',
-          cursor: 'pointer',
-        }}
-      >
-        Clear the followed path
-      </button>
+      <p style={{ margin: 0, fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
     </div>
   );
 }

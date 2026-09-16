@@ -37,7 +37,9 @@ import {
   search,
 } from '../address/search.js';
 import { demonstrationAddress } from '../address/demonstration.js';
+import { suburbsOf } from '../address/suburbs.js';
 import type { Task } from '../session.js';
+import type { SectionId } from '../tutorial/sections.js';
 import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
 import { COVERAGE, LAYER } from '../ui/terms.js';
 import {
@@ -108,6 +110,12 @@ export interface LandingProps {
    * comparison its own words; every other way here keeps these.
    */
   readonly task?: Task | null | undefined;
+  /**
+   * The guide section waiting for this address, if one is: `guideSection` in
+   * the session. It names the title, so somebody who pressed the drainage
+   * guide is asked to find drains rather than to see where rain moves.
+   */
+  readonly section?: SectionId | null | undefined;
 }
 
 /** The words that change with the task waiting for the address. */
@@ -117,10 +125,28 @@ export interface LandingCopy {
   readonly submit: string;
 }
 
+/**
+ * The explorer's words, with no section named.
+ *
+ * **The title says what to do, and the lead says where** (copy audit v2, #16).
+ * The lead used to list the layers by their data names, which the chooser's
+ * cards had just said in plainer words; now it says what the search covers.
+ * Which suburbs that is stays under the input, where it is read while typing.
+ */
 export const EXPLORE_COPY: LandingCopy = {
-  title: 'See how rainwater may move near your address',
-  lead: 'Search an address to view likely water paths, council drain records and ground height nearby.',
+  title: 'Enter your address',
+  lead: 'Covers the City of Melbourne.',
   submit: 'Explore this area →',
+};
+
+/**
+ * A title per guide section, so the screen matches the card that was pressed.
+ * Terrain has no guide yet and takes the plain title.
+ */
+export const SECTION_TITLES: Partial<Record<SectionId, string>> = {
+  drainage: 'Find drains near your address',
+  'water-flow': 'See where rain may flow near your address',
+  'low-areas': 'Find low areas near your address',
 };
 
 export const COMPARE_COPY: LandingCopy = {
@@ -129,8 +155,14 @@ export const COMPARE_COPY: LandingCopy = {
   submit: 'Find a drain →',
 };
 
-export const landingCopyFor = (task: Task | null | undefined): LandingCopy =>
-  task === 'compare' ? COMPARE_COPY : EXPLORE_COPY;
+export const landingCopyFor = (
+  task: Task | null | undefined,
+  section: SectionId | null | undefined = null,
+): LandingCopy => {
+  if (task === 'compare') return COMPARE_COPY;
+  const title = section === null || section === undefined ? undefined : SECTION_TITLES[section];
+  return title === undefined ? EXPLORE_COPY : { ...EXPLORE_COPY, title };
+};
 
 type Problem =
   | { readonly kind: 'outside-pilot'; readonly typed: string }
@@ -145,8 +177,11 @@ export function Landing({
   onBack,
   onHome,
   task,
+  section,
 }: LandingProps) {
-  const copy = landingCopyFor(task);
+  const copy = landingCopyFor(task, section);
+  // On the Kensington fallback the search covers less than the lead says.
+  const lead = copy === COMPARE_COPY || index.clipped !== true ? copy.lead : COVERAGE.addressesFallback;
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
@@ -157,6 +192,7 @@ export function Landing({
   );
 
   const demonstration = demonstrationAddress(index);
+  const suburbs = suburbsOf(index);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -224,7 +260,7 @@ export function Landing({
         className="landing__lead"
         style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
       >
-        {copy.lead}
+        {lead}
       </p>
 
       <form
@@ -264,6 +300,7 @@ export function Landing({
             }}
             placeholder="Start typing an address"
             autoComplete="off"
+            aria-describedby={suburbs.length > 0 ? 'address-suburbs' : undefined}
             style={{
               flex: '1 1 260px',
               minWidth: 0,
@@ -298,6 +335,24 @@ export function Landing({
             {copy.submit}
           </button>
         </div>
+
+        {/*
+          Straight under the box, from the review of 15 September: which
+          suburbs the search knows, so somebody in Brunswick finds out before
+          typing rather than after. Read off the index -- see `suburbsOf`.
+        */}
+        {suburbs.length > 0 && (
+          <p
+            id="address-suburbs"
+            style={{
+              margin: `${String(space(2))}px 0 0`,
+              font: type(text.small, { leading: 1.5 }),
+              color: ink.muted,
+            }}
+          >
+            Supported suburbs: {suburbs.join(', ')}
+          </p>
+        )}
 
         {suggestions.length > 0 && (
           <ul

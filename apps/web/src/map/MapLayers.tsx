@@ -2,8 +2,8 @@
  * The controls over the map, and the legend that says what each mark is.
  *
  * One module because they are one fact seen twice. The chips along the top
- * turn a mode on and off; the legend at the bottom says what its marks mean
- * and where they came from. Kept apart, the two drift — a layer renamed in the
+ * turn a mode on and off; the legend says what its marks mean, and once, under
+ * *About this data*, where they came from. Kept apart, the two drift — a layer renamed in the
  * control and not in the legend is a map that disagrees with its own key.
  *
  * **One level: a chip is a layer.** Drain pits, Drain pipes, Likely water
@@ -15,7 +15,7 @@
  * has a switch of its own — which is the substance those criteria protect,
  * whichever control happens to sit where.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   CHIP_KEYS,
@@ -24,8 +24,8 @@ import {
   PANEL_KEYS,
 } from './modes.js';
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
-import { LAYER, SOURCE } from '../ui/terms.js';
-import { basis, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
+import { LAYER, PROVENANCE } from '../ui/terms.js';
+import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
 type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch';
@@ -36,7 +36,6 @@ export interface LayerSpec {
   readonly chip: string;
   /** The name in the legend and the panel: the same name, from `ui/terms.ts`. */
   readonly label: string;
-  readonly basis: 'Council record' | 'Calculated by DrainLens';
   readonly swatch: Swatch;
 }
 
@@ -47,16 +46,18 @@ export interface LayerSpec {
  * named separately in AC 1.1.5, and they answer different questions: the pipes
  * are where water goes, the pits are where it can get in.
  *
- * This table is what a layer *looks like* and where it came from. Which
- * control governs it is `modes.ts`.
+ * This table is what a layer *looks like*. It used to carry where each came
+ * from as well, for a badge per layer; that is said once in the legend's
+ * *About this data* now (copy audit v2, #61). Which control governs a layer is
+ * `modes.ts`.
  */
 export const LAYERS: readonly LayerSpec[] = [
-  { key: 'terrain', chip: LAYER.ground, label: LAYER.ground, basis: 'Calculated by DrainLens', swatch: 'ramp' },
-  { key: 'pipe', chip: LAYER.pipes, label: LAYER.pipes, basis: 'Council record', swatch: 'line' },
-  { key: 'pit', chip: LAYER.pits, label: LAYER.pits, basis: 'Council record', swatch: 'dot' },
-  { key: 'channel', chip: LAYER.paths, label: LAYER.paths, basis: 'Calculated by DrainLens', swatch: 'flow' },
-  { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, basis: 'Calculated by DrainLens', swatch: 'blob' },
-  { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, basis: 'Calculated by DrainLens', swatch: 'hatch' },
+  { key: 'terrain', chip: LAYER.ground, label: LAYER.ground, swatch: 'ramp' },
+  { key: 'pipe', chip: LAYER.pipes, label: LAYER.pipes, swatch: 'line' },
+  { key: 'pit', chip: LAYER.pits, label: LAYER.pits, swatch: 'dot' },
+  { key: 'channel', chip: LAYER.paths, label: LAYER.paths, swatch: 'flow' },
+  { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, swatch: 'blob' },
+  { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
 ];
 
 /** The look-up the controls and the legend both go through. */
@@ -149,6 +150,7 @@ function Chip({
   disabled,
   title,
   tour,
+  pulse = false,
   onToggle,
 }: {
   readonly label: string;
@@ -158,11 +160,14 @@ function Chip({
   readonly title: string;
   /** The tour's name for this chip, so the overlay can find it. */
   readonly tour: string;
+  /** Outlined, and pulsing where motion is allowed: the guide's *press this*. */
+  readonly pulse?: boolean;
   readonly onToggle: () => void;
 }) {
   return (
     <button
       type="button"
+      className={pulse ? 'chip--pulse' : undefined}
       data-tour={tour}
       onClick={onToggle}
       disabled={disabled}
@@ -218,6 +223,21 @@ export interface LayerChipsProps {
   readonly keys?: readonly LayerKey[];
   /** The Layers button. Off inside the guide, which has nothing behind it yet. */
   readonly layersButton?: boolean;
+  /**
+   * The chip the guide's current step asks for, outlined so the reader can
+   * see where to press (copy audit v2, #21). Null or absent everywhere else.
+   */
+  readonly pulse?: LayerKey | null;
+  /**
+   * The same outline on the Layers button, or on one switch inside its panel.
+   *
+   * The ground height guide's first and second steps, Figma Terrain Tutorial,
+   * 16 September: its layer is behind the button, so that is where to press.
+   */
+  readonly pulseLayers?: boolean;
+  readonly pulsePanelKey?: LayerKey | null;
+  /** Told whenever the panel opens or shuts. The guide's first step waits on it. */
+  readonly onPanelChange?: (open: boolean) => void;
 }
 
 /**
@@ -233,8 +253,21 @@ export function LayerChips({
   unavailableKeys = [],
   keys = CHIP_KEYS,
   layersButton = true,
+  pulse = null,
+  pulseLayers = false,
+  pulsePanelKey = null,
+  onPanelChange,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    onPanelChange?.(open);
+  }, [open, onPanelChange]);
+  /*
+    With no chips the button is the first thing in the row, at the map's left
+    edge, and a panel hung from its right edge opened off the side of the map
+    -- clipped away inside the guide's frame. It hangs from the left then.
+  */
+  const panelSide = keys.length === 0 ? { left: 0 } : { right: 0 };
 
   return (
     <div
@@ -255,6 +288,7 @@ export function LayerChips({
             disabled={disabled}
             title={disabled ? `${spec.label} is still loading` : spec.label}
             tour={`chip-${key}`}
+            pulse={pulse === key && !state[key]}
             onToggle={() => {
               onToggle(key);
             }}
@@ -267,6 +301,7 @@ export function LayerChips({
         <button
           type="button"
           data-tour="layers"
+          className={pulseLayers ? 'chip--pulse' : undefined}
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -300,7 +335,7 @@ export function LayerChips({
           <div
             style={{
               position: 'absolute',
-              right: 0,
+              ...panelSide,
               top: 'calc(100% + 6px)',
               zIndex: 5,
               width: 288,
@@ -329,11 +364,15 @@ export function LayerChips({
                 <label
                   key={key}
                   title={disabled ? `${spec.label} is still loading` : spec.label}
+                  className={pulsePanelKey === key ? 'chip--pulse' : undefined}
                   style={{
                     display: 'flex',
                     gap: space(3),
                     alignItems: 'flex-start',
                     marginBottom: space(3),
+                    // Room for the outline, which is drawn as a shadow.
+                    padding: `${String(space(1))}px ${String(space(2))}px`,
+                    borderRadius: radius.small,
                     font: type(text.label, { leading: 1.5 }),
                     color: disabled ? ink.subtle : ink.base,
                   }}
@@ -347,10 +386,8 @@ export function LayerChips({
                     }}
                     style={{ marginTop: 3 }}
                   />
-                  <span>
-                    <span style={{ display: 'block' }}>{spec.label}</span>
-                    <BasisTag basis={spec.basis} />
-                  </span>
+                  {/* No source badge under the name: copy audit v2, #63. */}
+                  <span>{spec.label}</span>
                 </label>
               );
             })}
@@ -362,34 +399,17 @@ export function LayerChips({
   );
 }
 
-function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
-  const tone = which === 'Council record' ? basis.recorded : basis.derived;
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        marginTop: space(1),
-        padding: `1px ${String(space(2))}px`,
-        borderRadius: radius.pill,
-        font: type(text.micro, { leading: 1.5 }),
-        background: tone.fill,
-        color: tone.ink,
-      }}
-    >
-      {which}
-    </span>
-  );
-}
-
 /**
  * The legend, and where "distinguish official recorded data from system-derived
  * information" is met — AC 1.1.4, and AC 1.3.1 for the terrain in particular.
  *
- * The criterion asks that every layer carry *Council record* or
- * *Calculated by DrainLens*. It used to sit under each checkbox in the panel;
- * with the controls compressed into chips there is no room for it there, and a
- * tooltip is not something a layer *carries*. So it lives here, on screen
- * beside the mark it describes, for every layer that is currently drawn.
+ * The criterion was met with a *Council record* or *Calculated by DrainLens*
+ * mark beside every layer, and two rows at the bottom saying what the marks
+ * meant. **From copy audit v2 (#61) the distinction is said once, in words,
+ * under *About this data* at the bottom of the legend**, closed by default. A
+ * resident reading the key wants to know what a symbol is, not which dataset it
+ * came from, and a mark on every row was the noise the audit found. The
+ * sentences are `PROVENANCE`, the same ones every other place uses.
  *
  * **It folds, and folds to its own name rather than to nothing.** The map is
  * the thing somebody came for and this sits over a corner of it; on a laptop
@@ -405,7 +425,18 @@ function BasisTag({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
  * wrap on a narrow window — pinned to a corner it would simply be underneath
  * them — and it is why the caller owns the position now.
  */
-export function MapLegend({ state }: { readonly state: LayerState }) {
+export function MapLegend({
+  state,
+  pulseTerrain = false,
+}: {
+  readonly state: LayerState;
+  /**
+   * The ground-height scale outlined: the guide's steps about the colours and
+   * about AHD point at it. While the legend is folded, its Show button is
+   * outlined instead, since the scale is not there to outline.
+   */
+  readonly pulseTerrain?: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
@@ -443,6 +474,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
             setOpen((v) => !v);
           }}
           aria-expanded={open}
+          className={pulseTerrain && !open && state.terrain ? 'chip--pulse' : undefined}
           style={{
             marginLeft: 'auto',
             background: 'none',
@@ -461,7 +493,7 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
         <>
           {shown.map((spec) =>
             spec.swatch === 'ramp' ? (
-              <TerrainScale key={spec.key} spec={spec} />
+              <TerrainScale key={spec.key} spec={spec} pulse={pulseTerrain} />
             ) : (
               <div
                 key={spec.key}
@@ -476,13 +508,10 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
                 <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
                   {spec.label}
                 </span>
-                <span style={{ marginLeft: 'auto' }}>
-                  <BasisDot basis={spec.basis} />
-                </span>
               </div>
             ),
           )}
-          <p
+          <details
             style={{
               margin: `${String(space(3))}px 0 0`,
               paddingTop: space(2),
@@ -491,15 +520,38 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
               color: ink.subtle,
             }}
           >
-            <BasisDot basis="Council record" /> {SOURCE.recorded}
-            <br />
-            <BasisDot basis="Calculated by DrainLens" /> {SOURCE.derived}
-          </p>
+            <summary style={{ cursor: 'pointer', font: type(text.micro, { weight: weight.semibold }), color: ink.muted }}>
+              About this data
+            </summary>
+            <p style={{ margin: `${String(space(1))}px 0 0` }}>{PROVENANCE.recorded}</p>
+            <p style={{ margin: `${String(space(1))}px 0 0` }}>{PROVENANCE.derived}</p>
+            {/* What the ground-height layer's finer marks mean, only while it is drawn (#64). */}
+            {state.terrain && TERRAIN_DETAILS.map((detail) => (
+              <p key={detail} style={{ margin: `${String(space(1))}px 0 0` }}>
+                {detail}
+              </p>
+            ))}
+          </details>
         </>
       )}
     </div>
   );
 }
+
+/**
+ * The ground-height lines that left the legend's face (copy audit v2, #64).
+ *
+ * Five small lines under the scale, one with the abbreviation AHD, were more
+ * than a key needs. Two stay under the scale; these three are the detail for
+ * somebody who asks, under *About this data*. *Estimated ground height ·
+ * calculated by DrainLens* went altogether, since `PROVENANCE.derived` beside
+ * them says it.
+ */
+const TERRAIN_DETAILS: readonly string[] = [
+  'Colours mean the same height everywhere on the map.',
+  'Shading shows the shape of the land, not water depth.',
+  'Height lines are 1 m apart, bold every 5 m. Numbers marked ≈ are estimates to the nearest 0.5 m, not surveyed points.',
+];
 
 /**
  * Ground height, as a fixed scale in metres.
@@ -511,18 +563,26 @@ export function MapLegend({ state }: { readonly state: LayerState }) {
  * It used to read *Lower* and *Higher* with no numbers, because the ramp was
  * fitted to the ground in view and a colour meant "low for around here". The
  * ramp is now fixed to metres AHD, so the numbers are what the colours mean.
- * *Calculated by DrainLens* is in the words as well as the dot: AC 1.3.1.
+ * That it is calculated, AC 1.3.1, is said under the legend's *About this data*.
  */
-function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
+function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly pulse: boolean }) {
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
-    <div style={{ marginTop: space(3) }}>
+    <div
+      className={pulse ? 'chip--pulse' : undefined}
+      style={{
+        marginTop: space(3),
+        // Room for the outline without moving the scale: padded by as much as
+        // it is pulled out.
+        padding: space(1),
+        marginLeft: -space(1),
+        marginRight: -space(1),
+        borderRadius: radius.small,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: space(2) }}>
         <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
           {spec.label}
-        </span>
-        <span style={{ marginLeft: 'auto' }}>
-          <BasisDot basis={spec.basis} />
         </span>
       </div>
       <div
@@ -567,31 +627,8 @@ function TerrainScale({ spec }: { readonly spec: LayerSpec }) {
           </span>
         ))}
       </div>
-      <p style={micro}>metres above sea level (AHD), fixed everywhere</p>
-      <p style={micro}>Estimated ground height · calculated by DrainLens</p>
-      <p style={micro}>Shading shows the shape of the land, not water depth.</p>
-      <p style={micro}>Ground-height lines · 1 m intervals, bold every 5 m</p>
-      <p style={micro}>≈ numbers are estimated ground heights, to 0.5 m, not surveyed points.</p>
+      <p style={micro}>Height above sea level (metres)</p>
+      <p style={micro}>Lines join places of equal height.</p>
     </div>
-  );
-}
-
-function BasisDot({ basis: which }: { readonly basis: LayerSpec['basis'] }) {
-  const recorded = which === 'Council record';
-  const tone = recorded ? basis.recorded : basis.derived;
-  return (
-    <span
-      aria-label={which}
-      title={which}
-      style={{
-        display: 'inline-block',
-        width: 8,
-        height: 8,
-        marginRight: 4,
-        borderRadius: recorded ? radius.pill : 2,
-        background: tone.ink,
-        verticalAlign: 'baseline',
-      }}
-    />
   );
 }

@@ -679,3 +679,42 @@ button:disabled {
     animation: none;
   }
 }
+
+/*
+ * The guide's "press this" on a map chip.
+ *
+ * It replaced the line *Waiting for you to try it* under every step that waits
+ * for a press (copy audit v2, #21). An outline in the amber of the teaching
+ * pit's ring on the map (`palette.suggested`), with a ring
+ * that swells and fades around it. The outline is a box-shadow rather than the
+ * border, because the chip's border is an inline style and a class cannot
+ * override it.
+ *
+ * Under `prefers-reduced-motion` the ring holds still: the outline stays, since
+ * it is the information, and only the movement goes. `animation: none` rather
+ * than leaning on the global rule above, which would run one frame and leave
+ * the ring wherever the keyframes end, which is invisible.
+ */
+@keyframes drainlens-chip-pulse {
+  0% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 2px rgba(180, 105, 14, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+  }
+}
+
+.chip--pulse {
+  animation: drainlens-chip-pulse 1.6s ease-out infinite;
+  box-shadow: 0 0 0 2px #b4690e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip--pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 5px rgba(180, 105, 14, 0.3);
+  }
+}

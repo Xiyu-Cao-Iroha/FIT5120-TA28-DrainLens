@@ -10,7 +10,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { Pit } from '../map/artefact.js';
 import { TEACHING_RADIUS_M } from '../tutorial/pit.js';
-import { COMPARISON_RADIUS_M, aboutMetres, comparableNear } from './eligibility.js';
+import {
+  COMPARISON_RADIUS_M,
+  OFFERED_DRAIN_COUNT,
+  aboutMetres,
+  comparableNear,
+  offeredDrains,
+} from './eligibility.js';
 
 const pit = (asset: number | undefined, east: number, north: number): Pit => ({
   g: 'point',
@@ -85,5 +91,25 @@ describe('the distance in the sentence', () => {
     expect(aboutMetres(3)).toBe(10);
     expect(aboutMetres(0)).toBe(10);
     expect(aboutMetres(195)).toBe(200);
+  });
+});
+
+describe('the drains offered once an address is searched', () => {
+  it('is the nearest and the others, and nothing past the radius', () => {
+    const pits = [pit(1, 510, 500), pit(2, 530, 500), pit(3, 500 + COMPARISON_RADIUS_M + 10, 500)];
+    const offered = offeredDrains(comparableNear(HOME, pits, new Set(['1', '2', '3'])));
+    expect(offered.map((d) => d.assetNumber)).toEqual(['1', '2']);
+  });
+
+  it('stops at the nearest few, and the nearest is first', () => {
+    const pits = Array.from({ length: 12 }, (_, at) => pit(at + 1, 500 + 10 * (12 - at), 500));
+    const supported = new Set(pits.map((p) => String(p.asset_number)));
+    const offered = offeredDrains(comparableNear(HOME, pits, supported));
+    expect(offered).toHaveLength(OFFERED_DRAIN_COUNT);
+    expect(offered.map((d) => d.assetNumber)).toEqual(['12', '11', '10', '9', '8']);
+  });
+
+  it('is empty when nothing is near', () => {
+    expect(offeredDrains({ nearest: null, others: [] })).toHaveLength(0);
   });
 });

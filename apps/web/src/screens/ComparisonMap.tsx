@@ -32,9 +32,9 @@ import { DAY } from '../map/draw.js';
 import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
-import { type Eligibility, aboutMetres } from '../scenario/eligibility.js';
+import { type Eligibility, aboutMetres, offeredDrains } from '../scenario/eligibility.js';
 import { DIFFERENCE_LEGEND, DIFFERENCE_LEGEND_NOTE } from '../scenario/outcome.js';
-import { MAP_KEY, UNSUPPORTED_SHORT, supportOf } from '../scenario/support.js';
+import { MAP_KEY, TOO_FAR_SHORT, UNSUPPORTED_SHORT, supportOf } from '../scenario/support.js';
 import type { Trace } from '../trace/graph.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
@@ -97,12 +97,28 @@ export function ComparisonMap({
     [pits, selectedPitId],
   );
 
+  /*
+    What the map offers. After a search, only the comparable drains near that
+    address -- see `offeredDrains`. Opened from the full map there is no
+    address to be near, and every comparable drain is offered as before.
+  */
+  const offeredList = useMemo(
+    () => (address !== null && eligibility !== null ? offeredDrains(eligibility) : null),
+    [address, eligibility],
+  );
+  const offered = useMemo(
+    () => (offeredList === null ? supported : new Set(offeredList.map((drain) => drain.assetNumber))),
+    [offeredList, supported],
+  );
+
   const reasonFor = useCallback(
     (pit: Pit): string | null => {
-      const support = supportOf({ supported, withoutGround }, String(pit.asset_number ?? ''));
-      return support === 'supported' ? null : UNSUPPORTED_SHORT[support];
+      const asset = String(pit.asset_number ?? '');
+      const support = supportOf({ supported, withoutGround }, asset);
+      if (support !== 'supported') return UNSUPPORTED_SHORT[support];
+      return offered.has(asset) ? null : TOO_FAR_SHORT;
     },
-    [supported, withoutGround],
+    [supported, withoutGround, offered],
   );
 
   // A new step starts with nothing under the pointer and nothing refused.
@@ -135,8 +151,8 @@ export function ComparisonMap({
   const suggestedMark = choosing && nearest !== null ? Number(nearest.assetNumber) : null;
   const selectedMark = !choosing && selectedPitId !== null ? Number(selectedPitId) : null;
   const marks = useMemo(
-    () => ({ comparable: supported, suggested: suggestedMark, selected: selectedMark }),
-    [supported, suggestedMark, selectedMark],
+    () => ({ comparable: offered, suggested: suggestedMark, selected: selectedMark }),
+    [offered, suggestedMark, selectedMark],
   );
   // Only a different pit is news; the same pit under a moving pointer is not.
   // The canvas reports null on a press, a drag, a zoom and on leaving it.
@@ -171,7 +187,7 @@ export function ComparisonMap({
   // Keyboard order: the highlighted drain first, then the others by distance,
   // and only the ones on screen — a focus target off the canvas would scroll
   // a container that is not meant to scroll.
-  const targets = choosing && eligibility !== null && nearest !== null ? [nearest, ...eligibility.others] : [];
+  const targets = choosing && offeredList !== null && nearest !== null ? offeredList : [];
 
   const drainAt = choosing ? nearest?.at ?? null : (selectedPit?.c ?? null);
   const addressScreen = address === null ? null : on(address);
