@@ -20,7 +20,15 @@
 # different commit than the server it is migrating for is a class of failure
 # nobody can reproduce afterwards.
 
-FROM node:22-alpine AS build
+# **Base images are pinned by digest** (penetration test P06, P07). A moving
+# name such as `node:22-alpine` meant two builds of one commit could ship
+# different operating-system packages, and the image only picked up fixes when
+# the application happened to change. The tag is kept beside the digest so a
+# reader can see what it is; the digest is what Docker uses. To move to a newer
+# base, look up the new digest (deploy/README.md, "Rebuilding on a schedule"),
+# change both Dockerfiles, and let CI's image scan run on the pull request.
+
+FROM node:22.23.2-alpine3.24@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 WORKDIR /repo
 
 # The lockfile first, so only a dependency change busts the layer cache.
@@ -36,7 +44,7 @@ RUN npm ci
 COPY . .
 RUN npm run build --workspace @drainlens/api
 
-FROM node:22-alpine AS runtime
+FROM node:22.23.2-alpine3.24@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runtime
 WORKDIR /app
 
 # The same lockfile, without the toolchain: twenty-three packages against the
@@ -48,6 +56,20 @@ COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
 RUN npm ci --omit=dev && npm cache clean --force
+
+# **Then the package managers go, and the OS packages are brought up to date**
+# (penetration test P06; the CI image scan). The server is started with `node`
+# and never installs anything, but the Node base image ships npm, yarn and
+# corepack with their own dependency trees -- a CRITICAL in tar and ten HIGHs
+# on 16 September, none of them in this application's modules -- and its
+# Alpine layer lagged a libssl fix. Removing what nothing runs is simpler than
+# tracking those trees. Node carries its own OpenSSL, which `apk` does not
+# touch and the scan cannot see; that one moves only with the base image's
+# digest (deploy/README.md, "Rebuilding on a schedule").
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+           /usr/local/lib/node_modules/corepack /usr/local/bin/corepack \
+           /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY db/migrations db/migrations

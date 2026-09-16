@@ -26,6 +26,7 @@ import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
 import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import pg from 'pg';
 
 import {
@@ -148,6 +149,29 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
   const app = new Hono();
 
   app.use('*', cors({ origin: allowedOrigins() }));
+
+  /*
+    Defence headers on every answer, including the errors (penetration test
+    P02, P08, and the plan's "equivalent headers on the backend").
+
+    The API only ever returns JSON to `fetch`, so its policy is the tightest
+    there is: nothing may load, nothing may frame it. HSTS without
+    includeSubDomains, for the same reason as the site's: the run.app host is
+    not this project's to make promises for. Cross-origin resource policy is
+    left at the middleware's default of off, because the site reads these
+    responses from another origin by design and CORS already decides who may.
+  */
+  app.use(
+    '*',
+    secureHeaders({
+      contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      strictTransportSecurity: 'max-age=31536000',
+      xFrameOptions: 'DENY',
+      referrerPolicy: 'no-referrer',
+      crossOriginResourcePolicy: false,
+      crossOriginOpenerPolicy: 'same-origin',
+    }),
+  );
 
   /*
     Compression, which stopped being optional when the extent became a council.
