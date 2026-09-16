@@ -55,6 +55,7 @@ import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
 import { waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
 import {
@@ -67,7 +68,6 @@ import {
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import {
-  basis as basisTone,
   ink,
   line,
   radius,
@@ -648,8 +648,8 @@ export function MapView({
           at={toScreen(viewport, hit.feature.c)}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={publicLabelOf(hit.feature)}
-          // No source badge (copy audit v2, #30). Where the record comes from
-          // is said once, under View technical details in `PitDetail`.
+          // A grey source line at the foot, not a badge (copy audit v4, #30).
+          source="recorded"
           action={
             followed === null
               ? {
@@ -704,7 +704,8 @@ export function MapView({
           at={toScreen(viewport, midpoint(hit.feature.c))}
           within={{ width: viewport.widthPx, height: viewport.heightPx }}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
-          // No source badge, as on the pit card (copy audit v2, #30).
+          // The same source line as the pit card; the pipe card had the badge too.
+          source="recorded"
           onClose={() => {
             setHit(null);
           }}
@@ -725,9 +726,10 @@ export function MapView({
       {/*
         The warning sign's card: the requested sentence and nothing else.
 
-        No basis badge and no caveat, on purpose. It is advice about a place,
-        asked for in exactly these words, and what the low areas are and are
-        not is said beside the layer already. Hidden with the sign when the map
+        No source line and no caveat, on purpose. It is advice about a place,
+        asked for in exactly these words, and the industry mentor asked for no
+        further explanation on it; copy audit v4 (#62) left the source line to
+        the team, and the low areas' legend group says they are estimated. Hidden with the sign when the map
         zooms out past it, and back when it zooms in again, like a pit's card
         whose pit has left the screen.
       */}
@@ -751,9 +753,9 @@ export function MapView({
       {/*
         The address callout, and the mentor's *"even a small popup"* for the
         pin. It carries what the panel used to say about the address — AC
-        1.1.9.c — and the derived sentence keeps its own badge rather than
-        borrowing the card's, because the address is the person's own and
-        belongs to no dataset.
+        1.1.9.c — and ends with "Estimated by DrainLens ›" (copy audit v4,
+        #59, #60) for the figure, not a source for the card: the address is
+        the person's own and belongs to no dataset.
 
         It does not draw while a feature is selected: two cards on one map is
         one card too many, and the one somebody just pressed is the one they
@@ -776,12 +778,14 @@ export function MapView({
           }}
         >
           {explanation === null && groundTrend === null ? (
-            'No place where water may flow or collect was found close to this address.'
-          ) : (
             <>
-              {/* No source badge: copy audit v2, #60. The legend's About this data says it once. */}
-              <AddressInsight ground={groundTrend} near={explanation} />
+              No place where water may flow or collect was found close to this address.
+              <span style={{ display: 'block', marginTop: space(2) }}>
+                <SourceLink id="derived" />
+              </span>
             </>
+          ) : (
+            <AddressInsight ground={groundTrend} near={explanation} />
           )}
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>

@@ -9,6 +9,8 @@ What to do. Every task names the criterion it serves in [ITERATION-2-ACCEPTANCE.
 **The critical path is W1, and it is data.** Epic 3 is largely built and needs one engine change and a route back into the interface. Epic 4 needs a map of Greater Melbourne, a population dataset and a set of verified events, none of which are in the repository — and two of those three cannot be started by writing code.
 
 > **14 September: all three are in the repository now** — the boundaries in `sa2-points.json`, the population in `population.json`, four drafted events in `flood-events.json` with one checked. The critical path has moved from data to people: three events to check, a deployment, and the desk checks.
+>
+> **16 September: four events to check, not three.** The events were redrafted from official sources only, which cleared the one check (see *Events* below).
 
 ---
 
@@ -88,8 +90,8 @@ Carried over from Iteration 1 — **confirm at the first stand-up** rather than 
 
 - [x] **Define what *verified* means** and who does it → *4.2.2.a*. Written into `flood-events.json` itself: two sources at least, every sentence stated on one of them, and shown only once a team member has filled in `checkedBy` and `checkedOn`. The loader filters on those two fields (#133)
 - [x] **Schema for events**: name, first recorded date, associated places, area, team-written summary, source links → *4.2.1.a–e*. A published file with a guard (`history/events.ts`) and `tools/data/check-events.mjs` in CI, not a table: the events are hand-written and a table would add a migration and an API route for four rows
-- [x] **Three or four events, well sourced** → *4.2.1, 4.2.2*. Four drafted: Melbourne storm March 2010, storms February 2011, Christmas Day storm 2011, Maribyrnong River flood October 2022 — AIDR, ABC News and Melbourne Water
-- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader. **This is the check that makes the four events appear** — **one of four is done**: the Maribyrnong River flood, October 2022, checked on 14 September (#137) and shown for Maribyrnong, Kensington and Ascot Vale. The other three are waiting for a team member
+- [x] **Three or four events, well sourced** → *4.2.1, 4.2.2*. Four drafted: Melbourne storm March 2010, storms February 2011, Christmas Day storm 2011, Maribyrnong River flood October 2022 — the Australian Institute for Disaster Resilience (AIDR) with the Bureau of Meteorology for the three storms, Melbourne Water for Maribyrnong. **16 September: official sources only**, no news reports; all four summaries were rewritten to what those pages state, and `check-events.mjs` refuses a news outlet
+- [ ] **Review pass on the summaries** → *4.2.2.d*. No casualty figures without a source, no damage estimates, no superlatives. Nothing here is checked by a test, which is why it needs a reader. **This is the check that makes the four events appear** — **none of four is done as of 16 September**. The Maribyrnong River flood was checked on 14 September (#137), but its summary and sources changed on 16 September, so that check was cleared; all four are waiting for a team member, and `check-events.mjs` reports *0 checked and shown, 4 waiting*
 
 ---
 

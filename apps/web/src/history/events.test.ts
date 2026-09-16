@@ -22,7 +22,8 @@ import {
   assertEvents,
   eventDate,
   eventsFor,
-  noEventsText,
+  NO_EVENTS,
+  NO_EVENTS_TIP,
   verifiedEvents,
 } from './events.js';
 import type { ScopeAreas } from './severity.js';
@@ -164,11 +165,10 @@ describe('what is shown', () => {
   });
 
   it('handles an area with no verified event as 4.2.3 asks', () => {
-    const text = noEventsText('Brunswick');
-    expect(text).toMatch(/DrainLens has not added a verified flood event for Brunswick\./);
-    expect(text).toMatch(/This list is incomplete, so this does not mean flooding has never occurred there/);
-    expect(text).toMatch(/emergency response counts and rate above still apply/);
-    expect(text).not.toMatch(/Severity|score/);
+    // Copy audit v4, #89: one line, and the ⓘ says no event is not no flooding.
+    expect(NO_EVENTS).toBe('No checked flood events yet.');
+    expect(NO_EVENTS_TIP).toBe('This does not mean the area has never flooded.');
+    expect(`${NO_EVENTS} ${NO_EVENTS_TIP}`).not.toMatch(/Severity|score/);
     expect(NOT_COMPLETE).toMatch(/not a complete record/);
     expect(EVENTS_UNAVAILABLE).toMatch(/not a statement about this area/);
   });

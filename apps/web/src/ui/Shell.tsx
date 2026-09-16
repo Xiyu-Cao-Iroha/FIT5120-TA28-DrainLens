@@ -12,12 +12,7 @@
 
 import { type ReactNode, useEffect, useRef } from 'react';
 
-import {
-  CHANGES_NOTICE,
-  type Credit,
-  licenceUrl,
-  describeDatasets,
-} from './attribution.js';
+import { CHANGES_NOTICE, type Credit } from './attribution.js';
 import {
   brand,
   ink,
@@ -31,6 +26,7 @@ import {
   weight,
 } from './theme.js';
 import { COVERAGE } from './terms.js';
+import { SourceLink, SourcesProvider } from './SourcesPanel.js';
 
 export interface ShellProps {
   readonly children: ReactNode;
@@ -127,6 +123,7 @@ export function Shell({
   }, [at]);
 
   return (
+    <SourcesProvider credits={credits ?? []} notice={creditNotice ?? CHANGES_NOTICE}>
     <div
       style={{
         position: 'fixed',
@@ -241,9 +238,10 @@ export function Shell({
       </main>
 
       {credits !== undefined && credits.length > 0 && (
-        <Attribution credits={credits} extentName={extentName} notice={creditNotice ?? CHANGES_NOTICE} />
+        <Attribution extentName={extentName} />
       )}
     </div>
+    </SourcesProvider>
   );
 }
 
@@ -271,12 +269,8 @@ const SMALLER_MAP: Record<string, string> = {
  * permits; not absent, which it does not.
  */
 function Attribution({
-  credits,
   extentName,
-  notice,
 }: {
-  readonly credits: readonly Credit[];
-  readonly notice: string;
   // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
   // treats those as different, and the caller always passes the key.
   readonly extentName: string | undefined;
@@ -298,26 +292,14 @@ function Attribution({
           {smaller}
         </p>
       )}
-      <details>
-        <summary style={{ cursor: 'pointer' }}>Data sources · Licensing · Not a flood warning</summary>
-        <p style={{ margin: `${String(space(1))}px 0 0` }}>
-          {credits.map((credit) => (
-            <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
-              {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
-              <a
-                href={licenceUrl(credit.licence)}
-                target="_blank"
-                rel="license noreferrer"
-                style={{ color: ink.muted, textDecorationColor: line.strong }}
-              >
-                {credit.licence}
-              </a>
-              {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
-            </span>
-          ))}
-          <span>{notice}</span> <span>DrainLens is not a flood warning service.</span>
-        </p>
-      </details>
+      {/*
+        The credits and the changes notice moved into "About the data"
+        (ui/SourcesPanel.tsx, section "privacy"), one press away as before.
+        "Not a flood warning" stays visible on every screen.
+      */}
+      <p style={{ margin: 0 }}>
+        Not a flood warning · <SourceLink id="footer" inline />
+      </p>
     </footer>
   );
 }

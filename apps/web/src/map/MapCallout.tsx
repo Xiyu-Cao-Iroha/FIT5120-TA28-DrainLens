@@ -26,8 +26,8 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
 import { type Box, caretAt, placeCard, spotlightFor } from '../ui/callout.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import {
-  basis as basisTone,
   brand,
   ink,
   line,
@@ -68,14 +68,16 @@ export interface MapCalloutProps {
   readonly within: { readonly width: number; readonly height: number };
   readonly title: string;
   /**
-   * The badge, where one applies to the whole card.
+   * Where the card's information comes from, as one grey link at its foot.
    *
-   * Omitted on the address callout: the address is the person's own and is
-   * neither recorded by the council nor derived by us, while the sentence
-   * inside it *is* derived and carries its own badge. One label over both
-   * would put their house into a dataset.
+   * Copy audit v2 removed the coloured badge this replaces; copy audit v4
+   * (#30) brought the distinction back as small text, because AC 1.1.7 and
+   * 1.2.1 ask a popup to say whether it shows a council record or a DrainLens
+   * estimate. Omitted on the address callout, whose figure carries its own
+   * (the address is the person's, not a dataset's), and on the warning card,
+   * which the industry mentor asked to hold one sentence and nothing else.
    */
-  readonly basis?: 'Council record' | 'Calculated by DrainLens';
+  readonly source?: 'recorded' | 'derived';
   readonly children: ReactNode;
   /** The relevant next action, where there is one — AC 1.1.7.e. */
   readonly action?: { readonly label: string; readonly onPress: () => void };
@@ -101,7 +103,7 @@ export function MapCallout({
   at,
   within,
   title,
-  basis,
+  source,
   children,
   action,
   more,
@@ -126,12 +128,6 @@ export function MapCallout({
   );
   const card: Box = { x: 0, y: 0, width: WIDTH, height };
   const placement = placeCard(spot, card, within);
-  const tone =
-    basis === undefined
-      ? null
-      : basis === 'Council record'
-        ? basisTone.recorded
-        : basisTone.derived;
 
   return (
     <div
@@ -219,23 +215,7 @@ export function MapCallout({
         </button>
       </div>
 
-      {basis !== undefined && tone !== null && (
-        <span
-          style={{
-            display: 'inline-block',
-            margin: `${String(space(2))}px 0`,
-            padding: `1px ${String(space(2))}px`,
-            borderRadius: radius.pill,
-            background: tone.fill,
-            color: tone.ink,
-            font: type(text.micro, { weight: weight.medium, leading: 1.5 }),
-          }}
-        >
-          {basis}
-        </span>
-      )}
-
-      <div style={{ font: type(text.label, { leading: 1.55 }), color: ink.muted }}>{children}</div>
+      <div style={{ marginTop: space(1), font: type(text.label, { leading: 1.55 }), color: ink.muted }}>{children}</div>
 
       {action && (
         <button
@@ -286,6 +266,12 @@ export function MapCallout({
           </button>
           {open && <div style={{ marginTop: space(3) }}>{more}</div>}
         </>
+      )}
+
+      {source !== undefined && (
+        <div style={{ marginTop: space(3) }}>
+          <SourceLink id={source} />
+        </div>
       )}
     </div>
   );

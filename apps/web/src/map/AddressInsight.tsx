@@ -39,6 +39,13 @@
  * printed under it (copy audit v2, #59), and the ⓘ is only there when the
  * figure draws a direction for it to qualify.
  *
+ * **The foot of the card says the figure is an estimate** (copy audit v4,
+ * #59, #60): *Estimated by DrainLens ›*, a grey link to About the data, on the
+ * same row as the ⓘ so the card grows by no more than one line. AC 1.1.7 asks
+ * the popup to say the information is calculated. The ⓘ stays, because the
+ * About the data page says nothing about the figure's directions and
+ * distances being approximate.
+ *
  * The figure's accessible name is `describeAddress`, the same structure the
  * marks are drawn from, so the picture and what a screen reader hears cannot
  * disagree.
@@ -49,6 +56,7 @@ import { useId, useState } from 'react';
 import { type GroundTrend, describeAddress, isSteep } from './addressGround.js';
 import { DERIVED_DAY } from './derived.js';
 import { COMPASS_ANGLE, type NearbyThing, type WaterNearby } from './nearby.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 
 const WIDTH = 320;
 /**
@@ -470,17 +478,20 @@ export function AddressInsight({
           </text>
         ))}
       </svg>
-      {drawsDirection && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, minHeight: 18 }}>
-          {aboutOpen && (
-            <span id={aboutId} style={{ fontSize: 11, lineHeight: 1.3, color: CAPTION }}>
-              {CAPTION_TEXT}
-            </span>
-          )}
-          {/*
-            Drawn, not typed: the site's font subset has no ⓘ (public/fonts/README.md).
-            A press rather than hover alone, so it opens on a phone as well.
-          */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 18, marginTop: 4 }}>
+        <span style={{ marginRight: 'auto' }}>
+          <SourceLink id="derived" />
+        </span>
+        {drawsDirection && aboutOpen && (
+          <span id={aboutId} style={{ fontSize: 11, lineHeight: 1.3, color: CAPTION, textAlign: 'right' }}>
+            {CAPTION_TEXT}
+          </span>
+        )}
+        {/*
+          Drawn, not typed: the site's font subset has no ⓘ (public/fonts/README.md).
+          A press rather than hover alone, so it opens on a phone as well.
+        */}
+        {drawsDirection && (
           <button
             type="button"
             title={CAPTION_TEXT}
@@ -498,8 +509,8 @@ export function AddressInsight({
               <path d="M8 7.2v4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -101,7 +101,7 @@ Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 | 1.1.3.b | Five controls: *Drain pits*, *Drain pipes*, *Ground height*, *Likely water paths*, *Low areas* | | |
 | 1.1.3.c | Each one turns its layer off and on **individually** | | |
 | | **Ground height off → on is obviously different** (see above) | | |
-| 1.1.3.d | The legend's *About this data* says which layers are City of Melbourne records and which are estimated by DrainLens | | |
+| 1.1.3.d | The legend groups its rows under *From council records ›* (pits, pipes) and *Estimated by DrainLens ›* (water paths, low areas, ground height, ground data gaps); each title opens About the data at its section | | |
 | 1.1.3.e | The *Ground data gaps* layer — not enough ground measured — is available and legible | | |
 
 ---
@@ -115,7 +115,7 @@ Select a pit near the address. **Pit 1145091 is a good one** — 33 pipes, 15 st
 | 1.2.1.a | The selected pit is visibly highlighted | | |
 | 1.2.1.b | Its recorded fields are shown | | |
 | | A field the record does not hold says **Not recorded**, not blank | | |
-| 1.2.1.c | The pit card's technical details say the record is City of Melbourne's | | |
+| 1.2.1.c | The pit popup ends with a grey *From council records ›* that opens About the data at *Drains and pipes*; its technical details still say the record is City of Melbourne's | | |
 | 1.2.1.d | A follow-downstream action is offered | | |
 | 1.2.2.a | The path highlights the pit and its pipes | | |
 | 1.2.2.b | Arrows show which way water runs — **check one against the map** | | |
@@ -219,9 +219,11 @@ Reach an insufficient state — a pit the scene cannot place will do.
 
 | | What to look at | Result | Note |
 |---|---|---|---|
-| — | The footer's *Data sources · Licensing · Not a flood warning* line is on every screen | | |
-| — | The data credit is in the footer, with a working licence link | | |
-| — | It says the derived layers are **calculated, not published by the council** | | |
+| — | The footer's *Not a flood warning · Data sources and limits ›* line is on every screen | | |
+| — | *Data sources and limits ›* opens the full-screen **About the data** page; its section menu jumps to each section, and *Back* returns to the same screen with nothing lost | | |
+| — | The data credits are on that page, under *Your privacy and data licences*, with a working licence link | | |
+| — | The page says the derived layers are **calculated, not published by the council** | | |
+| — | A grey link in context (for example *Past records ›* in a flood area panel) opens the page at its own section, not at the top | | |
 | 1.1.5.a | "Choose a task" returns to the task page | | |
 | 1.1.5.b | The address survives it | | |
 | — | Browser **back** never lands on a screen with lost state | | |

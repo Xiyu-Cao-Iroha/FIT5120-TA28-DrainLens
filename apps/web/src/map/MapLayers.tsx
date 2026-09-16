@@ -2,8 +2,8 @@
  * The controls over the map, and the legend that says what each mark is.
  *
  * One module because they are one fact seen twice. The chips along the top
- * turn a mode on and off; the legend says what its marks mean, and once, under
- * *About this data*, where they came from. Kept apart, the two drift — a layer renamed in the
+ * turn a mode on and off; the legend says what its marks mean, grouped by
+ * where they came from. Kept apart, the two drift — a layer renamed in the
  * control and not in the legend is a map that disagrees with its own key.
  *
  * **One level: a chip is a layer.** Drain pits, Drain pipes, Likely water
@@ -24,7 +24,8 @@ import {
   PANEL_KEYS,
 } from './modes.js';
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
-import { LAYER, PROVENANCE } from '../ui/terms.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
+import { LAYER } from '../ui/terms.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -47,8 +48,8 @@ export interface LayerSpec {
  * are where water goes, the pits are where it can get in.
  *
  * This table is what a layer *looks like*. It used to carry where each came
- * from as well, for a badge per layer; that is said once in the legend's
- * *About this data* now (copy audit v2, #61). Which control governs a layer is
+ * from as well, for a badge per layer; the legend groups layers by source now
+ * (copy audit v4, #61, `LEGEND_GROUPS`). Which control governs a layer is
  * `modes.ts`.
  */
 export const LAYERS: readonly LayerSpec[] = [
@@ -403,13 +404,13 @@ export function LayerChips({
  * The legend, and where "distinguish official recorded data from system-derived
  * information" is met — AC 1.1.4, and AC 1.3.1 for the terrain in particular.
  *
- * The criterion was met with a *Council record* or *Calculated by DrainLens*
- * mark beside every layer, and two rows at the bottom saying what the marks
- * meant. **From copy audit v2 (#61) the distinction is said once, in words,
- * under *About this data* at the bottom of the legend**, closed by default. A
- * resident reading the key wants to know what a symbol is, not which dataset it
- * came from, and a mark on every row was the noise the audit found. The
- * sentences are `PROVENANCE`, the same ones every other place uses.
+ * The criterion was first met with a source mark beside every layer and two
+ * rows at the bottom saying what the marks meant; copy audit v2 then folded the
+ * distinction into a closed *About this data*. **Copy audit v4 (#61) groups the
+ * rows instead**, under two titles that are themselves links: *From council
+ * records* and *Estimated by DrainLens*. A mark per row sent the reader to the
+ * bottom to decode it; a closed fold hid the distinction the criterion wants on
+ * screen. A group title says it where the eye already is.
  *
  * **It folds, and folds to its own name rather than to nothing.** The map is
  * the thing somebody came for and this sits over a corner of it; on a laptop
@@ -491,47 +492,43 @@ export function MapLegend({
 
       {open && (
         <>
-          {shown.map((spec) =>
-            spec.swatch === 'ramp' ? (
-              <TerrainScale key={spec.key} spec={spec} pulse={pulseTerrain} />
-            ) : (
+          {LEGEND_GROUPS.map((group, index) => {
+            const inGroup = group.keys.flatMap((key) => shown.filter((l) => l.key === key));
+            if (inGroup.length === 0) return null;
+            return (
               <div
-                key={spec.key}
+                key={group.link}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: space(2),
-                  marginTop: space(2),
+                  marginTop: space(3),
+                  paddingTop: index === 0 ? 0 : space(2),
+                  borderTop: index === 0 ? 'none' : `1px solid ${line.hair}`,
                 }}
               >
-                <SwatchMark kind={spec.swatch} />
-                <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
-                  {spec.label}
-                </span>
+                {/* The group title is the source, and a link to what it means (copy audit v4, #61). */}
+                <SourceLink id={group.link} />
+                {inGroup.map((spec) =>
+                  spec.swatch === 'ramp' ? (
+                    <TerrainScale key={spec.key} spec={spec} pulse={pulseTerrain} />
+                  ) : (
+                    <div
+                      key={spec.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: space(2),
+                        marginTop: space(2),
+                      }}
+                    >
+                      <SwatchMark kind={spec.swatch} />
+                      <span style={{ font: type(text.small, { leading: 1.35 }), color: ink.base }}>
+                        {spec.label}
+                      </span>
+                    </div>
+                  ),
+                )}
               </div>
-            ),
-          )}
-          <details
-            style={{
-              margin: `${String(space(3))}px 0 0`,
-              paddingTop: space(2),
-              borderTop: `1px solid ${line.hair}`,
-              font: type(text.micro, { leading: 1.45 }),
-              color: ink.subtle,
-            }}
-          >
-            <summary style={{ cursor: 'pointer', font: type(text.micro, { weight: weight.semibold }), color: ink.muted }}>
-              About this data
-            </summary>
-            <p style={{ margin: `${String(space(1))}px 0 0` }}>{PROVENANCE.recorded}</p>
-            <p style={{ margin: `${String(space(1))}px 0 0` }}>{PROVENANCE.derived}</p>
-            {/* What the ground-height layer's finer marks mean, only while it is drawn (#64). */}
-            {state.terrain && TERRAIN_DETAILS.map((detail) => (
-              <p key={detail} style={{ margin: `${String(space(1))}px 0 0` }}>
-                {detail}
-              </p>
-            ))}
-          </details>
+            );
+          })}
         </>
       )}
     </div>
@@ -539,18 +536,16 @@ export function MapLegend({
 }
 
 /**
- * The ground-height lines that left the legend's face (copy audit v2, #64).
+ * The legend's two groups, by where a layer comes from (copy audit v4, #61).
  *
- * Five small lines under the scale, one with the abbreviation AHD, were more
- * than a key needs. Two stay under the scale; these three are the detail for
- * somebody who asks, under *About this data*. *Estimated ground height ·
- * calculated by DrainLens* went altogether, since `PROVENANCE.derived` beside
- * them says it.
+ * Each title is a grey link to the matching section of *About the data*, so
+ * the key itself says which marks are council records and which DrainLens
+ * estimated (AC 1.1.4, 1.3.1). The order within a group is the audit's, not
+ * the stacking order. A group with nothing switched on is not drawn.
  */
-const TERRAIN_DETAILS: readonly string[] = [
-  'Colours mean the same height everywhere on the map.',
-  'Shading shows the shape of the land, not water depth.',
-  'Height lines are 1 m apart, bold every 5 m. Numbers marked ≈ are estimates to the nearest 0.5 m, not surveyed points.',
+const LEGEND_GROUPS: readonly { readonly link: 'recorded' | 'derived'; readonly keys: readonly LayerKey[] }[] = [
+  { link: 'recorded', keys: ['pit', 'pipe'] },
+  { link: 'derived', keys: ['channel', 'lowPoint', 'terrain', 'unavailable'] },
 ];
 
 /**
@@ -563,7 +558,7 @@ const TERRAIN_DETAILS: readonly string[] = [
  * It used to read *Lower* and *Higher* with no numbers, because the ramp was
  * fitted to the ground in view and a colour meant "low for around here". The
  * ramp is now fixed to metres AHD, so the numbers are what the colours mean.
- * That it is calculated, AC 1.3.1, is said under the legend's *About this data*.
+ * That it is calculated, AC 1.3.1, is said by the legend group it sits in.
  */
 function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly pulse: boolean }) {
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
@@ -629,6 +624,11 @@ function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly puls
       </div>
       <p style={micro}>Height above sea level (metres)</p>
       <p style={micro}>Lines join places of equal height.</p>
+      {/*
+        The finer points (fixed colours, shading, line spacing, the ≈ marks)
+        left the legend for About the data: copy audit v4, #64.
+      */}
+      <SourceLink id="groundLegend" />
     </div>
   );
 }

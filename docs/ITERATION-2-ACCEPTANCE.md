@@ -58,24 +58,26 @@ What must not happen is the one change that would make the screen look better an
 | | What was done | PR |
 |---|---|---|
 | **4.1.1**, **4.1.2** | All 281 areas as marks, two modes (*Historical Flood Activity*, *Severity Score*), named breaks with ranges, *0+* for areas published as zero because everything was withheld, drag to pan | earlier, #132 |
-| **4.1.3**, **4.3.2** | Dispatches per 1,000 residents at 30 June 2012, labelled *Calculated by DrainLens* on the legend and in every area record until the copy audit of 15 September, which removed the badges; *More information* on both flood pages now says which figures are published and which are calculated. SEVERITY-SCORE.md | earlier, #132 |
-| **4.1.4–4.1.6** | Area record with per-year counts, floors marked `+`, *No score* with the area's residents, completeness in words | earlier, #128, #132 |
-| **4.3.1–4.3.4** | Every evidence sentence, with its numbers read from the artefacts — **80 of the 281 areas** hold a withheld count, 7 have no score — and three marks for three kinds of information | #132 |
-| **4.2.1–4.2.3** | `flood-events.json`, four events with two or three sources each. **None is shown until a team member checks it** and fills in `checkedBy` and `checkedOn`; until then every area shows the 4.2.3 empty state | #133 |
+| **4.1.3**, **4.3.2** | Dispatches per 1,000 residents at 30 June 2012, labelled *Calculated by DrainLens* on the legend and in every area record until the copy audit of 15 September, which removed the badges. Since copy audit v4 the area panel labels the rate *Our calculation ›*, a grey link to the *Emergency responses per 1,000 people* section of the About the data page, and its ⓘ says the rate is our calculation and the population is not the number of people affected. SEVERITY-SCORE.md | earlier, #132 |
+| **4.1.4–4.1.6** | Area record with per-year counts, floors marked `+`, *No score* with the area's residents, completeness in words. Since copy audit v4 each figure carries a short status, shown for every area: *Complete*, *At least (some counts hidden)* or *Not available*; the population reads *N people lived here in June 2012*; *About the data ›* and *Why “at least”? ›* open the page's explanation | earlier, #128, #132 |
+| **4.3.1–4.3.4** | Every evidence sentence, with its numbers read from the artefacts — **80 of the 281 areas** hold a withheld count, 7 have no score — and three marks for three kinds of information. Since copy audit v4 the sentences are the *Flood history*, *Emergency responses per 1,000 people* and *Checked flood events* sections of About the data (`ui/sources.ts`), and the three marks are grey links: *Past records ›*, *Our calculation ›*, *Checked by our team ›* | #132 |
+| **4.2.1–4.2.3** | `flood-events.json`, four events, each with two official sources. **None is shown until a team member checks it** and fills in `checkedBy` and `checkedOn`; until then every area shows the 4.2.3 empty state, *No checked flood events yet.* with an ⓘ saying this does not mean the area has never flooded | #133 |
 
 ### Since then, 14 September
 
 | | What changed | PR |
 |---|---|---|
 | **4.1.1**, **4.1.2** | The areas are drawn as their ASGS 2011 boundaries, simplified to 25 m — 19,682 vertices in `sa2-points.json` version 2 — rather than as marks at a point each. Dots on an empty ground gave no sense of where anything was. The map stops zooming in at 20 m per pixel, and `check-areas.mjs` asserts every name point lies inside its own shape | #136 |
-| **4.2.2.a** | **One event is checked and shown**: the Maribyrnong River flood of October 2022, signed off on 14 September, so Maribyrnong, Kensington and Ascot Vale now show it. The other three are still waiting, and `check-events.mjs` reports *1 checked and shown, 3 waiting* | #137 |
+| **4.2.2.a** | **One event is checked and shown**: the Maribyrnong River flood of October 2022, signed off on 14 September, so Maribyrnong, Kensington and Ascot Vale now show it. The other three are still waiting, and `check-events.mjs` reported *1 checked and shown, 3 waiting*. **Undone on 16 September**, see below | #137 |
 | Names | The copy review renamed what a resident reads, including terms the criteria use — *Severity Score* among them. See *Names on screen* below | #144 |
 | **4.1.3**, **4.3.2** | The flood history board ranks either by call-outs or by call-outs per 1,000 residents, over the 274 areas that have a rate, with *How the rate is calculated* folded beneath the list | #145 |
 | **3.1.1**, **3.1.2.f**, **3.1.4** | 15 September, `feat/blockage-flow`: the comparison is rebuilt as the *Blockage Flow* prototype's steps — address search, an eligibility check, choose a drain (the nearest comparable inlet within 200 m highlighted; others teal-ringed; unsupported pits grey with a one-line reason), choices, review, result. An address with no comparable drain stops before any setup, so *Terrain unavailable* is no longer reachable as a result; 3.1.4's other reasons still are. A drain on the full map still opens the comparison with that drain chosen | — |
+| **4.2.1**, **4.2.2** | 16 September, `fix/about-the-data`: **official sources only.** Every event now cites the Australian Institute for Disaster Resilience and a Bureau of Meteorology page, and Maribyrnong two Melbourne Water pages; no news reports. The summaries say only what those pages state. Because the Maribyrnong text and sources changed, its 14 September check was cleared: **0 of 4 checked**, and `check-events.mjs` reports *0 checked and shown, 4 waiting* and refuses a news outlet | — |
+| **4.1.3–4.1.6**, **4.2.3**, **4.3.1–4.3.4** | 16 September, `fix/about-the-data`: copy audit v4. A full-screen **About the data** page, opened from *Data sources and limits ›* in the footer of every screen and from grey links in context, holds the sources, methods and limits; the flood map's *More information* fold is gone. See the rows above and the 4.3.4 note | — |
 
 ### Still needs a person
 
-- **4.2.2.a** — a team member to open every source of the **three** drafted events still unchecked and sign them off. Nothing in code can do this, which is the point of it.
+- **4.2.2.a** — a team member to open every source of **all four** drafted events, none checked since 16 September, and sign them off. Nothing in code can do this, which is the point of it.
 - **Deploy `develop`** to `drainlens-dev`, whose last deploy recorded in this repository is `8cd079b` from 11 September ([deploy/README.md](../deploy/README.md)); a later redeploy is not written down anywhere, so check the running revision before assuming #128–#146 are on it — then walk both journeys in a browser and tick what is seen.
 - Desk check 2, and the rehearsal decision on leading with *No clear change* (DECISIONS-PENDING.md §1).
 
@@ -90,7 +92,7 @@ What must not happen is the one change that would make the screen look better an
 | *Historical Flood Activity* mode | *Recorded SES flood call-outs* | `FLOOD.callouts` |
 | *Severity Score* mode, and the score | *SES flood call-outs per 1,000 residents*; the value is written with the unit *call-outs per 1,000 residents* | `FLOOD.rate`, `FLOOD.rateUnit` |
 | SES crew dispatch | *call-out* — "one SES crew response, not one flood event" | `FLOOD.unit` |
-| *Exact* / *Minimum value* / *Not available* (4.1.6.a) | *Complete published total* / *Minimum total* / *Not available*, and *No recorded call-outs* for a complete zero | `completenessText` in `history/severity.ts` |
+| *Exact* / *Minimum value* / *Not available* (4.1.6.a) | *Complete* / *At least (some counts hidden)* / *Not available*, for the count and the rate separately, since copy audit v4 (16 September) | `STATUS` in `history/severity.ts` |
 | An area with no score | *No rate* | `scoreLabel` in `history/severity.ts` |
 | *Higher than baseline* / *No clear change* | *More water than with a clear drain* / *No clear difference* | `BANDS` in `scenario/outcome.ts` |
 | The all-clear baseline | The clear-drain setting | `scenario/outcome.ts` |
@@ -489,6 +491,8 @@ From *Iteration 2 Requirements*.
 - [ ] **4.3.4.e** Allow the user to understand the source and limitations of each information type separately
 
 > **15 September:** the copy audit removed the per-section source badges from the flood pages. The three kinds are now told apart in words: counts are *emergency responses* recorded by the Victoria State Emergency Service, the rate is explained under *How the rate is calculated*, and events sit under their own heading. See the names note in ITERATION-1-ACCEPTANCE.md.
+>
+> **16 September, copy audit v4: labels back, as grey links, and the explanation is a page.** The area panel labels its three kinds *Past records ›* (the counts), *Our calculation ›* (the rate) and *Checked by our team ›* (the events), each opening its own section of **About the data**: *Flood history*, *Emergency responses per 1,000 people* and *Checked flood events*. Those sections answer 4.3.1 to 4.3.4, with the source, years, area unit, what one count is, the privacy withholding, the calculation and the limits of each kind separately (4.3.4.e); the page is "the evidence explanation" the criteria open. The page is reached from *Data sources and limits ›* in the footer of every screen, and from *About the data ›* in the area panel (4.1.4.h). On screen the map keeps *Each one is a time the SES was sent to help.* and *Past data only, not a forecast.*
 >
 > **Three kinds of thing on one map, and they are not equally solid.** A dispatch count is a published record. An event summary is a person writing. A Severity Score is arithmetic we did. The map legend already separates *recorded by the council* from *calculated by DrainLens*; this needs a third mark, and the three have to stay distinguishable when an area shows all of them at once.
 

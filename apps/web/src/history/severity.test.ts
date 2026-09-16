@@ -30,7 +30,8 @@ import {
   bandOf,
   breaksFor,
   completenessOf,
-  completenessText,
+  statusOf,
+  STATUS,
   decodeRing,
   joinAreas,
   scoreLabel,
@@ -179,23 +180,31 @@ describe('what an area is worth saying', () => {
     // Port Melbourne Industrial and Braeside: a withheld region, and too few
     // residents to score. The panel said "The counts are exact" about both.
     const both = area({ complete: false, suppressedRegions: 1, regions: 3, rate: null, persons: 400 });
-    const state = completenessOf(both, 'severity');
-    expect(state).toBe('unavailable');
-    const said = completenessText(both, state, 'Flood');
-    expect(said.label).toBe('Not available.');
-    expect(said.body).not.toContain('published total is complete');
-    expect(said.body).toContain('1 of its 3 smaller regions');
-    expect(said.body).toContain('minimum');
+    expect(completenessOf(both, 'severity')).toBe('unavailable');
+    // Copy audit v4, #88: the count and the rate each carry their own status.
+    expect(statusOf(both, 'count')).toBe('minimum');
+    expect(statusOf(both, 'rate')).toBe('unavailable');
 
     const exactButUnscored = area({ rate: null, persons: 400 });
-    expect(completenessText(exactButUnscored, 'unavailable', 'Flood').body).toContain('The published total is complete');
+    expect(statusOf(exactButUnscored, 'count')).toBe('exact');
+    expect(statusOf(exactButUnscored, 'rate')).toBe('unavailable');
   });
 
-  it('says each completeness state in its own words', () => {
-    expect(completenessText(area(), 'exact', 'Flood').label).toBe('Complete published total.');
-    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').label).toBe('Some counts hidden.');
-    expect(completenessText(area({ complete: false, suppressedRegions: 2, regions: 46 }), 'minimum', 'Flood').body).toContain('2 of its 46');
-    expect(completenessText(area({ total: 0 }), 'none', 'Flood').body).toContain('no flood emergency response here');
+  it('gives every area a short status, complete ones included', () => {
+    expect(STATUS).toEqual({
+      exact: 'Complete',
+      minimum: 'At least (some counts hidden)',
+      unavailable: 'Not available',
+    });
+    expect(statusOf(area(), 'count')).toBe('exact');
+    expect(statusOf(area(), 'rate')).toBe('exact');
+    // A complete zero is a complete count.
+    expect(statusOf(area({ total: 0 }), 'count')).toBe('exact');
+    const withheld = area({ complete: false, suppressedRegions: 2, total: 160, rate: 6.18 });
+    expect(statusOf(withheld, 'count')).toBe('minimum');
+    expect(statusOf(withheld, 'rate')).toBe('minimum');
+    // A zero that is zero because every region was withheld is unknown.
+    expect(statusOf(area({ total: 0, complete: false, suppressedRegions: 1 }), 'count')).toBe('unavailable');
   });
 
   it('reads the mode’s own number off the area', () => {

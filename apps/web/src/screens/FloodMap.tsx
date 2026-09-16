@@ -17,11 +17,15 @@
  * and no claim about who was affected. The rate's denominator is the
  * population; dividing by it is the opposite of counting people.
  *
- * **Short on the surface, the rest under More information** (copy audit v2,
- * 15 September, #79 to #87). The header spells the SES out once, says how to
- * read the colours and what one count is, and keeps one safety line. The panel
- * shows an area's numbers with one sentence each; the method, the coverage and
- * who recorded what are folded below it, and the source badges are gone.
+ * **Short on the surface, the rest in About the data** (copy audit v2, #79 to
+ * #87; copy audit v4, #81 to #89). The header spells the SES out once, says
+ * how to read the colours and what one count is, and keeps one safety line.
+ * The panel shows an area's numbers, each with a short status, and labels its
+ * three kinds of information with grey links (*Past records ›*, *Our
+ * calculation ›*, *Checked by our team ›*) instead of coloured badges. The
+ * method, the coverage and the limits, which v2 folded under *More
+ * information* in the panel, are sections of About the data now; the panel
+ * keeps its own *About the data ›* link (AC 4.1.4).
  */
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -40,32 +44,30 @@ import {
   type PointsArtefact,
   type PopulationArtefact,
   type ScopeAreas,
+  STATUS,
+  type Status,
   completenessOf,
-  completenessText,
   scoreLabel,
+  statusOf,
   totalLabel,
 } from '../history/severity.js';
-import {
-  INFORMATION_TYPES,
-  NOT_A_FORECAST,
-  type Point,
-  activityEvidence,
-  coverageEvidence,
-  severityEvidence,
-} from '../history/evidence.js';
+import { AREA_KINDS, NOT_A_FORECAST, RATE_TIP, TOTAL_TIP } from '../history/evidence.js';
 import {
   EVENTS_UNAVAILABLE,
   type FloodEvent,
   NOT_COMPLETE,
+  NO_EVENTS,
+  NO_EVENTS_TIP,
   againstRecord,
   eventDate,
   eventsFor,
-  noEventsText,
 } from '../history/events.js';
 import { yearLabel, yearRange } from '../history/artefact.js';
 import { atLeastTip } from '../history/board.js';
 import { LEGEND_INSET_PX, legendBox, legendOpen } from '../history/legendFold.js';
 import { type Viewport, clamp, fitWithin, pan, scaleToContain, zoomAt } from '../map/viewport.js';
+import { type SourceLinkId } from '../ui/sources.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import { FLOOD } from '../ui/terms.js';
 import {
   brand,
@@ -362,17 +364,9 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
         }}
       >
         {chosen === null ? (
-          <Nothing mode={mode} scope={scope} population={population} areas={areas} />
+          <Nothing />
         ) : (
-          <Detail
-            area={chosen}
-            mode={mode}
-            years={years}
-            population={population}
-            scope={scope}
-            areas={areas}
-            events={events}
-          />
+          <Detail area={chosen} years={years} population={population} scope={scope} events={events} />
         )}
       </aside>
     </div>
@@ -385,141 +379,42 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
  * It says what pressing an area gives, rather than sitting empty. An empty
  * panel beside a full map reads as a panel that failed to load.
  *
- * **One sentence, and More information folded** (copy audit v2, #83). The
- * evidence used to open here by default, fifteen paragraphs down the densest
- * column on the site; it now starts closed, as it already did inside an area.
+ * **One sentence and one link** (copy audit v4, #83). The evidence used to
+ * open here, fifteen paragraphs down the densest column on the site; v2 folded
+ * it under *More information*, and v4 moved it to About the data, which
+ * *About the data ›* opens.
  */
-function Nothing({
-  mode,
-  scope,
-  population,
-  areas,
-}: {
-  readonly mode: MapMode;
-  readonly scope: ScopeAreas;
-  readonly population: PopulationArtefact;
-  readonly areas: readonly MapArea[];
-}) {
+function Nothing() {
   return (
     <div style={{ color: ink.muted, font: type(text.label, { leading: 1.6 }) }}>
       <h2
         style={{
-          margin: 0,
+          margin: `0 0 ${String(space(2))}px`,
           font: type(text.lead, { weight: weight.semibold }),
           color: ink.strong,
         }}
       >
         Click an area to see its flood history.
       </h2>
-      <Evidence mode={mode} scope={scope} population={population} areas={areas} />
+      <SourceLink id="history" />
     </div>
-  );
-}
-
-/**
- * The evidence behind the map, AC 4.3.1 to 4.3.4 and 4.1.4.h.
- *
- * One press away, before anything is chosen and inside an area's record:
- * "learn more" is not a link to a document somebody will not open, it is the
- * sentences, here. Closed by default everywhere since copy audit v2 (#83), and
- * named *More information* like the flood history page's fold.
- *
- * **Who recorded what is said here, once** (#85). The three kinds of
- * information are kept apart in words rather than by coloured badges on every
- * section of the panel and in the key.
- */
-function Evidence({
-  mode,
-  scope,
-  population,
-  areas,
-  open = false,
-}: {
-  readonly mode: MapMode;
-  readonly scope: ScopeAreas;
-  readonly population: PopulationArtefact;
-  readonly areas: readonly MapArea[];
-  readonly open?: boolean;
-}) {
-  const [shown, setShown] = useState(open);
-  const view = mode === 'activity' ? activityEvidence(scope, areas) : severityEvidence(scope, population);
-  return (
-    <section style={{ marginTop: space(5) }}>
-      <button
-        type="button"
-        aria-expanded={shown}
-        onClick={() => {
-          setShown((now) => !now);
-        }}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          color: brand.ink,
-          font: type(text.label, { weight: weight.semibold }),
-          textDecoration: 'underline',
-          cursor: 'pointer',
-        }}
-      >
-        More information
-      </button>
-      {shown && (
-        <div style={{ marginTop: space(3) }}>
-          <Points heading={QUESTIONS[mode].tab} points={view} />
-          <Points heading="Coverage and uncertainty" points={coverageEvidence(scope, population, areas)} />
-          <h4 style={headingStyle}>Three kinds of information</h4>
-          {INFORMATION_TYPES.map((kind) => (
-            <p key={kind.key} style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
-              <strong style={{ color: ink.strong }}>{kind.what}.</strong> {kind.from} {kind.purpose} {kind.limits}
-            </p>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-const headingStyle = {
-  margin: `${String(space(3))}px 0 ${String(space(2))}px`,
-  font: type(text.micro, { weight: weight.semibold }),
-  letterSpacing: tracking.caps,
-  textTransform: 'uppercase',
-  color: ink.subtle,
-} as const;
-
-function Points({ heading, points }: { readonly heading: string; readonly points: readonly Point[] }) {
-  return (
-    <>
-      <h4 style={headingStyle}>{heading}</h4>
-      {points.map((point) => (
-        <p key={point.title} style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.micro, { leading: 1.55 }), color: ink.muted }}>
-          <strong style={{ color: ink.strong }}>{point.title}.</strong> {point.body}
-        </p>
-      ))}
-    </>
   );
 }
 
 /** What one area's record supports — AC 4.1.4. */
 function Detail({
   area,
-  mode,
   years,
   population,
   scope,
-  areas,
   events,
 }: {
   readonly events: readonly FloodEvent[] | null;
   readonly area: MapArea;
-  readonly mode: MapMode;
   readonly years: readonly string[];
   readonly population: PopulationArtefact;
   readonly scope: ScopeAreas;
-  readonly areas: readonly MapArea[];
 }) {
-  const state = completenessOf(area, mode);
-  const completeness = completenessText(area, state, scope.incidentType);
   const widest = Math.max(1, ...area.byYear);
 
   return (
@@ -539,19 +434,22 @@ function Detail({
       </p>
 
       {/*
-        Copy audit v2, #86: the number and its unit, with what one count is
-        behind an information button rather than a sentence under the bars.
+        Copy audit v4, #86 and #88: the number and its unit, what one count is
+        behind an ⓘ, and the count's status on the line under it, for every
+        area. The section is labelled "Past records ›" (#85).
       */}
-      <Section title={FLOOD.callouts}>
-        <p style={{ margin: `0 0 ${String(space(3))}px` }}>
+      <Section title={FLOOD.callouts} link={AREA_KINDS.recorded}>
+        <p style={{ margin: `0 0 ${String(space(1))}px` }}>
           <strong
             style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}
             {...(area.complete ? {} : { title: atLeastTip(String(area.total)) })}
           >
             {totalLabel(area)}
           </strong>{' '}
-          {area.total === 1 ? FLOOD.unitOne : FLOOD.unit} <InfoTip text={FLOOD.explain} />
+          {area.total === 1 ? FLOOD.unitOne : FLOOD.unit}{' '}
+          <InfoTip label="What is an emergency response?" text={TOTAL_TIP} />
         </p>
+        <StatusLine status={statusOf(area, 'count')} />
         {area.byYear.map((count, index) => (
           <div
             key={years[index] ?? index}
@@ -587,12 +485,12 @@ function Detail({
       </Section>
 
       {/*
-        Copy audit v2, #87: the rate and how many people live here, one line
-        each. Where the population figure comes from, what the rate is not and
-        that DrainLens calculated it are under More information.
+        Copy audit v4, #87: the rate, its status, and how many people live
+        here, with who calculated it and what the population is not behind the
+        ⓘ. The section is labelled "Our calculation ›" (#85).
       */}
-      <Section title={FLOOD.rate}>
-        <p style={{ margin: `0 0 ${String(space(2))}px` }}>
+      <Section title={FLOOD.rate} link={AREA_KINDS.calculated}>
+        <p style={{ margin: `0 0 ${String(space(1))}px` }}>
           <strong
             style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}
             {...(area.rate === null || area.complete ? {} : { title: atLeastTip(area.rate.toFixed(2)) })}
@@ -601,6 +499,7 @@ function Detail({
           </strong>{' '}
           {area.rate === null ? '' : FLOOD.rateUnit}
         </p>
+        <StatusLine status={statusOf(area, 'rate')} />
         <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
           {/*
             Branched on the residents rather than on the rate, which is not a
@@ -617,22 +516,56 @@ function Detail({
               a low rate.
             </>
           ) : (
-            <>{area.persons.toLocaleString('en-AU')} people live here.</>
+            <>
+              {/* The population date is said here, not only on About the data (AC 4.1.3, 4.1.4). */}
+              {area.persons.toLocaleString('en-AU')} people lived here in {monthYear(population.denominator)}.{' '}
+              <InfoTip label="About this rate" text={RATE_TIP} />
+            </>
           )}
         </p>
       </Section>
 
-      <Section title="How complete this is">
-        <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
-          <strong style={{ color: ink.strong }}>{completeness.label}</strong> {completeness.body}
-        </p>
-      </Section>
-
-      <Section title="Verified flood events">
+      <Section title="Checked flood events" link={AREA_KINDS.checked}>
         <Events area={area} events={events} period={scope.reportingPeriod} />
       </Section>
-      <Evidence mode={mode} scope={scope} population={population} areas={areas} />
+
+      {/* AC 4.1.4: the way to the evidence stays in the selected panel (copy audit v4, #83). */}
+      <SourceLink id="history" />
     </div>
+  );
+}
+
+/**
+ * An area figure's status, and why a minimum is one (copy audit v4, #88).
+ *
+ * Shown under the figure for every area, *Complete* included: the criterion
+ * wants the state visible, not only the exception.
+ */
+function StatusLine({ status }: { readonly status: Status }) {
+  return (
+    <p
+      style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: space(2),
+        flexWrap: 'wrap',
+        margin: `0 0 ${String(space(3))}px`,
+      }}
+    >
+      <span
+        style={{
+          padding: `1px ${String(space(2))}px`,
+          borderRadius: radius.pill,
+          background: surface.sunken,
+          color: ink.base,
+          font: type(text.micro, { weight: weight.medium, leading: 1.6 }),
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {STATUS[status]}
+      </span>
+      {status === 'minimum' && <SourceLink id="minimum" />}
+    </p>
   );
 }
 
@@ -641,7 +574,9 @@ function Detail({
  *
  * The empty state is written first and is not a placeholder: events are
  * written by hand and checked by a second person, so almost every one of the
- * 281 areas has none, and this is what the section says most of the time.
+ * 281 areas has none, and this is what the section says most of the time. It
+ * is one line and an ⓘ since copy audit v4 (#89), and the section is never
+ * hidden.
  */
 function Events({
   area,
@@ -655,7 +590,13 @@ function Events({
   const note = { margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted };
   if (events === null) return <p style={note}>{EVENTS_UNAVAILABLE}</p>;
   const here = eventsFor(events, area.code);
-  if (here.length === 0) return <p style={note}>{noEventsText(area.name)}</p>;
+  if (here.length === 0) {
+    return (
+      <p style={note}>
+        {NO_EVENTS} <InfoTip label="What does no event mean?" text={NO_EVENTS_TIP} />
+      </p>
+    );
+  }
   return (
     <>
       {here.map((event) => (
@@ -702,20 +643,44 @@ function Events({
   );
 }
 
-function Section({ title, children }: { readonly title: string; readonly children: React.ReactNode }) {
+/**
+ * One part of the area panel: its title, and the grey link that says which
+ * kind of information it is (copy audit v4, #85; AC 4.3.4).
+ */
+function Section({
+  title,
+  link,
+  children,
+}: {
+  readonly title: string;
+  readonly link: SourceLinkId;
+  readonly children: React.ReactNode;
+}) {
   return (
     <section style={{ marginBottom: space(5) }}>
-      <h3
+      <div
         style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: space(3),
+          flexWrap: 'wrap',
           margin: `0 0 ${String(space(2))}px`,
-          font: type(text.micro, { weight: weight.semibold }),
-          letterSpacing: tracking.caps,
-          textTransform: 'uppercase',
-          color: ink.subtle,
         }}
       >
-        {title}
-      </h3>
+        <h3
+          style={{
+            margin: 0,
+            font: type(text.micro, { weight: weight.semibold }),
+            letterSpacing: tracking.caps,
+            textTransform: 'uppercase',
+            color: ink.subtle,
+          }}
+        >
+          {title}
+        </h3>
+        <SourceLink id={link} />
+      </div>
       <div style={{ font: type(text.label, { leading: 1.6 }), color: ink.muted }}>{children}</div>
     </section>
   );
@@ -803,8 +768,9 @@ function Legend({
           AC 4.1.3.c and e, 4.3.3.d: what the numbers are and over what years
           is the title above, which stays visible when the key is folded. Who
           produced them was a badge here; copy audit v2 (#82, #85) removed it
-          and the repeated subtitle, and More information in the panel says
-          who recorded the counts and who calculated the rate.
+          and the repeated subtitle, and the area panel's section links say
+          who recorded the counts and who calculated the rate. The key ends
+          with "Why “at least”? ›" for its hatched entries (v4, #82).
         */}
         {legendFor(mode).map((entry) => (
           <div
@@ -830,6 +796,7 @@ function Legend({
             </span>
           </div>
         ))}
+        <SourceLink id="minimum" />
       </div>
     </div>
   );
@@ -838,18 +805,18 @@ function Legend({
 /**
  * An information button beside a number, opening the sentence that explains it.
  *
- * Copy audit v2, #86: *what one count is* matters but need not sit under every
- * area. A hover title alone would be out of reach on a phone and to a
- * keyboard, so it is a button: the title shows on hover, and pressing it
- * shows the sentence under the number.
+ * Copy audit v2 and v4, #86, #87, #89: a sentence that matters but need not
+ * sit under every area. A hover title alone would be out of reach on a phone
+ * and to a keyboard, so it is a button: the title shows on hover, and pressing
+ * it shows the sentence under the number.
  */
-function InfoTip({ text: sentence }: { readonly text: string }) {
+function InfoTip({ label, text: sentence }: { readonly label: string; readonly text: string }) {
   const [shown, setShown] = useState(false);
   return (
     <>
       <button
         type="button"
-        aria-label="What is an emergency response?"
+        aria-label={label}
         aria-expanded={shown}
         title={sentence}
         onClick={() => {
@@ -907,3 +874,11 @@ function Zoom({ onZoom }: { readonly onZoom: (by: number) => void }) {
     </div>
   );
 }
+
+/** "2012-06-30" as a resident reads it: "June 2012". */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const monthYear = (isoDate: string): string => {
+  const [year, month] = isoDate.split('-');
+  const name = MONTHS[Number(month) - 1];
+  return name === undefined || year === undefined ? isoDate : `${name} ${year}`;
+};

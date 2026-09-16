@@ -110,7 +110,8 @@ describe('pressing a sign', () => {
 
 describe('the sign and its card', () => {
   it('says exactly what was asked for', () => {
-    expect(WARNING_TITLE).toBe('Water collects here easily');
+    // Copy audit v4, #62: hedged with *may*, so it is not read as a forecast.
+    expect(WARNING_TITLE).toBe('Water may pool here in heavy rain');
     // Copy audit v2, #62: the advice alone, without repeating the title.
     expect(WARNING_BODY).toBe('Avoid parking here when heavy rain is coming.');
   });
