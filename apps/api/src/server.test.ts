@@ -7,9 +7,10 @@
  * cannot read, and the browser reports it as a network error with no body.
  */
 
-import { describe, expect, it } from 'vitest';
+import pg from 'pg';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createMemo } from './server.js';
+import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createApp, createMemo } from './server.js';
 
 describe('who may read this from a browser', () => {
   it('allows the deployed site and the local dev server by default', () => {
@@ -103,5 +104,32 @@ describe('remembering a rebuilt artefact', () => {
 
   it('keeps an answer for ten minutes', () => {
     expect(REBUILT_FOR_MS).toBe(600_000);
+  });
+});
+
+describe('the defence headers on every answer', () => {
+  // A pool that cannot connect: the headers must be on the failure as well,
+  // and no test here needs a database to check them.
+  const down = { connect: () => Promise.reject(new Error('no database here')) } as unknown as pg.Pool;
+  // The server logs the failure it answers with; that log is not this test's.
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(['/health', '/api/flood-history', '/nowhere'])('sends them on %s, whatever the status', async (route) => {
+    const response = await createApp(down).request(route);
+    expect(response.headers.get('content-security-policy')).toBe("default-src 'none'; frame-ancestors 'none'");
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it('leaves cross-origin reading to CORS, so the site can still fetch it', async () => {
+    const response = await createApp(down).request('/health');
+    expect(response.headers.get('cross-origin-resource-policy')).toBeNull();
   });
 });

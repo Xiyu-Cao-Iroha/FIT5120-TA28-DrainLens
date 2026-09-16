@@ -318,7 +318,7 @@ that lands in shell history. Let it prompt.
 **Use `-apr1`, not bcrypt, for this image.** nginx implements apr1 itself, in
 `ngx_crypt.c`, so it works regardless of what the container's libc offers. For
 `$2y$` it hands off to the platform's `crypt()`, which is a dependency on musl
-in `nginx:1.27-alpine` rather than on nginx — a needless thing to be right
+in the Alpine base image rather than on nginx — a needless thing to be right
 about when apr1 is guaranteed. The gate is website-level protection on a
 student project, not a credential store.
 
@@ -630,12 +630,59 @@ Verified against the live URL, not only locally.
 |---|---|---|
 | **Module worker content type** | `text/javascript`, one header | A module worker is refused outright at any other type. **The map still draws, so losing the entire comparison feature looks like nothing happening.** |
 | **gzip** | `content-encoding: gzip` on `.bin` and `.json` | The first visit is 6.42 MB instead of 1.36 MB. The site works; it is four times heavier. |
-| **Cache, in three classes** | `immutable` / `max-age=300` / `no-cache` | `/data` is not content-hashed. A rebuilt artefact behind a long cache is a map that silently disagrees with the model it was built beside. |
+| **Cache, in three classes** | `private, …immutable` / `private, max-age=300` / `private, no-cache` (all `private` from 16 September) | `/data` is not content-hashed. A rebuilt artefact behind a long cache is a map that silently disagrees with the model it was built beside. |
 | **`/data/*` returns 404** | A missing artefact 404s | Otherwise the single-page rewrite returns `index.html`, which reaches `assertUsable` as a parse error rather than as a missing file. |
 
 The content types are set with a `types` block, not `add_header`. `add_header` **appends**, so the first version sent every response with two `Content-Type` headers — caught by `curl -I` before it went anywhere.
 
 **Two types have been added since, and neither has been checked against a deployed URL.** `application/gzip` for the scenario tiles, which the pipeline gzips once and the worker decompresses, and `image/webp` for the terrain tiles. Neither type is in `gzip_types`, and that is the point: both are already compressed, and nginx should send them as they are rather than compress compressed bytes again. The table above was verified live; these two types are only configuration until somebody runs `curl -sI` against a tile on a deployment that carries them.
+
+---
+
+## Hardening after the penetration test (16 September)
+
+The team's penetration test ran against a local build of this image and found five things the site container did not do. All five are fixed in configuration; none changes what a visitor sees.
+
+| Finding | What changed | Where |
+|---|---|---|
+| **P02, P08** No defence headers | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HSTS (one year, no subdomains), `Referrer-Policy: no-referrer`, a `Permissions-Policy` and `Cross-Origin-Opener-Policy`, on every response including the 401 | `deploy/security-headers.conf`, included by `nginx.conf` |
+| **P03** The signed-in site could be framed | `frame-ancestors 'none'` and `X-Frame-Options: DENY` | the same file |
+| **P05** A shared cache handed protected data to a visitor who never signed in | Every response behind the gate is `Cache-Control: private` | `nginx.conf` |
+| **P06** Root master process, no read-only mode, stale base image | Runs as `nginx` (uid 101); writes only under `/tmp/nginx`; base images pinned by digest | `Dockerfile`, `entrypoint.sh` |
+| **P04** (defence in depth) | `script-src 'self'` with no inline script anywhere; `quality.html`'s inline `<style>` moved to `quality.css` so `style-src 'self'` needs no exception | `apps/web/public/quality.css` |
+
+The API sends its own set through Hono's `secureHeaders` (`default-src 'none'`, `DENY`, HSTS, `nosniff`, `no-referrer`), tested in `apps/api/src/server.test.ts` on answers and on failures alike.
+
+**The CSP names one other host, and it is filled in at start-up.** `connect-src` must allow the API, and the API's address is baked into the bundle at build time (`VITE_API_BASE`). The Dockerfile hands the same build argument to the runtime stage, and `entrypoint.sh` reduces it to an origin and writes it into `/tmp/nginx/security-headers.conf`, refusing to start on anything that is not a plain `https://host[:port]` — the value goes into a response header, and a semicolon in it would rewrite the policy. A build with `--build-arg VITE_API_BASE=` gets `connect-src 'self'`.
+
+**Headers are included in every location that sets one.** nginx inherits `add_header` into a `location` only when that location declares none, and three of them declare `Cache-Control`. Leaving out the `include` there drops the whole policy from `/assets`, `/data` and `index.html` without an error.
+
+### Checked on 16 September, against a local build of this image
+
+- `docker run --read-only --tmpfs /tmp …` starts; `docker top` shows master and workers as uid 101.
+- Without credentials: `/`, `/index.html`, `/data/map.json`, `/assets/`, `//data/map.json`, `/DATA/map.json`, five other methods, `X-Original-URL` and a wrong password all return 401; `/%2e%2e/etc/passwd` and a `%00` suffix return 400. With the test credential, 200.
+- Every header above is present once on `/`, `/data/…`, `/assets/…`, a single-page route and the 401.
+- **P05 repeated**: an nginx caching proxy keyed on the URL alone, in front of the container. A signed-in request is a cache `MISS` every time, and the same URL without credentials through the proxy is 401.
+- **The CSP breaks nothing**, checked by serving the built site with the same headers in Chrome: the council map from the API, all six layers, Ground height tiles, both flood pages, the whole blocked-drain comparison (the module worker and its tiles), the self-hosted font and `quality.html` — no `securitypolicyviolation` event.
+- It still fails closed: no credentials, or a `VITE_API_BASE` with a `;` in it, and the container exits before nginx starts.
+
+### Rebuilding on a schedule
+
+A pinned digest stops a base image changing under a build; it also stops it getting fixes. The CI `security` job scans both images on every pull request and every week on the default branch, and **a new fixable HIGH or CRITICAL finding is the signal to move the pin**:
+
+```bash
+# The digest behind a tag (multi-architecture index). Repeat for node:<tag>.
+TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/nginx:pull" | sed -E 's/.*"token":"([^"]+)".*/\1/')
+curl -sI -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json" -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" https://registry-1.docker.io/v2/library/nginx/manifests/1.30.5-alpine3.24 | grep -i docker-content-digest
+```
+
+Change the `FROM` lines in both Dockerfiles, open a pull request so the scan runs on the new images, merge, and redeploy `drainlens-dev` and the API. Otherwise redeploy at least once a month even without an application change, so the running revision is never older than the scan that passed it.
+
+After a deploy, check the headers on the live URL; they are on the 401, so no password is needed:
+
+```bash
+curl -sI https://drainlens-dev-205559161217.australia-southeast1.run.app/ | grep -iE 'content-security|x-frame|strict-transport|x-content-type|referrer|permissions'
+```
 
 ---
 

@@ -9,9 +9,27 @@ The offline geospatial pipeline. Runs once, on a developer machine, and publishe
 ```
 cd pipeline
 py -m venv .venv                      # python3 -m venv .venv on macOS/Linux
-./.venv/Scripts/python.exe -m pip install -e . -r requirements-dev.txt
+./.venv/Scripts/python.exe -m pip install --require-hashes -r requirements.lock
+./.venv/Scripts/python.exe -m pip install --no-deps --no-build-isolation -e .
 ./.venv/Scripts/python.exe -m pytest
 ```
+
+That is what CI installs. `pip install -e . -r requirements-dev.txt` still works and resolves to the newest versions `pyproject.toml` allows, which is the way to find out whether a newer release breaks anything before relocking.
+
+### Locked dependencies
+
+**The ranges in `pyproject.toml` say what the pipeline is compatible with; `requirements.lock` says what was tested**, with a SHA-256 for every file (penetration test P07). CI installs the lock with `--require-hashes`, so a release that changes, or a file swapped on the index under the same version, fails the install instead of running. The lock covers the runtime dependencies, the test tools in `requirements-dev.txt`, and the build backend in `requirements-build.txt`, because the package itself is installed with `--no-build-isolation`.
+
+`requirements-audit.lock` is the same for `pip-audit`, which CI's `security` job installs to audit `requirements.lock` every push and every week. It is kept apart because the pipeline never imports it.
+
+Regenerate both after changing any of those inputs, or to take newer releases, with [uv](https://docs.astral.sh/uv/) from this directory:
+
+```bash
+uv pip compile pyproject.toml requirements-dev.txt requirements-build.txt --universal --python-version 3.13 --generate-hashes -o requirements.lock
+uv pip compile requirements-audit.txt --universal --python-version 3.13 --generate-hashes -o requirements-audit.lock
+```
+
+Add `--upgrade` to move every pin to the newest allowed release; without it uv keeps the existing pins where they still fit. `--universal` makes one file for Windows and the Linux runner (`colorama` carries a `sys_platform == 'win32'` marker), and `--python-version 3.13` matches CI. Then install the new lock into a fresh venv, run `pytest`, and commit the lock in the same change as whatever moved it.
 
 ## Build the drainage graph artefact
 
