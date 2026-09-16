@@ -34,7 +34,7 @@ import type { GuideOverlay } from '../map/guideMarks.js';
 import { RAMP_GRADIENT } from '../map/terrain.js';
 import type { Viewport } from '../map/viewport.js';
 import type { SupportedAddress } from '../session.js';
-import type { TraceArtefact } from '../trace/graph.js';
+import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import { chooseTeachingPit } from '../tutorial/pit.js';
 import {
   type Finished,
@@ -256,6 +256,15 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
     inside the 300 m the guide opens on.
   */
   const pitStep = steps.findIndex((s) => s.kind === 'do' && s.requires === 'pit-selected');
+
+  /*
+    Any pit now finishes the pit step (team request, 16 September), and a
+    quarter of the pits in this extent have no connected pipe on record. For
+    one of those, *Show connected drain pipe* draws nothing, so the finish page
+    says why rather than leaving the reader to wonder what they missed.
+  */
+  const noPipeShown =
+    wantsPit && now.followingPit !== null && traceDownstream(trace, now.followingPit).steps === 0;
   const pitAsked = teaching !== null && pitStep >= 0 && (done || index0 >= pitStep);
 
   /*
@@ -391,6 +400,7 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
         lookingBack={lookingBack}
         stepDone={stepDone}
         groundOff={lesson.withGround !== undefined && !now.terrain}
+        noPipeShown={noPipeShown}
         answer={step === undefined ? undefined : answers[step.id]}
         onAnswer={(option) => {
           if (step !== undefined) setAnswers((held) => ({ ...held, [step.id]: option }));
@@ -423,6 +433,7 @@ function Coach({
   lookingBack,
   stepDone,
   groundOff,
+  noPipeShown,
   answer,
   onAnswer,
   onStart,
@@ -445,6 +456,8 @@ function Coach({
   readonly stepDone: boolean;
   /** The ground height guide, with Ground height switched off. */
   readonly groundOff: boolean;
+  /** The drainage guide finished on a drain with no connected pipe. */
+  readonly noPipeShown: boolean;
   readonly answer: number | undefined;
   readonly onAnswer: (option: number) => void;
   readonly onStart: () => void;
@@ -519,7 +532,11 @@ function Coach({
 
           {done ? (
             lesson.finished.badge === undefined ? (
-              <Done copy={lesson.finished} onFinish={onFinish} />
+              <Done
+                copy={lesson.finished}
+                onFinish={onFinish}
+                {...(noPipeShown ? { note: NO_PIPE_NOTE } : {})}
+              />
             ) : (
               <Complete copy={lesson.finished} onPrevious={onPrevious} onFinish={onFinish} />
             )
@@ -891,12 +908,27 @@ function Progress({ done, total }: { readonly done: number; readonly total: numb
   );
 }
 
-function Done({ copy, onFinish }: { readonly copy: Finished; readonly onFinish: () => void }) {
+/** Said on the drainage finish page when the chosen drain had no pipe to draw. */
+export const NO_PIPE_NOTE =
+  'The drain you chose has no connected pipe in the council records, so no pipe was drawn. The drain with the orange ring has one.';
+
+function Done({
+  copy,
+  onFinish,
+  note,
+}: {
+  readonly copy: Finished;
+  readonly onFinish: () => void;
+  readonly note?: string;
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(4) }}>
       <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
         {copy.headline}
       </h2>
+      {note !== undefined && (
+        <p style={{ margin: 0, font: type(text.body, { leading: 1.5 }), color: ink.muted }}>{note}</p>
+      )}
       {copy.body !== undefined && (
         <p style={{ margin: 0, font: type(text.body, { leading: 1.5 }), color: ink.base }}>
           {copy.body}

@@ -348,10 +348,16 @@ export function highlightFor(step: Step, now: MapNow): Highlight | null {
 /**
  * Is this step's requirement true of the map right now?
  *
- * `teachingPit` is the one the guide asked for, and is null for a lesson that
- * does not name one. A different pit does not satisfy a `pit-selected` step —
- * not to be strict about it, but because the next step presses *Show connected
- * pipe*, and a quarter of the pits in this extent have nothing to show there.
+ * **Any pit satisfies `pit-selected`** (team request, 16 September). It used
+ * to be only the pit the guide ringed, on the reasoning that a quarter of the
+ * pits in this extent have no connected pipe to show next; in use, a reader who
+ * pressed the pit beside the ringed one was told nothing and stayed stuck. The
+ * ring stays as a suggestion, and the guide says so when the chosen pit has no
+ * recorded pipe (`Guide.tsx`). `trace-following` asks for the pit that is
+ * selected, so the connected pipe shown is the one for the pit just pressed.
+ *
+ * `teachingPit` is kept in the signature for the lessons that name one; no
+ * requirement reads it now.
  */
 export function satisfied(
   requires: Requirement,
@@ -373,9 +379,9 @@ export function satisfied(
     case 'unmeasured-on':
       return now.unmeasured;
     case 'pit-selected':
-      return teachingPit !== null && now.selectedPit === teachingPit;
+      return now.selectedPit !== null;
     case 'trace-following':
-      return teachingPit !== null && now.followingPit === teachingPit;
+      return now.followingPit !== null && now.followingPit === now.selectedPit;
     case 'layers-opened':
       return now.layersOpened || now.layersOpen;
     case 'terrain-shown':
