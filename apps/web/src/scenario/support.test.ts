@@ -47,7 +47,7 @@ describe('the short reason on a grey drain', () => {
     expect(Object.values(MAP_KEY)).toEqual([
       'Your address',
       'Drain available to test',
-      'Other drains (not available for this test)',
+      'Other drains (can’t be tested)',
     ]);
   });
 });

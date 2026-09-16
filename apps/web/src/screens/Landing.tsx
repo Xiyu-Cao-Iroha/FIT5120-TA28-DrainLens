@@ -103,7 +103,7 @@ export interface LandingProps {
    * The task waiting for this address, if one is.
    *
    * **The comparison's address screen used to be the explorer's.** Somebody
-   * who had just pressed *Search an address to start* on the blocked-drain
+   * who had just pressed *Check an address* on the blocked-drain
    * comparison was asked to *See how rainwater may move near your address*
    * and offered *Explore this area*, which in the 15 September user test read
    * as having been sent somewhere else. The team's Figma (H2 and H3) gives the

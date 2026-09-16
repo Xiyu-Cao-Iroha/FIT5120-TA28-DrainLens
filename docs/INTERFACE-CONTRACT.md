@@ -179,7 +179,7 @@ Three distinctions in that table are load-bearing:
 
 **A network limitation never becomes an insufficiency.** Where a pipe leads has no bearing on the surface calculation, so a missing downstream connection travels alongside a successful result rather than replacing it.
 
-> **The identifiers are not the words on screen.** Since 14 September `higher-than-baseline` reads *More water than with a clear drain* and `no-clear-change` reads *No clear difference* (`apps/web/src/scenario/outcome.ts`); on-screen names in general come from `apps/web/src/ui/terms.ts`. The values above are the contract and did not change, so nothing on the wire or in a stored result moved with the copy.
+> **The identifiers are not the words on screen.** Since 14 September `higher-than-baseline` reads *More water than with a clear drain* and `no-clear-change` reads *No clear difference*, and since 17 September its heading reads *No visible difference nearby* while the summary row keeps *No clear difference* (`apps/web/src/scenario/outcome.ts`); on-screen names in general come from `apps/web/src/ui/terms.ts`. The values above are the contract and did not change, so nothing on the wire or in a stored result moved with the copy.
 
 ---
 

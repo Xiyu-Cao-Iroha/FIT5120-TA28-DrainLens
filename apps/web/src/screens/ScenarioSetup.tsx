@@ -267,7 +267,7 @@ export function ScenarioReview({ address, scenario, distanceM, onRun, onChange }
       </dl>
 
       <button type="button" onClick={onRun} style={primary(true)}>
-        Show the difference
+        Run comparison
       </button>
       <p style={note}>{REVIEW_DISCLAIMER}</p>
       <button type="button" onClick={onChange} style={link}>

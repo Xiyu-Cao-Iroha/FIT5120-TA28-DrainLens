@@ -91,11 +91,11 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
   'no-clear-change': {
     title: COMPARISON_TITLE,
     // Plain words from the 14 September copy review, over AC 3.1.3.e's band names.
-    band: 'No clear difference',
+    band: 'No visible difference nearby',
     finding: null,
     // What the heading means, in other words. What it does not mean is
     // `NO_CLEAR_CHANGE_MEANS`, which the screen shows beside this.
-    body: 'At this total rainfall, the calculation could not separate your drain setting from a clear drain.',
+    body: 'At this total rainfall, the model found no extra surface water nearby large enough to show on the map.',
     comparison: 'No clear difference',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: false,
@@ -167,14 +167,14 @@ export const RESULT_DISCLAIMER =
   'This comparison does not predict flooding. It does not show flood depth or when water may arrive.';
 
 /**
- * The short line under *Show the difference*, before anything has run.
+ * The short line under *Run comparison*, before anything has run.
  *
  * AC 3.1.3.g said at the moment of asking rather than only on the answer: the
  * comparison is between two settings, not an inspection of the drain and not
  * a forecast. The full disclaimer follows on the result.
  */
 export const REVIEW_DISCLAIMER =
-  'This compares a clear drain with your blocked-drain choice. It does not show the drain’s current condition or predict flooding.';
+  'Most drains show no visible change nearby. This is a model comparison, not the drain’s current condition or a flood forecast.';
 
 /**
  * The purple, named once, for the legend and the note beside the finding.
@@ -216,16 +216,16 @@ export const COMPARING_STEPS: readonly string[] = [
  */
 export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly body: string }[] = [
   {
-    title: 'The model routes some water to other nearby drains',
-    body: 'The council’s drainage network here has enough drain pits that, in the model, water passing one blocked drain is taken in by the next few. Blocking a single drain moves very little water.',
+    title: 'The model may send the water elsewhere',
+    body: 'Other nearby drains may take it in, or it may keep flowing downhill.',
   },
   {
-    title: 'The model spreads remaining water across the calculated low area',
-    body: 'In the model, water that reaches a low area spreads across all of it. A blocked drain can add real volume and still raise the surface by less than a millimetre, which is not something to act on.',
+    title: 'The model does not show small changes',
+    body: 'Small or spread-out changes are not shown on the map.',
   },
   {
-    title: 'We will not report a difference finer than the ground data',
-    body: 'Ground-height data comes from aerial photography and is accurate to about 25 centimetres. A calculated change smaller than that is below what the data can support, so it is reported as no clear difference rather than as a number.',
+    title: 'Why small changes are left out',
+    body: 'Ground height comes from aerial photographs and is accurate to about 25 centimetres, so a smaller calculated change is below what the data can support.',
   },
 ];
 
@@ -257,7 +257,7 @@ export const RAINFALL_EXPLAINED =
  * the audit on 13 September found it was not on the screen at all.
  */
 export const NO_CLEAR_CHANGE_MEANS =
-  'No clear difference means this simplified calculation did not find a clear difference from the clear-drain setting. It does not show whether this drain is blocked now, or that a blockage would have no effect in a real flood.';
+  'This does not mean the area cannot flood, or that a blockage here would not matter.';
 
 /**
  * Everything the comparison cannot tell a person, AC 3.3.2 a to i, in order.
@@ -272,7 +272,9 @@ export const LIMITATIONS: readonly string[] = [
   'The result does not show flood depth or water depth.',
   'It does not estimate when floodwater would arrive.',
   'It does not give a flood probability or a risk score.',
-  NO_CLEAR_CHANGE_MEANS,
+  // The full sentence, not `NO_CLEAR_CHANGE_MEANS`: the note beside the finding
+  // is the short form, and AC 3.3.2.h still needs saying in full here.
+  'No clear difference means this simplified calculation did not find a clear difference from the clear-drain setting. It does not show whether this drain is blocked now, or that a blockage would have no effect in a real flood.',
   'It only shows differences from the clear-drain setting, within the area of ground data around the selected drain.',
 ];
 
