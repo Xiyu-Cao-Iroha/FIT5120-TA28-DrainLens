@@ -50,9 +50,9 @@ describe('the nearest drain the comparison can use', () => {
 
   it('answers none when nothing comparable is within reach — the no-match state', () => {
     const pits = [pit(1, 900, 900), pit(2, 510, 500)];
-    expect(comparableNear(HOME, pits, new Set(['1']))).toEqual({ nearest: null, others: [] });
-    expect(comparableNear(HOME, pits, new Set())).toEqual({ nearest: null, others: [] });
-    expect(comparableNear(HOME, [], new Set(['1']))).toEqual({ nearest: null, others: [] });
+    expect(comparableNear(HOME, pits, new Set(['1']))).toEqual({ nearest: null, others: [], showsDifference: false });
+    expect(comparableNear(HOME, pits, new Set())).toEqual({ nearest: null, others: [], showsDifference: false });
+    expect(comparableNear(HOME, [], new Set(['1']))).toEqual({ nearest: null, others: [], showsDifference: false });
   });
 
   it('takes a radius, so a test can force the no-match state', () => {
@@ -110,6 +110,32 @@ describe('the drains offered once an address is searched', () => {
   });
 
   it('is empty when nothing is near', () => {
-    expect(offeredDrains({ nearest: null, others: [] })).toHaveLength(0);
+    expect(offeredDrains({ nearest: null, others: [], showsDifference: false })).toHaveLength(0);
+  });
+});
+
+describe('preferring a drain the model shows a difference for', () => {
+  const pits = [pit(1, 510, 500), pit(2, 530, 500), pit(3, 560, 500)];
+  const supported = new Set(['1', '2', '3']);
+
+  it('highlights the nearest differing drain over a nearer one that does not differ', () => {
+    const found = comparableNear(HOME, pits, supported, COMPARISON_RADIUS_M, new Set(['3', '2']));
+    expect(found.nearest?.assetNumber).toBe('2');
+    expect(found.showsDifference).toBe(true);
+    // The rest keep their distance order, the nearest non-differing drain first.
+    expect(found.others.map((d) => d.assetNumber)).toEqual(['1', '3']);
+  });
+
+  it('falls back to the nearest comparable drain when none nearby differs', () => {
+    const found = comparableNear(HOME, pits, supported, COMPARISON_RADIUS_M, new Set(['99']));
+    expect(found.nearest?.assetNumber).toBe('1');
+    expect(found.showsDifference).toBe(false);
+  });
+
+  it('does not reach past the radius for a differing drain', () => {
+    const far = [...pits, pit(4, 500 + COMPARISON_RADIUS_M + 5, 500)];
+    const found = comparableNear(HOME, far, new Set(['1', '2', '3', '4']), COMPARISON_RADIUS_M, new Set(['4']));
+    expect(found.nearest?.assetNumber).toBe('1');
+    expect(found.showsDifference).toBe(false);
   });
 });

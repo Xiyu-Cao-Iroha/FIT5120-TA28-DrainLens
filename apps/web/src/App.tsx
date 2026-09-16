@@ -33,7 +33,8 @@ import { DrainsUnavailable, FindingDrains, NoMatch } from './screens/NoMatch.js'
 import { TaskSelect } from './screens/TaskSelect.js';
 import { type DifferenceArea, footprintCorners, intoMapFrame } from './map/difference.js';
 import type { Local } from './map/viewport.js';
-import { comparableNear } from './scenario/eligibility.js';
+import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
+import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
@@ -233,6 +234,13 @@ export function App() {
     worker's list. Against the pits the served map draws, so the drain it
     highlights is always one the person can see and press.
   */
+  // The drains the model shows a difference for (see `scenario/differences.ts`).
+  const [differences, setDifferences] = useState<DifferencesArtefact | null>(null);
+  useEffect(() => {
+    void loadDifferences('/data/scenario-differences.json').then(setDifferences);
+  }, []);
+  const differing = useMemo(() => differingDrains(differences), [differences]);
+
   const eligibility = useMemo(
     () =>
       loaded === null || session.address === null || !scenario.ready
@@ -241,8 +249,10 @@ export function App() {
             [session.address.eastingM, session.address.northingM],
             loaded.map.layers.pit ?? [],
             scenario.supported,
+            COMPARISON_RADIUS_M,
+            differing,
           ),
-    [loaded, session.address, scenario.ready, scenario.supported],
+    [loaded, session.address, scenario.ready, scenario.supported, differing],
   );
   // No match: the reducer decides what that may do, and only step 1 stops.
   useEffect(() => {
@@ -682,9 +692,19 @@ export function App() {
           dispatch({
             type: 'comparison-finished',
             run,
+            /*
+              The band for the amount the person chose, not the worker's
+              headline, which is the last amount solved (60 mm). Read off the
+              headline, a choice of 20 mm could say *More water* over a map
+              with nothing drawn on it -- found by the model census of
+              16 September.
+            */
             outcome:
               result.status === 'successful'
-                ? { kind: 'comparison', band: result.band }
+                ? {
+                    kind: 'comparison',
+                    band: result.positions.find((p) => p.rainfallMm === rainfallMm)?.band ?? result.band,
+                  }
                 : { kind: 'insufficient', reason: result.reason },
           });
         });
@@ -900,6 +920,7 @@ export function App() {
         ) : (
           <ScenarioChoices
             scenario={session.scenario}
+            differenceHint={differenceHint(differences, session.scenario.pitId)}
             distanceM={distanceM}
             onBlockage={(blockage) => dispatch({ type: 'blockage-selected', blockage })}
             onRainfall={(rainfallMm) => dispatch({ type: 'rainfall-selected', rainfallMm })}

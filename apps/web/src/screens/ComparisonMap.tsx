@@ -331,7 +331,8 @@ export function ComparisonMap({
             borderRadius: radius.small,
           }}
         >
-          Nearest drain you can test · about {aboutMetres(distanceM)} m away
+          {eligibility?.showsDifference === true ? 'Drain that shows a difference' : 'Nearest drain you can test'} · about{' '}
+          {aboutMetres(distanceM)} m away
         </span>
       )}
 

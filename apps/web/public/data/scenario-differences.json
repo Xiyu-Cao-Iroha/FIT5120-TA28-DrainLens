@@ -1,0 +1,334 @@
+{
+ "artefact": "scenario-differences",
+ "version": 1,
+ "note": "Drains for which the blocked-drain comparison finds more water than with a clear drain, per setting and rainfall amount: the number of cells above the 0.05 m3 threshold. Worked out in advance with the same engine and scene tiles the site uses, over 9239 drains; only drains with a difference are listed. A statement about the model, not about real flooding.",
+ "rainfallMm": [
+  20,
+  40,
+  60
+ ],
+ "drains": {
+  "1139969": {
+   "partly-blocked": [
+    0,
+    386,
+    453
+   ],
+   "fully-blocked": [
+    298,
+    398,
+    469
+   ]
+  },
+  "1140452": {
+   "fully-blocked": [
+    0,
+    0,
+    1164
+   ]
+  },
+  "1140569": {
+   "fully-blocked": [
+    84,
+    139,
+    199
+   ]
+  },
+  "1140570": {
+   "fully-blocked": [
+    0,
+    43,
+    0
+   ]
+  },
+  "1140692": {
+   "partly-blocked": [
+    0,
+    250,
+    262
+   ],
+   "fully-blocked": [
+    196,
+    257,
+    289
+   ]
+  },
+  "1140693": {
+   "fully-blocked": [
+    0,
+    250,
+    262
+   ]
+  },
+  "1140748": {
+   "fully-blocked": [
+    182,
+    0,
+    0
+   ]
+  },
+  "1141114": {
+   "fully-blocked": [
+    0,
+    0,
+    219
+   ]
+  },
+  "1142310": {
+   "partly-blocked": [
+    0,
+    275,
+    0
+   ],
+   "fully-blocked": [
+    162,
+    277,
+    0
+   ]
+  },
+  "1142786": {
+   "partly-blocked": [
+    57,
+    0,
+    0
+   ],
+   "fully-blocked": [
+    57,
+    0,
+    0
+   ]
+  },
+  "1142798": {
+   "fully-blocked": [
+    0,
+    0,
+    201
+   ]
+  },
+  "1143277": {
+   "fully-blocked": [
+    29,
+    45,
+    0
+   ]
+  },
+  "1143963": {
+   "fully-blocked": [
+    0,
+    0,
+    33
+   ]
+  },
+  "1144004": {
+   "fully-blocked": [
+    0,
+    0,
+    8677
+   ]
+  },
+  "1144068": {
+   "partly-blocked": [
+    85,
+    0,
+    0
+   ],
+   "fully-blocked": [
+    85,
+    0,
+    0
+   ]
+  },
+  "1144070": {
+   "partly-blocked": [
+    81,
+    0,
+    0
+   ],
+   "fully-blocked": [
+    85,
+    0,
+    0
+   ]
+  },
+  "1146289": {
+   "fully-blocked": [
+    0,
+    159,
+    173
+   ]
+  },
+  "1146554": {
+   "fully-blocked": [
+    0,
+    290,
+    361
+   ]
+  },
+  "1146556": {
+   "fully-blocked": [
+    0,
+    290,
+    361
+   ]
+  },
+  "1146558": {
+   "partly-blocked": [
+    217,
+    297,
+    361
+   ],
+   "fully-blocked": [
+    244,
+    320,
+    361
+   ]
+  },
+  "1146560": {
+   "fully-blocked": [
+    0,
+    286,
+    361
+   ]
+  },
+  "1146596": {
+   "fully-blocked": [
+    0,
+    888,
+    1085
+   ]
+  },
+  "1146598": {
+   "fully-blocked": [
+    0,
+    888,
+    1077
+   ]
+  },
+  "1147031": {
+   "partly-blocked": [
+    389,
+    0,
+    0
+   ],
+   "fully-blocked": [
+    403,
+    0,
+    0
+   ]
+  },
+  "1149955": {
+   "fully-blocked": [
+    0,
+    0,
+    8677
+   ]
+  },
+  "1152665": {
+   "fully-blocked": [
+    29,
+    45,
+    0
+   ]
+  },
+  "1153791": {
+   "fully-blocked": [
+    0,
+    27,
+    37
+   ]
+  },
+  "1363560": {
+   "fully-blocked": [
+    198,
+    0,
+    0
+   ]
+  },
+  "1363588": {
+   "partly-blocked": [
+    0,
+    208,
+    358
+   ],
+   "fully-blocked": [
+    154,
+    210,
+    360
+   ]
+  },
+  "1363621": {
+   "partly-blocked": [
+    154,
+    333,
+    412
+   ],
+   "fully-blocked": [
+    175,
+    357,
+    479
+   ]
+  },
+  "1364263": {
+   "partly-blocked": [
+    0,
+    29,
+    0
+   ],
+   "fully-blocked": [
+    21,
+    29,
+    0
+   ]
+  },
+  "1447988": {
+   "partly-blocked": [
+    162,
+    276,
+    0
+   ],
+   "fully-blocked": [
+    163,
+    277,
+    0
+   ]
+  },
+  "1572855": {
+   "partly-blocked": [
+    0,
+    250,
+    262
+   ],
+   "fully-blocked": [
+    196,
+    257,
+    289
+   ]
+  },
+  "1579195": {
+   "partly-blocked": [
+    0,
+    135,
+    0
+   ],
+   "fully-blocked": [
+    122,
+    139,
+    0
+   ]
+  },
+  "1759357": {
+   "fully-blocked": [
+    71,
+    0,
+    0
+   ]
+  },
+  "1800851": {
+   "fully-blocked": [
+    204,
+    0,
+    0
+   ]
+  }
+ }
+}
