@@ -278,8 +278,9 @@ export interface Lesson {
   /** An entry screen before step one. Only the ground height guide has one. */
   readonly intro?: LessonIntro;
   /**
-   * Previous, to look back at a step already passed. Opt-in: the three
-   * older lessons were designed without it. See `stepBack`.
+   * Previous, to look back at a step already passed. See `stepBack`. It was
+   * the ground height guide's alone until 16 September, when the team asked
+   * for a way back in every guide.
    */
   readonly previous?: boolean;
   readonly mapChrome?: MapChrome;
