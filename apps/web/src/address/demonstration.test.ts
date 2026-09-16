@@ -73,3 +73,35 @@ describe('choosing the address to offer', () => {
     expect(DEMONSTRATION_LABEL).toMatch(/^\d/);
   });
 });
+
+describe('the comparison’s own offer', () => {
+  it('names a published address the comparison can show a difference for', async () => {
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const { unpack } = await import('./search.js');
+    const { COMPARE_DEMONSTRATION_LABEL } = await import('./demonstration.js');
+    const { comparableNear } = await import('../scenario/eligibility.js');
+    const { differingDrains } = await import('../scenario/differences.js');
+    const data = (name: string): unknown =>
+      JSON.parse(readFileSync(path.resolve(__dirname, '../../public/data', name), 'utf8')) as unknown;
+    const map = data('map.json') as { extent: { min_e: number; min_n: number; width_m: number; height_m: number }; layers: { pit: never[] } };
+    const published = unpack(data('addresses.json') as never, map.extent);
+    const offered = demonstrationAddress(published, COMPARE_DEMONSTRATION_LABEL);
+    expect(offered?.label).toBe(COMPARE_DEMONSTRATION_LABEL);
+    const tiles = data('scene-tiles/index.json') as { windows: Record<string, unknown> };
+    const differing = differingDrains(data('scenario-differences.json') as never);
+    const found = comparableNear(
+      [offered?.e ?? 0, offered?.n ?? 0],
+      map.layers.pit,
+      new Set(Object.keys(tiles.windows)),
+      undefined,
+      differing,
+    );
+    expect(found.showsDifference).toBe(true);
+  });
+
+  it('falls back to the guide’s address, then to the first', () => {
+    const guide = at('g', DEMONSTRATION_LABEL);
+    expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere').id).toBe('g');
+  });
+});

@@ -56,7 +56,24 @@ export const DEMONSTRATION_LABEL = '46 Gatehouse Drive, Kensington';
  * the build rather than letting the offer quietly go back to being whatever
  * sorts first.
  */
-export function demonstrationAddress(index: AddressIndex): IndexedAddress | undefined {
-  const wanted = DEMONSTRATION_LABEL.toLowerCase();
-  return index.addresses.find((a) => a.label.toLowerCase() === wanted) ?? index.addresses[0];
+export function demonstrationAddress(
+  index: AddressIndex,
+  label: string = DEMONSTRATION_LABEL,
+): IndexedAddress | undefined {
+  const find = (wanted: string) => index.addresses.find((a) => a.label.toLowerCase() === wanted.toLowerCase());
+  return find(label) ?? find(DEMONSTRATION_LABEL) ?? index.addresses[0];
 }
+
+/**
+ * The address the blocked-drain comparison offers, which is not the guide's.
+ *
+ * 46 Gatehouse Drive has no drain within 200 m that the model shows a
+ * difference for, so a first comparison from it always says *No clear
+ * difference* (census of 16 September, `public/data/scenario-differences.json`).
+ * 89 Market Street, Kensington is 13 m from drain 1363588, which shows one at
+ * every rainfall amount when fully blocked and at 40 and 60 mm when partly
+ * blocked, and it is inside the bundled Kensington square as well as the
+ * council map. `check-guide.mjs` does not hold it; `demonstration.test.ts`
+ * does.
+ */
+export const COMPARE_DEMONSTRATION_LABEL = '89 Market Street, Kensington';
