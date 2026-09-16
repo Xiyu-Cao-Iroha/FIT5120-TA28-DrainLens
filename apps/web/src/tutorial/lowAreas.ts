@@ -104,4 +104,5 @@ export const LOW_AREAS: Lesson = {
     { key: 'pit', at: 5, on: (now) => now.pits },
   ]),
   teachingPit: false,
+  previous: true,
 };

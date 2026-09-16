@@ -562,16 +562,15 @@ function step(session: Session, event: SessionEvent): Session {
       return {
         ...session,
         /*
-          The address is asked for once, not once per section.
+          Every guide opens on the address screen (team request, 16 September).
 
-          This said `'address'` unconditionally, which was right while there
-          was one lesson and became a toll gate the moment there were three:
-          finish drainage, come back to the four, pick water flow, and be asked
-          for the address you gave ninety seconds ago. It is still reachable
-          from the map's own Address control, which is where somebody who
-          wants a different street goes.
+          It skipped straight to the guide once an address was known, so the
+          second guide started on the first guide's street with no moment to
+          choose another. The address screen now offers the address already
+          given as a one-press *Continue with …*, so going on costs a press and
+          not the typing it cost before 11 September.
         */
-        screen: session.address === null ? 'address' : 'guide',
+        screen: 'address',
         guideSection: event.section,
         // The map's mode follows the section, so finishing the guide and
         // opening the map shows the thing that was just taught rather than

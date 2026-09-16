@@ -471,6 +471,12 @@ export function App() {
             task={session.pendingTask}
             // The title follows the guide card that was pressed (copy audit v2, #16).
             section={session.guideSection}
+            // The address already given, as a one-press way on.
+            current={
+              session.address === null
+                ? null
+                : (loaded.index.addresses.find((a) => a.id === session.address?.id) ?? null)
+            }
             onFound={(address) =>
               dispatch({
                 type: 'address-accepted',
@@ -611,6 +617,10 @@ export function App() {
               }}
               onLeave={() => {
                 dispatch({ type: 'guide-left' });
+              }}
+              // Back to the address screen, keeping the section chosen.
+              onBack={() => {
+                dispatch({ type: 'change-address' });
               }}
             />
           )}
