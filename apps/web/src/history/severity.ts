@@ -18,8 +18,6 @@
  * code change anything else would notice.
  */
 
-import { FLOOD } from '../ui/terms.js';
-
 export class AreaDataError extends Error {}
 
 function fail(what: string): never {
@@ -305,38 +303,32 @@ export function completenessOf(area: MapArea, mode: MapMode): Completeness {
 export type MapMode = 'activity' | 'severity';
 
 /**
- * What the panel says about completeness, as a label and the sentence after it.
+ * The short status beside a figure in the area panel (copy audit v4, #88;
+ * AC 4.1.4, 4.1.6): *Complete*, *At least (some counts hidden)* or *Not
+ * available*, shown for every area, complete ones included.
  *
- * Out of the component so it can be tested: the first version said "The
- * counts are exact" about every area without a score, and two of those seven
- * -- Port Melbourne Industrial and Braeside -- have a withheld region. A
- * missing denominator and a withheld numerator are separate facts, and one
- * does not tell you anything about the other.
+ * It replaced a labelled section with a sentence per state. The regions
+ * behind a minimum and the reasons are About the data now.
+ *
+ * **Per figure, not per area.** The first version of the panel said "The
+ * counts are exact" about every area without a rate, and two of those seven,
+ * Port Melbourne Industrial and Braeside, have a withheld region. A missing
+ * population and a withheld count are separate facts, so the count and the
+ * rate each get their own status. A total of zero with a withheld region is
+ * *Not available*, as the key says: it reads as none and means unknown.
  */
-export function completenessText(
-  area: Pick<MapArea, 'complete' | 'suppressedRegions' | 'regions'>,
-  state: Completeness,
-  incidentType: string,
-): { readonly label: string; readonly body: string } {
-  // Copy audit v2: no "Minimum total", no call-outs, no dashes. The section
-  // this fills, "How complete this is", is tier 3 (#88) and stays.
-  const withheld = `Some counts in this area were hidden for privacy: ${String(area.suppressedRegions)} of its ${String(area.regions)} smaller regions`;
-  switch (state) {
-    case 'minimum':
-      return { label: 'Some counts hidden.', body: `${withheld}, so the real total may be higher.` };
-    case 'none':
-      return {
-        label: 'None recorded.',
-        body: `The SES recorded no ${incidentType.toLowerCase()} ${FLOOD.unitOne} here across the whole period. That is different from a small number.`,
-      };
-    case 'unavailable':
-      return {
-        label: 'Not available.',
-        body: `${area.complete ? 'The published total is complete' : `${withheld}, so the total is a minimum`}; there is no rate because the area has too few residents to compare.`,
-      };
-    case 'exact':
-      return { label: 'Complete published total.', body: 'No count within this area was withheld.' };
-  }
+export const STATUS = {
+  exact: 'Complete',
+  minimum: 'At least (some counts hidden)',
+  unavailable: 'Not available',
+} as const;
+
+export type Status = keyof typeof STATUS;
+
+export function statusOf(area: Pick<MapArea, 'complete' | 'total' | 'rate'>, figure: 'count' | 'rate'): Status {
+  if (figure === 'rate' && area.rate === null) return 'unavailable';
+  if (area.complete) return 'exact';
+  return figure === 'count' && area.total === 0 ? 'unavailable' : 'minimum';
 }
 
 export interface Break {

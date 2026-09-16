@@ -61,9 +61,9 @@ In the CBD the surface is towers, and the apparent 45–60 m of "relief" in a 50
 
 ## The tie the team already has
 
-The Problem Statement's own evidence list includes the ABC report on **Kensington Banks** and new Melbourne Water flood mapping — residents told their homes are newly flagged, and worried about what it means for them. The street names the analysis surfaced are that estate: **Gatehouse Drive, McAllister Mews, Stockmans Way, Fairbairn Drive**.
+Melbourne Water's own flood information covers **Kensington Banks**, the estate beside the Maribyrnong River. The street names the analysis surfaced are that estate: **Gatehouse Drive, McAllister Mews, Stockmans Way, Fairbairn Drive**. (This paragraph cited a news report until 16 September; the project uses official sources only.)
 
-We did not pick Kensington to fit the story. The measurements pointed there, and the story was already on file.
+We did not pick Kensington to fit the story. The measurements pointed there.
 
 This also settles **D1b**, the open question about the persona. Daniel Chan lives in Lilydale, outside any council that publishes drainage data. Moving him to Kensington puts him inside the pilot area and inside the evidence the project already cites, without inventing anything.
 

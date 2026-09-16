@@ -115,15 +115,15 @@ Two files from 1270.0.55.001, both the **2011 edition**, which is the edition th
 
 ### Verified flood events
 
-`apps/web/public/data/flood-events.json` is **written by the team**, not downloaded. Each event is drafted from at least two public pages, and each page is linked on the site beside it:
+`apps/web/public/data/flood-events.json` is **written by the team**, not downloaded. Each event is drafted from at least two official pages, and each page is linked on the site beside it. **News reports are not used** (team decision, 16 September):
 
 | Publisher | Pages used |
 |---|---|
 | Australian Institute for Disaster Resilience | Knowledge Hub event records: Melbourne storms 2010, February 2011, 2011 |
-| ABC News | Reports of 7 March 2010, 5 February 2011, 26 December 2011, 6 October 2023 |
-| Melbourne Water | *Maribyrnong River flood* page; final report of the independent review panel |
+| Bureau of Meteorology | *Victoria in March 2010*; *Special Climate Statement 28* (February 2011 rainfall); *Victoria in December 2011* |
+| Melbourne Water | *Maribyrnong River flood* page; its announcement of the independent review panel's final report |
 
-The pages are cited and linked, not copied: summaries are the team's own sentences. An event appears only after a team member fills in `checkedBy` and `checkedOn`; on 14 September one of the four has been checked and three are waiting. `tools/data/check-events.mjs` holds the file to that rule in CI, and ties every event to an area the map has.
+The pages are cited and linked, not copied: summaries are the team's own sentences, and say only what those pages state. An event appears only after a team member fills in `checkedBy` and `checkedOn`. **On 16 September none of the four is checked**: all four were rewritten from these sources that day, so the Maribyrnong check of 14 September was cleared with them. `tools/data/check-events.mjs` holds the file to that rule in CI, refuses a source on a news outlet's site (`NEWS_HOSTS`), and ties every event to an area the map has.
 
 ### Not data at all
 

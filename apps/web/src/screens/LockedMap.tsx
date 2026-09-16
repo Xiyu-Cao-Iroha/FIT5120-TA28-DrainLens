@@ -3,12 +3,12 @@
  *
  * **A disclosure, not a gate.** This is the one moment in the product where
  * somebody is about to read the drainage data without having been told what
- * it is, and the four lines from `lockNotice` are the four things they would
- * otherwise have to work out: the extent, that none of it is a live flood
- * warning, that a line ending may be the record ending, and where the
- * calculated layers are drawn. The first two are said; the last two are behind
- * *More information*, because four lines in front of a button were skipped
- * whole (copy audit v2, #52). *Open the full map* works at once — the
+ * it is. `lockNotice` says the two things they must know before pressing:
+ * the extent, and that none of it is a live flood warning. The rest (a line
+ * ending may be the record ending; the calculated layers are drawn only where
+ * the ground data allows) is *More about the map ›*, which opens About the
+ * data (copy audit v4, #52; v2 had it behind a *More information* fold). Four
+ * lines in front of a button were skipped whole. *Open the full map* works at once — the
  * five-second countdown that stood in front of it was removed in the copy
  * review of 14 September.
  *
@@ -28,6 +28,7 @@ import {
   nextSection,
 } from '../tutorial/sections.js';
 import type { SectionId } from '../tutorial/sections.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import { FULL_MAP } from '../ui/terms.js';
 import {
   ink,
@@ -128,32 +129,9 @@ export function LockedMap({
             ))}
           </ul>
 
-          <details>
-            <summary
-              style={{
-                cursor: 'pointer',
-                font: type(text.label, { weight: weight.semibold }),
-                color: ink.strong,
-              }}
-            >
-              More information
-            </summary>
-            <ul
-              style={{
-                margin: `${String(space(3))}px 0 0`,
-                paddingLeft: space(5),
-                display: 'flex',
-                flexDirection: 'column',
-                gap: space(2),
-                font: type(text.label, { leading: 1.5 }),
-                color: ink.muted,
-              }}
-            >
-              {notice.more.map((sentence) => (
-                <li key={sentence}>{sentence}</li>
-              ))}
-            </ul>
-          </details>
+          <p style={{ margin: `-${String(space(2))}px 0 0` }}>
+            <SourceLink id="mapNotice" />
+          </p>
 
           <p style={{ margin: 0, font: type(text.label), color: ink.muted }}>
             {done === 0

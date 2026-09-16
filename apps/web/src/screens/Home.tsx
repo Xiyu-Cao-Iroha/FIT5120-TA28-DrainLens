@@ -56,7 +56,8 @@ import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
 import { CoverageBadge } from '../ui/Shell.js';
-import { FLOOD, FULL_MAP, LAYER, PROVENANCE, TOTAL_RAINFALL } from '../ui/terms.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
+import { FLOOD, FULL_MAP, TOTAL_RAINFALL } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -144,7 +145,7 @@ export const PATHS: readonly {
  * Three steps, one short action each (copy audit v2, #10).
  *
  * The third step used to say where each layer's data comes from, which is not
- * something to do; the map legend says that once now. The privacy promise stays
+ * something to do; the map legend's source groups say that now. The privacy promise stays
  * in the second step because the code keeps it: the address index is searched
  * on the device and the address is written nowhere.
  */
@@ -154,23 +155,6 @@ const STEPS: readonly { readonly title: string; readonly body?: string }[] = [
   { title: 'Turn on the layers you want to see' },
 ];
 
-/**
- * What the product gives and does not, folded under *More information* at the
- * bottom of the page (copy audit v2, #11). *A plain-English note on every layer
- * saying whether it is recorded or calculated* went with the source badges;
- * where the data comes from is said here and in the legend instead.
- */
-const PROVIDES: readonly string[] = [
-  `Street drains and the pipes that join them, including gaps where the record ends. ${PROVENANCE.recorded}`,
-  `${LAYER.paths}, ${LAYER.lowAreas.toLowerCase()} and ${LAYER.ground.toLowerCase()}. ${PROVENANCE.derived}`,
-  `Past flood emergency responses by area across Greater Melbourne, ${FLOOD.period}`,
-];
-
-const WITHHOLDS: readonly string[] = [
-  'Live warnings, forecasts, or any prediction of future flooding',
-  'How deep water would be, or when it would arrive',
-  `Drainage, ${LAYER.paths.toLowerCase()} or ${LAYER.lowAreas.toLowerCase()} anywhere outside the City of Melbourne`,
-];
 
 export interface HomeProps {
   readonly history: FloodHistoryArtefact;
@@ -873,7 +857,8 @@ function FloodPreview({ artefact }: { readonly artefact: FloodHistoryArtefact })
           color: ink.subtle,
         }}
       >
-        <strong>+</strong> means at least this many.
+        {/* The source line moved to About the data (copy audit v4, #8). */}
+        <strong>+</strong> means at least this many. <SourceLink id="history" inline />
       </p>
     </div>
   );
@@ -1280,14 +1265,15 @@ function Flow() {
 
 /**
  * The line the whole site is built around, said once more on the way out, with
- * the two lists folded under it.
+ * a link to the rest.
  *
- * **One visible line, and the lists one press away** (copy audit v2, #11). The
- * seven items used to stand open in two cards above a separate closing note,
- * and the audit found nobody reads seven caveats at the bottom of a page. The
- * line that must survive a quick read is the one kept open: this is not a
- * warning service, and where the warnings are. *More information* is closed
- * by default and says in its summary what is inside.
+ * **One visible line, and the lists one press away.** The seven items used to
+ * stand open in two cards, and the audit found nobody reads seven caveats at
+ * the bottom of a page; v2 folded them (#11). Copy audit v4 (#11) replaces the
+ * fold with *What DrainLens can and cannot show ›*, which opens About the
+ * data at *What DrainLens cannot tell you*, so the list is kept in one place.
+ * The line that must survive a quick read stays open: this is not a warning
+ * service, and where the warnings are.
  *
  * The footer says the same on every screen. This repeats it at the bottom of
  * the page somebody reads before deciding to trust the thing, which is the
@@ -1318,89 +1304,11 @@ function Limits() {
         >
           DrainLens is not a live flood warning. For current warnings, check VicEmergency.
         </p>
-        <details style={{ marginTop: space(4) }}>
-          <summary
-            style={{
-              cursor: 'pointer',
-              font: type(text.label, { weight: weight.semibold }),
-              color: ink.strong,
-            }}
-          >
-            More information
-          </summary>
-          <div
-            style={{
-              display: 'grid',
-              gap: space(5),
-              gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-              marginTop: space(5),
-            }}
-          >
-            <ClaimCard title="DrainLens provides" items={PROVIDES} tone="recorded" />
-            <ClaimCard title="DrainLens does not provide" items={WITHHOLDS} tone="withheld" />
-          </div>
-        </details>
+        <p style={{ margin: `${String(space(3))}px 0 0` }}>
+          <SourceLink id="homeLimits" />
+        </p>
       </div>
     </section>
   );
 }
 
-function ClaimCard({
-  title,
-  items,
-  tone,
-}: {
-  readonly title: string;
-  readonly items: readonly string[];
-  readonly tone: 'recorded' | 'withheld';
-}) {
-  return (
-    <section
-      style={{
-        background: surface.raised,
-        border: `1px solid ${line.base}`,
-        borderRadius: radius.large,
-        boxShadow: shadow.resting,
-        padding: space(5),
-      }}
-    >
-      <h3
-        style={{
-          margin: `0 0 ${String(space(4))}px`,
-          font: type(text.body, { weight: weight.semibold }),
-          color: ink.strong,
-        }}
-      >
-        {title}
-      </h3>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {items.map((item) => (
-          <li
-            key={item}
-            style={{
-              display: 'flex',
-              gap: space(3),
-              alignItems: 'flex-start',
-              marginBottom: space(3),
-              font: type(text.label, { leading: 1.6 }),
-              color: ink.muted,
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                flexShrink: 0,
-                marginTop: 8,
-                width: tone === 'recorded' ? 14 : 5,
-                height: 5,
-                borderRadius: radius.pill,
-                background: tone === 'recorded' ? basisTone.recorded.ink : line.strong,
-              }}
-            />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}

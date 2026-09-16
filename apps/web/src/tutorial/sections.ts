@@ -114,13 +114,15 @@ export function nextSection(learned: Learned): SectionId | null {
  * - the paths and low areas are `derived.json`, calculated here and published
  *   by nobody, and drawn only where the ground data allows.
  *
- * **Two said, two folded** (copy audit v2, #52). Four lines in front of a
- * button were skipped whole, so the extent and the safety line are `said` and
- * the other two are `more`, behind *More information*.
+ * **Two said, the rest one link away.** Four lines in front of a button were
+ * skipped whole (copy audit v2, #52), so v2 folded the last two behind *More
+ * information*. Copy audit v4 (#52) replaces the fold with *More about the map
+ * ›*, which opens About the data at *Drains and pipes*; that page says the
+ * line stops where the record stops, and that water paths are not shown over
+ * ground data gaps, in its own words (`ui/sources.ts`).
  */
 export interface LockNotice {
   readonly said: readonly [string, string];
-  readonly more: readonly [string, string];
 }
 
 export function lockNotice(extentName: string): LockNotice {
@@ -150,9 +152,5 @@ export function lockNotice(extentName: string): LockNotice {
 
   return {
     said: [where, 'It shows records and estimates, not live flood warnings.'],
-    more: [
-      'Drain pits and pipes come from council records. A line that ends may mean the council record ends there.',
-      'Calculated water paths and low areas are shown only where enough ground data is available.',
-    ],
   };
 }

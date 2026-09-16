@@ -46,11 +46,13 @@ export interface WarningsArtefact {
 export class WarningsError extends Error {}
 
 /**
- * The card. The title is as requested; the body is the request's advice alone
- * (copy audit v2, #62), since its first sentence repeated the title word for
- * word and its dash broke the site's writing rules.
+ * The card. The body is the request's advice alone (copy audit v2, #62),
+ * since its first sentence repeated the title word for word and its dash
+ * broke the site's writing rules. The title says *may* (copy audit v4, #62),
+ * so it does not read as "this spot will flood" (AC 1.3.2). No source line:
+ * the industry mentor asked for no further explanation on this card.
  */
-export const WARNING_TITLE = 'Water collects here easily';
+export const WARNING_TITLE = 'Water may pool here in heavy rain';
 export const WARNING_BODY = 'Avoid parking here when heavy rain is coming.';
 
 /**

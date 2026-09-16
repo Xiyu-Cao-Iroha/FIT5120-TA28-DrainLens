@@ -12,15 +12,20 @@
  */
 
 /**
- * Where a piece of information comes from.
+ * Where a piece of information comes from, as the blocked-drain comparison
+ * groups its result.
  *
- * **Said once, in More information, not as a badge on every card** (copy
- * audit v2 of 15 September, #30, #60, #61, #63, #85). The badges answered a
- * question -- who says so -- that a resident reading a map does not ask on
- * every card, and seven of them on one screen were the noise the audit found.
- * The distinction itself is kept: `PROVENANCE` below is the sentence pair that
- * carries it, and the blocked-drain comparison, which was outside the audit,
- * still groups its result by these three.
+ * **Not a badge on the map's cards any more.** Copy audit v2 (15 September,
+ * #30, #60, #61, #63, #85) removed the coloured badges: seven on one screen
+ * were the noise the audit found. Copy audit v4 brought the distinction back
+ * on screen, because AC 1.1.4, 1.1.7, 1.2.1, 1.3.1, 4.1.3 and 4.3.4 ask for
+ * recorded and calculated information to be told apart where it is shown, but
+ * as quiet grey links rather than badges: *From council records ›* and
+ * *Estimated by DrainLens ›* on the map legend's groups and the popups, *Past
+ * records ›*, *Our calculation ›* and *Checked by our team ›* in the flood
+ * area panel. Those labels are `SOURCE_LINKS` in `ui/sources.ts`, and each
+ * opens its section of About the data. The comparison, which was outside both
+ * audits, still uses these three.
  */
 export const SOURCE = {
   recorded: 'Council record',
@@ -38,7 +43,13 @@ export const LAYER = {
   limited: 'Ground data gaps',
 } as const;
 
-/** Where the map's information comes from, as More information says it once. */
+/**
+ * Where the map's information comes from, as a sentence.
+ *
+ * The map legend said these under *About this data* after copy audit v2; its
+ * source groups replaced them in v4 (#61). The pit card's technical details
+ * still open with the first.
+ */
 export const PROVENANCE = {
   recorded: 'Drain and pipe locations come from City of Melbourne records.',
   derived: 'Water paths, low areas and ground height are estimated by DrainLens.',
@@ -73,11 +84,14 @@ export const TOTAL_RAINFALL = 'Total rainfall';
  * spelled out. Each page writes `ses` the first time it names the service and
  * `explain` beside the first count.
  *
- * `explain` is not the audit's sentence. The audit suggested *each crew sent
- * counts as one emergency response*, and the publisher's data quality
- * statement says the opposite: the figures *preclude multiple crew attendances
- * at any one incident*, so a job that drew four crews counts once. See
- * docs/FLOOD-HISTORY-DATA.md.
+ * **`explain` is copy audit v4's sentence**, and it is accurate. v2's audit
+ * suggested *each crew sent counts as one emergency response*, and the
+ * publisher's data quality statement says the opposite: the figures *preclude
+ * multiple crew attendances at any one incident*, so a job that drew four
+ * crews counts once (docs/FLOOD-HISTORY-DATA.md). v2 therefore wrote a longer
+ * sentence spelling that out. v4's *a time the SES was sent to help* is one
+ * dispatch to one job, which is what one count is, and it says nothing about
+ * how many crews went, so it cannot be read as one count per crew.
  */
 export const FLOOD = {
   /** The view and ranking toggles. */
@@ -90,7 +104,7 @@ export const FLOOD = {
   rateUnit: 'emergency responses per 1,000 people',
   /** The service, in full, the first time a page names it. */
   ses: 'Victoria State Emergency Service (SES)',
-  explain: 'One emergency response is one flood job the SES sent crews to, however many crews went.',
+  explain: 'Each one is a time the SES was sent to help.',
   /** The six financial years, as a resident reads a span. */
   period: '2009 to 2015',
   /** The legend's title, once the page has spelled the SES out. */

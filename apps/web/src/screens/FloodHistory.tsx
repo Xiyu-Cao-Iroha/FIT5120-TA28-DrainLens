@@ -9,14 +9,20 @@
  * rather than described under it, and an area whose total is a minimum carries
  * a `+` on its own row.
  *
- * **Said short, and said once** (copy audit v2, 15 September, #65 to #77). The
- * reporting period, source and licence box above the chart is gone (#66): the
- * years are in the subtitle and the source and licences under More
- * information. The seven folded limits became three icon rows a reader can take
- * in at a glance, with the detail folded into one More information (#74). A
- * minimum is a `+` with a tooltip rather than a badge (#70), and the notes
- * under the lists count what is shown rather than explaining ties and minimums
- * again (#71, #77).
+ * **Said short, and said once** (copy audit v2, 15 September, #65 to #77;
+ * copy audit v4, #65, #66, #70, #74, #76). The reporting period, source and
+ * licence box above the chart is gone (#66): the years and the source are in
+ * the subtitle, the area unit is one line under the list, and the licences are
+ * in About the data. The seven folded limits became three icon rows a reader
+ * can take in at a glance (#74), followed by *About the data ›*; the fold of
+ * limits and data details is gone, because that page now says all of it. A
+ * minimum is a `+` and a visible *At least* badge (#70), with one *Why "at
+ * least"? ›* under the list, and the notes under the lists count what is shown
+ * rather than explaining ties and minimums again (#71, #77).
+ *
+ * **AC 2.1.1 and 2.3.1 are still met on this page, not only behind a link:**
+ * period and source in the subtitle, area unit under the list, what a count is
+ * (`FLOOD.explain`), not severity and not current or future in the icon rows.
  *
  * **The bar is the ranking; the sparkline is the timing.** The bar is scaled
  * against every published area, so pressing *Show more locations* never
@@ -47,24 +53,19 @@ import {
   type Figure,
   type RateRanking,
   atLeastTip,
-  bandRules,
   countFigure,
-  exampleSum,
-  listNames,
   rankByRate,
   rateFigure,
   rateTip,
-  readableDate,
   sparklineLabel,
   topNote,
   unratedNote,
   wetYearNote,
-  workedExample,
   yearTip,
 } from '../history/board.js';
-import { countsOf } from '../history/evidence.js';
 import type { PopulationArtefact } from '../history/severity.js';
 import type { AreaLoad } from '../history/useAreas.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import { FLOOD } from '../ui/terms.js';
 import {
   brand,
@@ -156,9 +157,11 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
         />
       )}
 
-      <div style={{ marginTop: space(4) }}>
-        <RateRules artefact={artefact} areas={areas} onOpen={onNeedAreas} />
-      </div>
+      <ListFoot
+        geography={artefact.geographySource.publisher}
+        rate={view === 'rate'}
+        minimum={artefact.areas.some((a) => !a.complete)}
+      />
 
       {/*
         The map of every area, offered where the ranking ends.
@@ -213,7 +216,6 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
       </section>
 
       <KeyPoints />
-      <MoreInformation artefact={artefact} areas={areas} />
       <ToTheMap onOpenMap={onOpenMap} />
 
       {/*
@@ -243,9 +245,10 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
 /**
  * The eyebrow, the question and the one sentence that says what a count is.
  *
- * Copy audit v2, #65: the service is spelled out the first time the page names
- * it, and `FLOOD.explain` sits beside it. *Not a forecast* is one of the icon
- * rows under the list rather than a third clause here.
+ * Copy audit v2 and v4, #65: the service is spelled out the first time the
+ * page names it, and `FLOOD.explain` sits beside it. *Not live or future
+ * flooding* is one of the icon rows under the list rather than a third clause
+ * here.
  */
 function Heading() {
   return (
@@ -279,7 +282,7 @@ function Heading() {
           color: ink.muted,
         }}
       >
-        Areas ranked by how often the {FLOOD.ses} sent crews to help with flooding, {FLOOD.period}.{' '}
+        Areas ranked by emergency responses to flooding from the {FLOOD.ses}, {FLOOD.period}.{' '}
         {FLOOD.explain}
       </p>
     </>
@@ -587,8 +590,9 @@ function CalloutList({
  * map.
  *
  * The division behind each rate, the count and the people, is the number's
- * tooltip rather than a line under the bar (copy audit v2, #76), and *How the
- * rate is calculated* divides one real area out in full.
+ * tooltip rather than a line under the bar (copy audit v2, #76). The fold
+ * that divided one real area out in full is now *Our calculation ›* under the
+ * list (copy audit v4, #76), which opens About the data at the rate.
  */
 function RateList({
   artefact,
@@ -709,6 +713,7 @@ function Row({
             {name}
           </strong>
           {band !== null && <Flag>{band}</Flag>}
+          {figure.minimum && <Flag>At least</Flag>}
           {tied !== null && <Flag>{tied}</Flag>}
         </span>
         <span
@@ -931,11 +936,11 @@ function Tip({
 }
 
 /**
- * A quiet label beside an area's name: its band, or *Same count*.
+ * A quiet label beside an area's name: its band, *At least*, or *Same count*.
  *
- * There was a loud one as well, for *exact count not published*. The copy
- * audit (#70) replaced it with the `+` and its tooltip, so only the quiet tone
- * is left.
+ * There was a loud one as well, for a withheld count. Copy audit v2 (#70)
+ * replaced it with the `+` and a tooltip; v4 (#70) brought back a short,
+ * quiet *At least*, because a tooltip is not there on a phone.
  */
 function Flag({ children }: { readonly children: string }) {
   return (
@@ -955,97 +960,32 @@ function Flag({ children }: { readonly children: string }) {
 }
 
 /**
- * How the rate is calculated, folded under the list.
+ * The small lines under either list (copy audit v4, #66, #70, #76).
  *
- * **Every number in it is read, not typed.** The dates come from the
- * artefacts, the bands from `SEVERITY_BREAKS`, the minimum from the population
- * file, and the example is divided out from a real area's figures. A rules
- * box that restated the thresholds by hand would be the first thing to go
- * stale when the bands are next revisited, and the one place nobody checks.
- *
- * Opening it asks for the area data, so the worked example is there to read
- * without having to switch rankings first.
+ * The area unit, which AC 2.1.1 and 2.3.1 want on the page now that the source
+ * box is gone, and the links that replaced the folds: *Why "at least"? ›*
+ * while any area on the board is a minimum, and *Our calculation ›* in the
+ * rate ranking, where *How the rate is calculated* used to open.
  */
-function RateRules({
-  artefact,
-  areas,
-  onOpen,
+function ListFoot({
+  geography,
+  rate,
+  minimum,
 }: {
-  readonly artefact: FloodHistoryArtefact;
-  readonly areas: AreaLoad;
-  readonly onOpen: () => void;
+  readonly geography: string;
+  readonly rate: boolean;
+  readonly minimum: boolean;
 }) {
-  const { data, problem } = areas;
-  const example = data === null ? null : workedExample(data.areas, artefact.areas.map((a) => a.name));
-  const unrated = data === null ? [] : data.areas.filter((a) => a.rate === null).map((a) => a.name);
-  const gap = { margin: `0 0 ${String(space(2))}px` };
-  const list = { margin: `0 0 ${String(space(2))}px`, paddingLeft: space(5) };
-
   return (
-    <Point title="How the rate is calculated" onOpen={onOpen}>
-      <p style={gap}>
-        The rate compares how often the SES was sent to flooding in an area with how many people
-        live there.
-      </p>
-      <ol style={list}>
-        <li>
-          Take the {FLOOD.unit} recorded in the area from{' '}
-          {readableDate(artefact.reportingPeriod.start)} to {readableDate(artefact.reportingPeriod.end)}.
-        </li>
-        <li>
-          Divide by the number of people estimated to live there
-          {data === null
-            ? ', in the middle of that period.'
-            : ` on ${readableDate(data.population.denominator)}, from the ${data.population.source.publisher}.`}
-        </li>
-        <li>Multiply by 1,000, so the answer reads as {FLOOD.rateUnit}.</li>
-      </ol>
-
-      {problem !== null ? (
-        <p style={gap}>
-          The population figures could not be loaded, so the worked example and the minimum number
-          of residents cannot be shown here.
+    <div style={{ marginTop: space(3), font: type(text.small, { leading: 1.5 }), color: ink.subtle }}>
+      <p style={{ margin: 0 }}>Areas follow {geography} boundaries.</p>
+      {(minimum || rate) && (
+        <p style={{ margin: `${String(space(1))}px 0 0`, display: 'flex', gap: space(4), flexWrap: 'wrap' }}>
+          {minimum && <SourceLink id="minimum" />}
+          {rate && <SourceLink id="calculation" />}
         </p>
-      ) : data === null ? (
-        <p style={gap}>Loading the population figures for a worked example…</p>
-      ) : (
-        <>
-          {example !== null && (
-            <p style={gap}>
-              <strong style={{ color: ink.strong }}>Worked example.</strong> {example.name}:{' '}
-              {exampleSum(example)}
-              {example.band === null ? '.' : `, which is ${example.band}.`}
-            </p>
-          )}
-          <p style={gap}>
-            Areas with fewer than {data.population.minimumResidents.toLocaleString('en-AU')} residents
-            get no rate, because one {FLOOD.unitOne} among a handful of residents gives a large number
-            that means little.
-            {unrated.length > 0 &&
-              ` ${String(unrated.length)} ${unrated.length === 1 ? 'area is' : 'areas are'} left out for this reason: ${listNames(unrated)}.`}
-          </p>
-        </>
       )}
-
-      <p style={gap}>Each rate is placed in one of three bands, set near the quartiles of all the rates:</p>
-      <ul style={list}>
-        {bandRules().map((rule) => (
-          <li key={rule}>{rule}</li>
-        ))}
-      </ul>
-      <p style={gap}>
-        Where some counts in an area were hidden for privacy, its total is a minimum, so its rate is a
-        minimum too and is marked +.
-      </p>
-      {/*
-        Copy audit v2, #85: said in words, not as the "Calculated by DrainLens"
-        badge this sentence used to open with.
-      */}
-      <p style={{ margin: 0 }}>
-        DrainLens works out this rate; the SES does not publish it. Like the counts, the rate does
-        not measure flood depth, damage or current risk, and it is not a count of people affected.
-      </p>
-    </Point>
+    </div>
   );
 }
 
@@ -1055,19 +995,20 @@ function RateRules({
  * **Copy audit v2, #74.** This was a titled section, a sentence introducing
  * it and seven folds, and the audit's point was that seven fold titles are
  * themselves a wall of text when a resident needs to keep three things: the
- * data is old, it counts jobs rather than damage, and it is not a forecast.
- * Those three are here, on the outside, which keeps the reason the folds had
- * their claims on their faces -- a reader who opens nothing has still been
- * told. The detail behind them is in `MoreInformation`.
+ * data is old, it counts responses rather than how bad floods were, and it is
+ * not live or future flooding. Those three are here, on the outside, so a
+ * reader who opens nothing has still been told. The detail behind them is
+ * About the data (copy audit v4, #74: this wording, and the link under them).
  */
 function KeyPoints() {
   const points: readonly (readonly [ReactNode, string])[] = [
-    [<CalendarIcon key="calendar" />, `Past data: ${FLOOD.period}`],
-    [<JobsIcon key="jobs" />, 'Counts SES flood jobs, not flood damage'],
-    [<ForecastIcon key="forecast" />, 'Not a forecast'],
+    [<CalendarIcon key="calendar" />, `${FLOOD.period} records only`],
+    [<JobsIcon key="jobs" />, 'Counts times the SES was sent, not how bad floods were'],
+    [<ForecastIcon key="forecast" />, 'Not live or future flooding'],
   ];
 
   return (
+    <>
     <ul
       aria-label="About these numbers"
       style={{
@@ -1106,6 +1047,10 @@ function KeyPoints() {
         </li>
       ))}
     </ul>
+    <p style={{ margin: `${String(space(2))}px 0 0` }}>
+      <SourceLink id="history" />
+    </p>
+    </>
   );
 }
 
@@ -1145,184 +1090,6 @@ function ForecastIcon() {
       <path d="M6 15h8a3.5 3.5 0 0 0 .4-7A4.5 4.5 0 0 0 5.8 9 3 3 0 0 0 6 15Z" />
       <path d="M3 3l14 14" />
     </svg>
-  );
-}
-
-/**
- * The limits and the data details, in one closed fold (copy audit v2, #66,
- * #74).
- *
- * AC 2.3.1, all four parts, are still on the page rather than behind a link:
- * three of them as the icon rows above and all of them here. The source and
- * both licences moved here from the box above the chart, which the audit
- * found put licensing on the first screen.
- *
- * **Two withheld numbers, and what each counts** (copy audit v2, appendix D).
- * This page's 144 are small regions in the whole SES file; the area map's 80
- * are areas of 281 holding at least one. A reader who sees both reads a
- * contradiction, so the paragraph says they count different things, with the
- * map's figures once the area data has loaded.
- */
-function MoreInformation({
-  artefact,
-  areas,
-}: {
-  readonly artefact: FloodHistoryArtefact;
-  readonly areas: AreaLoad;
-}) {
-  const withheld = artefact.counts.suppressedRegions;
-  const onMap = areas.data === null ? null : countsOf(areas.data.areas);
-  const heading = {
-    margin: `${String(space(4))}px 0 ${String(space(1))}px`,
-    font: type(text.label, { weight: weight.semibold, leading: 1.4 }),
-    color: ink.strong,
-  } as const;
-  const para = { margin: 0 };
-  const { source, geographySource, geography, reportingPeriod } = artefact;
-
-  return (
-    <div style={{ marginTop: space(4) }}>
-      <Point title="More information">
-        <h4 style={{ ...heading, marginTop: 0 }}>One count is one flood job, not one flood</h4>
-        <p style={para}>
-          {FLOOD.explain} The jobs are recorded by the {source.publisher}.
-        </p>
-
-        <h4 style={heading}>Not a measure of damage</h4>
-        <p style={para}>
-          A flooded garage and a flooded street count as one each. Nothing in this data says how deep
-          the water was, how long it stayed or what it cost, so a higher count does not mean worse
-          flooding. The same is true of the rate per 1,000 people.
-        </p>
-
-        <h4 style={heading}>The record ends on {readableDate(reportingPeriod.end)}</h4>
-        <p style={para}>
-          Drains, buildings and rainfall have all changed since. Nothing here describes conditions
-          today.
-        </p>
-
-        <h4 style={heading}>Flash flooding is not counted</h4>
-        <p style={para}>
-          {artefact.excludes} So an area where flooding comes as sudden run-off in a storm can sit
-          lower on this list than you might expect.
-        </p>
-
-        <h4 style={heading}>Some counts were hidden for privacy</h4>
-        <p style={para}>
-          The SES did not publish counts for {withheld.toLocaleString('en-AU')} of the{' '}
-          {artefact.counts.regions.toLocaleString('en-AU')} small regions in its data, under the
-          Privacy and Data Protection Act 2014, because so few people live there that a count could
-          identify someone. An area holding one of them shows at least its total, marked +, and the
-          real total may be higher.{' '}
-          {onMap === null
-            ? 'The area map counts areas rather than small regions, so its number is different.'
-            : `The area map counts something different: ${String(onMap.floors)} of its ${String(onMap.areas)} areas hold at least one hidden small region.`}
-        </p>
-
-        <h4 style={heading}>A count depends on who calls</h4>
-        <p style={para}>
-          Areas differ in population, in how much of the drainage is public, and in how likely people
-          are to call the SES rather than the council or nobody. The ranking reflects those
-          differences as much as it reflects water.
-        </p>
-
-        <h4 style={heading}>Data details</h4>
-        <p style={para}>
-          Areas are statistical areas ({geography.unit}) defined by the {geographySource.publisher} in
-          the {geography.standard}. The reporting period runs from {readableDate(reportingPeriod.start)}{' '}
-          to {readableDate(reportingPeriod.end)}.
-        </p>
-        <p style={{ margin: `${String(space(2))}px 0 0` }}>
-          Source: {source.dataset}, {source.publisher}, {source.licence}.
-        </p>
-        <p style={{ margin: `${String(space(1))}px 0 0` }}>
-          Area names: {geographySource.dataset}, {geographySource.publisher}, {geographySource.licence}.
-        </p>
-      </Point>
-    </div>
-  );
-}
-
-/**
- * A fold with its claim or its name on the outside.
- *
- * **The face has to say something, not label it.** It held each of the page's
- * limits as its own fold, so a reader who opened none had still read every
- * claim. Since copy audit v2 (#74) those claims are the icon rows, and this
- * holds the two things a reader opens on purpose: *How the rate is
- * calculated* and *More information*.
- *
- * The body is a `div`, not a `p`, so a fold can hold a list — the rate's
- * rules are steps, and steps written as one paragraph are harder to follow.
- */
-function Point({
-  title,
-  onOpen,
-  children,
-}: {
-  readonly title: string;
-  /** Called each time the fold is opened, for a body that needs something loaded. */
-  readonly onOpen?: () => void;
-  readonly children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div
-      style={{
-        marginBottom: space(2),
-        border: `1px solid ${line.hair}`,
-        borderRadius: radius.base,
-        background: surface.page,
-      }}
-    >
-      <h3 style={{ margin: 0 }}>
-        <button
-          type="button"
-          onClick={() => {
-            if (!open) onOpen?.();
-            setOpen((was) => !was);
-          }}
-          aria-expanded={open}
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: space(3),
-            width: '100%',
-            padding: `${String(space(3))}px ${String(space(4))}px`,
-            background: 'none',
-            border: 'none',
-            textAlign: 'left',
-            font: type(text.label, { weight: weight.semibold, leading: 1.4 }),
-            color: ink.strong,
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ flex: 1 }}>{title}</span>
-          {/*
-            The only mark saying this opens, so it is coloured like something
-            to see: `ink.subtle` measures 3.1:1 on this card, below the 4.5:1
-            normal text needs, and an affordance nobody notices is a paragraph
-            nobody knows is there.
-          */}
-          <span aria-hidden style={{ color: ink.muted }}>
-            {open ? '⌃' : '⌄'}
-          </span>
-        </button>
-      </h3>
-      {open && (
-        <div
-          style={{
-            margin: 0,
-            padding: `0 ${String(space(4))}px ${String(space(3))}px`,
-            font: type(text.label, { leading: 1.6 }),
-            color: ink.muted,
-          }}
-        >
-          {children}
-        </div>
-      )}
-    </div>
   );
 }
 

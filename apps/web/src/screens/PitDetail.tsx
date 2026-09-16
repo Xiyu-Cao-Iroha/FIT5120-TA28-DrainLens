@@ -20,6 +20,7 @@ import { sectionFor } from '../crosssection/section.js';
 import { CrossSection, SectionNotes } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
+import { SourceLink } from '../ui/SourcesPanel.js';
 import { PROVENANCE } from '../ui/terms.js';
 
 /**
@@ -272,13 +273,20 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
  * The followed path, on the card: one short sentence and the way to clear it.
  *
  * The detail that used to follow here moved to `TraceDetails`, under *View
- * technical details* (copy audit v2, #33).
+ * technical details* (copy audit v2, #33). Copy audit v4 (#33) adds *Why the
+ * line stops ›*, to About the data, and the map marks each place the drawn
+ * line ends (`trace/draw.ts`), which is where AC 1.2.2's missing or uncertain
+ * connections are shown. The sentence keeps "the council's pipe record"
+ * rather than the audit's "the council map": it is the record that stops.
  */
 function TraceSummary({ onClear }: { readonly onClear: () => void }) {
   return (
     <div style={{ paddingTop: 10, borderTop: '1px solid #e6ebe4' }}>
       <span style={LABEL}>FOLLOWED PATH</span>
-      <p style={{ margin: '6px 0 10px' }}>{FOLLOWED_PATH_SHORT}</p>
+      <p style={{ margin: '6px 0 4px' }}>{FOLLOWED_PATH_SHORT}</p>
+      <p style={{ margin: '0 0 10px' }}>
+        <SourceLink id="pathEnds" />
+      </p>
 
       <button
         type="button"

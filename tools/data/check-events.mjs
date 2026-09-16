@@ -11,6 +11,10 @@
  *   an event tied to a code the map does not have is shown nowhere, and
  *   silently;
  * - every source link is https and no two events share an id;
+ * - no source is a news outlet (team decision, 16 September: events are
+ *   written from official publications only, such as government agencies
+ *   and the Bureau of Meteorology). `NEWS_HOSTS` is the list refused; a news
+ *   site not on it is still out of bounds, and belongs on it when found;
  * - a check is recorded as a name and a date together, never one of them.
  *
  * It does not fetch the links. CI's network is not the thing being tested,
@@ -34,6 +38,32 @@ const scope = await read('apps/web/public/data/sa2-areas.json');
 const names = new Map(scope.areas.map((area) => [area.code, area.name]));
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** News outlets, matched on the link's host and its parent domains. */
+const NEWS_HOSTS = [
+  'abc.net.au',
+  'theage.com.au',
+  'smh.com.au',
+  'heraldsun.com.au',
+  'news.com.au',
+  'sbs.com.au',
+  '9news.com.au',
+  '7news.com.au',
+  '10play.com.au',
+  'theguardian.com',
+  'skynews.com.au',
+  'couriermail.com.au',
+];
+
+const isNews = (url) => {
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return NEWS_HOSTS.some((news) => host === news || host.endsWith(`.${news}`));
+};
 const problems = [];
 
 if (events.artefact !== 'flood-events') problems.push(`the file says it is ${JSON.stringify(events.artefact)}`);
@@ -56,6 +86,8 @@ for (const event of events.events ?? []) {
   for (const source of sources) {
     if (typeof source.url !== 'string' || !source.url.startsWith('https://')) {
       problems.push(`${label} has a source that is not an https link: ${String(source.url)}`);
+    } else if (isNews(source.url)) {
+      problems.push(`${label} cites a news outlet, and events use official sources only: ${source.url}`);
     }
   }
   const byWhom = event.checkedBy ?? null;

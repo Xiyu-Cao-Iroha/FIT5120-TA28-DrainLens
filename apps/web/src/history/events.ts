@@ -164,10 +164,17 @@ export function againstRecord(event: FloodEvent, period: { readonly start: strin
   return 'This falls inside the SES record on this map, but the counts above do not say which emergency responses, if any, belong to it.';
 }
 
-/** AC 4.2.3 a–c: an area with no verified event. */
-export function noEventsText(areaName: string): string {
-  return `DrainLens has not added a verified flood event for ${areaName}. This list is incomplete, so this does not mean flooding has never occurred there. The emergency response counts and rate above still apply.`;
-}
+/**
+ * AC 4.2.3: an area with no checked event, as one line and an ⓘ (copy audit
+ * v4, #89).
+ *
+ * The section is still drawn for every area, never hidden, and the ⓘ carries
+ * the sentence the criterion needs: no event listed is not no flooding. The
+ * three sentences it replaced also said the counts above still apply, which
+ * the panel shows by showing them.
+ */
+export const NO_EVENTS = 'No checked flood events yet.';
+export const NO_EVENTS_TIP = 'This does not mean the area has never flooded.';
 
 /** AC 4.2.3.c, under a list that is not empty. */
 export const NOT_COMPLETE =
