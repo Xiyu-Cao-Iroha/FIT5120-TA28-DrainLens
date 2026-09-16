@@ -79,4 +79,5 @@ export const DRAINAGE: Lesson = {
     { key: 'pipe', at: 2, on: (now) => now.pipes },
   ]),
   teachingPit: true,
+  previous: true,
 };

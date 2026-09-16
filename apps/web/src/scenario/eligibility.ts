@@ -46,8 +46,16 @@ export interface ComparableDrain {
 }
 
 export interface Eligibility {
-  /** The nearest comparable drain within the radius, or null: nothing to compare here. */
+  /**
+   * The drain step 1 highlights, or null: nothing to compare here.
+   *
+   * The nearest comparable drain that the model shows a difference for, when
+   * there is one within the radius; otherwise the nearest comparable drain.
+   * See `scenario/differences.ts` for why (team request, 16 September).
+   */
   readonly nearest: ComparableDrain | null;
+  /** Whether `nearest` is one the model shows a difference for. */
+  readonly showsDifference: boolean;
   /**
    * The other comparable drains within the radius, nearest first.
    *
@@ -70,6 +78,7 @@ export function comparableNear(
   pits: readonly Pit[],
   supported: ReadonlySet<string>,
   radiusM: number = COMPARISON_RADIUS_M,
+  differing: ReadonlySet<string> = new Set(),
 ): Eligibility {
   const byAsset = new Map<string, ComparableDrain>();
   for (const pit of pits) {
@@ -86,8 +95,13 @@ export function comparableNear(
   const ordered = [...byAsset.values()].sort(
     (a, b) => a.distanceM - b.distanceM || a.assetNumber.localeCompare(b.assetNumber),
   );
-  const [nearest = null, ...others] = ordered;
-  return { nearest, others };
+  const preferred = ordered.find((drain) => differing.has(drain.assetNumber)) ?? ordered[0] ?? null;
+  const others = ordered.filter((drain) => drain !== preferred);
+  return {
+    nearest: preferred,
+    others,
+    showsDifference: preferred !== null && differing.has(preferred.assetNumber),
+  };
 }
 
 /**

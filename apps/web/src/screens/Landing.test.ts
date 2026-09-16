@@ -19,7 +19,7 @@ describe('the address screen’s words', () => {
     expect(copy).toBe(COMPARE_COPY);
     // The team's Figma, H2 and H3.
     expect(copy.title).toBe('Which address do you want to check?');
-    expect(copy.lead).toMatch(/nearest drain you can test/);
+    expect(copy.lead).toMatch(/a drain near it you can test/);
     expect(copy.submit).toBe('Find a drain →');
   });
 

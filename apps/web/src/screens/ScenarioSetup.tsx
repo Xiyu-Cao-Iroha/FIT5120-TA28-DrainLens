@@ -88,13 +88,15 @@ export interface ChoicesProps {
   readonly scenario: ScenarioInputs;
   /** Metres from the address to the chosen drain, or null when opened from the full map. */
   readonly distanceM: number | null;
+  /** Where the model shows a difference for this drain, or null. See `scenario/differences.ts`. */
+  readonly differenceHint?: string | null;
   readonly onBlockage: (blockage: BlockageSetting) => void;
   readonly onRainfall: (mm: number) => void;
   readonly onReview: () => void;
 }
 
 /** Step 2 of 3: the drain summary, then the condition and the rainfall, and nothing else. */
-export function ScenarioChoices({ scenario, distanceM, onBlockage, onRainfall, onReview }: ChoicesProps) {
+export function ScenarioChoices({ scenario, distanceM, differenceHint = null, onBlockage, onRainfall, onReview }: ChoicesProps) {
   const missing = missingScenarioInput(scenario);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const intake = WHAT_IS_UNCERTAIN[0];
@@ -105,6 +107,10 @@ export function ScenarioChoices({ scenario, distanceM, onBlockage, onRainfall, o
       <h1 style={heading}>Choose what to compare</h1>
 
       <DrainSelected pitId={scenario.pitId} distanceM={distanceM} />
+
+      {differenceHint !== null && (
+        <p style={{ margin: 0, font: type(text.small, { leading: 1.5 }), color: ink.muted }}>{differenceHint}</p>
+      )}
 
       <fieldset style={fieldset}>
         <legend style={question}>

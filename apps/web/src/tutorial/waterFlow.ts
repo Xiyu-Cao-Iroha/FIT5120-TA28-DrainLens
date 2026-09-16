@@ -88,4 +88,5 @@ export const WATER_FLOW: Lesson = {
     { key: 'unavailable', at: 4, on: (now) => now.unmeasured },
   ]),
   teachingPit: false,
+  previous: true,
 };

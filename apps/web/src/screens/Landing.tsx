@@ -36,7 +36,7 @@ import {
   resolve,
   search,
 } from '../address/search.js';
-import { demonstrationAddress } from '../address/demonstration.js';
+import { COMPARE_DEMONSTRATION_LABEL, demonstrationAddress } from '../address/demonstration.js';
 import { suburbsOf } from '../address/suburbs.js';
 import type { Task } from '../session.js';
 import type { SectionId } from '../tutorial/sections.js';
@@ -151,7 +151,7 @@ export const SECTION_TITLES: Partial<Record<SectionId, string>> = {
 
 export const COMPARE_COPY: LandingCopy = {
   title: 'Which address do you want to check?',
-  lead: 'We’ll find the nearest drain you can test for a blocked-drain comparison.',
+  lead: 'We’ll find a drain near it you can test for a blocked-drain comparison.',
   submit: 'Find a drain →',
 };
 
@@ -191,7 +191,7 @@ export function Landing({
     [index, typed],
   );
 
-  const demonstration = demonstrationAddress(index);
+  const demonstration = demonstrationAddress(index, copy === COMPARE_COPY ? COMPARE_DEMONSTRATION_LABEL : undefined);
   const suburbs = suburbsOf(index);
 
   function submit(event: FormEvent) {

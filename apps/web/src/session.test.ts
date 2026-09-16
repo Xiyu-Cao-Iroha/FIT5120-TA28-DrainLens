@@ -235,12 +235,11 @@ describe('going back', () => {
     expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
   });
 
-  it('asks for the address once, not once per section', () => {
+  it('opens every guide on the address screen and asks for the address again', () => {
     /*
-     * It asked every time, which was invisible while there was one lesson and
-     * became a toll gate the moment there were three: finish drainage, come
-     * back to the four, pick water flow, and be asked for the address you gave
-     * ninety seconds ago. Found by walking the second lesson, not by a test.
+     * Team decision, 16 September: the second guide skipped the address
+     * screen and started on the first guide's street. The screen now comes
+     * every time, empty.
      */
     const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(first.screen).toBe('address');
@@ -252,9 +251,21 @@ describe('going back', () => {
       reduce(withAddress, { type: 'guide-finished' }),
       { type: 'guide-chosen', section: 'water-flow' },
     );
-    expect(second.screen).toBe('guide');
+    expect(second.screen).toBe('address');
     expect(second.guideSection).toBe('water-flow');
-    expect(second.address).toEqual(GATEHOUSE);
+    expect(second.address).toBeNull();
+    expect(reduce(second, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('guide');
+  });
+
+  it('goes back from a guide to the address screen with the section still chosen', () => {
+    const inGuide = play([
+      { type: 'get-started' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    const back = reduce(inGuide, { type: 'change-address' });
+    expect(back.screen).toBe('address');
+    expect(back.guideSection).toBe('drainage');
   });
 
   it('keeps the chosen section, because Back is not un-choosing it', () => {
@@ -714,7 +725,9 @@ describe('opening the map from the homepage', () => {
     expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
   });
 
-  it('keeps whatever the person had already chosen', () => {
+  it('forgets the address, and keeps the person’s own assumptions', () => {
+    // Team decision, 16 September: the full map asks for an address again on
+    // every visit. The blockage and rainfall are choices, not a place.
     const busy = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'blockage-selected', blockage: 'fully-blocked' },
@@ -722,7 +735,8 @@ describe('opening the map from the homepage', () => {
     ]);
     const end = reduce(busy, { type: 'map-opened' });
 
-    expect(end.address).toEqual(GATEHOUSE);
+    expect(end.address).toBeNull();
+    expect(end.scenario.pitId).toBeNull();
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
 
