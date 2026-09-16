@@ -533,6 +533,21 @@ const BACK: Readonly<Record<Screen, Screen>> = {
  * `mapOpenings` — the short version is that the map remounts, so nothing is
  * carried in from the last visit.
  */
+/**
+ * Let go of the address and everything that belonged to its street.
+ *
+ * The same fields `address-cleared` resets. Used where the team asks for the
+ * address to be entered again: each guide, and each visit to the full map.
+ */
+function forgetAddress(session: Session): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome'> {
+  return {
+    address: null,
+    rejectedAddress: null,
+    scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+    outcome: null,
+  };
+}
+
 export function reduce(session: Session, event: SessionEvent): Session {
   const next = step(session, event);
   return next.screen === 'explore' && session.screen !== 'explore'
@@ -562,15 +577,17 @@ function step(session: Session, event: SessionEvent): Session {
       return {
         ...session,
         /*
-          Every guide opens on the address screen (team request, 16 September).
+          Every guide opens on the address screen, empty (team decision,
+          16 September).
 
           It skipped straight to the guide once an address was known, so the
           second guide started on the first guide's street with no moment to
-          choose another. The address screen now offers the address already
-          given as a one-press *Continue with …*, so going on costs a press and
-          not the typing it cost before 11 September.
+          choose another. The team's rule is that an address is entered for
+          each guide and each visit to the full map, so the one given before is
+          let go here rather than offered back. See `forgetAddress`.
         */
         screen: 'address',
+        ...forgetAddress(session),
         guideSection: event.section,
         // The map's mode follows the section, so finishing the guide and
         // opening the map shows the thing that was just taught rather than
@@ -824,6 +841,9 @@ function step(session: Session, event: SessionEvent): Session {
           was written after a rule spread across three cases.
         */
         screen: allLearned(session.learned) ? 'explore' : 'locked',
+        // The full map starts with no address, whatever was searched before
+        // (team decision, 16 September); the map's own search box asks again.
+        ...forgetAddress(session),
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',

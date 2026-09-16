@@ -116,11 +116,6 @@ export interface LandingProps {
    * guide is asked to find drains rather than to see where rain moves.
    */
   readonly section?: SectionId | null | undefined;
-  /**
-   * The address already given, offered as *Continue with …* so a second
-   * guide does not make anyone type it again. Absent when there is none.
-   */
-  readonly current?: IndexedAddress | null | undefined;
 }
 
 /** The words that change with the task waiting for the address. */
@@ -183,7 +178,6 @@ export function Landing({
   onHome,
   task,
   section,
-  current,
 }: LandingProps) {
   const copy = landingCopyFor(task, section);
   // On the Kensington fallback the search covers less than the lead says.
@@ -378,32 +372,7 @@ export function Landing({
           </ul>
         )}
 
-        {suggestions.length === 0 && problem === null && current !== null && current !== undefined && (
-          <p style={{ margin: `${String(space(3))}px 0 0`, font: type(text.label), color: ink.subtle }}>
-            <button
-              type="button"
-              onClick={() => {
-                onFound(current);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                font: type(text.label, { weight: weight.semibold }),
-                color: brand.ink,
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
-            >
-              Continue with {current.label} →
-            </button>
-          </p>
-        )}
-
-        {suggestions.length === 0 &&
-          problem === null &&
-          demonstration &&
-          demonstration.id !== current?.id && (
+        {suggestions.length === 0 && problem === null && demonstration && (
           <p
             style={{
               margin: `${String(space(3))}px 0 0`,

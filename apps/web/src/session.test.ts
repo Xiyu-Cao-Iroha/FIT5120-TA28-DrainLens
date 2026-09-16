@@ -235,11 +235,11 @@ describe('going back', () => {
     expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
   });
 
-  it('opens every guide on the address screen, keeping the address given', () => {
+  it('opens every guide on the address screen and asks for the address again', () => {
     /*
-     * Team request, 16 September: the second guide skipped the address screen
-     * and started on the first guide's street. The screen now comes every
-     * time, and offers the address already given as *Continue with …*.
+     * Team decision, 16 September: the second guide skipped the address
+     * screen and started on the first guide's street. The screen now comes
+     * every time, empty.
      */
     const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(first.screen).toBe('address');
@@ -253,7 +253,7 @@ describe('going back', () => {
     );
     expect(second.screen).toBe('address');
     expect(second.guideSection).toBe('water-flow');
-    expect(second.address).toEqual(GATEHOUSE);
+    expect(second.address).toBeNull();
     expect(reduce(second, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('guide');
   });
 
@@ -725,7 +725,9 @@ describe('opening the map from the homepage', () => {
     expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
   });
 
-  it('keeps whatever the person had already chosen', () => {
+  it('forgets the address, and keeps the person’s own assumptions', () => {
+    // Team decision, 16 September: the full map asks for an address again on
+    // every visit. The blockage and rainfall are choices, not a place.
     const busy = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'blockage-selected', blockage: 'fully-blocked' },
@@ -733,7 +735,8 @@ describe('opening the map from the homepage', () => {
     ]);
     const end = reduce(busy, { type: 'map-opened' });
 
-    expect(end.address).toEqual(GATEHOUSE);
+    expect(end.address).toBeNull();
+    expect(end.scenario.pitId).toBeNull();
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
 
