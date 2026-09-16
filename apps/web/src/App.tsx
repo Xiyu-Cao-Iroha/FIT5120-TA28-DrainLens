@@ -622,6 +622,10 @@ export function App() {
               onLeave={() => {
                 dispatch({ type: 'guide-left' });
               }}
+              // Back to the address screen, keeping the section chosen.
+              onBack={() => {
+                dispatch({ type: 'change-address' });
+              }}
             />
           )}
         </Shell>

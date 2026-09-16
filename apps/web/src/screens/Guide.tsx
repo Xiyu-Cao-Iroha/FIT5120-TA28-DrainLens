@@ -97,9 +97,15 @@ export interface GuideProps {
    * lesson's entry screen. Absent, the entry screen has no skip.
    */
   readonly onLeave?: () => void;
+  /**
+   * Back from step one to the address screen (team request, 16 September).
+   * Every later step has Previous; the first had nowhere to go back to but the
+   * header's small Address control.
+   */
+  readonly onBack?: () => void;
 }
 
-export function Guide({ map, derived, trace, index, address, section, onFinish, onLeave }: GuideProps) {
+export function Guide({ map, derived, trace, index, address, section, onFinish, onLeave, onBack }: GuideProps) {
   const [now, setNow] = useState<MapNow>(NOTHING_ON_MAP);
   /** How many `read` steps have been pressed past. See `stepIndex`. */
   const [acknowledged, setAcknowledged] = useState(0);
@@ -409,6 +415,7 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
           setStarted(true);
         }}
         {...(onLeave === undefined ? {} : { onLeave })}
+        {...(onBack === undefined ? {} : { onBack })}
         onNext={() => {
           if (lookingBack) setCursor(stepForward(shown, index0));
           else setAcknowledged(shown + 1);
@@ -438,6 +445,7 @@ function Coach({
   onAnswer,
   onStart,
   onLeave,
+  onBack,
   onNext,
   onPrevious,
   onFinish,
@@ -462,6 +470,7 @@ function Coach({
   readonly onAnswer: (option: number) => void;
   readonly onStart: () => void;
   readonly onLeave?: () => void;
+  readonly onBack?: () => void;
   readonly onNext: () => void;
   readonly onPrevious: () => void;
   readonly onFinish: () => void;
@@ -645,7 +654,7 @@ function Coach({
                   </div>
                 )}
 
-                {(hasNext || (previous && stepNumber > 0) || step.kind === 'quiz') && (
+                {(hasNext || (previous && stepNumber > 0) || (stepNumber === 0 && onBack !== undefined) || step.kind === 'quiz') && (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: space(3), flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 160px', display: 'flex', flexDirection: 'column', gap: space(1) }}>
                       {step.kind === 'quiz' && chosen !== undefined && (
@@ -681,6 +690,11 @@ function Coach({
                         </button>
                       )}
                     </div>
+                    {stepNumber === 0 && onBack !== undefined && (
+                      <button type="button" onClick={onBack} style={secondary}>
+                        ← Back
+                      </button>
+                    )}
                     {previous && stepNumber > 0 && (
                       <button type="button" onClick={onPrevious} style={secondary}>
                         ← Previous
