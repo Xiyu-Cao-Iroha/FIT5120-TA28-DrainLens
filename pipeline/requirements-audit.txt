@@ -1,0 +1,4 @@
+# The auditor CI runs over requirements.lock, kept out of that lock because the
+# pipeline never imports it. Compiled with hashes into requirements-audit.lock
+# (penetration test P07); see "Locked dependencies" in README.md.
+pip-audit>=2.9
