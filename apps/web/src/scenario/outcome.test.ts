@@ -299,7 +299,7 @@ describe('the Iteration 2 wording', () => {
       expect(presentation.body.trim()).not.toBe('');
     }
     // The body still says what happened, in its own words.
-    expect(BANDS['no-clear-change'].body).toMatch(/could not separate your drain setting from a clear drain/);
+    expect(BANDS['no-clear-change'].body).toMatch(/no extra surface water nearby large enough to show on the map/);
     expect(BANDS['higher-than-baseline'].body).toMatch(/less water enters the selected drain/);
   });
 
@@ -311,9 +311,8 @@ describe('the Iteration 2 wording', () => {
 
   it('says what No clear difference does not mean', () => {
     // AC 3.3.2.h and 3.1.3.f. Found missing from the screen on 13 September.
-    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/did not find a clear difference from the clear-drain setting/);
-    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/does not show whether this drain is blocked now/);
-    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/no effect in a real flood/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/does not mean the area cannot flood/);
+    expect(NO_CLEAR_CHANGE_MEANS).toMatch(/blockage here would not matter/);
   });
 
   it('lists all nine limitations, a to i, in order', () => {
@@ -326,7 +325,9 @@ describe('the Iteration 2 wording', () => {
     expect(e).toMatch(/does not show flood depth or water depth/i);
     expect(f).toMatch(/when floodwater would arrive/i);
     expect(g).toMatch(/flood probability or a risk score/i);
-    expect(h).toBe(NO_CLEAR_CHANGE_MEANS);
+    expect(h).toMatch(/did not find a clear difference from the clear-drain setting/);
+    expect(h).toMatch(/does not show whether this drain is blocked now/);
+    expect(h).toMatch(/no effect in a real flood/);
     expect(i).toMatch(/only shows differences from the clear-drain setting/i);
   });
 
@@ -359,9 +360,9 @@ describe('the Iteration 2 wording', () => {
 
 describe('the Blockage Flow copy', () => {
   it('says before running that it is a comparison, not an inspection or a forecast', () => {
-    expect(REVIEW_DISCLAIMER).toMatch(/compares a clear drain/);
-    expect(REVIEW_DISCLAIMER).toMatch(/does not show the drain’s current condition/);
-    expect(REVIEW_DISCLAIMER).toMatch(/predict flooding/);
+    expect(REVIEW_DISCLAIMER).toMatch(/model comparison/);
+    expect(REVIEW_DISCLAIMER).toMatch(/not the drain’s current condition/);
+    expect(REVIEW_DISCLAIMER).toMatch(/flood forecast/);
   });
 
   it('gives the purple one meaning and no magnitude', () => {

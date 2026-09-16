@@ -177,10 +177,10 @@ Open it on the same pit, then on one the record connects nothing to.
 | | **On pit 1363621 a violet patch appears on the map, just north of the pin.** The panel promises highlighted areas; check they are there | | |
 | | On a pit that reports *No clear difference*, the panel says *"no difference is drawn on the map for this result"* and **nothing is painted**. Both directions matter | | |
 | 2.2.1.d | The selected pit **and its downstream path** stay visible on the map | | |
-| 2.2.1.e | The band is *No clear difference* or *More water than with a clear drain* | | |
+| 2.2.1.e | The heading is *No visible difference nearby* or *More water than with a clear drain*; the summary row says *Comparison: No clear difference* for the first | | |
 | 2.2.1.f | Where the data cannot support a comparison, *Insufficient information* appears instead of a band — tested properly in section 8 | | |
 | 2.2.1.g | It is described as indicative, not a flood prediction | | |
-| | **Open "Why this is usually the answer here"** — does it explain, or excuse? | | |
+| | **Open "Why?"** — does it explain, or excuse? | | |
 | 2.2.2.a | Rainfall shown in millimetres | | |
 | 2.2.2.c | Change it: the pit and blockage do **not** change | | |
 | 2.2.2.b | Both conditions move to the same amount | | |

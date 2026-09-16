@@ -193,7 +193,7 @@ export function Result({
       {noClearChange && (
         <details>
           <summary style={{ cursor: 'pointer', color: brand.ink, font: type(text.small, { weight: weight.medium }) }}>
-            Why this is usually the answer here
+            Why?
           </summary>
           <ul style={list}>
             {WHY_NO_CLEAR_CHANGE.map((item) => (

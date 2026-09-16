@@ -1179,7 +1179,7 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
             className="home__section-title"
             style={{ margin: `${String(space(3))}px 0`, color: ON_PHOTO.title }}
           >
-            What happens if a drain is blocked? Do Assumptions here!
+            Could one blocked drain change where water collects?
           </h2>
           <p
             style={{
@@ -1189,11 +1189,9 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Choose a nearby drain and compare two settings under the same{' '}
-            {TOTAL_RAINFALL.toLowerCase()}: clear and blocked. This is a model comparison, not an
-            observation or forecast.
+            Compare the same {TOTAL_RAINFALL.toLowerCase()} with a nearby drain clear and blocked.
           </p>
-          <PrimaryButton label="Search an address to start →" onPress={onCompare} />
+          <PrimaryButton label="Check an address →" onPress={onCompare} />
           <p
             style={{
               margin: `${String(space(3))}px 0 0`,
@@ -1201,7 +1199,7 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.quiet,
             }}
           >
-            After you choose an address, we find the nearest drain you can test, then you choose how blocked it is and the rainfall.
+            Most drains show no visible change nearby.
           </p>
         </div>
       </div>
