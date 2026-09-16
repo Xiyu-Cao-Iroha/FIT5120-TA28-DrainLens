@@ -53,7 +53,7 @@ export const DRAINAGE_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'pit-selected',
-    prompt: 'Click the drain with the orange ring.',
+    prompt: 'Click any drain on the map, such as the one with the orange ring.',
     requires: 'pit-selected',
   },
   {

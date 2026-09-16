@@ -72,18 +72,19 @@ describe('what each requirement is waiting for', () => {
     expect(satisfied('pipes-on', now({ pipes: true, pits: false }), PIT)).toBe(false);
   });
 
-  it('accepts only the pit the guide asked for', () => {
-    // Not strictness for its own sake: the next step presses "Show connected
-    // pipe", and 215 of the 895 pits in this extent have nothing to show.
+  it('accepts any pit, not only the ringed one', () => {
+    // Team request, 16 September: a reader who pressed the pit beside the
+    // ringed one was stuck with nothing said.
     expect(satisfied('pit-selected', now({ selectedPit: PIT }), PIT)).toBe(true);
-    expect(satisfied('pit-selected', now({ selectedPit: '1144727' }), PIT)).toBe(false);
+    expect(satisfied('pit-selected', now({ selectedPit: '1144727' }), PIT)).toBe(true);
+    expect(satisfied('pit-selected', now({ selectedPit: '1144727' }), null)).toBe(true);
+    expect(satisfied('pit-selected', now({ selectedPit: null }), PIT)).toBe(false);
   });
 
-  it('is never satisfied when the guide has no pit to point at', () => {
-    // `chooseTeachingPit` returns null on an artefact with no candidate. The
-    // step must stall visibly rather than pass on a null comparison.
-    expect(satisfied('pit-selected', now({ selectedPit: null }), null)).toBe(false);
-    expect(satisfied('trace-following', now({ followingPit: null }), null)).toBe(false);
+  it('follows the pipe of the pit that is selected', () => {
+    expect(satisfied('trace-following', now({ selectedPit: '1144727', followingPit: '1144727' }), PIT)).toBe(true);
+    expect(satisfied('trace-following', now({ selectedPit: '1144727', followingPit: null }), PIT)).toBe(false);
+    expect(satisfied('trace-following', now({ selectedPit: '1144727', followingPit: PIT }), PIT)).toBe(false);
   });
 });
 
@@ -129,8 +130,13 @@ describe('walking the section', () => {
     expect(finished(DRAINAGE_STEPS, now({ pits: true }), PIT, 99)).toBe(false);
   });
 
-  it('cannot be finished by following a pit the guide did not choose', () => {
-    const wrong = { ...ALL_DONE, selectedPit: '1144727', followingPit: '1144727' };
-    expect(finished(DRAINAGE_STEPS, wrong, PIT, DRAINAGE_STEPS.length)).toBe(false);
+  it('can be finished on any pit whose pipe is followed', () => {
+    const other = { ...ALL_DONE, selectedPit: '1144727', followingPit: '1144727' };
+    expect(finished(DRAINAGE_STEPS, other, PIT, DRAINAGE_STEPS.length)).toBe(true);
+  });
+
+  it('cannot be finished by following a pit other than the one selected', () => {
+    const mixed = { ...ALL_DONE, selectedPit: '1144727', followingPit: PIT };
+    expect(finished(DRAINAGE_STEPS, mixed, PIT, DRAINAGE_STEPS.length)).toBe(false);
   });
 });
