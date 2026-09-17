@@ -26,7 +26,7 @@
  * what somebody is about to get, and what they are not.
  */
 
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useId, useMemo, useState } from 'react';
 
 import {
   type AddressIndex,
@@ -36,7 +36,12 @@ import {
   resolve,
   search,
 } from '../address/search.js';
-import { COMPARE_DEMONSTRATION_LABEL, demonstrationAddress } from '../address/demonstration.js';
+import {
+  COMPARE_DEMONSTRATION_LABELS,
+  DEMONSTRATION_LABELS,
+  demonstrationAddress,
+  demonstrationAddresses,
+} from '../address/demonstration.js';
 import { suburbsOf } from '../address/suburbs.js';
 import type { Task } from '../session.js';
 import type { SectionId } from '../tutorial/sections.js';
@@ -185,13 +190,19 @@ export function Landing({
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
+  const examplesId = useId();
 
   const suggestions: Match[] = useMemo(
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
 
-  const demonstration = demonstrationAddress(index, copy === COMPARE_COPY ? COMPARE_DEMONSTRATION_LABEL : undefined);
+  // Three to choose from (team feedback, 17 September), the comparison's own
+  // where it is waiting: each of those is near a drain that shows a difference.
+  const examples = demonstrationAddresses(
+    index,
+    copy === COMPARE_COPY ? COMPARE_DEMONSTRATION_LABELS : DEMONSTRATION_LABELS,
+  );
   const suburbs = suburbsOf(index);
 
   function submit(event: FormEvent) {
@@ -372,33 +383,53 @@ export function Landing({
           </ul>
         )}
 
-        {suggestions.length === 0 && problem === null && demonstration && (
-          <p
+        {suggestions.length === 0 && problem === null && examples.length > 0 && (
+          <div
             style={{
               margin: `${String(space(3))}px 0 0`,
               font: type(text.label),
               color: ink.subtle,
             }}
           >
-            Not sure?{' '}
-            <button
-              type="button"
-              onClick={() => {
-                onFound(demonstration);
-              }}
+            <p id={examplesId} style={{ margin: 0 }}>
+              Not sure? Try {examples.length === 1 ? 'this address' : 'one of these'}:
+            </p>
+            <ul
+              aria-labelledby={examplesId}
               style={{
-                background: 'none',
-                border: 'none',
+                listStyle: 'none',
+                margin: `${String(space(1))}px 0 0`,
                 padding: 0,
-                font: type(text.label, { weight: weight.semibold }),
-                color: brand.ink,
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: space(1),
               }}
             >
-              Try {demonstration.label}
-            </button>
-          </p>
+              {examples.map((example) => (
+                <li key={example.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFound(example);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      textAlign: 'left',
+                      font: type(text.label, { weight: weight.semibold }),
+                      color: brand.ink,
+                      textDecoration: 'underline',
+                      textUnderlineOffset: 3,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {example.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {problem !== null && <UnsupportedNotice problem={problem} index={index} />}

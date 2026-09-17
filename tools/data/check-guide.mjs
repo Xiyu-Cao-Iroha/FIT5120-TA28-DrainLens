@@ -170,7 +170,13 @@ if (unreachable > 0) {
  * a rebuilt index that drops this address, or moves it, fails here rather
  * than quietly going back to offering whatever sorts first.
  */
-const DEMONSTRATION = '46 Gatehouse Drive, Kensington';
+const DEMONSTRATIONS = [
+  '46 Gatehouse Drive, Kensington',
+  // Since 17 September the guides offer three (DEMONSTRATION_LABELS), each
+  // held to the same rules.
+  '11 Neale Street, Kensington',
+  '2 Balmer Street, Kensington',
+];
 
 /**
  * How far the offered address must sit from the nearest boundary.
@@ -190,35 +196,37 @@ const DEMONSTRATION_MARGIN_M = 150;
  * failure that was not happening.
  */
 const asProductLabel = (label) => label.replace('|', ', ').toLowerCase();
-const offered = addresses.find((a) => asProductLabel(a.label) === DEMONSTRATION.toLowerCase());
-if (offered === undefined) {
-  note(
-    `${DEMONSTRATION} is not in the published index, so the address the product offers ` +
-      `has silently gone back to whichever one sorts first. Pick another and name it in ` +
-      `apps/web/src/address/demonstration.ts.`,
-  );
-} else {
-  // Against the bundled map, the smaller of the two it can be drawn on.
-  const margin = Math.min(
-    offered.e,
-    offered.n,
-    map.extent.width_m - offered.e,
-    map.extent.height_m - offered.n,
-  );
-  if (margin < DEMONSTRATION_MARGIN_M) {
+for (const DEMONSTRATION of DEMONSTRATIONS) {
+  const offered = addresses.find((a) => asProductLabel(a.label) === DEMONSTRATION.toLowerCase());
+  if (offered === undefined) {
     note(
-      `${DEMONSTRATION} is ${margin.toFixed(1)} m from the edge of the extent, under the ` +
-        `${String(DEMONSTRATION_MARGIN_M)} m the guide needs to centre on it. Its teaching pit ` +
-        `will be drawn against the frame, where the map keeps its controls.`,
+      `${DEMONSTRATION} is not in the published index, so the address the product offers ` +
+        `has silently gone back to whichever one sorts first. Pick another and name it in ` +
+        `apps/web/src/address/demonstration.ts.`,
     );
-  }
-  let nearest = Infinity;
-  for (const pit of candidates) {
-    const d = Math.hypot(offered.e - pit.c[0], offered.n - pit.c[1]);
-    if (d < nearest) nearest = d;
-  }
-  if (nearest > RADIUS_M) {
-    note(`${DEMONSTRATION} has no teachable pit within ${String(RADIUS_M)} m`);
+  } else {
+    // Against the bundled map, the smaller of the two it can be drawn on.
+    const margin = Math.min(
+      offered.e,
+      offered.n,
+      map.extent.width_m - offered.e,
+      map.extent.height_m - offered.n,
+    );
+    if (margin < DEMONSTRATION_MARGIN_M) {
+      note(
+        `${DEMONSTRATION} is ${margin.toFixed(1)} m from the edge of the extent, under the ` +
+          `${String(DEMONSTRATION_MARGIN_M)} m the guide needs to centre on it. Its teaching pit ` +
+          `will be drawn against the frame, where the map keeps its controls.`,
+      );
+    }
+    let nearest = Infinity;
+    for (const pit of candidates) {
+      const d = Math.hypot(offered.e - pit.c[0], offered.n - pit.c[1]);
+      if (d < nearest) nearest = d;
+    }
+    if (nearest > RADIUS_M) {
+      note(`${DEMONSTRATION} has no teachable pit within ${String(RADIUS_M)} m`);
+    }
   }
 }
 
