@@ -32,12 +32,23 @@ import { type Local, type Viewport, toScreen } from './viewport.js';
 export const DIFFERENCE_FILL = 'rgba(124, 58, 237, 0.55)';
 
 /**
+ * The route the extra water takes, a darker violet than the patch it ends in,
+ * dashed so it reads as a direction rather than as more water.
+ */
+export const ROUTE_STROKE = '#5b21b6';
+
+/**
  * A cell is one square of the calculation grid, keyed by its south-west
  * corner in local metres.
  */
 export interface DifferenceArea {
   readonly cells: readonly Local[];
   readonly cellSizeM: number;
+  /**
+   * From the blocked drain to the first cell marked, as points in local
+   * metres (`extraWaterRoute` in the worker). Empty when there is none.
+   */
+  readonly route?: readonly Local[];
 }
 
 /**
@@ -96,6 +107,14 @@ export function footprintCorners(area: DifferenceArea | null): Local[] {
     maxE = Math.max(maxE, east + area.cellSizeM);
     maxN = Math.max(maxN, north + area.cellSizeM);
   }
+  // The route runs between the drain and the patch, so it is inside the box
+  // already unless it bends outside it on the way.
+  for (const [east, north] of area.route ?? []) {
+    minE = Math.min(minE, east);
+    minN = Math.min(minN, north);
+    maxE = Math.max(maxE, east);
+    maxN = Math.max(maxN, north);
+  }
   return [
     [minE, minN],
     [maxE, maxN],
@@ -126,5 +145,54 @@ export function drawDifference(
     }
     context.fillRect(x, y - lift, side, lift);
   }
+  context.restore();
+  drawRoute(context, area.route ?? [], viewport);
+}
+
+/** The arrowhead's length along the route, in pixels. */
+const ARROW_PX = 10;
+
+/**
+ * The extra water's route, over the patch: a white casing so it reads on any
+ * base, a dashed violet line, and an arrowhead where it reaches the purple.
+ */
+export function drawRoute(context: CanvasRenderingContext2D, route: readonly Local[], viewport: Viewport): void {
+  if (route.length < 2) return;
+  const points = route.map((point) => toScreen(viewport, point));
+  const trace = () => {
+    context.beginPath();
+    points.forEach(([x, y], index) => (index === 0 ? context.moveTo(x, y) : context.lineTo(x, y)));
+  };
+
+  context.save();
+  context.lineJoin = 'round';
+  context.lineCap = 'round';
+  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  context.lineWidth = 6;
+  trace();
+  context.stroke();
+  context.strokeStyle = ROUTE_STROKE;
+  context.lineWidth = 3;
+  context.setLineDash([8, 6]);
+  trace();
+  context.stroke();
+  context.setLineDash([]);
+
+  // The arrowhead points along the last segment long enough to have a heading.
+  const [tipX, tipY] = points[points.length - 1]!;
+  let from = points.length - 2;
+  while (from > 0 && Math.hypot(tipX - points[from]![0], tipY - points[from]![1]) < 1) from -= 1;
+  const [fromX, fromY] = points[from]!;
+  const angle = Math.atan2(tipY - fromY, tipX - fromX);
+  context.fillStyle = ROUTE_STROKE;
+  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(tipX, tipY);
+  context.lineTo(tipX - ARROW_PX * Math.cos(angle - 0.45), tipY - ARROW_PX * Math.sin(angle - 0.45));
+  context.lineTo(tipX - ARROW_PX * Math.cos(angle + 0.45), tipY - ARROW_PX * Math.sin(angle + 0.45));
+  context.closePath();
+  context.fill();
+  context.stroke();
   context.restore();
 }

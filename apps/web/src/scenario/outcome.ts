@@ -185,6 +185,15 @@ export const REVIEW_DISCLAIMER =
  */
 export const DIFFERENCE_LEGEND = 'Area with more surface water in the model';
 
+/**
+ * The dashed line from the drain to the purple (`drawRoute`).
+ *
+ * The purple can sit well away from the drain, in the first hollow downhill,
+ * and without the route that reads as a drawing error. "In the model" because
+ * the route is the model's flow direction, not an observed path.
+ */
+export const ROUTE_LEGEND = 'Where the extra water flows, in the model';
+
 /** What the purple is not, beside the legend line. */
 export const DIFFERENCE_LEGEND_NOTE =
   'Purple marks changes large enough to report. It is not water depth, and its edge follows the area the model found rather than a circle around the drain.';

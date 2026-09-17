@@ -13,7 +13,7 @@
  * download.
  */
 
-import { runScenario } from '@drainlens/scenario';
+import { type DepressionField, type FlowField, LEAVES_WINDOW, downstreamOf, runScenario } from '@drainlens/scenario';
 import type { BlockageSetting } from '@drainlens/schema';
 
 import type { InsufficiencyReason } from '@drainlens/schema';
@@ -67,6 +67,15 @@ export interface SolvedPosition {
    * with the scene and every comparison returned `invalid_inlet`.
    */
   readonly higherAreasM: readonly (readonly [east: number, north: number])[];
+  /**
+   * The way the water the blocked drain no longer takes flows to the first
+   * cell it marks higher, as cell centres in **local metres**, drain first.
+   *
+   * Empty when nothing is higher, or when the route cannot be traced to a
+   * marked cell: a line that ends somewhere else would claim a path the
+   * model did not take. See `extraWaterRoute`.
+   */
+  readonly routeM: readonly (readonly [east: number, north: number])[];
 }
 
 /**
@@ -174,6 +183,87 @@ export function higherAreasOf(
 }
 
 /**
+ * The way the extra water goes, from the blocked drain to the difference.
+ *
+ * **Why it is drawn** (team feedback, 17 September). At 89 Market Street the
+ * purple is 140 m from the drain, in the first hollow downhill of it, and a
+ * patch that far from the drain it belongs to read as a drawing error. It is
+ * not one: the water the blocked drain no longer takes runs downhill, past the
+ * next drain, into a hollow that is not yet full. This is that route.
+ *
+ * It follows the engine's own rules, as `solvePosition` routes water: one
+ * cell downhill at a time along the flow field; into a hollow, which holds
+ * it; out of a hollow at its spill cell when that hollow shows no difference,
+ * because then it passed the water on. It stops at the first cell marked
+ * higher. If the route leaves the window, loops, or never reaches a marked
+ * cell, there is no route to draw and the answer is empty.
+ *
+ * Only the corners are kept: a straight run of cells is one segment.
+ */
+export function extraWaterRoute(
+  bands: readonly string[],
+  flow: FlowField,
+  depressions: DepressionField,
+  drainCell: number,
+  grid: { readonly width: number; readonly height: number; readonly cellSizeM: number },
+): (readonly [number, number])[] {
+  const higher = (cell: number) => bands[cell] === 'higher-than-baseline';
+  const marked = new Set<number>();
+  for (let cell = 0; cell < bands.length; cell += 1) {
+    if (higher(cell)) marked.add(depressions.cellDepression[cell] ?? -1);
+  }
+  if (marked.size === 0) return [];
+
+  const column = (cell: number) => cell % grid.width;
+  const row = (cell: number) => Math.floor(cell / grid.width);
+  const cells: number[] = [];
+  const seen = new Set<number>();
+  let cell = drainCell;
+  while (cell !== LEAVES_WINDOW && !seen.has(cell)) {
+    seen.add(cell);
+    cells.push(cell);
+    if (higher(cell)) break;
+    const hollow = depressions.cellDepression[cell] ?? -1;
+    if (hollow >= 0) {
+      const held = depressions.depressions[hollow];
+      if (held === undefined) return [];
+      if (!marked.has(hollow)) {
+        cell = held.spillCell;
+        continue;
+      }
+      // The water is held here. End the line on the hollow's nearest marked
+      // cell, so it meets the purple rather than stopping at the rim.
+      let nearest = -1;
+      let nearestM = Infinity;
+      for (const other of held.cells) {
+        if (!higher(other)) continue;
+        const d = Math.hypot(column(other) - column(cell), row(other) - row(cell));
+        if (d < nearestM) [nearest, nearestM] = [other, d];
+      }
+      if (nearest < 0) return [];
+      cells.push(nearest);
+      break;
+    }
+    cell = downstreamOf(flow, cell);
+  }
+  const last = cells[cells.length - 1];
+  if (last === undefined || !higher(last)) return [];
+
+  const kept = cells.filter((c, index) => {
+    const before = cells[index - 1];
+    const after = cells[index + 1];
+    if (before === undefined || after === undefined) return true;
+    return (
+      column(c) - column(before) !== column(after) - column(c) || row(c) - row(before) !== row(after) - row(c)
+    );
+  });
+  const half = grid.cellSizeM / 2;
+  return kept.map(
+    (c) => [column(c) * grid.cellSizeM + half, (grid.height - 1 - row(c)) * grid.cellSizeM + half] as const,
+  );
+}
+
+/**
  * What the engine is handed for a loaded scene.
  *
  * Its own function because what it leaves out is invisible in a result: the
@@ -241,6 +331,7 @@ export function handle(request: RunRequest | LoadRequest, loaded: LoadedScene | 
         band: position.band,
         cellsHigherThanBaseline: position.cellsHigherThanBaseline,
         higherAreasM: higherAreasOf(position.bands, loaded.grid),
+        routeM: extraWaterRoute(position.bands, loaded.flow, loaded.depressions, request.drainCell, loaded.grid),
       })),
       band: last.band,
       cellsHigherThanBaseline: last.cellsHigherThanBaseline,
