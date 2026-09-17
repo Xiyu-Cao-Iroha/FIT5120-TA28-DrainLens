@@ -760,15 +760,15 @@ export function App() {
       // than leaving the map showing the amount the run happened to end on.
       // Null off the result screen and null for an insufficient outcome: a
       // highlight with no finding beside it is a claim nobody made.
+      const shownPosition = positions.find((p) => p.rainfallMm === session.scenario.rainfallMm);
+      const sceneOrigin = windowOrigin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n };
       const differenceShown: DifferenceArea | null =
         session.screen === 'result' && outcome?.kind === 'comparison'
           ? {
-              cells: intoMapFrame(
-                positions.find((p) => p.rainfallMm === session.scenario.rainfallMm)?.higherAreasM ?? [],
-                windowOrigin ?? { minE: loaded.map.extent.min_e, minN: loaded.map.extent.min_n },
-                loaded.map.extent,
-              ),
+              cells: intoMapFrame(shownPosition?.higherAreasM ?? [], sceneOrigin, loaded.map.extent),
               cellSizeM,
+              // Where the extra water goes to get there (team feedback, 17 September).
+              route: intoMapFrame(shownPosition?.routeM ?? [], sceneOrigin, loaded.map.extent),
             }
           : null;
 

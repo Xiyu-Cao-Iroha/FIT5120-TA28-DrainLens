@@ -22,6 +22,7 @@ const position = (rainfallMm: number): SolvedPosition => ({
   band: 'no-clear-change',
   cellsHigherThanBaseline: 0,
   higherAreasM: [],
+  routeM: [],
 });
 
 describe('which rainfall amounts a run solves', () => {

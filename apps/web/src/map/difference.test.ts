@@ -121,6 +121,15 @@ describe('the box the result refits to', () => {
     ]);
   });
 
+  it('takes in the route where it bends outside the patch', () => {
+    const cells: Local[] = [[10, 20]];
+    const route: Local[] = [[4.5, 30.5], [10.5, 20.5]];
+    expect(footprintCorners({ cells, cellSizeM: 1, route })).toEqual([
+      [4.5, 20],
+      [11, 30.5],
+    ]);
+  });
+
   it('has nothing to fit when there is no difference', () => {
     expect(footprintCorners(null)).toEqual([]);
     expect(footprintCorners({ cells: [], cellSizeM: 1 })).toEqual([]);
