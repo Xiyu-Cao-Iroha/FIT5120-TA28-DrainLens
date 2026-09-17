@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { MapArtefact, Pit } from '../map/artefact.js';
-import { DIFFERENCE_FILL, type DifferenceArea } from '../map/difference.js';
+import { DIFFERENCE_FILL, type DifferenceArea, ROUTE_STROKE } from '../map/difference.js';
 import {
   COACH_WIDTH_PX,
   type HeldReason,
@@ -33,7 +33,7 @@ import type { Hit } from '../map/hit.js';
 import { MapCanvas } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
 import { type Eligibility, aboutMetres, offeredDrains } from '../scenario/eligibility.js';
-import { DIFFERENCE_LEGEND, DIFFERENCE_LEGEND_NOTE } from '../scenario/outcome.js';
+import { DIFFERENCE_LEGEND, DIFFERENCE_LEGEND_NOTE, ROUTE_LEGEND } from '../scenario/outcome.js';
 import { MAP_KEY, TOO_FAR_SHORT, UNSUPPORTED_SHORT, supportOf } from '../scenario/support.js';
 import type { Trace } from '../trace/graph.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
@@ -413,6 +413,22 @@ export function ComparisonMap({
             <KeyLine swatch={<span style={{ ...swatch, background: DIFFERENCE_FILL, borderRadius: 2, border: '1px solid #5b21b6' }} />}>
               {DIFFERENCE_LEGEND}
             </KeyLine>
+            {(difference?.route?.length ?? 0) >= 2 && (
+              <KeyLine
+                swatch={
+                  <span
+                    style={{
+                      ...swatch,
+                      height: 0,
+                      borderRadius: 0,
+                      borderTop: `3px dashed ${ROUTE_STROKE}`,
+                    }}
+                  />
+                }
+              >
+                {ROUTE_LEGEND}
+              </KeyLine>
+            )}
             <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.micro, { leading: 1.45 }), color: ink.muted }}>
               {DIFFERENCE_LEGEND_NOTE}
             </p>

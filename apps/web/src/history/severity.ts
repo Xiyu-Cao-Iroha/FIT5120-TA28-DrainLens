@@ -414,6 +414,19 @@ export function scoreLabel(area: MapArea): string {
   return `${area.rate.toFixed(2)}${area.complete ? '' : '+'}`;
 }
 
+/**
+ * The rate split by year: each year's count over the same residents.
+ *
+ * One denominator for every year, the one the rate itself uses, so the years
+ * add up to the area's rate rather than to six rates on six populations that
+ * the panel would then have to explain. Null where the area has no rate.
+ */
+export function yearRates(area: MapArea): readonly number[] | null {
+  if (area.persons === null) return null;
+  const persons = area.persons;
+  return area.byYear.map((count) => (count / persons) * 1000);
+}
+
 /** The count as it is written on screen, with the same rule. */
 export function totalLabel(area: MapArea): string {
   return `${String(area.total)}${area.complete ? '' : '+'}`;
