@@ -50,6 +50,7 @@ import {
   scoreLabel,
   statusOf,
   totalLabel,
+  yearRates,
 } from '../history/severity.js';
 import { AREA_KINDS, NOT_A_FORECAST, RATE_TIP, TOTAL_TIP } from '../history/evidence.js';
 import {
@@ -366,7 +367,7 @@ export function FloodMap({ areas, scope, population, points, events, onBack }: F
         {chosen === null ? (
           <Nothing />
         ) : (
-          <Detail area={chosen} years={years} population={population} scope={scope} events={events} />
+          <Detail area={chosen} years={years} population={population} scope={scope} events={events} mode={mode} />
         )}
       </aside>
     </div>
@@ -408,31 +409,22 @@ function Detail({
   population,
   scope,
   events,
+  mode,
 }: {
+  readonly mode: MapMode;
   readonly events: readonly FloodEvent[] | null;
   readonly area: MapArea;
   readonly years: readonly string[];
   readonly population: PopulationArtefact;
   readonly scope: ScopeAreas;
 }) {
-  const widest = Math.max(1, ...area.byYear);
-
-  return (
-    <div>
-      <h2
-        style={{
-          margin: `0 0 ${String(space(1))}px`,
-          font: type(text.lead, { weight: weight.semibold }),
-          letterSpacing: tracking.title,
-          color: ink.strong,
-        }}
-      >
-        {area.name}
-      </h2>
-      <p style={{ margin: `0 0 ${String(space(5))}px`, font: type(text.micro), color: ink.subtle }}>
-        Statistical area · {yearRange(years)}
-      </p>
-
+  // The panel follows the map (team feedback, 17 September): the figure the
+  // map is coloured by comes first with its years under it, and the other
+  // figure follows without them.
+  const countLeads = mode === 'activity';
+  const split = yearRates(area);
+  const totalSection = (
+    <>
       {/*
         Copy audit v4, #86 and #88: the number and its unit, what one count is
         behind an ⓘ, and the count's status on the line under it, for every
@@ -441,7 +433,10 @@ function Detail({
       <Section title={FLOOD.callouts} link={AREA_KINDS.recorded}>
         <p style={{ margin: `0 0 ${String(space(1))}px` }}>
           <strong
-            style={{ font: type(text.display, { weight: weight.bold }), color: ink.strong }}
+            style={{
+              font: type(countLeads ? text.display : text.title, { weight: weight.bold }),
+              color: ink.strong,
+            }}
             {...(area.complete ? {} : { title: atLeastTip(String(area.total)) })}
           >
             {totalLabel(area)}
@@ -450,40 +445,14 @@ function Detail({
           <InfoTip label="What is an emergency response?" text={TOTAL_TIP} />
         </p>
         <StatusLine status={statusOf(area, 'count')} />
-        {area.byYear.map((count, index) => (
-          <div
-            key={years[index] ?? index}
-            style={{ display: 'flex', alignItems: 'center', gap: space(3), marginBottom: space(1) }}
-          >
-            <span style={{ width: 62, font: type(text.micro), color: ink.subtle }}>
-              {yearLabel(years[index])}
-            </span>
-            <span
-              style={{
-                flex: 1,
-                height: 8,
-                borderRadius: radius.pill,
-                background: surface.sunken,
-                overflow: 'hidden',
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: `${String((count / widest) * 100)}%`,
-                  height: '100%',
-                  background: brand.base,
-                }}
-              />
-            </span>
-            <span style={{ width: 28, textAlign: 'right', font: type(text.micro), color: ink.muted }}>
-              {String(count)}
-              {area.complete ? '' : '+'}
-            </span>
-          </div>
-        ))}
+        {countLeads ? (
+          <YearBars years={years} values={area.byYear} label={String} complete={area.complete} />
+        ) : null}
       </Section>
-
+    </>
+  );
+  const rateSection = (
+    <>
       {/*
         Copy audit v4, #87: the rate, its status, and how many people live
         here, with who calculated it and what the population is not behind the
@@ -492,7 +461,10 @@ function Detail({
       <Section title={FLOOD.rate} link={AREA_KINDS.calculated}>
         <p style={{ margin: `0 0 ${String(space(1))}px` }}>
           <strong
-            style={{ font: type(text.title, { weight: weight.bold }), color: ink.strong }}
+            style={{
+              font: type(countLeads ? text.title : text.display, { weight: weight.bold }),
+              color: ink.strong,
+            }}
             {...(area.rate === null || area.complete ? {} : { title: atLeastTip(area.rate.toFixed(2)) })}
           >
             {scoreLabel(area)}
@@ -500,6 +472,9 @@ function Detail({
           {area.rate === null ? '' : FLOOD.rateUnit}
         </p>
         <StatusLine status={statusOf(area, 'rate')} />
+        {!countLeads && split !== null ? (
+          <YearBars years={years} values={split} label={(value) => value.toFixed(2)} complete={area.complete} />
+        ) : null}
         <p style={{ margin: 0, font: type(text.micro, { leading: 1.6 }), color: ink.muted }}>
           {/*
             Branched on the residents rather than on the rate, which is not a
@@ -524,6 +499,36 @@ function Detail({
           )}
         </p>
       </Section>
+    </>
+  );
+
+  return (
+    <div>
+      <h2
+        style={{
+          margin: `0 0 ${String(space(1))}px`,
+          font: type(text.lead, { weight: weight.semibold }),
+          letterSpacing: tracking.title,
+          color: ink.strong,
+        }}
+      >
+        {area.name}
+      </h2>
+      <p style={{ margin: `0 0 ${String(space(5))}px`, font: type(text.micro), color: ink.subtle }}>
+        Statistical area · {yearRange(years)}
+      </p>
+
+      {countLeads ? (
+        <>
+          {totalSection}
+          {rateSection}
+        </>
+      ) : (
+        <>
+          {rateSection}
+          {totalSection}
+        </>
+      )}
 
       <Section title="Checked flood events" link={AREA_KINDS.checked}>
         <Events area={area} events={events} period={scope.reportingPeriod} />
@@ -532,6 +537,60 @@ function Detail({
       {/* AC 4.1.4: the way to the evidence stays in the selected panel (copy audit v4, #83). */}
       <SourceLink id="history" />
     </div>
+  );
+}
+
+/**
+ * One bar per year, scaled to the area's own busiest year.
+ *
+ * Under the count, each year's count; under the rate, each year's share of it
+ * (`yearRates`), which add up to the rate.
+ */
+function YearBars({
+  years,
+  values,
+  label,
+  complete,
+}: {
+  readonly years: readonly string[];
+  readonly values: readonly number[];
+  readonly label: (value: number) => string;
+  readonly complete: boolean;
+}) {
+  const widest = Math.max(Number.MIN_VALUE, ...values);
+  return (
+    <>
+      {values.map((value, index) => (
+        <div
+          key={years[index] ?? index}
+          style={{ display: 'flex', alignItems: 'center', gap: space(3), marginBottom: space(1) }}
+        >
+          <span style={{ width: 62, font: type(text.micro), color: ink.subtle }}>{yearLabel(years[index])}</span>
+          <span
+            style={{
+              flex: 1,
+              height: 8,
+              borderRadius: radius.pill,
+              background: surface.sunken,
+              overflow: 'hidden',
+            }}
+          >
+            <span
+              style={{
+                display: 'block',
+                width: `${String((value / widest) * 100)}%`,
+                height: '100%',
+                background: brand.base,
+              }}
+            />
+          </span>
+          <span style={{ width: 36, textAlign: 'right', font: type(text.micro), color: ink.muted }}>
+            {label(value)}
+            {complete ? '' : '+'}
+          </span>
+        </div>
+      ))}
+    </>
   );
 }
 

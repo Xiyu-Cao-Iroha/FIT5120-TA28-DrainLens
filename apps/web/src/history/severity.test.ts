@@ -37,6 +37,7 @@ import {
   scoreLabel,
   totalLabel,
   valueOf,
+  yearRates,
 } from './severity.js';
 
 const YEARS = ['2009-10', '2010-11'];
@@ -431,5 +432,17 @@ describe('the numbers on the panel are the artefact’s, not arithmetic', () => 
     const [joinedArea] = joinAreas(withReal, population([1000, 1000]), points(1));
     expect(joinedArea.regions).toBe(46);
     expect(joinedArea.suppressedRegions).toBe(1);
+  });
+});
+
+describe('the rate split by year', () => {
+  it('divides each year by the rate’s own residents, so the years add up to the rate', () => {
+    const split = yearRates(area());
+    expect(split).toEqual([20 / 24, 4 / 24]);
+    expect((split ?? []).reduce((a, b) => a + b, 0)).toBeCloseTo(1);
+  });
+
+  it('has no split where the area has no rate', () => {
+    expect(yearRates(area({ persons: null, rate: null }))).toBeNull();
   });
 });
