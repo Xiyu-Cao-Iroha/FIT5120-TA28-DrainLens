@@ -77,3 +77,77 @@ export function demonstrationAddress(
  * does.
  */
 export const COMPARE_DEMONSTRATION_LABEL = '89 Market Street, Kensington';
+
+/**
+ * The example addresses the guides and the full map offer, first one first.
+ *
+ * **Three, from team feedback on 17 September**, so there is a choice rather
+ * than one address everybody tries. Each is inside the bundled Kensington
+ * square, at least 150 m from its edges (the guide's opening view centres on
+ * it), and near a teaching pit with a long path onward:
+ *
+ * ==============================  ==========  =========  ======
+ * address                         from edge   to pit     pipes
+ * ==============================  ==========  =========  ======
+ * 46 Gatehouse Drive                  307 m       24 m      22
+ * 11 Neale Street                     426 m        3 m      18
+ * 2 Balmer Street                     188 m        4 m      16
+ * ==============================  ==========  =========  ======
+ *
+ * `tools/data/check-guide.mjs` holds all three to the same rules.
+ */
+export const DEMONSTRATION_LABELS: readonly string[] = [
+  DEMONSTRATION_LABEL,
+  '11 Neale Street, Kensington',
+  '2 Balmer Street, Kensington',
+];
+
+/**
+ * The example addresses the comparison offers: three suburbs, each a few
+ * metres from a drain the model shows a difference for.
+ *
+ * ================================  ======  =========  ==================
+ * address                           drain   to drain   difference at
+ * ================================  ======  =========  ==================
+ * 89 Market Street, Kensington      1363588     13 m   fully 20/40/60 mm
+ * 35 Poplar Road, Parkville         1146558     17 m   both, every amount
+ * 93 Dudley Street, West Melbourne  1139969      4 m   fully 20/40/60 mm
+ * 89 Epsom Road, Kensington         1363621     15 m   both, every amount
+ * ================================  ======  =========  ==================
+ *
+ * The first three are offered. Parkville and West Melbourne are outside the
+ * bundled Kensington square, so when the council map is unavailable they are
+ * not in the index and Epsom Road takes their place (`demonstrationAddresses`).
+ */
+export const COMPARE_DEMONSTRATION_LABELS: readonly string[] = [
+  COMPARE_DEMONSTRATION_LABEL,
+  '35 Poplar Road, Parkville',
+  '93 Dudley Street, West Melbourne',
+  '89 Epsom Road, Kensington',
+];
+
+/** How many example addresses a screen offers. */
+export const EXAMPLE_COUNT = 3;
+
+/**
+ * The example addresses to offer: the named ones the index holds, in order,
+ * up to `EXAMPLE_COUNT`.
+ *
+ * A name the index does not hold is skipped rather than replaced by an
+ * arbitrary address. If none is held, the single fallback of
+ * `demonstrationAddress` applies, so a screen always has something to offer
+ * while there is any address at all.
+ */
+export function demonstrationAddresses(
+  index: AddressIndex,
+  labels: readonly string[] = DEMONSTRATION_LABELS,
+): IndexedAddress[] {
+  const byLabel = new Map(index.addresses.map((a) => [a.label.toLowerCase(), a]));
+  const found = labels
+    .map((label) => byLabel.get(label.toLowerCase()))
+    .filter((a): a is IndexedAddress => a !== undefined)
+    .slice(0, EXAMPLE_COUNT);
+  if (found.length > 0) return found;
+  const fallback = demonstrationAddress(index, labels[0]);
+  return fallback === undefined ? [] : [fallback];
+}

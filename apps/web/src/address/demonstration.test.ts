@@ -105,3 +105,80 @@ describe('the comparison’s own offer', () => {
     expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere').id).toBe('g');
   });
 });
+
+describe('the three example addresses', () => {
+  it('offers the named ones the index holds, in order, and no more than three', async () => {
+    const { demonstrationAddresses, EXAMPLE_COUNT } = await import('./demonstration.js');
+    const labels = ['4 D Street, Kensington', '1 A Street, Kensington', '2 B Street, Kensington', '3 C Street, Kensington'];
+    const offered = demonstrationAddresses(
+      index([at('c', labels[3]!), at('a', labels[1]!), at('b', labels[2]!), at('d', labels[0]!)]),
+      labels,
+    );
+    expect(EXAMPLE_COUNT).toBe(3);
+    expect(offered.map((a) => a.id)).toEqual(['d', 'a', 'b']);
+  });
+
+  it('skips a name the index does not hold rather than inventing one', async () => {
+    const { demonstrationAddresses } = await import('./demonstration.js');
+    const offered = demonstrationAddresses(index([at('x', '9 Other Street, Kensington'), at('b', '2 B Street, Kensington')]), [
+      '1 A Street, Kensington',
+      '2 B Street, Kensington',
+    ]);
+    expect(offered.map((a) => a.id)).toEqual(['b']);
+  });
+
+  it('keeps one fallback when it holds none of them, and nothing for an empty index', async () => {
+    const { demonstrationAddresses } = await import('./demonstration.js');
+    expect(demonstrationAddresses(index([at('x', '9 Other Street, Kensington')]), ['1 A Street, Kensington']).map((a) => a.id)).toEqual(['x']);
+    expect(demonstrationAddresses(index([]))).toEqual([]);
+  });
+
+  it('offers three guide addresses on the bundled map, each centred and near a pit with a path', async () => {
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const { unpack } = await import('./search.js');
+    const { DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
+    const { chooseTeachingPit } = await import('../tutorial/pit.js');
+    const data = (name: string): unknown =>
+      JSON.parse(readFileSync(path.resolve(__dirname, '../../public/data', name), 'utf8')) as unknown;
+    const map = data('map.json') as { extent: { min_e: number; min_n: number; width_m: number; height_m: number }; layers: { pit: never[] } };
+    const offered = demonstrationAddresses(unpack(data('addresses.json') as never, map.extent));
+    expect(offered.map((a) => a.label)).toEqual(DEMONSTRATION_LABELS);
+    for (const address of offered) {
+      const margin = Math.min(address.e, address.n, map.extent.width_m - address.e, map.extent.height_m - address.n);
+      expect(margin).toBeGreaterThanOrEqual(150);
+      const pit = chooseTeachingPit([address.e, address.n], map.layers.pit, data('trace.json') as never);
+      expect(pit?.steps ?? 0).toBeGreaterThanOrEqual(15);
+      expect(pit?.distanceM ?? Infinity).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it('offers three comparison addresses on the council map, each opening on a drain that shows a difference', async () => {
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const { unpack } = await import('./search.js');
+    const { COMPARE_DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
+    const { comparableNear } = await import('../scenario/eligibility.js');
+    const { differingDrains } = await import('../scenario/differences.js');
+    const read = (file: string): unknown => JSON.parse(readFileSync(file, 'utf8')) as unknown;
+    const data = (name: string) => read(path.resolve(__dirname, '../../public/data', name));
+    type MapFile = { extent: { min_e: number; min_n: number; width_m: number; height_m: number }; layers: { pit: never[] } };
+    const supported = new Set(Object.keys((data('scene-tiles/index.json') as { windows: object }).windows));
+    const differing = differingDrains(data('scenario-differences.json') as never);
+    const opensOnDifference = (map: MapFile, labels: readonly string[]) => {
+      const offered = demonstrationAddresses(unpack(data('addresses.json') as never, map.extent), COMPARE_DEMONSTRATION_LABELS);
+      expect(offered.map((a) => a.label)).toEqual(labels);
+      for (const address of offered) {
+        const found = comparableNear([address.e, address.n], map.layers.pit, supported, undefined, differing);
+        expect(found.showsDifference, address.label).toBe(true);
+        expect(found.nearest?.distanceM ?? Infinity, address.label).toBeLessThanOrEqual(20);
+      }
+    };
+    // The live map: the first three.
+    const council = read(path.resolve(__dirname, '../../../api/data/city-of-melbourne/map.json')) as MapFile;
+    opensOnDifference(council, COMPARE_DEMONSTRATION_LABELS.slice(0, 3));
+    // The Kensington fallback: the two it holds.
+    const bundled = data('map.json') as MapFile;
+    opensOnDifference(bundled, [COMPARE_DEMONSTRATION_LABELS[0]!, COMPARE_DEMONSTRATION_LABELS[3]!]);
+  }, 60_000);
+});
