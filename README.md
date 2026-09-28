@@ -10,9 +10,10 @@ Stormwater flood risk for residents of Greater Melbourne communities that flood 
 
 | | URL | Built from | Showing |
 |---|---|---|---|
-| **The live site** | https://drainlens-205559161217.australia-southeast1.run.app | `main` | the latest **completed** iteration — Iteration 1 today |
+| **The live site** | https://drainlens-205559161217.australia-southeast1.run.app | `main` | the latest **completed** iteration — **Iteration 2** since 28 September 2026 |
 | **Iteration 1, preserved** | https://drainlens-iteration1-205559161217.australia-southeast1.run.app | tag `iteration-1-frozen` (`138a002`) | Iteration 1, permanently — live since 11 September 2026 |
-| **Iteration 2, in build** | https://drainlens-dev-205559161217.australia-southeast1.run.app | `develop` | Iteration 2 as it is written — live since 11 September 2026 |
+| **Iteration 2, preserved** | https://drainlens-iteration2-205559161217.australia-southeast1.run.app | tag `iteration-2-frozen` | Iteration 2, permanently — deployed at the freeze |
+| **Iteration 3, in build** | https://drainlens-dev-205559161217.australia-southeast1.run.app | `develop` | whatever is being written — live since 11 September 2026 |
 
 **The live URL never changes and never goes away.** It is the one address to give
 anybody, and what it serves moves forward one iteration at a time: Iteration 1
@@ -118,16 +119,16 @@ The Python pipeline has its own setup; see [pipeline/README.md](./pipeline/READM
 
 These are the numbers the team committed to in its Week 4 KPI assessment. They are enforced in `vitest.config.ts` and `pipeline/pyproject.toml`, and checked by CI on every pull request — not just written down.
 
-Re-measured on **11 September 2026**, on this laptop, in a self-check that ran every gate rather than reading the last recorded figure. The Node coverage and test counts were re-measured again on **13 September 2026**, after #133, and on **14 September 2026**, after #146, when the Python count was re-collected as well; the Python coverage figure is the one measured with #143 the same day.
+Re-measured on **28 September 2026**, on this laptop, at the Iteration 2 freeze: every gate run again rather than read off the last record. The database tests are the exception, as always — they need a Postgres, so the figure is the one CI measured on the freeze pull request.
 
 **This table is the only place the test counts are written.** Every prose restatement of them has gone stale, three times, and the third was hours old — see the note under *Suite runtime*.
 
 | Gate | Target | Current |
 |---|---|---|
 | Coverage, judgement-carrying modules | ≥ 90% from the first iteration | `packages/schema` and `packages/scenario` both above 90%, enforced separately |
-| Coverage, overall | ≥ 88% | **95.93%** Node · **93.83%** Python |
+| Coverage, overall | ≥ 88% | **95.53%** Node · **93.83%** Python |
 | Suite runtime | < 5 s | **Breached, and the gate does not say by which clock — see below** |
-| Tests | — | **1,423** Node unit across 77 files · **62** database across 4 · **636** Python across 28 — **2,121** |
+| Tests | — | **1,447** Node unit across 78 files · **62** database across 4 · **636** Python across 28 — **2,145** |
 | Tests written before or alongside the component | every one | met |
 | Merges via pull request with written review | 100% | enforced by a GitHub ruleset |
 | Direct pushes to `main` | zero | enforced, and **tested by attempting one** |
@@ -196,6 +197,7 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 | Version | Date | Change |
 |---|---|---|
+| 1.0.0 | 28 Sep 2026 | **Iteration 2 frozen.** `develop` merged into `main`, which had held `138a002` since 10 September, and tagged `iteration-2-frozen`. Every gate re-run on the day rather than cited: 1,447 Node tests across 78 files at 95.53%, 636 Python across 28 at 93.83%, the database tests in CI, `tsc --build --force` clean, `tools/docs/check.mjs` and all seven data checks clean, and a build with `VITE_API_BASE` set producing `index-B4AIZ7xS.js` — the hash to compare the deployed bundle against. The iteration adds the blocked-drain comparison end to end (eligibility, the three-step setup, the difference layer and the route the extra water takes), the ground-height guide, the flood history map and board, *About the data*, the security work the penetration test asked for, and two copy audits. See deploy/README.md, "Preserving each iteration". |
 | 0.50.0 | 17 Sep 2026 | **Three example addresses to try, not one**, from team feedback. The address screen lists three under *Not sure? Try one of these*. The guides and the full map offer 46 Gatehouse Drive, 11 Neale Street and 2 Balmer Street, Kensington, each at least 150 m inside the bundled square and near a pit with a path of 15 pipes or more; `check-guide.mjs` now holds all three. The comparison offers 89 Market Street, Kensington, 35 Poplar Road, Parkville and 93 Dudley Street, West Melbourne, each within 20 m of a drain the model shows a difference for; on the Kensington fallback, where the other two suburbs are not in the index, it offers 89 Market Street and 89 Epsom Road. |
 | 0.49.0 | 17 Sep 2026 | **The comparison draws where the extra water goes.** A teammate read the purple at 89 Market Street, 140 m from the drain, as a drawing error. It was not: the water the blocked drain no longer takes runs downhill, past the next drain, into the first hollow that is not yet full, and the purple is there. The result map now draws that route as a dashed violet line with an arrowhead, from the drain to the nearest purple cell, and the key names it *Where the extra water flows, in the model*. The route follows the engine's own rules (downhill along the flow field, through a hollow that shows no difference at its spill cell) and is drawn only when it actually reaches the purple; across the 36 drains that show a difference, 84 of 87 results get one, and the other three have purple at the drain itself. |
 | 0.48.0 | 17 Sep 2026 | **The flood area panel follows the map view**, from team feedback. With *Total emergency responses* on, the panel opens with the count and its years, as before, and the rate follows. With *Emergency responses per 1,000 people* on, it opens with the rate and its years, each year being that year's responses over the same residents, so the six add up to the rate (Romsey: 4.81), and the total follows as one line. Nothing is removed from either view. |
