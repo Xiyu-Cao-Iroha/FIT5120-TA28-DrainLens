@@ -59,7 +59,11 @@ ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build --workspace @drainlens/web
 
-FROM nginx:1.30.5-alpine3.24@sha256:25820c39dba41369486df729ad6697de2fab631ca809e0503e1d1e0c73d9a232 AS runtime
+# Repinned on 28 September 2026: the 17 September digest carried libexpat
+# 2.8.4-r0 and CVE-2026-93990 (HIGH) was published against it, which the
+# freeze's image scan caught. Same nginx version, rebuilt image, libexpat
+# 2.8.5-r0.
+FROM nginx:1.30.5-alpine3.24@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94 AS runtime
 
 # The same API base the bundle was built with, so deploy/entrypoint.sh can name
 # its origin in the Content-Security-Policy. An ARG does not cross stages; it
