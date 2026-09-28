@@ -382,7 +382,8 @@ that rule is what produced the second one rather than a rewrite of the first.
 | Tag | Commit | Marks |
 |---|---|---|
 | `iteration-1-final` | `0a0a4d6` | the **5 September** deployment, `drainlens-00011-pzw`, bundle `index-etSUqsfy.js` |
-| `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` -- what is live |
+| `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` |
+| `iteration-2-frozen` | `main` at the freeze | the **28 September** freeze, bundle `index-B4AIZ7xS.js` -- what is live |
 
 ```bash
 git tag -a iteration-1-frozen <commit> -m "Iteration 1 frozen, 8 September 2026"
@@ -399,7 +400,20 @@ git push origin iteration-1-frozen
 > what happened. One tag pointed at the newer commit would say the 5 September
 > deployment never had its own figures.
 
-**What the freeze verified, on the day.** Every gate re-run rather than read
+**What the Iteration 2 freeze verified, 28 September 2026.** The same pass,
+run again rather than cited: 1,447 Node tests across 78 files at 95.53%, 636
+Python across 28 at 93.83%, the 62 database tests in CI on the freeze pull
+request, `tsc --build --force` clean, `tools/docs/check.mjs` clean, all seven
+`tools/data/check-*.mjs` clean, and a local build with `VITE_API_BASE` set
+producing `index-B4AIZ7xS.js`. The last is the check that the tag and the
+running service are the same code, and it is made against the deployed URL
+after the tag is deployed -- not assumed from the build.
+
+> **The freeze is a tag and a deployment, not a branch that stops moving.**
+> `develop` carries Iteration 3 from here, and `main` holds Iteration 2 until
+> that one is finished, in the shape the row below describes.
+
+**What the Iteration 1 freeze verified, on the day.** Every gate re-run rather than read
 off the last record: 683 Node tests across 37 files at 92.56%, 377 Python at
 91.79%, `tsc --build --force` clean, `tools/docs/check.mjs` clean, and a local
 build **with `VITE_API_BASE` set** reproducing `index-DFGygy6v.js` -- the
@@ -420,9 +434,9 @@ role is the closest thing available to the subdomain pattern the studio draws:
 
 | Role | The studio's shape | Service | Built from | Holds |
 |---|---|---|---|---|
-| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | Iteration 2, as it is built |
-| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 1**, and not moving |
-| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1` | tag `iteration-1-frozen` | deployed once, then left alone |
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | the iteration being built -- Iteration 3 from 28 September |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 2** since 28 September 2026 |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1`, `drainlens-iteration2` | tags `iteration-1-frozen`, `iteration-2-frozen` | deployed once, then left alone |
 
 > **`drainlens` filled two of those roles at once until 10 September, and the
 > freeze is what stopped that being safe.** It had been redeployed eight times
@@ -454,7 +468,8 @@ iteration* rather than the newest good code, so it holds at
 > `develop` into `main` merge is one click away at any time. The check is the
 > same one the empty-diff incident produced: after merging, read where the
 > commit landed rather than trusting the routine. `git rev-parse origin/main`
-> must still be `138a002` for the whole of Iteration 2.
+> must still be `138a002` for the whole of Iteration 2. **It moved once, at the
+> freeze on 28 September**, which is the single move that row allows.
 
 **Completing Iteration 2** is then one pass, and it is the same shape as the
 Iteration 1 freeze: merge `develop` into `main`, re-run every gate rather than

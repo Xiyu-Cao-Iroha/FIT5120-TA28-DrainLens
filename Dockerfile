@@ -59,7 +59,20 @@ ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build --workspace @drainlens/web
 
-FROM nginx:1.30.5-alpine3.24@sha256:25820c39dba41369486df729ad6697de2fab631ca809e0503e1d1e0c73d9a232 AS runtime
+# Repinned on 28 September 2026, to the current build of the same tag. It is
+# not what fixed the finding below — the rebuilt image ships the same libexpat
+# — but a pin a fortnight behind the tag it names is worth moving while the
+# scan is being read.
+FROM nginx:1.30.5-alpine3.24@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94 AS runtime
+
+# **Then the OS packages are brought up to date**, as `deploy/api/Dockerfile`
+# has done since 16 September. The Iteration 2 freeze scan found CVE-2026-93990
+# (HIGH) against libexpat 2.8.4-r0, fixed in 2.8.5-r0 and shipped by Alpine but
+# not yet by the nginx image: repinning to the tag's newest digest still
+# carried 2.8.4-r0, which is the reason this line exists rather than a second
+# digest bump. nginx's own binary comes from the pinned digest and `apk` does
+# not replace it, so what moves here is the operating system around it.
+RUN apk upgrade --no-cache
 
 # The same API base the bundle was built with, so deploy/entrypoint.sh can name
 # its origin in the Content-Security-Policy. An ARG does not cross stages; it
