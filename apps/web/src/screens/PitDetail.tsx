@@ -20,8 +20,8 @@ import { sectionFor } from '../crosssection/section.js';
 import { CrossSection, SectionNotes } from './CrossSection.js';
 import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.js';
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
-
-const RECORDED_BADGE = 'Official recorded data';
+import { SourceLink } from '../ui/SourcesPanel.js';
+import { PROVENANCE } from '../ui/terms.js';
 
 /**
  * The fields the pit layer carries, in the order a person reads them.
@@ -33,8 +33,8 @@ const RECORDED_BADGE = 'Official recorded data';
  */
 const FIELDS: readonly { readonly key: keyof Pit; readonly label: string }[] = [
   { key: 'asset_number', label: 'Asset number' },
-  { key: 'asset_description', label: 'Description' },
-  { key: 'object_type_lupvalue', label: 'Type' },
+  { key: 'asset_description', label: 'Council description' },
+  { key: 'object_type_lupvalue', label: 'Council type' },
 ];
 
 export const NOT_RECORDED = 'Not recorded';
@@ -44,17 +44,40 @@ export const DEPTH_NOTE =
   'pit in this area, and filling the gap with an estimate would present a ' +
   'guess as a measurement.';
 
-/** One line per way a path can stop, in the person's words rather than ours. */
+/**
+ * One line per way a path can stop, in the person's words rather than ours.
+ *
+ * Each reads after *The path ends where*.
+ */
 export const ENDING_LABELS: Readonly<Record<string, string>> = {
-  'no-recorded-connection': 'the record has no pipe leaving that pit',
-  'unrecorded-destination': 'a pipe leaves, but the record does not say where it goes',
+  'no-recorded-connection': 'the council record has no outgoing pipe',
+  'unrecorded-destination': 'a pipe leaves but the council record does not say where it goes',
   'leaves-mapped-area': 'the pipe continues outside the mapped area',
   'cycle-guard': 'the recorded connections loop back on themselves',
 };
 
 export const NO_OUTLET_NOTE =
-  'This area has no recorded outfall, so a path always ends where the record ' +
-  'ends rather than where the water leaves the drainage system.';
+  'No outfall is recorded in this area. The displayed path therefore ends where ' +
+  'the council pipe record ends; this may not be where water leaves the real system.';
+
+/**
+ * What the followed path is, said on the card by default.
+ *
+ * The counts, the reasons each branch stops and the outfall sentence used to
+ * sit here, open, as five sentences and two engineering words (*downstream*,
+ * *outfall*). They are all still on the card, under *View technical details*
+ * (copy audit v2, #33). This is the one a resident reads: what the line is,
+ * and that it is not the end of the real system.
+ */
+export const FOLLOWED_PATH_SHORT =
+  'The highlighted line shows where water from this drain may flow. It stops where the council’s pipe record stops.';
+
+/** How many recorded pipes the followed path shows, as a sentence. */
+export function pipesShown(count: number): string {
+  if (count === 0) return 'No pipe could be followed from this pit.';
+  if (count === 1) return 'One recorded downstream pipe is shown.';
+  return `${String(count)} recorded downstream pipes are shown.`;
+}
 
 /**
  * The three limits, in the words somebody who is not an engineer would use.
@@ -93,15 +116,6 @@ export const PLAIN_LIMITS: readonly {
 ];
 
 const LABEL: React.CSSProperties = { fontSize: 12, letterSpacing: 0.6, color: '#61707c' };
-
-const BADGE: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '1px 7px',
-  borderRadius: 999,
-  fontSize: 11,
-  background: '#dcece6',
-  color: '#1f5b4e',
-};
 
 export interface PitDetailProps {
   readonly pit: Pit;
@@ -174,9 +188,14 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
       {sectionOpen && (
         <div style={{ marginBottom: 12 }}>
           <span style={LABEL}>SELECTED PIT</span>
-          <div style={{ margin: '4px 0 8px' }}>
-            <span style={BADGE}>{RECORDED_BADGE}</span>
-          </div>
+          {/*
+            Where the record comes from, as a sentence rather than the *Council
+            record* badge that sat here and on the card above (copy audit v2,
+            #30). Said once, here.
+          */}
+          <p style={{ margin: '4px 0 8px', fontSize: 12, color: '#5b6e7e' }}>
+            {PROVENANCE.recorded}
+          </p>
 
           <dl
             style={{
@@ -211,6 +230,8 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
           <p style={{ margin: '0 0 12px', fontSize: 12, color: '#5b6e7e' }}>{DEPTH_NOTE}</p>
 
           <SectionNotes outcome={outcome} />
+
+          {trace !== null && <TraceDetails trace={trace} />}
         </div>
       )}
 
@@ -231,7 +252,7 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
               cursor: followable ? 'pointer' : 'default',
             }}
           >
-            Follow the recorded downstream path
+            Show connected drain pipe
           </button>
           {!followable && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: '#61707c' }}>
@@ -242,55 +263,30 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
           )}
         </>
       ) : (
-        <TraceSummary trace={trace} onClear={onClear} />
+        <TraceSummary onClear={onClear} />
       )}
     </div>
   );
 }
 
 /**
- * What the followed path did.
+ * The followed path, on the card: one short sentence and the way to clear it.
  *
- * The count of stops is given before the reasons, because "it stopped in four
- * places" is the fact that changes how much of this path a person should
- * trust, and the reasons only qualify it.
+ * The detail that used to follow here moved to `TraceDetails`, under *View
+ * technical details* (copy audit v2, #33). Copy audit v4 (#33) adds *Why the
+ * line stops ›*, to About the data, and the map marks each place the drawn
+ * line ends (`trace/draw.ts`), which is where AC 1.2.2's missing or uncertain
+ * connections are shown. The sentence keeps "the council's pipe record"
+ * rather than the audit's "the council map": it is the record that stops.
  */
-function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onClear: () => void }) {
-  const reasons = endingsByReason(trace);
-  const brokenRecord = trace.endings.filter((ending) =>
-    stoppedBecauseOfTheRecord(ending.reason),
-  ).length;
-
+function TraceSummary({ onClear }: { readonly onClear: () => void }) {
   return (
     <div style={{ paddingTop: 10, borderTop: '1px solid #e6ebe4' }}>
       <span style={LABEL}>FOLLOWED PATH</span>
-      <p style={{ margin: '6px 0 8px' }}>
-        {trace.pipes.length === 0 ? (
-          'No pipe could be followed from this pit.'
-        ) : (
-          <>
-            <strong>
-              {trace.pipes.length} recorded {trace.pipes.length === 1 ? 'pipe' : 'pipes'}
-            </strong>{' '}
-            across {trace.steps} {trace.steps === 1 ? 'step' : 'steps'} downstream.
-          </>
-        )}
+      <p style={{ margin: '6px 0 4px' }}>{FOLLOWED_PATH_SHORT}</p>
+      <p style={{ margin: '0 0 10px' }}>
+        <SourceLink id="pathEnds" />
       </p>
-
-      <p style={{ margin: '0 0 6px' }}>
-        The path stops in {trace.endings.length} {trace.endings.length === 1 ? 'place' : 'places'}
-        {brokenRecord > 0 ? ':' : ', all at the edge of the mapped area:'}
-      </p>
-      <ul style={{ margin: '0 0 10px', paddingLeft: 18, color: '#4a5b68' }}>
-        {reasons.map(({ reason, count }) => (
-          <li key={reason} style={{ marginBottom: 3 }}>
-            {count > 1 ? `${count} × ` : ''}
-            {ENDING_LABELS[reason] ?? reason}
-          </li>
-        ))}
-      </ul>
-
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
 
       <button
         type="button"
@@ -306,6 +302,52 @@ function TraceSummary({ trace, onClear }: { readonly trace: Trace; readonly onCl
       >
         Clear the followed path
       </button>
+    </div>
+  );
+}
+
+/**
+ * What the followed path did, in full, for whoever opens the technical details.
+ *
+ * The count of stops is given before the reasons, because "it ends in four
+ * places" is the fact that changes how much of this path a person should
+ * trust, and the reasons only qualify it.
+ */
+function TraceDetails({ trace }: { readonly trace: Trace }) {
+  const reasons = endingsByReason(trace);
+  const brokenRecord = trace.endings.filter((ending) =>
+    stoppedBecauseOfTheRecord(ending.reason),
+  ).length;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <span style={LABEL}>FOLLOWED PATH</span>
+      <p style={{ margin: '6px 0 8px' }}>
+        <strong>{pipesShown(trace.pipes.length)}</strong>
+      </p>
+
+      {reasons.length === 1 && trace.endings.length === 1 ? (
+        <p style={{ margin: '0 0 10px' }}>
+          The path ends where {ENDING_LABELS[reasons[0]!.reason] ?? reasons[0]!.reason}.
+        </p>
+      ) : (
+        <>
+          <p style={{ margin: '0 0 6px' }}>
+            The path ends in {trace.endings.length} places
+            {brokenRecord > 0 ? ', where:' : ', all at the edge of the mapped area:'}
+          </p>
+          <ul style={{ margin: '0 0 10px', paddingLeft: 18, color: '#4a5b68' }}>
+            {reasons.map(({ reason, count }) => (
+              <li key={reason} style={{ marginBottom: 3 }}>
+                {count > 1 ? `${count} × ` : ''}
+                {ENDING_LABELS[reason] ?? reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <p style={{ margin: 0, fontSize: 12, color: '#5b6e7e' }}>{NO_OUTLET_NOTE}</p>
     </div>
   );
 }

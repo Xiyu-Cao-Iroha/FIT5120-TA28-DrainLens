@@ -24,7 +24,9 @@ import { fileURLToPath } from 'node:url';
 
 import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import pg from 'pg';
 
 import {
@@ -51,10 +53,37 @@ import {
  */
 export const DEFAULT_ORIGINS = [
   'https://drainlens-205559161217.australia-southeast1.run.app',
+  /*
+    The dev service, and the reason this list is a thing that can be wrong
+    without anybody being told.
+
+    Iteration 2 moved to three URLs on 11 September -- root, archive, dev --
+    and this list was not one of the things that moved. The dev service is a
+    different origin, so the browser dropped every response from this API
+    before the page saw it, and `fetchTogether` did exactly what it is for:
+    fell back to the copy in the container. The footer said so in plain words
+    -- *the wider council map needs the database, which is not answering* --
+    and it was right, from where the browser was standing.
+
+    What it looked like was the council extent not working. What it was is
+    this array. **A CORS list is not a feature flag, but it behaves like one**:
+    the whole Iteration 2 URL had been serving one square kilometre for a day.
+  */
+  'https://drainlens-dev-205559161217.australia-southeast1.run.app',
   // `npm run dev`, from .claude/launch.json.
   'http://localhost:5183',
   'http://127.0.0.1:5183',
 ];
+
+/*
+  `drainlens-iteration1` is deliberately **not** here.
+
+  It serves the frozen Iteration 1 bundle, which asks for `/api/map/kensington`
+  -- an extent this database no longer holds. Letting it through would give it
+  a 404 and the same fallback it gets now, by accident instead of on purpose.
+  An archive should not depend on a live database that has moved on; it holds
+  its own copies and that is what makes it an archive.
+*/
 
 export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
   if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;
@@ -75,10 +104,116 @@ export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORI
  */
 export const ARTEFACT_CACHE = 'public, max-age=300';
 
-export function createApp(pool: pg.Pool): Hono {
+/**
+ * How long a process keeps an artefact it has already rebuilt from rows.
+ *
+ * The user test of 15 September timed the map and derived routes at 2.5 and
+ * 3.0 seconds on the deployed site. Part of that is a cold instance, which no
+ * code here can help; the rest is rebuilding 21,113 pits and 17,242 pipes from
+ * rows on every request, for an answer that only changes when the migration
+ * job runs. Ten minutes bounds how stale a warm instance can be after a load,
+ * and an instance rarely lives that long between visits anyway.
+ */
+export const REBUILT_FOR_MS = 10 * 60 * 1000;
+
+export interface Memo {
+  /** The value for `key`, building it at most once per `ttlMs` however many ask at once. */
+  get<T>(key: string, build: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * A small in-process memo for rebuilt artefacts.
+ *
+ * Concurrent requests for the same key share one build, so the first visitors
+ * after a cold start do not each rebuild the council map. A build that fails
+ * is forgotten at once: a 404 for an extent that has not been loaded yet, or a
+ * database that was briefly unreachable, must not be remembered as the answer.
+ */
+export function createMemo(ttlMs: number, now: () => number = Date.now): Memo {
+  const held = new Map<string, { readonly at: number; readonly value: Promise<unknown> }>();
+  return {
+    get<T>(key: string, build: () => Promise<T>): Promise<T> {
+      const found = held.get(key);
+      if (found !== undefined && now() - found.at < ttlMs) return found.value as Promise<T>;
+      const value = build();
+      held.set(key, { at: now(), value });
+      value.catch(() => {
+        if (held.get(key)?.value === value) held.delete(key);
+      });
+      return value;
+    },
+  };
+}
+
+export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)): Hono {
   const app = new Hono();
 
   app.use('*', cors({ origin: allowedOrigins() }));
+
+  /*
+    Defence headers on every answer, including the errors (penetration test
+    P02, P08, and the plan's "equivalent headers on the backend").
+
+    The API only ever returns JSON to `fetch`, so its policy is the tightest
+    there is: nothing may load, nothing may frame it. HSTS without
+    includeSubDomains, for the same reason as the site's: the run.app host is
+    not this project's to make promises for. Cross-origin resource policy is
+    left at the middleware's default of off, because the site reads these
+    responses from another origin by design and CORS already decides who may.
+  */
+  app.use(
+    '*',
+    secureHeaders({
+      contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      strictTransportSecurity: 'max-age=31536000',
+      xFrameOptions: 'DENY',
+      referrerPolicy: 'no-referrer',
+      crossOriginResourcePolicy: false,
+      crossOriginOpenerPolicy: 'same-origin',
+    }),
+  );
+
+  /*
+    Compression, which stopped being optional when the extent became a council.
+
+    The map went out as **6,942,917 bytes with no `Content-Encoding` at all**:
+    p50 749.6 ms, p95 1556.5 ms, against 55 ms for the derived layers. At
+    Kensington's 316 KB nobody had to think about it. The same JSON gzips to
+    1.22 MB, and the site's own nginx has been compressing its bundled copies
+    all along -- so the *offline* fallback was the fast path and the API was
+    the slow one, which is the wrong way round for the source of truth.
+
+    Measured through this middleware, against a local database holding the
+    council extent — bytes on the wire, not `fetch`'s decoded length, which
+    reported 6,942,917 for a body that had travelled as 1.2 MB:
+
+    ==============================  ===========  ===========  =====
+    route                           uncompressed  gzip         ratio
+    ==============================  ===========  ===========  =====
+    /api/map/city-of-melbourne        6,942,917    1,220,733   5.7x
+    /api/trace/city-of-melbourne        709,800      126,950   5.6x
+    /api/derived/city-of-melbourne      166,503       41,781   4.0x
+    /api/flood-history                    5,526        1,770   3.1x
+    ==============================  ===========  ===========  =====
+
+    The level is the default, gzip 6. On this laptop level 1 gives 1.46 MB for
+    65 ms and level 9 gives 1.19 MB for 278 ms; 6 is 1.22 MB for 161 ms, and
+    the last 30 KB is not worth 117 ms of a one-CPU instance.
+
+    `Vary: Accept-Encoding` matters here and the middleware sets it: these
+    responses carry `Cache-Control: public`, and without the header a shared
+    cache is free to hand a gzipped body to a client that never asked for one.
+
+    **`/api/*` rather than `*`, because the middleware's own threshold does not
+    protect `/health`.** It skips compression below 1 KB by reading
+    `Content-Length` — and `c.json()` does not set one, so the check is
+    skipped rather than passed, and the 39-byte health body came back gzipped
+    into 59. Measured, after this comment had already claimed the opposite;
+    scoping the middleware is the fix that does not depend on a header nothing
+    here sends. `/health` is `no-store` and is polled, which is the one route
+    where a wrapper costs something every time and saves nothing ever.
+  */
+  app.use('/api/*', compress());
 
   /**
    * Answer, or say plainly what is missing.
@@ -88,14 +223,27 @@ export function createApp(pool: pg.Pool): Hono {
    * sentence the query threw; anything else is logged server-side and becomes
    * a bare 500, because the details of an unexpected failure are ours.
    */
+  const withClient = async (work: (client: pg.PoolClient) => Promise<unknown>) => {
+    const client = await pool.connect();
+    try {
+      return await work(client);
+    } finally {
+      client.release();
+    }
+  };
+
   const answer = async (
     c: Context,
     work: (client: pg.PoolClient) => Promise<unknown>,
     cache: string = ARTEFACT_CACHE,
+    // Rebuilt artefacts are memoised by route; `/health` passes none, because
+    // a health check answered from memory is a health check of the memory.
+    key?: string,
   ) => {
-    const client = await pool.connect();
     try {
-      const body = (await work(client)) as Record<string, unknown>;
+      const body = (await (key === undefined
+        ? withClient(work)
+        : memo.get(key, () => withClient(work)))) as Record<string, unknown>;
       // Only on an answer. A 404 cached for five minutes is a missing extent
       // that stays missing after the migration job has put it there.
       c.header('Cache-Control', cache);
@@ -104,8 +252,6 @@ export function createApp(pool: pg.Pool): Hono {
       if (error instanceof NotFound) return c.json({ error: error.message }, 404);
       console.error(error);
       return c.json({ error: 'the request could not be answered' }, 500);
-    } finally {
-      client.release();
     }
   };
 
@@ -123,18 +269,20 @@ export function createApp(pool: pg.Pool): Hono {
   );
 
   app.get('/api/map/:extent', (c) =>
-    answer(c, (client) => mapArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => mapArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `map/${c.req.param('extent')}`),
   );
 
   app.get('/api/derived/:extent', (c) =>
-    answer(c, (client) => derivedArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => derivedArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `derived/${c.req.param('extent')}`),
   );
 
   app.get('/api/trace/:extent', (c) =>
-    answer(c, (client) => traceArtefact(client, c.req.param('extent'))),
+    answer(c, (client) => traceArtefact(client, c.req.param('extent')), ARTEFACT_CACHE, `trace/${c.req.param('extent')}`),
   );
 
-  app.get('/api/flood-history', (c) => answer(c, (client) => floodHistoryArtefact(client)));
+  app.get('/api/flood-history', (c) =>
+    answer(c, (client) => floodHistoryArtefact(client), ARTEFACT_CACHE, 'flood-history'),
+  );
 
   return app;
 }

@@ -206,6 +206,20 @@ function validate(scene: SceneInput, assumptions: Assumptions): void {
       throw new EngineError(`drain ${drain.assetNumber} sits outside the calculation window`);
     }
   }
+  // The stores below are arrays indexed by depression id. An id at or past the
+  // depression count is written nowhere -- a typed array drops it silently --
+  // and the water in that hollow disappears. That happened on 13 September,
+  // when council-wide ids reached a one-kilometre window unrenumbered: 70% of
+  // the rain vanished, and only the mass-balance check stood between it and a
+  // map. Refused here, by name, before any water moves.
+  const count = scene.depressions.depressions.length;
+  for (const depression of scene.depressions.depressions) {
+    if (!Number.isInteger(depression.id) || depression.id < 0 || depression.id >= count) {
+      throw new EngineError(
+        `depression id ${String(depression.id)} is not in 0..${String(count - 1)}; depressions must be numbered densely`,
+      );
+    }
+  }
   const { captureFraction, noticeableVolumeM3 } = assumptions;
   if (!(captureFraction >= 0 && captureFraction <= 1)) {
     throw new EngineError(`capture fraction must be within 0..1, received ${String(captureFraction)}`);

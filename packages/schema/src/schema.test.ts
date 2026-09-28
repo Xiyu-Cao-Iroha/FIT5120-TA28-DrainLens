@@ -32,6 +32,8 @@ import {
   assetNumber,
   buildRunProvenance,
   isSupportedRainfall,
+  isValidatedRainfall,
+  VALIDATED_RAINFALL_LEVELS_MM,
   stationId,
   type PositionResult,
   type ScenarioInputs,
@@ -350,5 +352,21 @@ describe('wire payloads', () => {
     expect(containsForbiddenKey({ ...check, Latitude: -37.81 })).toBe('latitude');
     expect(() => assertSendable({ ...check, lon: 144.96 })).toThrow(WirePayloadError);
     expect(() => assertSendable({ ...check, sessionId: 'abc' })).toThrow(/never leave the device/);
+  });
+});
+
+describe('the validated rainfall levels', () => {
+  it('are exactly 20, 40 and 60 mm, all inside the supported range', () => {
+    expect([...VALIDATED_RAINFALL_LEVELS_MM]).toEqual([20, 40, 60]);
+    for (const mm of VALIDATED_RAINFALL_LEVELS_MM) expect(isSupportedRainfall(mm)).toBe(true);
+  });
+
+  it('refuses an amount inside the range that nobody validated', () => {
+    // AC 3.2.3.b: a level, not a range. 50 mm is supported by the engine and
+    // was never offered or checked.
+    expect(isValidatedRainfall(40)).toBe(true);
+    expect(isValidatedRainfall(50)).toBe(false);
+    expect(isValidatedRainfall(120)).toBe(false);
+    expect(isValidatedRainfall(Number.NaN)).toBe(false);
   });
 });

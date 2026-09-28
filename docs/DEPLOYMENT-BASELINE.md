@@ -56,6 +56,8 @@ node tools/perf/measure.mjs https://the-deployed-url 100
 
 The resource list is **discovered, not hard-coded** — read from the served `index.html`, the bundle (for the worker's hashed name) and `scene.json`. A hand-written list stops matching the next build, and probing URLs that 404 looks fast.
 
+> **14 September 2026: the discovery no longer reads `scene.json`.** The map's ground is now pre-coloured tiles for the whole council, so `tools/perf/critical-path.mjs` reads `data/terrain-tiles/index.json` and counts it with the two overview images it names, and nothing under `data/scene/`. The tiles themselves follow the view and are not part of a fixed first visit, so they are not counted. **A run today is therefore a different critical path from every table below** — `elevation.bin`, 788 KB over the wire on 5 September, is replaced by two WebP images of 373 KB and 397 KB that nginx sends as they are — and it must be compared against a "before" taken with the same script, not against these.
+
 To reproduce the "before" exactly:
 
 ```bash
@@ -133,6 +135,8 @@ The local server in `tools/perf/serve.mjs` sets these, and the deployment must m
 | gzip | required. Without it the first visit is 6.42 MB instead of 1.37 MB |
 | `/assets/*` | `max-age=31536000, immutable` — the names are content-hashed |
 | `/data/*` | short max-age. These are **not** hashed, and a rebuilt artefact behind a long cache is a map that silently disagrees with itself |
+
+> **The deployment has two types this table does not, and the local server does not match them** (14 September 2026). `deploy/nginx.conf` serves the scenario tiles' `.gz` as `application/gzip` and the terrain tiles as `image/webp`, and compresses neither, because both are compressed already. `serve.mjs` has no entry for either: it sends them as `application/octet-stream` and gzips them again. The transfer figure for those files would differ between the two servers for that reason alone, so a local "before" that includes them is not the same measurement as a deployed "after" until `serve.mjs` learns both types.
 
 ---
 

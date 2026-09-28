@@ -20,10 +20,27 @@
  * alternative is a database that silently re-runs the same migration forever.
  *
  * It is safe to run twice. The migrations are skipped once recorded, and the
- * load is a truncate-and-insert.
+ * load is a delete-and-insert for the extent it is loading.
+ *
+ * **Which extent is an argument, and the default is the one that ships.** Two
+ * extents are published; the database holds one at a time, because Kensington
+ * is a square kilometre inside the council and the two would store the same
+ * assets twice in two coordinate frames. So the job has to be told, and being
+ * told the wrong thing has to be loud: an unknown `--extent` is a refusal that
+ * names the ones that exist, never a fall back to the default. A deployment
+ * that meant to serve a council and quietly served a square kilometre would
+ * look entirely healthy from the outside.
+ *
+ * **Changing which extent an instance serves needs `--replace`.** The two
+ * published extents overlap, so a database holding one cannot accept the
+ * other; the load says so by name rather than letting the primary key say it
+ * at the 896th insert. `--replace` is the answer, and is not the default
+ * because it deletes rows nobody named.
  *
  *   DATABASE_URL=... node apps/api/dist/migrate.js
  *   DATABASE_URL=... node apps/api/dist/migrate.js --schema-only
+ *   DATABASE_URL=... node apps/api/dist/migrate.js --extent city-of-melbourne --replace
+ *   DATABASE_URL=... node apps/api/dist/migrate.js --data /some/other/dir --extent kensington
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -32,7 +49,7 @@ import path from 'node:path';
 
 import pg from 'pg';
 
-import { load } from './load.js';
+import { BUNDLED, load, SOURCES, type Source } from './load.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -123,12 +140,67 @@ export async function migrate(client: pg.ClientBase): Promise<number[]> {
   return ran;
 }
 
+/** The value after a flag, or a refusal that says the flag needs one. */
+function valueOf(argv: readonly string[], flag: string): string | undefined {
+  const at = argv.indexOf(flag);
+  if (at === -1) return undefined;
+  const value = argv[at + 1];
+  if (!value || value.startsWith('--')) {
+    throw new MigrateError(`${flag} needs a value`);
+  }
+  return value;
+}
+
+/**
+ * Which artefacts to load, from `--extent` and `--data`.
+ *
+ * Neither flag: the extent that ships in the image, which is what every
+ * deployment before the council did and what a bare `migrate.js` still means.
+ *
+ * `--extent` alone names one of the published extents and takes its directory
+ * from the image. `--data` alone is a refusal: a directory does not say which
+ * extent it holds, and the loader writes that name onto every row it inserts,
+ * so guessing it is how the council's geometry ends up labelled `kensington`
+ * and answering for the wrong frame. Given both, the directory wins and the
+ * name is taken at its word -- that is the escape hatch for a rebuilt artefact
+ * that is not in the image yet.
+ */
+export function sourceFrom(argv: readonly string[]): Source {
+  const dir = valueOf(argv, '--data');
+  const name = valueOf(argv, '--extent');
+
+  if (dir && name) return { dir: path.resolve(dir), extent: name };
+  if (dir) {
+    throw new MigrateError('--data needs --extent as well; a directory does not name its extent');
+  }
+  if (!name) return BUNDLED;
+
+  const known = SOURCES[name];
+  if (!known) {
+    throw new MigrateError(
+      `${name} is not a published extent (${Object.keys(SOURCES).sort().join(', ')})`,
+    );
+  }
+  return known;
+}
+
 /** Migrate, then load, against `DATABASE_URL`. */
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) throw new MigrateError('DATABASE_URL is not set');
 
   const schemaOnly = argv.includes('--schema-only');
+  const replace = argv.includes('--replace');
+
+  // `--schema-only --replace` reads as "replace the rows" and does nothing at
+  // all, because the rows are the part it skips. Refused rather than ignored.
+  if (schemaOnly && replace) {
+    throw new MigrateError('--replace has nothing to do under --schema-only, which loads no rows');
+  }
+
+  // Resolved before connecting, so a mistyped extent fails in the first
+  // second of the job rather than after the migrations have been applied.
+  const from = sourceFrom(argv);
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {
@@ -144,8 +216,9 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
       return;
     }
 
+    process.stdout.write(`  extent                 ${from.extent}\n`);
     await client.query('BEGIN');
-    const counted = await load(client);
+    const counted = await load(client, from, { replace });
     await client.query('COMMIT');
     for (const [table, n] of Object.entries(counted)) {
       process.stdout.write(`  ${table.padEnd(22)} ${String(n).padStart(6)}\n`);

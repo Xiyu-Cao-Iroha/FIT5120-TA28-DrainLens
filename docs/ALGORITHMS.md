@@ -8,13 +8,13 @@ hollows, and the browser routes rainfall over both. This document walks that
 chain and names the file and function at each step, so a question about any
 claim on screen has somewhere to land.
 
-> **The last link in this chain is not currently on screen.** The surface, the
-> flow field and the hollows are — they are what the map draws as terrain,
-> water flow and low areas. The rainfall routing on top of them belongs to the
-> drain-blockage comparison, which AC 1.1.1 requires to be absent from the
-> Iteration 1 interface. The engine, its tests and this description are all
-> intact and unchanged; what is missing is a way to reach it. See
-> [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+> **Every link in this chain is on screen again.** The surface, the flow field
+> and the hollows are what the map draws as *Ground height*, *Likely water
+> paths* and *Low areas*. The rainfall routing on top of them belongs to the
+> drain-blockage comparison, which AC 1.1.1 required to be absent from the
+> Iteration 1 interface ([ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md));
+> the engine and its tests stayed intact through that, and since 12 September
+> the comparison is offered again as *Blocked drain comparison*.
 
 **What it defers.** [pipeline/README.md](../pipeline/README.md) is the authority
 on the ground filter — the SMRF window, the building-footprint cross-check, and
@@ -46,6 +46,7 @@ point cloud → bare-earth surface → ┬→ conditioned surface → D8 flow fi
 | Find hollows | the **raw** bare-earth surface | filling is what a hollow is measured *against*; a filled surface has none left to find |
 | Route water | a **conditioned** surface | raw ground has pits and flats that trap water and stall the routing |
 | Draw the blue lines | accumulation over the conditioned surface | it is a picture of the same routing, not a second opinion |
+| Colour the ground, and say which way it falls at an address | the **raw** surface | the conditioned one has its hollows filled and its buildings raised 100 m; coloured, it would hide the low areas drawn over it |
 
 [`condition()`](../pipeline/src/drainlens_pipeline/hydrology.py) says this in its
 own docstring: *"Never hand the result to `find_depressions`. That is the
@@ -120,9 +121,40 @@ convergence.
 
 Cells above the **99.5th percentile** of accumulation are called channel, traced
 from each head downstream, and simplified with Douglas–Peucker at a 1 m
-tolerance. These are the *Likely surface water paths* layer, labelled
-**System-derived** on screen — they are not a council dataset and the interface
-never implies they are.
+tolerance. These are the *Likely water paths* layer, labelled
+**Calculated by DrainLens** on screen — they are not a council dataset and the
+interface never implies they are. (Until 14 September the button read *Water
+flow*, the legend *Likely surface water paths* and the label *System-derived
+result*.)
+
+**The arrows on those lines point the way the water goes, and that was
+checked on the whole of both artefacts, not a sample.** Douglas–Peucker drops
+vertices and never reorders them, so each vertex of a path should be reachable
+from the one before it by following the flow field. On 14 September every
+vertex of all 38 Kensington paths and all 990 council paths was, against
+`flow-direction.npy` from the terrain build each came from; the same walk
+over the paths reversed failed on every one. `test_never_runs_uphill` in
+`pipeline/tests/test_derived.py` holds the property for new builds.
+
+### Which way the ground falls at an address — `address_ground.py`
+
+Not part of the water chain, and deliberately so. For each of the 62,397
+addresses in the council index (4,089 in Kensington until 14 September) a plane is fitted to the **raw** ground within `FIT_RADIUS_M = 75` m,
+weighted 0 on buildings, 0.35 on interpolated open ground and 1 on measured.
+The plane's downhill direction is given as one of eight compass points only
+when the fall across 150 m is at least 0.5 m, R² is at least 0.30, at least
+35% of the weight is measured, and the 75 m and 100 m fits agree within 22.5°
+— the width of an octant. Otherwise the answer is *unclear*, or *edge* where
+the disc runs off the measured ground — which over the council includes a
+missing point-cloud tile anywhere within the 100 m check disc. Council-wide:
+38,498 falls, 23,899 unclear and 0 edge in
+`apps/web/public/data/terrain/address-ground.json`; the Kensington-only run had
+given 1,982, 1,640 and 467, and the 3,622 addresses it answered agree 99.9%.
+
+It is a trend over an area about 150 m across, not a path water takes; the
+module's docstring records why the two answer different questions.
+[pipeline/README.md](../pipeline/README.md) has the comparison with the terrain
+handover's sample.
 
 ---
 
@@ -204,6 +236,13 @@ where the blocked run holds more than the baseline by more than
 `noticeableVolumeM3 = 0.05` m³. Absolute depth is never reported — AD7, and the
 result screen says so in its own words.
 
+**The two bands keep their identifiers and changed their words.** In code they
+are still `higher-than-baseline` and `no-clear-change`; since 14 September the
+screen calls them *More water than with a clear drain* and *No clear
+difference* (`apps/web/src/scenario/outcome.ts`). The measurements below are
+dated records and use the words of their day: *higher than baseline* is the
+first band and *no clear change* the second.
+
 ---
 
 ## The three failures that shaped this, measured
@@ -262,6 +301,82 @@ disappeared into an average while the arithmetic stayed correct.
 > original code, so this is not proof the comments were wrong — but the two
 > matching figures should not be quoted as independent measurements until
 > somebody can reproduce them.
+
+### The site ran with Failure 3 until 13 September
+
+The engine has taken `rimDepthM` since 29 August, and the scene has carried
+`rim-depth.bin` since the same day. **The browser loaded neither**:
+`scene.ts` never fetched the file and the worker never passed it, so every
+comparison anybody ran on the site spread a hollow's water evenly — the exact
+failure above, in production, with every test green because the engine's own
+tests supplied the shape directly.
+
+It was fixed in PR #128. What it changed, measured on the Kensington scene,
+every inlet at 20, 40 and 60 mm, rim depth against even spreading, cells
+reported higher than baseline:
+
+| Inlet | Blockage | With rim depth | Evenly spread |
+|---|---|---|---|
+| 1730246 | fully | 40 · 72 · 121 | 0 · 0 · 144 |
+| 1363588 | fully | 154 · 210 · 360 | 0 · 0 · 652 |
+| 1363588 | partly | 0 · 208 · 358 | 0 · 0 · 0 |
+| 1363621 | fully | 175 · 357 · 479 | 652 · 652 · 652 |
+| 1363621 | partly | 154 · 333 · 412 | 0 · 652 · 652 |
+
+**Three inlets, and for them the band on the site was wrong at seven of
+fifteen positions.** Every other inlet reads *no clear change* either way. The
+PR description said no band changed; that was measured on 60 of the 475 inlets,
+none of which was one of these three, and it was wrong.
+
+## The validated rainfall levels
+
+AC 3.2.3.b asks for "only rainfall levels supported and validated by the
+current scenario model". The explorer offers **20, 40 and 60 mm** and nothing
+else (`VALIDATED_RAINFALL_LEVELS_MM` in `packages/schema`). A number box that
+accepted any amount was removed; it let 500 mm reach the engine.
+
+Validated means this, run on 13 September against the Kensington scene with rim
+depth, the engine's mass-balance and monotonicity checks in force:
+
+| | Runs | Result |
+|---|---:|---|
+| Every inlet (475) × fully and partly blocked × 20/40/60 mm | 950 | **946 successful**, 4 *invalid inlet* (two inlets the record does not describe well enough) |
+| Checks refused a comparison | — | **none** — no *comparison not comparable*, no *calculation failed* |
+| Runs with any position higher than baseline | — | 5 runs, 3 inlets, 14 positions (the table above) |
+
+### Council-wide, since the scene tiles
+
+The comparison now runs over the one-kilometre window around the chosen drain,
+stitched from four 500 m tiles cut from the council-wide terrain build
+(`scene_tiles.py`, `sceneTiles.ts`). Validated the same way, 13 September:
+
+| | Inlets | Runs | Successful | Refused by the checks | Invalid inlet | Inlets with any position higher |
+|---|---:|---:|---:|---:|---:|---:|
+| Kensington, every inlet | 475 | 950 | 946 | **0** | 4 | 2 |
+| Council, seeded 3% sample | 322 | 644 | 628 | **0** | 16 | 2 |
+
+**Kensington through the tiles reproduces the Kensington scene.** Every status
+matches, and for inlets 1363588 and 1363621 every count of cells higher than
+baseline is identical to the table above. Inlet 1730246 no longer shows a
+difference: it sits near Kensington's edge, and its window is now the one with
+it in the middle, so the water around it is followed further before it leaves.
+
+**The invalid inlets are two drains snapped onto one cell.** Snapping moves a
+pit up to three metres onto the busiest flow cell; where a junction pit and an
+inlet land on the same cell, the engine finds the junction first. It is the
+same four Kensington runs as before the tiles, not something the tiles added.
+
+**One defect was caught by the mass-balance check on the way.** The engine
+indexes its depression stores by id, and council ids (past 21,000) reached a
+window of a few hundred depressions unrenumbered: 70% of the rain in the first
+window tried vanished into writes past the end of a typed array, and every
+comparison came back *not comparable*. The window now renumbers its hollows
+from zero, and `solvePosition` refuses ids that are not dense.
+
+Why these three amounts: all inside `RAINFALL_RANGE_MM` (0–120 mm), 20 and 60 mm
+are where the blockage sensitivity in DECISIONS-PENDING.md §1 was measured, and
+40 mm is the default with a step either side. A fourth level is a new
+validation run, not a new button.
 
 ---
 

@@ -4,7 +4,7 @@
  * Pits and pipes are published records used as provided. Surface-water paths,
  * low points and the unavailable areas are calculated from a filtered
  * photogrammetric surface. The interface calls the first `Official recorded
- * data` and the second `System-derived result`, and the map has to make that
+ * data` and the second `Calculated by DrainLens`, and the map has to make that
  * difference visible without anyone reading a legend — otherwise a derivation
  * borrows the authority of a record simply by being drawn beside one.
  *
@@ -225,14 +225,21 @@ interface Extremes {
   maxN: number;
 }
 
-const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
-  for (const point of path) {
-    if (point[0] >= seen.minE && point[0] <= seen.maxE && point[1] >= seen.minN && point[1] <= seen.maxN) {
-      return true;
-    }
-  }
-  // A shape can span the view without a vertex inside it, so fall back to its
-  // own bounds. Cheaper to do second: most shapes fail or pass on a vertex.
+/**
+ * Each shape's bounds, worked out once.
+ *
+ * Recomputed on every frame they were free at a square kilometre and 800
+ * shapes. The council-wide artefact carries about 16,000, and walking every
+ * vertex of every one of them on each frame of a drag was a large part of
+ * what made the zoomed-out map stutter. The artefact is immutable once
+ * loaded, so a path's bounds never change and can be kept against the path
+ * itself.
+ */
+const extremes = new WeakMap<readonly Local[], Extremes>();
+
+function extremesOf(path: readonly Local[]): Extremes {
+  const known = extremes.get(path);
+  if (known) return known;
   let minE = Infinity;
   let minN = Infinity;
   let maxE = -Infinity;
@@ -243,22 +250,216 @@ const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
     if (point[1] < minN) minN = point[1];
     if (point[1] > maxN) maxN = point[1];
   }
-  return minE <= seen.maxE && maxE >= seen.minE && minN <= seen.maxN && maxN >= seen.minN;
+  const found = { minE, minN, maxE, maxN };
+  extremes.set(path, found);
+  return found;
+}
+
+/**
+ * Whether any part of a shape's bounds is on screen.
+ *
+ * Bounds rather than vertices: a shape can span the view without a vertex
+ * inside it, and a vertex inside the view is always inside the bounds too, so
+ * the one test answers both.
+ */
+const pathVisible = (path: readonly Local[], seen: Extremes): boolean => {
+  const box = extremesOf(path);
+  return box.minE <= seen.maxE && box.maxE >= seen.minE && box.minN <= seen.maxN && box.maxN >= seen.minN;
 };
 
-function trace(
+/**
+ * The smallest low point drawn, as its longer side on screen, in pixels.
+ *
+ * **A display filter that changes with zoom, not a claim about the ground.**
+ * Below a pixel a hollow cannot be seen, only paid for: zoomed out over the
+ * whole council, most of the 15,000 are specks under a pixel wide, each one
+ * a fill and a stroke. Zoom in and every one of them is drawn again.
+ */
+export const LOW_POINT_MIN_PX = 1;
+
+/** Rings per path when drawing low points. See the note in `drawDerived`. */
+export const LOW_POINTS_PER_PATH = 10;
+
+/** Twice the signed area of a ring, in the map frame: its sign is its winding. */
+function windingOf(ring: readonly Local[]): number {
+  let total = 0;
+  for (let i = 1; i < ring.length; i += 1) {
+    const a = ring[i - 1];
+    const b = ring[i];
+    if (!a || !b) continue;
+    total += a[0] * b[1] - b[0] * a[1];
+  }
+  return total;
+}
+
+/**
+ * How many of these points a ring contains, by even-odd crossings. A point
+ * exactly on the edge may land either side.
+ *
+ * A council outline runs to 7,500 vertices and can hold a hundred holes, so
+ * this is most of what `joinedToPrevious` costs.
+ */
+function countInside(ring: readonly Local[], points: readonly Local[]): number {
+  let count = 0;
+  for (const point of points) {
+    const [px, py] = point;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+      const a = ring[i];
+      const b = ring[j];
+      if (!a || !b) continue;
+      if (a[1] > py !== b[1] > py && px < ((b[0] - a[0]) * (py - a[1])) / (b[1] - a[1]) + a[0]) {
+        inside = !inside;
+      }
+    }
+    if (inside) count += 1;
+  }
+  return count;
+}
+
+/**
+ * For each low-point ring in drawing order, whether it has to go into the same
+ * path as the ring before it.
+ *
+ * **The bug this exists for: a low area whose middle went white one zoom step
+ * in, and filled again one step out.** `derived.py` writes every ring as its
+ * own polygon, holes included — a hollow with a raised patch inside it is an
+ * outline followed by a ring wound the other way. The fill is non-zero, so the
+ * hole is only a hole when both rings are in one path; batched ten to a path,
+ * whether they were depended on how many rings earlier in the list happened to
+ * be on screen, which changes with every pan and zoom. Split, the hole was
+ * filled on its own over an outline that had already filled it, and read as
+ * solid blue; together it was correctly empty and read as the area vanishing.
+ * Measured on the Kensington artefact's largest low area, the 1,119 m² hole in
+ * it flipped between the two going from 1.55 to 2.4 px/m.
+ *
+ * So a hole is tied to the ring around it, and every ring between them, and a
+ * batch may only end where no hole is waiting for its outline. The outline is
+ * the nearest earlier ring of the other winding whose bounds contain the hole's
+ * and which contains most of three of its vertices — "most of", because at a
+ * diagonal pinch a hole's vertex sits on the outline itself. The outlines'
+ * winding is read from the layer rather than assumed: every hole lies inside a
+ * larger outline, so the whole layer's signed area has the outlines' sign.
+ *
+ * Culling cannot split what this joins. A hole's bounds sit inside its
+ * outline's, so whenever the hole is on screen and big enough to draw, so is
+ * the outline. Islands — a hollow inside another's hole — need nothing: each
+ * hollow's rings sum to one winding inside it and none outside, so separate
+ * hollows can share a path or not without changing a pixel.
+ *
+ * Worked out once per artefact. Over the council's 14,926 rings it is 1,951
+ * holes, each a short walk back through the list -- the longest is 162 rings
+ * -- and about 100 ms in Chrome on the first frame that draws the layer,
+ * against 40 to 60 ms for every frame of the council overview after it.
+ */
+const joins = new WeakMap<readonly DerivedPolygon[], Uint8Array>();
+
+export function joinedToPrevious(shapes: readonly DerivedPolygon[]): Uint8Array {
+  const known = joins.get(shapes);
+  if (known) return known;
+
+  const rings: (readonly Local[])[] = [];
+  const joined: number[] = [];
+  for (const shape of shapes) {
+    shape.c.forEach((ring, index) => {
+      rings.push(ring);
+      // Rings written into one polygon are one shape by definition.
+      joined.push(index > 0 ? 1 : 0);
+    });
+  }
+  const flags = Uint8Array.from(joined);
+  const winding = rings.map(windingOf);
+  const outlineSign = Math.sign(winding.reduce((sum, w) => sum + w, 0));
+  // Plain arrays for the walk back, which touches seventy thousand rings over
+  // the council and would otherwise ask the bounds cache for each of them.
+  const isOutline = winding.map((w) => w !== 0 && Math.sign(w) === outlineSign);
+  const boxes = rings.map(extremesOf);
+
+  for (let hole = 0; hole < rings.length; hole += 1) {
+    const w = winding[hole] ?? 0;
+    if (w === 0 || isOutline[hole] === true) continue;
+    const ring = rings[hole] ?? [];
+    const box = boxes[hole];
+    if (!box) continue;
+    const samples = [0, Math.floor(ring.length / 3), Math.floor((2 * ring.length) / 3)]
+      .map((i) => ring[i])
+      .filter((p): p is Local => p !== undefined);
+    for (let outline = hole - 1; outline >= 0; outline -= 1) {
+      if (isOutline[outline] !== true) continue;
+      const around = rings[outline] ?? [];
+      const bounds = boxes[outline];
+      if (!bounds || bounds.minE > box.minE || bounds.maxE < box.maxE || bounds.minN > box.minN || bounds.maxN < box.maxN) {
+        continue;
+      }
+      if (countInside(around, samples) * 2 <= samples.length) continue;
+      for (let between = outline + 1; between <= hole; between += 1) flags[between] = 1;
+      break;
+    }
+  }
+
+  joins.set(shapes, flags);
+  return flags;
+}
+
+const bigEnough = (path: readonly Local[], scale: number): boolean => {
+  const box = extremesOf(path);
+  return Math.max(box.maxE - box.minE, box.maxN - box.minN) * scale >= LOW_POINT_MIN_PX;
+};
+
+/**
+ * Add one ring to the current path. **Does not begin one.**
+ *
+ * It was split out of a `trace` that began a path per ring, because `hatch`
+ * composes a clip region from several rings at once and that `beginPath`
+ * threw away every ring but the last — so only one unavailable area was ever
+ * hatched, and *which* one changed as the view moved. On screen that was
+ * areas flickering and disappearing while the map was dragged. The low points
+ * now build one path the same way, and `trace` had no callers left.
+ */
+function addRing(
   context: CanvasRenderingContext2D,
   viewport: Viewport,
   path: readonly Local[],
 ): void {
-  context.beginPath();
+  const screen = onScreen(viewport, path);
+  for (let index = 0; index < screen.length; index += 1) {
+    const point = screen[index];
+    if (!point) continue;
+    if (index === 0) context.moveTo(point[0], point[1]);
+    else context.lineTo(point[0], point[1]);
+  }
+}
+
+/**
+ * A path's vertices on screen, leaving out any within `MIN_STEP_PX` of the
+ * last one kept.
+ *
+ * Zoomed out over the whole council the low points alone are 400,000 vertices,
+ * most of them a fraction of a pixel from their neighbour. Leaving those out
+ * took that layer from 191 ms a frame to about 50 ms in Chrome, and changes
+ * nothing zoomed in: the pipeline already simplified to a metre, so at street
+ * zoom no two vertices are this close. The first and last are always kept, so
+ * a ring still closes where it started and a channel still ends where it ends.
+ */
+export const MIN_STEP_PX = 2;
+
+function onScreen(viewport: Viewport, path: readonly Local[]): (readonly [number, number])[] {
+  const kept: (readonly [number, number])[] = [];
+  let lastX = 0;
+  let lastY = 0;
   for (let index = 0; index < path.length; index += 1) {
     const point = path[index];
     if (!point) continue;
     const [x, y] = toScreen(viewport, point);
-    if (index === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
+    const first = kept.length === 0;
+    const last = index === path.length - 1;
+    if (first || last || Math.abs(x - lastX) + Math.abs(y - lastY) >= MIN_STEP_PX) {
+      kept.push([x, y]);
+      lastX = x;
+      lastY = y;
+    }
   }
+  return kept;
 }
 
 /**
@@ -276,9 +477,11 @@ function hatch(
   palette: DerivedPalette,
 ): void {
   context.save();
+  // One path, every ring in it. `trace` would begin a new one per ring and
+  // clip to whichever came last.
   context.beginPath();
   for (const ring of rings) {
-    trace(context, viewport, ring);
+    addRing(context, viewport, ring);
     context.closePath();
   }
   context.clip();
@@ -286,8 +489,31 @@ function hatch(
   context.strokeStyle = palette.hatch;
   context.lineWidth = 1;
   context.beginPath();
+
+  /*
+    **The pattern is anchored to the ground, not to the screen.**
+
+    These lines were laid out from the canvas's own left edge, so they stayed
+    put while the map moved underneath them — dragging made the hatching crawl
+    through the shapes it belongs to, which reads as the shapes shimmering.
+    Reported as *"it wobbles while dragging"*, and it had been true since the
+    layer was written; the clip fix only made it visible in more places at once.
+
+    Every line here satisfies `x - y = offset`, so a pan of `(dx, dy)` moves
+    the ground under them by `dx - dy` in that quantity. Shifting the whole
+    family by the same amount — read off where the extent's own corner lands —
+    makes the hatching travel with the map. Taken modulo the spacing so the
+    number stays small however far somebody has panned.
+
+    It has a second effect worth having: neighbouring areas now share one
+    continuous pattern rather than each carrying its own, so a cluster of small
+    shapes reads as one texture instead of a scatter of independent ones.
+  */
+  const [originX, originY] = toScreen(viewport, [0, 0]);
+  const phase = (((originX - originY) % HATCH_SPACING_PX) + HATCH_SPACING_PX) % HATCH_SPACING_PX;
+
   const reach = viewport.widthPx + viewport.heightPx;
-  for (let offset = -viewport.heightPx; offset < reach; offset += HATCH_SPACING_PX) {
+  for (let offset = -viewport.heightPx + phase; offset < reach; offset += HATCH_SPACING_PX) {
     context.moveTo(offset, 0);
     context.lineTo(offset + viewport.heightPx, viewport.heightPx);
   }
@@ -334,19 +560,47 @@ export function drawDerived(
   }
 
   if (show.lowPoint) {
+    /*
+      **A few rings to a path**, not one each and not all at once.
+
+      One fill and one dashed stroke per ring was 30,000 draw calls a frame
+      over the whole council and most of a 236 ms frame. One path holding
+      every ring is worse: Chrome's cost for filling and dashing a path grows
+      faster than its length, and 15,000 rings in one path hung the tab.
+      Measured on 2,000 real rings -- one per path 51 ms, 10 per path 12 ms,
+      50 19 ms, 200 24 ms. Separate hollows never overlap, so batching paints
+      the same pixels and every edge keeps its dash -- **provided a hole is
+      never cut off from its outline**, which is what `joinedToPrevious` holds
+      a batch open for. A batch can run past ten rings to do it.
+    */
     context.fillStyle = palette.lowPoint;
     context.strokeStyle = palette.lowPointEdge;
     context.lineWidth = 1;
     context.setLineDash([...LOW_POINT_DASH]);
-    for (const shape of artefact.layers['low-point'] ?? []) {
+    let inPath = 0;
+    const flush = (): void => {
+      if (inPath === 0) return;
+      context.fill();
+      context.stroke();
+      inPath = 0;
+    };
+    const shapes = artefact.layers['low-point'] ?? [];
+    const joined = joinedToPrevious(shapes);
+    let at = -1;
+    for (const shape of shapes) {
       for (const ring of shape.c) {
-        if (!pathVisible(ring, seen)) continue;
-        trace(context, viewport, ring);
+        at += 1;
+        if (!pathVisible(ring, seen) || !bigEnough(ring, viewport.scale)) continue;
+        // Full, and this ring starts something new rather than finishing a
+        // hollow the path already holds the outline of.
+        if (inPath >= LOW_POINTS_PER_PATH && joined[at] !== 1) flush();
+        if (inPath === 0) context.beginPath();
+        addRing(context, viewport, ring);
         context.closePath();
-        context.fill();
-        context.stroke();
+        inPath += 1;
       }
     }
+    flush();
     context.setLineDash([]);
   }
 
@@ -360,7 +614,7 @@ export function drawDerived(
     context.setLineDash([...CHANNEL_DASH]);
     for (const line of artefact.layers.channel ?? []) {
       if (!pathVisible(line.c, seen)) continue;
-      const screen = line.c.map((point) => toScreen(viewport, point));
+      const screen = onScreen(viewport, line.c);
       drawn.push(screen);
       context.beginPath();
       for (let i = 0; i < screen.length; i += 1) {

@@ -16,6 +16,8 @@ import {
   LICENCE_URL,
   creditLine,
   creditsFor,
+  creditsForSources,
+  licenceUrl,
   describeDatasets,
 } from './attribution.js';
 
@@ -167,5 +169,27 @@ describe('what the licence requires', () => {
 
   it('does not claim the derived layers are the council own work', () => {
     expect(CHANGES_NOTICE.toLowerCase()).not.toMatch(/published by the city|official/);
+  });
+});
+
+describe('the flood map credits its own sources', () => {
+  it('names the SES and the ABS, one line per publisher and licence', () => {
+    const credits = creditsForSources([
+      { publisher: 'Victoria State Emergency Service', licence: 'CC BY 4.0', dataset_id: 'vicses' },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', dataset_id: '1270.0.55.001' },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', dataset_id: '3218.0' },
+      undefined,
+    ]);
+    expect(credits).toEqual([
+      { publisher: 'Victoria State Emergency Service', licence: 'CC BY 4.0', datasets: ['vicses'], lastModified: null },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', datasets: ['1270.0.55.001', '3218.0'], lastModified: null },
+    ]);
+  });
+
+  it('links each licence to its own deed', () => {
+    // Every credit linked CC BY 4.0 while every source was the council's; the
+    // ABS publishes under CC BY 2.5 Australia.
+    expect(licenceUrl('CC BY 2.5 AU')).toBe('https://creativecommons.org/licenses/by/2.5/au/');
+    expect(licenceUrl('CC BY 4.0')).toBe(LICENCE_URL);
   });
 });

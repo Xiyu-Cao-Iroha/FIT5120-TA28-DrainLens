@@ -22,44 +22,122 @@
  * stores such a preference today.
  */
 
-import type {
-  BlockageSetting,
-  ComparisonBand,
-  InsufficiencyReason,
+import {
+  type BlockageSetting,
+  type ComparisonBand,
+  type InsufficiencyReason,
+  isValidatedRainfall,
 } from '@drainlens/schema';
 
 import type { MapMode } from './map/modes.js';
+import {
+  NOTHING_LEARNED,
+  type Learned,
+  type SectionId,
+  allLearned,
+} from './tutorial/sections.js';
 
 /**
  * Which screen the person is on.
  *
- * **Four of these are unreachable, and deliberately so.**
+ * **None of these is hidden any more.** Four were until 11 September, and
+ * three until 13 September.
  *
- * `address` and `task` were the two steps between the homepage and the map.
- * Since 3 September the homepage opens the map directly and an address is
- * named in the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put
- * it. `scenario` and `result` are the drain-blockage comparison, which AC
- * 1.1.1 requires to be absent from the Iteration 1 interface.
+ * `task` was one of two steps between the homepage and the map. Since
+ * 3 September the homepage opens the map directly and an address is named in
+ * the map's own search bar, which is where AC 1.1.2 and AC 1.1.3 put it.
+ * `scenario` and `result` are the drain-blockage comparison, which AC 1.1.1
+ * kept out of the Iteration 1 interface.
  *
- * All four are kept rather than deleted: their screens and tests are intact,
- * and Iteration 2 decides whether to restore them or remove them. Nothing
- * dispatches an event that reaches any of them, which is what makes them
- * hidden rather than merely unvisited.
+ * **`address` stopped being one of them on 11 September.** The guide asks
+ * where you live before it can point at a pit near you, and this is the screen
+ * that asks — built in August, unreachable since 3 September, and reached
+ * again without being rewritten. Kept code that turns out to be needed is the
+ * argument for keeping it, and it is worth saying once that the argument paid.
+ *
+ * **`scenario`, `result` and `task` came back on 13 September**, for AC 3.1.1:
+ * the homepage's comparison card asks for an address and opens the comparison,
+ * a drain on the full map opens it directly (`scenario-from-map`), and the
+ * comparison's *Choose a task* breadcrumb reaches `task`. The same argument as
+ * `address`: they were kept rather than deleted, with their tests, and were
+ * reached again rather than rewritten.
  */
 export type Screen =
   /** What somebody lands on: what this is, before it asks anything of them. */
   | 'home'
   /** The recorded flood incidents, which are about the past and not this address. */
   | 'history'
-  /** Unreachable — the map's search bar took this over. */
+  /**
+   * The same incidents as a map of all 281 areas, in two modes.
+   *
+   * A separate screen from the board rather than a tab on it, because the
+   * board is a ranking of thirty and the map is every area in scope. AC
+   * 2.2.1.b caps the board at thirty and nothing here changes that: the map
+   * reads its own artefact.
+   */
+  | 'flood-map'
+  /** The guide's way in, and reachable again since 11 September. */
   | 'address'
-  /** Unreachable — the homepage's cards took this over. */
+  /** The task question, reached from the comparison's breadcrumb. */
   | 'task'
   | 'explore'
-  /** Unreachable — the comparison is out of the Iteration 1 interface. */
+  /**
+   * The guide: the real map with a coach beside it, one section at a time.
+   *
+   * Added 11 September, after the mentor's point that the user journey was
+   * somebody arriving at a square kilometre with four layers and no basemap
+   * and being left to it. It reuses `address` as its way in, which is why that
+   * screen is no longer unreachable and the note above it is no longer whole.
+   */
+  /**
+   * "What do you want to explore first?" — the front door from 11 September.
+   *
+   * *Get started* lands here rather than on the map, which is the mentor's
+   * point made structural rather than written on a card.
+   */
+  | 'choose'
+  | 'guide'
+  /**
+   * The whole map, asked for before the guide is finished.
+   *
+   * Not a refusal. It is the four things somebody is about to read without
+   * having been told what they are, and a five-second wait before the way in
+   * is offered — after which it opens whether or not any of the guide has been
+   * done. See `LOCK_NOTICE`.
+   */
+  | 'locked'
+  /**
+   * **The blocked-drain comparison is five screens from 15 September**, one per
+   * step of the Blockage Flow prototype: choose a drain, make the choices,
+   * review them, read the result — and, before any of those, the stop for an
+   * address with no drain the comparison can use.
+   *
+   * It used to be one screen with four numbered sections and a *Use this
+   * drain* confirmation, which let somebody set a condition and an amount of
+   * rain for an address the engine was always going to refuse. A screen per
+   * step is what lets the reducer say which way each step can go, and which it
+   * cannot: nothing leads from `no-match` to a drain, an assumption or a
+   * rainfall control.
+   *
+   * Step 1. The map, the highlighted nearest drain and nothing else.
+   */
+  | 'drain'
+  /**
+   * Step 2: the condition and the rainfall, beside the map. From step 1, or
+   * straight from a drain on the full map (`scenario-from-map`).
+   */
   | 'scenario'
-  /** Unreachable — as above. */
+  /** Step 3: what will be compared, and the button that runs it. The run's progress shows here too. */
+  | 'review'
+  /** The comparison's result. */
   | 'result'
+  /**
+   * No drain near this address can be compared, said before any setup.
+   *
+   * Reached only from `drain`, once the eligibility check has answered. The
+   * ways out are another address, the example address and the full map.
+   */
+  | 'no-match'
   | 'unsupported';
 
 /**
@@ -93,7 +171,16 @@ export interface ScenarioInputs {
   readonly pitId: string | null;
   readonly pitWasSuggested: boolean;
   readonly blockage: BlockageSetting | null;
-  readonly rainfallMm: number;
+  /**
+   * Null until chosen, for the reason `blockage` is.
+   *
+   * It defaulted to 40 mm until 15 September. The prototype's step 2 keeps
+   * *Review your choices* disabled until both are chosen, and a rainfall the
+   * interface pre-selected is an assumption the person carries into a result
+   * without having made it — the argument AC 2.1.1 (Aug-27 set) made for the
+   * blockage, which applies to the rain word for word.
+   */
+  readonly rainfallMm: number | null;
 }
 
 export type Outcome =
@@ -117,19 +204,80 @@ export interface Session {
   readonly mapMode: MapMode | null;
   /** The page the map was opened from — AC 1.1.10. */
   readonly mapOrigin: MapOrigin;
+  /**
+   * How many times the map has been arrived at. Only ever used as an identity.
+   *
+   * **The map is meant to start clean every time somebody enters it** — no pit
+   * selected, no trace drawn, no card left over from the last visit — and
+   * until now that was true only because React happened to unmount `MapView`
+   * on the way out. Nothing said so, nothing tested it, and the day somebody
+   * lifts the selection into this session the way `mapMode` was lifted, it
+   * silently stops being true.
+   *
+   * So the map is keyed on this and remounts by construction. Counting
+   * arrivals rather than naming them is deliberate: the rule is *entering the
+   * map*, and there are three ways to do it — the homepage, a task, and the
+   * way back from a result — which is three chances to forget one.
+   */
+  readonly mapOpenings: number;
+  /**
+   * Which sections of the guide are finished.
+   *
+   * Held here because the session is what the screens read, and mirrored onto
+   * the device by `tutorial/progress.ts` so it survives a reload. **This is
+   * the authoritative copy**: a device that will not store anything still
+   * finishes the guide, it just starts again next time.
+   */
+  readonly learned: Learned;
+  /** The section being taught, or null outside the guide. */
+  readonly guideSection: SectionId | null;
+  /**
+   * A task chosen before an address was given, waiting for one.
+   *
+   * The same shape of problem `guideSection` solves, for the other question
+   * the address screen is asked on behalf of. A homepage card naming a task
+   * cannot go straight to it — every task screen is about somewhere — so it
+   * asks for an address first and this remembers what it was for.
+   *
+   * **Null is not "no task", it is "nobody is waiting".** With nothing
+   * pending, an accepted address lands on the task question, which is what it
+   * did before any of this and is still right for somebody who arrived by
+   * changing their address rather than by choosing a task.
+   */
+  readonly pendingTask: Task | null;
+  /**
+   * Which screen asked for the pending task, so Back from the address screen
+   * returns there. The homepage and the chooser both offer the comparison
+   * since 15 September, and Back from an address asked for by the chooser
+   * landing on the homepage would skip the screen the person was just on.
+   */
+  readonly pendingTaskFrom: 'home' | 'choose';
+  /**
+   * Where the comparison was opened from: the task question, or a drain on the
+   * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
+   * has no task question behind it, and may have no address at all.
+   */
+  readonly scenarioOrigin: 'task' | 'map';
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
+  /**
+   * The run the screen is waiting for, or null.
+   *
+   * **Cancel has to mean the answer is not shown.** The worker cannot be
+   * stopped halfway through a solve, so a cancelled run still replies — and a
+   * reply that arrived after Cancel, or after a second run was started, used to
+   * be indistinguishable from the one being waited for. `comparison-finished`
+   * is taken only from the run named here.
+   */
+  readonly run: number | null;
 }
-
-/** The middle of the three published comparison amounts. */
-export const DEFAULT_RAINFALL_MM = 40;
 
 export const EMPTY_SCENARIO: ScenarioInputs = {
   pitId: null,
   pitWasSuggested: false,
   blockage: null,
-  rainfallMm: DEFAULT_RAINFALL_MM,
+  rainfallMm: null,
 };
 
 export const INITIAL_SESSION: Session = {
@@ -139,9 +287,16 @@ export const INITIAL_SESSION: Session = {
   task: null,
   mapMode: null,
   mapOrigin: 'home',
+  mapOpenings: 0,
+  learned: NOTHING_LEARNED,
+  guideSection: null,
+  pendingTask: null,
+  pendingTaskFrom: 'home',
+  scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
   running: false,
+  run: null,
 };
 
 export type SessionEvent =
@@ -156,13 +311,88 @@ export type SessionEvent =
    * that belongs to the old neighbourhood.
    */
   | { readonly type: 'address-moved'; readonly address: SupportedAddress }
+  /**
+   * The address let go of, from the map's search box.
+   *
+   * There was no way to do this. The box showed a chosen address as its
+   * *placeholder* and cleared what was typed, so the clear button — gated on
+   * there being typed text — vanished at exactly the moment there was
+   * something to clear, and the mark stayed on the map with no control that
+   * removed it. An address you cannot take back is a stronger commitment than
+   * this product asks for: nothing about it is stored, and it should be no
+   * harder to drop than it was to set.
+   *
+   * It drops the pit for the same reason `address-moved` does. A pit chosen
+   * near an address is an answer to a question about that address.
+   */
+  | { readonly type: 'address-cleared' }
   | { readonly type: 'address-rejected'; readonly typed: string }
   | { readonly type: 'task-chosen'; readonly task: Task }
+  /**
+   * A task chosen somewhere that has no address yet.
+   *
+   * `task-chosen` assumes one: it is dispatched from the task question, which
+   * is only reached by giving an address. The homepage has no address and is
+   * where AC 3.1.1 needs the comparison to be offered from, so this is the
+   * same choice made one screen earlier — it collects the address first and
+   * then does exactly what `task-chosen` does.
+   */
+  | { readonly type: 'task-wanted'; readonly task: Task; readonly from?: 'home' | 'choose' }
+  /** Back to the task question from a task -- the comparison's breadcrumb. */
+  | { readonly type: 'task-reconsidered' }
+  /**
+   * The comparison, opened on a drain chosen on the map (AC 3.1.1: "given the
+   * user is viewing the local drainage map, when the user opens the Scenario
+   * Explorer"). No address is needed: the drain is the location.
+   */
+  | { readonly type: 'scenario-from-map'; readonly pitId: string }
   | { readonly type: 'pit-selected'; readonly pitId: string; readonly suggested: boolean }
   | { readonly type: 'blockage-selected'; readonly blockage: BlockageSetting }
   | { readonly type: 'rainfall-selected'; readonly rainfallMm: number }
-  | { readonly type: 'comparison-started' }
-  | { readonly type: 'comparison-finished'; readonly outcome: Outcome }
+  /**
+   * A run begins. `run` names it, so that only its answer is shown; see
+   * `Session.run`. Starting moves to step 3, where the progress is drawn.
+   */
+  | { readonly type: 'comparison-started'; readonly run?: number }
+  /** A run's answer. Ignored unless it is the run being waited for. */
+  | { readonly type: 'comparison-finished'; readonly outcome: Outcome; readonly run?: number }
+  /** Cancel, while comparing: back to the review, and the answer is dropped when it comes. */
+  | { readonly type: 'comparison-cancelled' }
+  /**
+   * The eligibility check found no comparable drain near the address.
+   *
+   * Dispatched by the screen, because the check needs the worker's list of
+   * comparable drains and the reducer holds no data. What it may do with the
+   * answer is decided here: only step 1 can become the no-match state.
+   */
+  | { readonly type: 'drains-none-nearby' }
+  /** *Review your choices*: step 2 to step 3, only when all three are chosen. */
+  | { readonly type: 'choices-reviewed' }
+  /** *Change my choices*: step 3 back to step 2, with everything still chosen. */
+  | { readonly type: 'choices-changed' }
+  /**
+   * *Return to the map*, or the *Choose a drain* crumb: step 1 again.
+   *
+   * The drain is let go of — step 1 is the question of which drain — and the
+   * condition and rainfall are kept, because they were the person's own. A
+   * comparison opened from the full map has no address to find a drain near,
+   * so it returns to the full map instead.
+   */
+  | { readonly type: 'drains-reopened' }
+  /**
+   * *Try another address*, from the no-match state or the *Address search*
+   * crumb: the address screen with the comparison still waiting, so the next
+   * address lands on step 1 rather than on the task question.
+   */
+  | { readonly type: 'another-address-wanted' }
+  /** *Try an example address*: the demonstration address, straight into step 1. */
+  | { readonly type: 'example-address-chosen'; readonly address: SupportedAddress }
+  /**
+   * The rainfall control on the result: another amount the same run already
+   * solved (AC 3.2.1). Carries that amount's band from the cache, and never
+   * starts a run.
+   */
+  | { readonly type: 'result-rainfall'; readonly rainfallMm: number; readonly band: ComparisonBand }
   | { readonly type: 'back' }
   /**
    * Into the map without answering anything first.
@@ -189,26 +419,143 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  /** The board's map, which is the same records drawn rather than ranked. */
+  | { readonly type: 'flood-map-opened' }
+  /** The homepage's front door: the four cards, not the map. */
+  | { readonly type: 'get-started' }
+  /**
+   * Start a section of the guide.
+   *
+   * It goes to the address screen rather than to the map, because the guide
+   * cannot point at a pit near you until it knows where you are — and because
+   * "press the pit near your address" is the sentence the whole section is
+   * built around. The address is the first thing it needs, not a detail it
+   * collects later.
+   */
+  | { readonly type: 'guide-chosen'; readonly section: SectionId }
+  /**
+   * A section finished.
+   *
+   * Marks it learned and goes back to the four, which is what the design draws
+   * and the only screen that can show the person what they have and have not
+   * done. Carrying straight on to the next section would decide for them.
+   */
+  | { readonly type: 'guide-finished' }
+  /**
+   * Left a section from its entry screen without starting it.
+   *
+   * *Skip for now* on the ground height guide's first screen. Back to the
+   * four, like finishing, but nothing is marked learned: nothing was.
+   */
+  | { readonly type: 'guide-left' }
+  /** The notice was read and the wait is over. */
+  | { readonly type: 'lock-passed' }
   /** Back out of the map, to whichever page opened it — AC 1.1.10. */
   | { readonly type: 'leave-map' }
   | { readonly type: 'go-home' }
+  /**
+   * Left the address screen without giving one.
+   *
+   * Where that goes depends on why the screen was open, which is why it is a
+   * reducer decision and not two buttons wired to two actions in the view: a
+   * guide section is pending exactly when the chooser sent somebody here, and
+   * otherwise this screen was reached from the homepage. The view would have
+   * to read `guideSection` to work that out, and then two places would know
+   * the rule.
+   */
+  | { readonly type: 'address-abandoned' }
   | { readonly type: 'change-address' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
 /** Where `back` goes from each screen. */
+/**
+ * Where a task opens.
+ *
+ * One line, in one place, because two screens now send somebody to a task:
+ * the task question, which has an address, and the homepage, which does not.
+ * A second copy of this would be a homepage card that opens a different
+ * screen from the card with the same name one step further in.
+ */
+const screenForTask = (task: Task): Screen => (task === 'compare' ? 'drain' : 'explore');
+
+/**
+ * The comparison's steps, where choosing a drain on the map means something.
+ *
+ * On the full map a pit selection is the map's own business. Here it is the
+ * prototype's pin click: one click completes step 1, and a different drain
+ * clicked later re-runs that same transition from wherever the person is.
+ */
+const CHOOSING_A_DRAIN: ReadonlySet<Screen> = new Set<Screen>(['drain', 'scenario', 'review', 'result']);
+
+/** Starting the comparison over at step 1: no drain, no result, nothing running. */
+const atStepOne = (session: Session): Session => ({
+  ...session,
+  screen: 'drain',
+  task: 'compare',
+  scenarioOrigin: 'task',
+  // The drain belongs to step 1's question. The assumptions are the person's.
+  scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+  outcome: null,
+  running: false,
+  run: null,
+});
+
 const BACK: Readonly<Record<Screen, Screen>> = {
   home: 'home',
   history: 'home',
+  // Back from the map is the board it was opened from, not the homepage. The
+  // board is where the ranking and the six sentences about what a count means
+  // live, and they are what somebody leaving the map most likely wants.
+  'flood-map': 'history',
   address: 'home',
   task: 'address',
+  // Out of a section is back to the address it was built around, not out of
+  // the guide altogether. The way out of the guide is the Home control.
+  choose: 'home',
+  guide: 'address',
+  locked: 'choose',
   explore: 'task',
-  scenario: 'task',
+  drain: 'address',
+  scenario: 'drain',
+  review: 'scenario',
   result: 'scenario',
+  'no-match': 'address',
   unsupported: 'address',
 };
 
+/**
+ * One rule about arriving at the map, applied to every route into it.
+ *
+ * Counting the arrival here rather than inside each case is the point: three
+ * different events can put somebody on the map, and a rule written three times
+ * is a rule that will be right twice. What the count is *for* is on
+ * `mapOpenings` — the short version is that the map remounts, so nothing is
+ * carried in from the last visit.
+ */
+/**
+ * Let go of the address and everything that belonged to its street.
+ *
+ * The same fields `address-cleared` resets. Used where the team asks for the
+ * address to be entered again: each guide, and each visit to the full map.
+ */
+function forgetAddress(session: Session): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome'> {
+  return {
+    address: null,
+    rejectedAddress: null,
+    scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+    outcome: null,
+  };
+}
+
 export function reduce(session: Session, event: SessionEvent): Session {
+  const next = step(session, event);
+  return next.screen === 'explore' && session.screen !== 'explore'
+    ? { ...next, mapOpenings: next.mapOpenings + 1 }
+    : next;
+}
+
+function step(session: Session, event: SessionEvent): Session {
   switch (event.type) {
     case 'address-moved':
       return {
@@ -223,10 +570,82 @@ export function reduce(session: Session, event: SessionEvent): Session {
           : {}),
       };
 
-    case 'address-accepted':
+    case 'get-started':
+      return { ...session, screen: 'choose' };
+
+    case 'guide-chosen':
       return {
         ...session,
-        screen: 'task',
+        /*
+          Every guide opens on the address screen, empty (team decision,
+          16 September).
+
+          It skipped straight to the guide once an address was known, so the
+          second guide started on the first guide's street with no moment to
+          choose another. The team's rule is that an address is entered for
+          each guide and each visit to the full map, so the one given before is
+          let go here rather than offered back. See `forgetAddress`.
+        */
+        screen: 'address',
+        ...forgetAddress(session),
+        guideSection: event.section,
+        // The map's mode follows the section, so finishing the guide and
+        // opening the map shows the thing that was just taught rather than
+        // whatever was last looked at.
+        mapMode: event.section,
+      };
+
+    case 'guide-finished': {
+      const section = session.guideSection;
+      if (section === null) return session;
+      return {
+        ...session,
+        // Back to the four, which is the only screen that can show what has
+        // and has not been done. Carrying straight on would decide for them.
+        screen: 'choose',
+        guideSection: null,
+        learned: { ...session.learned, [section]: true },
+      };
+    }
+
+    case 'guide-left':
+      return session.guideSection === null
+        ? session
+        : { ...session, screen: 'choose', guideSection: null };
+
+    case 'address-cleared':
+      return {
+        ...session,
+        address: null,
+        rejectedAddress: null,
+        scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
+        outcome: null,
+      };
+
+    case 'address-accepted':
+      // The comparison was waiting: step 1, with the eligibility check next.
+      if (session.guideSection === null && session.pendingTask === 'compare') {
+        return atStepOne({
+          ...session,
+          pendingTask: null,
+          address: event.address,
+          rejectedAddress: null,
+        });
+      }
+      return {
+        ...session,
+        // The same screen answers two questions now. It asks for an address
+        // and hands it to whoever was waiting: the guide, when a section is
+        // running, and the task question otherwise -- which is where this
+        // always went and is currently unreachable.
+        screen:
+          session.guideSection !== null
+            ? 'guide'
+            : session.pendingTask === null
+              ? 'task'
+              : screenForTask(session.pendingTask),
+        ...(session.pendingTask === null ? {} : { task: session.pendingTask }),
+        pendingTask: null,
         address: event.address,
         rejectedAddress: null,
         // A different address invalidates the pit, which belongs to the old
@@ -243,45 +662,197 @@ export function reduce(session: Session, event: SessionEvent): Session {
     case 'address-rejected':
       return { ...session, screen: 'unsupported', rejectedAddress: event.typed };
 
+    case 'task-wanted':
+      // With an address already in hand this is `task-chosen`, and saying so
+      // by falling through would be cheaper than the recursion. It would also
+      // be two cases that have to be kept the same by hand.
+      //
+      // **It takes over from a guide section left pending.** Choosing a guide,
+      // backing out of the address screen and going home leaves
+      // `guideSection` set, and `address-accepted` gives the guide priority —
+      // so the comparison button on the homepage used to deliver somebody to a
+      // guide they had abandoned. The task is the more recent answer, the same
+      // rule `leaves the guide in charge when both are waiting` applies the
+      // other way round.
+      //
+      // **The comparison always asks, even with an address in hand**, from 15
+      // September. The team's brief for the blocked-drain flow starts with
+      // searching an address, the homepage button says *Search an address to
+      // start*, and the address given earlier in the tab may have been for a
+      // different reason entirely. The search box is one keystroke from the
+      // same street, and the eligibility check that follows is about the
+      // address the person has just confirmed.
+      return session.address === null || event.task === 'compare'
+        ? {
+            ...session,
+            screen: 'address',
+            pendingTask: event.task,
+            pendingTaskFrom: event.from ?? 'home',
+            guideSection: null,
+          }
+        : reduce({ ...session, guideSection: null }, { type: 'task-chosen', task: event.task });
+
     case 'task-chosen':
+      if (event.task === 'compare') {
+        return atStepOne({ ...session, pendingTask: null, mapMode: null });
+      }
       return {
         ...session,
-        screen: event.task === 'compare' ? 'scenario' : 'explore',
+        screen: screenForTask(event.task),
         task: event.task,
+        pendingTask: null,
+        scenarioOrigin: 'task',
         // The other way into the map. A mode left over from an earlier trip
         // through the homepage would quietly override the task's own defaults.
         mapMode: null,
       };
 
     case 'pit-selected':
+      if (!CHOOSING_A_DRAIN.has(session.screen)) {
+        return {
+          ...session,
+          scenario: { ...session.scenario, pitId: event.pitId, pitWasSuggested: event.suggested },
+        };
+      }
+      // Nothing changes under a run in progress: its answer is about the drain it started with.
+      if (session.running) return session;
       return {
         ...session,
+        /*
+          Step 2, from any step. One click completes step 1 — there is no
+          second *Use this drain* — and a different drain chosen on the review
+          or the result is the same transition again, not a trip back to
+          step 1.
+
+          **The condition and the rainfall are kept.** They are the person's
+          assumptions, not facts about the drain, which is the rule a new
+          address already follows; clearing them would make somebody who
+          wanted the same test one drain along set it up again. A result is
+          dropped, because it was about the other drain.
+        */
+        screen: 'scenario',
         scenario: { ...session.scenario, pitId: event.pitId, pitWasSuggested: event.suggested },
+        outcome: null,
       };
 
     case 'blockage-selected':
       return { ...session, scenario: { ...session.scenario, blockage: event.blockage } };
 
     case 'rainfall-selected':
+      // Only a validated level (AC 3.2.3.b). Anything else is ignored rather
+      // than stored: a stored 35 mm would be shown in the summary as if it
+      // were a choice the explorer offered.
+      if (!isValidatedRainfall(event.rainfallMm)) return session;
       return { ...session, scenario: { ...session.scenario, rainfallMm: event.rainfallMm } };
 
     case 'comparison-started':
-      return { ...session, running: true, outcome: null };
+      return { ...session, screen: 'review', running: true, outcome: null, run: event.run ?? null };
 
     case 'comparison-finished':
+      // Only the answer being waited for. After Cancel nothing is; after a
+      // second start, it is the second run's.
+      if (!session.running || (event.run ?? null) !== session.run) return session;
       return { ...session, running: false, screen: 'result', outcome: event.outcome };
 
+    case 'comparison-cancelled':
+      // The prototype's C5 to C4: back to the review, with every choice intact.
+      if (!session.running) return session;
+      return { ...session, running: false, run: null, screen: 'review' };
+
+    case 'drains-none-nearby':
+      // Only step 1 can become the stop. A late answer about an address the
+      // person has already left must not pull them back to it.
+      return session.screen === 'drain'
+        ? { ...session, screen: 'no-match', scenario: { ...session.scenario, pitId: null, pitWasSuggested: false } }
+        : session;
+
+    case 'choices-reviewed':
+      return session.screen === 'scenario' && canRunComparison(session.scenario)
+        ? { ...session, screen: 'review' }
+        : session;
+
+    case 'choices-changed':
+      return session.screen === 'review' && !session.running ? { ...session, screen: 'scenario' } : session;
+
+    case 'drains-reopened':
+      if (session.address === null) {
+        return { ...session, screen: 'explore', task: 'full-map', outcome: null, running: false, run: null };
+      }
+      return atStepOne(session);
+
+    case 'another-address-wanted':
+      return {
+        ...session,
+        screen: 'address',
+        pendingTask: 'compare',
+        guideSection: null,
+        outcome: null,
+        running: false,
+        run: null,
+      };
+
+    case 'example-address-chosen':
+      return atStepOne({
+        ...session,
+        address: event.address,
+        rejectedAddress: null,
+        pendingTask: null,
+        guideSection: null,
+      });
+
+    case 'result-rainfall':
+      if (session.screen !== 'result' || session.outcome?.kind !== 'comparison') return session;
+      if (!isValidatedRainfall(event.rainfallMm)) return session;
+      return {
+        ...session,
+        scenario: { ...session.scenario, rainfallMm: event.rainfallMm },
+        outcome: { kind: 'comparison', band: event.band },
+      };
+
     case 'back':
+      if (session.screen === 'scenario' && session.scenarioOrigin === 'map') {
+        return { ...session, screen: 'explore' };
+      }
       return { ...session, screen: BACK[session.screen] };
+
+    case 'scenario-from-map':
+      return {
+        ...session,
+        screen: 'scenario',
+        task: 'compare',
+        pendingTask: null,
+        scenarioOrigin: 'map',
+        // The drain is chosen; the blockage is not. A pre-selected assumption
+        // is one the interface made on the person's behalf.
+        scenario: { ...EMPTY_SCENARIO, rainfallMm: session.scenario.rainfallMm, pitId: event.pitId },
+        outcome: null,
+      };
 
     case 'map-opened':
       return {
         ...session,
-        screen: 'explore',
+        /*
+          Every route to the whole map goes through one gate, and it is here
+          rather than at the routes.
+
+          There are three ways in today and the flood board may add a fourth;
+          a lock written at each of them is a lock that will be right at most
+          of them. The same argument as `mapOpenings` a few lines down, which
+          was written after a rule spread across three cases.
+        */
+        screen: allLearned(session.learned) ? 'explore' : 'locked',
+        // The full map starts with no address, whatever was searched before
+        // (team decision, 16 September); the map's own search box asks again.
+        ...forgetAddress(session),
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',
       };
+
+    case 'lock-passed':
+      // The five seconds are up and the notice was read. Nothing is recorded:
+      // this is a decision about one press, not a fact about the person.
+      return { ...session, screen: 'explore' };
 
     case 'leave-map':
       // AC 1.1.10. Not `back`, which walks a fixed chain: the map has two ways
@@ -291,8 +862,43 @@ export function reduce(session: Session, event: SessionEvent): Session {
     case 'history-opened':
       return { ...session, screen: 'history' };
 
+    case 'flood-map-opened':
+      return { ...session, screen: 'flood-map' };
+
     case 'go-home':
-      return { ...session, screen: 'home' };
+      return { ...session, screen: 'home', pendingTask: null };
+
+    case 'address-abandoned':
+      // Back to whoever asked. The pending section is left alone: pressing
+      // Back does not un-choose the part of the guide, it just stops short of
+      // giving an address, and the chooser it lands on will set it again.
+      //
+      // **A pending task is dropped, and that asymmetry is deliberate.** The
+      // chooser re-sets the section every time it is used; the homepage does
+      // not, so a task kept here would sit through a visit to the map and
+      // then divert the next address somebody gives for an unrelated reason.
+      return {
+        ...session,
+        screen:
+          session.guideSection !== null ||
+          (session.pendingTask !== null && session.pendingTaskFrom === 'choose')
+            ? 'choose'
+            : 'home',
+        pendingTask: null,
+        pendingTaskFrom: 'home',
+      };
+
+    case 'task-reconsidered':
+      /*
+        Back to the task question, which the comparison's own breadcrumb has
+        claimed to do since it was written and did not: it dispatched
+        `task-chosen` with the task already chosen, so 'Choose a task' led
+        back to the screen it was pressed on. Nobody noticed because the
+        screen it names had no way in at all.
+
+        Guarded on the address because the task screen puts one on itself.
+      */
+      return session.address === null ? session : { ...session, screen: 'task' };
 
     case 'change-address':
       return { ...session, screen: 'address' };
@@ -333,9 +939,10 @@ export function reduce(session: Session, event: SessionEvent): Session {
  * Returned rather than thrown: the setup screen needs to name the missing
  * choice at the control, and a thrown error would only reach a catch block.
  */
-export function missingScenarioInput(scenario: ScenarioInputs): 'pit' | 'blockage' | null {
+export function missingScenarioInput(scenario: ScenarioInputs): 'pit' | 'blockage' | 'rainfall' | null {
   if (scenario.pitId === null) return 'pit';
   if (scenario.blockage === null) return 'blockage';
+  if (scenario.rainfallMm === null) return 'rainfall';
   return null;
 }
 

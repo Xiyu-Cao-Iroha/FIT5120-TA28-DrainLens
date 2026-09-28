@@ -14,6 +14,7 @@ import {
   GUIDED_ON,
   type LayerKey,
   type MapMode,
+  NOTHING_ON,
   PANEL_KEYS,
   openingLayers,
   visibilityOf,
@@ -49,8 +50,34 @@ describe('where each control lives', () => {
 });
 
 describe('the presets', () => {
-  it('opens the unguided map with every layer on', () => {
+  it('has one preset with every layer on', () => {
+    // Still what the legend and the comparison map mean by "everything". It
+    // stopped being what the unguided map opens with on 10 September.
     expect(Object.values(ALL_ON).every(Boolean)).toBe(true);
+  });
+
+  it('opens the unguided map with nothing on at all', () => {
+    expect(Object.values(NOTHING_ON).some(Boolean)).toBe(false);
+  });
+
+  it('covers every layer, so a new one cannot arrive switched on', () => {
+    // Written as a sweep rather than six booleans: the failure this catches is
+    // a layer added to `LayerState` and given a value everywhere except here,
+    // which would open the map with one thing on and no reason why.
+    for (const key of ALL_LAYERS) {
+      expect(NOTHING_ON[key]).toBe(false);
+    }
+    expect(Object.keys(NOTHING_ON).sort()).toEqual([...ALL_LAYERS].sort());
+  });
+
+  it('still leaves the ground on under every homepage card', () => {
+    // The ground went off for the unguided entry on 11 September and stayed on
+    // for the cards, which is not an inconsistency: a card names a thing to
+    // look at, and AC 1.1.2 asks that pressing it show that thing.
+    expect(NOTHING_ON.terrain).toBe(false);
+    for (const way of ['drainage', 'water-flow', 'terrain', 'low-areas'] as const) {
+      expect(openingLayers(way).terrain).toBe(true);
+    }
   });
 
   it('leaves low areas and the hatching out of the guided task, and nothing else', () => {
@@ -107,7 +134,9 @@ describe('openingLayers', () => {
 
   it('never opens the hatching from a card', () => {
     // It is a statement about the evidence and it belongs to the reader, not
-    // to the way they arrived. The full map turns it on; a card does not.
+    // to the way they arrived. No card turns it on, and since 10 September no
+    // preset does either — the unguided map opens empty, so it is reached
+    // from the Layers panel or not at all.
     for (const way of WAYS_IN) {
       expect(openingLayers(way).unavailable).toBe(false);
     }

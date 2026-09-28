@@ -6,9 +6,11 @@ Deployed **5 September 2026**. This file was written as a runbook before any of 
 
 A second Cloud Run service, `drainlens-api`, over a Cloud SQL for PostgreSQL instance. Five `GET` routes returning the artefacts the frontend already accepts, rebuilt from rows. Same project `fit5120-504507`, same region `australia-southeast1`, same log exclusion — that last one has to be *verified*, not inherited by assumption, and step 2 is where.
 
-**The site reads four of its five artefacts from here**, and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. The footer of every screen says which source answered. See `apps/web/src/data/source.ts`.
+**The site reads four artefacts from here** — the map, the derived layers, the drainage graph and the flood board — and falls back to the copies in its own container when this cannot answer. So the database is load-bearing and the site is still not something this service can take down — which matters because the instance below is expected to be *stopped between demonstrations*, and that is a planned state rather than an incident. See `apps/web/src/data/source.ts`.
 
-The address index is the fifth artefact and stays bundled, deliberately and permanently.
+**What the footer says depends on the build.** The Iteration 1 build that `drainlens` and `drainlens-iteration1` serve names the source on every screen. On `develop` since 14 September it speaks only when the answer changes what a visitor sees: when the map is the bundled Kensington copy, the footer says *"The full council map is not available right now, so this map shows only one square kilometre of Kensington."* When the database answers, it says nothing about where the map came from.
+
+The address index stays bundled, deliberately and permanently. So does everything the site has gained since the four — the area shapes, population, checked flood events, address insight and both council tile packs are static files in the site's container, and nothing here serves them.
 
 ---
 
@@ -90,6 +92,8 @@ Both failures of the first deployment were this, and neither looked like it. The
 The fix for filters is not more quoting. It is **filters with no spaces and no quotes in them at all**, which step 10 now uses.
 
 This is the same family as *Quote the hash with single quotes* in [`deploy/README.md`](README.md), where double quotes reduced an apr1 hash to a single character and nginx accepted it. In all three cases the shell edited the value and nothing downstream could tell.
+
+**It happened a fourth time on 11 September, to this page's own rule.** The council migration's `--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace` went out unquoted on the reasoning that a token with no spaces is safe. It is not; the comma is enough on its own. gcloud stored one argument and the container went looking for a module named `migrate.js --extent city-of-melbourne --replace`. **The job deployed successfully** — that is what makes this one worth writing down twice: a mangled `--args` is not a deployment error, it is a container that starts, fails, and reports exit code 1 with nothing about quoting anywhere in the message.
 
 ---
 
@@ -235,6 +239,8 @@ Read the execution log before continuing. It prints a line per table, and the nu
 
 A second execution prints `schema  already current` and the same table counts: the migrations are skipped once recorded and the load is a truncate-and-insert.
 
+> **That block is 5 September's, and `load.test.ts` no longer asserts all of it** (checked 14 September 2026). Migration **004** holds every area in the scope rather than the board's thirty, and the load now fills `population` as well. Against the same Kensington artefacts the test asserts `derived_shape` **362**, `flood_area` **1,686**, `flood_area_coverage` **281** of which thirty carry a `board_rank`, and `population` **1,967**. The pits, pipes, roads, labels and trace rows are unchanged. `/health` still reports `areas` as thirty, because it counts the ranked rows rather than the table, and adds `scopeAreas` for the 281 — `loaded()` in `queries.ts` says why a number that silently changed meaning would have been worse. Read the job's own log against the test, not against this block.
+
 Then the service:
 
 ```bash
@@ -283,12 +289,186 @@ The instance name is not in the filter because there is one instance in this pro
 
 ---
 
+## Iteration 2: serving the City of Melbourne instead of Kensington
+
+Two extents are published. **The database holds exactly one**, and changing which one is a different operation from the first deployment above — the instance already has rows in it.
+
+### The artefacts are committed, which nothing else in `/data` is
+
+`load.ts` reads files, so the files have to be in the image, and the image is built from this repository. `/data` — where `pipeline/` writes the council build — is in `.dockerignore` as well as `.gitignore`, so an artefact built there is not in the build context at all and cannot be copied out of it. The council's three files are therefore committed under **`apps/api/data/city-of-melbourne/`**, which the Dockerfile copies whole:
+
+| | |
+|---|---|
+| `map.json` | 6.7 MB — 21,113 pits, 17,242 pipes, 4,177 roads, 2,775 labels |
+| `trace.json` | 693 KB |
+| `derived.json` | 210 KB, reframed to the council's origin by `pipeline/reframe.py` |
+| *no `flood-history.json`* | That board is Greater Melbourne's, not any pilot extent's. It is read from the bundled copy whichever extent is being loaded — a second, byte-identical copy in the council directory would be two files that must stay equal with nothing to notice when they stop |
+
+1.3 MB as git objects, paid once per rebuild of the council extent. Everything else under `/data` — including the 4 GB point cloud — stays ignored.
+
+> **The `derived.json` row is 11 September's.** Since 13 September the council's derived layers are no longer Kensington's reframed: they are calculated over the whole extent wherever the point cloud has a tile — 211 of the 306 — and the file is **7.7 MB**, holding 990 water-path, 14,926 low-area and 824 limited-ground shapes, with the 95 missing tiles listed in the artefact itself. `tools/data/check-derived.mjs` checks it against its own extent in CI. The database load grows with it, from the 394 derived shapes in the log below to 16,740, and **whether `--memory=1Gi` and `--task-timeout=30m` below still hold for that load has not been measured against Cloud SQL.** The git-object figure above has not been re-measured either.
+
+### `--replace`, and why it is not the default
+
+The two extents **overlap**: Kensington is a square kilometre inside the council, and its 895 pits are 895 of the council's 21,113 under the same `asset_number`, which is a global primary key. Loading either one into a database holding the other fails on `pit_pkey` — **in both directions**. The load deletes the extent it is *loading*, so it leaves the one that is in the way; that was measured, not reasoned about, after the reasoning got the direction wrong.
+
+So the loader asks first and refuses in a sentence that names what is in the way:
+
+```
+LoadError: the database holds kensington, which overlaps city-of-melbourne: the same
+assets would be stored twice in two coordinate frames, and the insert would fail on
+pit_pkey. Load with --replace to remove kensington first.
+```
+
+`--replace` is not the default because it deletes rows nobody named, and because the schema was written for a second *pilot area* — two extents that do not overlap should both be able to live here. This one is a containing extent, which is a different relationship. `--replace` is for a deployment that is deliberately changing which extent it serves.
+
+Failing this way is safe: migrations 002 and 003 have already been applied and recorded by the time the load refuses, so re-running with the flag prints `schema already current` and carries on.
+
+### The sequence
+
+Migrations **002** and **003** are new since the first deployment and are applied by the same job. 003 is the one that matters for the council: `pipe.ref` was a primary key because the sample had no duplicates, and council-wide **85 of 17,242 pipes carry no `ref` at all and one `ref` is used twice**.
+
+**Migration 004 arrived on 12 September**, after the deployment recorded below: `db/migrations/004_scope_areas.sql` widens the flood tables from the board's thirty areas to all 281 and keeps the thirty as the rows carrying a `board_rank`. The next execution of the job applies it the same way. Nothing on this page records that execution against Cloud SQL, so the counts in the logs below are from before it.
+
+Build the image at the commit being deployed — on `develop` for Iteration 2, not `main`, which is frozen:
+
+```bash
+gcloud builds submit --config=deploy/api/cloudbuild.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
+```
+
+Point the job at the council. **`--args` is comma-delimited, so the whole flag goes in single quotes** — this is *Wrap any argument containing a comma in single quotes* from the PowerShell section above, and skipping it is the third time this project has shipped that mistake:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,city-of-melbourne,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=1Gi --task-timeout=30m --max-retries=0
+```
+
+> **This paragraph said the opposite for one deployment**, and the deployment failed on it: *"`--args` is comma-delimited and the whole flag is one token with no spaces, which is what keeps PowerShell out of it."* Having no spaces is not what keeps PowerShell out — the comma is enough. It split the value into four elements and rejoined them with spaces, gcloud stored **one** argument, and the container went looking for a module called `migrate.js --extent city-of-melbourne --replace`:
+>
+> ```
+> Error: Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'
+> ```
+>
+> The rule was already written twenty lines up this page, next to `--database-flags=a=off,b=off,c=none`, which is the same shape and failed the same way on 5 September. It was reasoned past rather than applied.
+
+**Check the arguments before executing**, because the job deploys successfully either way — a mangled `--args` is not a deploy error, it is a container that starts and exits 1:
+
+```bash
+gcloud run jobs describe drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --format=yaml
+```
+
+Four elements under `args:`, not one:
+
+```yaml
+          - args:
+            - apps/api/dist/migrate.js
+            - --extent
+            - city-of-melbourne
+            - --replace
+```
+
+**`--memory=1Gi` and `--task-timeout=30m`, both raised.** The council map is 6.7 MB of JSON parsed into memory, and the load is 46,000 single-row inserts in one transaction; locally it takes just under a minute against a database on the same machine, and the 10-minute timeout that was ample for 895 pits is not a margin worth relying on over a socket.
+
+```bash
+gcloud run jobs execute drainlens-migrate --region=australia-southeast1 --project=fit5120-504507 --wait
+```
+
+The log to expect, copied from the rehearsal against the local database rather than composed:
+
+```
+  schema                 already current
+  extent                 city-of-melbourne
+  replaced kensington         1
+  source                      8
+  extent                      1
+  artefact_envelope           4
+  pit                     21113
+  pipe                    17242
+  road                     4177
+  street_label             2775
+  derived_shape             394
+  trace_link              12798
+  trace_reason                4
+  flood_area                180
+  flood_area_coverage        30
+```
+
+`replaced kensington` appears only when there was something to replace; a second execution omits it and prints the same table counts.
+
+> **That block is the deployed job's own log, not the rehearsal's.** It ran on 11 September as `drainlens-migrate-nsv7x`, applied migrations 2 and 3 against an instance that had only ever seen 1, replaced Kensington, and exited 0. The rehearsal's output was identical apart from `schema  already current`.
+
+Then redeploy the service on the same image, so the server and the migration that filled its database were built from one commit:
+
+```bash
+gcloud run deploy drainlens-api --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --port=8080 --memory=512Mi --max-instances=2 --min-instances=0 --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --allow-unauthenticated
+```
+
+### Going back to Kensington
+
+The same command with the extent swapped. It needs `--replace` in that direction too, for the same reason:
+
+```bash
+gcloud run jobs deploy drainlens-migrate --image=australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens/api:$(git rev-parse --short HEAD) --region=australia-southeast1 --project=fit5120-504507 --command=node '--args=apps/api/dist/migrate.js,--extent,kensington,--replace' --set-cloudsql-instances=fit5120-504507:australia-southeast1:drainlens-db --set-secrets=DATABASE_URL=drainlens-db-url:latest --memory=512Mi --task-timeout=10m --max-retries=0
+```
+
+### Verifying it
+
+`verify-api.mjs` takes the extent as a second argument, because the instance holds one of two and comparing against the wrong one is worse than not comparing at all:
+
+```bash
+node tools/deploy/verify-api.mjs https://drainlens-api-205559161217.australia-southeast1.run.app city-of-melbourne
+```
+
+It compares every response against `apps/api/data/city-of-melbourne` deeply, and the flood board against the bundled copy. **This is the check that found the one real defect in the council load**: `ref` stopped being the pipe primary key in migration 003, `queries.ts` still mapped it as `Number(r.ref)`, and `Number(null)` is `0` — so the 85 council pipes the council identified with nothing came back carrying *reference number zero*. Not missing, not flagged, indistinguishable from an asset id. Every shape-based check passed.
+
+### What the council deployment measured, 11 September 2026
+
+| | |
+|---|---|
+| Revision | `drainlens-api-00003-g7k`, serving 100% |
+| Image | `api:5156e68` — the merge commit on `develop`, compared rather than assumed. `main` is unchanged at `138a002` for the whole of Iteration 2 |
+| Migration job | `drainlens-migrate-nsv7x`, exit 0. `schema applied 2, 3`, `replaced kensington 1`, then the row counts above |
+| Data | `/health` answers `{"status":"ok","pits":21113,"areas":30}` |
+| Responses | `verify-api.mjs … city-of-melbourne` passed **all eight checks**. Every response deep-equals the committed artefact |
+| **AD1** | `httpRequest.remoteIp:*` over the whole project, one hour, 100 requests in the window: **no entries**. Positive control in the same window returns `system_event`, `varlog/system`, `stdout` and `activity` — and **no `run.googleapis.com/requests` log at all**, which is the exclusion working rather than a filter that matched nothing. Checked again because a new revision is a new chance for it to stop being true, not because anything suggested it had |
+| Failures | **0 of 100 requests** |
+
+Latency, from a laptop over a home connection to Sydney — the same caveat as every other figure on this page: it measures that link as much as the service. Sample counts differ per route because the map is now twenty times the size it was in September's table, and thirty samples of it is 208 MB of egress to learn what ten will tell you.
+
+| Route | n | p50 | p95 | max | Body |
+|---|---|---|---|---|---|
+| `/health` | 30 | 33.0 ms | 36.4 ms | 312.4 ms | — |
+| `/api/flood-history` | 30 | 36.3 ms | 41.9 ms | 53.5 ms | 5.4 KB |
+| `/api/derived/city-of-melbourne` | 15 | 55.0 ms | 66.3 ms | 66.3 ms | 162.6 KB |
+| `/api/trace/city-of-melbourne` | 15 | 191.0 ms | 247.5 ms | 247.5 ms | 693.2 KB |
+| `/api/map/city-of-melbourne` | 10 | **749.6 ms** | **1556.5 ms** | 1556.5 ms | **6.78 MB** |
+
+The single 312 ms on `/health` is a cold start, as it was in September; `--min-instances=0` means the first request after an idle period pays for the container and the connector.
+
+> **Nothing here is compressed, and at council scale that is the finding.** There is no `Content-Encoding` on any response and no compression middleware in `server.ts` — the map goes out as **6,942,917 bytes on the wire**, where the same JSON gzips to about 1.2 MB. It was never worth noticing at 316 KB. It is now the largest single cost of entering the map for anybody the API is answering, and it is **the opposite way round from the fallback**: nginx compresses the copies in the site's own container, so the offline path is the fast one. Recorded rather than fixed in the same breath, because it is a change to the service and this section is a record of what was deployed.
+>
+> **Fixed the same day, in the revision after this one.** `hono/compress` on `/api/*`, measured through the middleware against a local database holding the council:
+>
+> | route | uncompressed | gzip | |
+> |---|---|---|---|
+> | `/api/map/city-of-melbourne` | 6,942,917 B | 1,220,733 B | 5.7× |
+> | `/api/trace/city-of-melbourne` | 709,800 B | 126,950 B | 5.6× |
+> | `/api/derived/city-of-melbourne` | 166,503 B | 41,781 B | 4.0× |
+> | `/api/flood-history` | 5,526 B | 1,770 B | 3.1× |
+>
+> **`/api/*` rather than `*`, and that is not tidiness.** The middleware skips bodies under 1 KB by reading `Content-Length`, and `c.json()` sets none — so the check is skipped rather than passed, and the 39-byte `/health` body came back gzipped into 59. The route that is polled and can never benefit was the one paying. There is a test for it.
+
+### What changes on the site, and what does not
+
+Nothing about the frontend deployment. The site asks the API for `city-of-melbourne` and falls back to its own bundled `kensington` when the API is unreachable — which is the normal state between demos — and `fetchTogether` takes all three place-artefacts from one side or the other, so the two coordinate frames can never be mixed on one screen.
+
+---
+
 ## What must still be true afterwards
 
 | | |
 |---|---|
 | **AD1** | No log entry from either service carries a client address, and the positive control shows that logging is happening at all |
-| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
+| **The site survives this being off** | Stop the instance and the site must still draw, from its bundled copies, with the footer saying so — on a `develop` build, the line that the full council map is not available and the map shows one square kilometre of Kensington. It is the one behaviour to re-check after any change here, because everything else about a fallback looks identical to a working API |
 | **CORS names the site, not `*`** | `allowedOrigins()` lists the site and the dev server. Nothing here is secret and no request carries a credential, so `*` would leak nothing — but a list is easy to widen later and impossible to narrow once something unknown depends on it |
 | **`FORBIDDEN_WIRE_KEYS`** | Still nothing on the wire that names a person. Every route is a `GET` with no body; there is no path that could carry one |
 | **The database is derived** | Nothing is written here that is not in the repository. If that stops being true — Epic 4's drain checks would be the first — this document is wrong and `--no-backup` is wrong with it |
@@ -302,6 +482,10 @@ The instance name is not in the filter because there is one instance in this pro
 |---|---|
 | `permission denied for schema public` in the job log | Postgres 15 removed the implicit `CREATE` grant on `public`. Connect as the `postgres` user and `GRANT ALL ON SCHEMA public TO drainlens;`, then re-run the job |
 | The job succeeds, `/health` answers 404 | The service is on a revision that started before the job ran, or against a different database. `/health` refuses to report ok on an empty database on purpose — a 200 over no rows is a service that looks healthy and serves an empty map |
+| `Cannot find module '/app/apps/api/dist/migrate.js --extent city-of-melbourne --replace'` | PowerShell split `--args` on its commas and rejoined them with spaces, so gcloud stored one argument instead of four. Single-quote the whole `--args=` flag and re-deploy the job; the image is fine and does not need rebuilding |
+| `LoadError: the database holds kensington, which overlaps city-of-melbourne` | The instance already holds the other extent. Re-run the job with `--replace` — the migrations it applied first are recorded, so the second run picks up at the load |
+| `duplicate key value violates unique constraint "pit_pkey"` | An image built before `--replace` existed. Rebuild at a commit that has it rather than deleting rows by hand |
+| `ENOENT ... /app/apps/api/data/city-of-melbourne/map.json` | The image predates the committed council artefacts, or was built from a context that excluded them. `/data` is dockerignored and `apps/api/data` deliberately is not |
 | `ENOENT ... /app/apps/web/public/data/map.json` | The image was flattened. `load.ts` resolves the artefacts relative to its own file and `migrate.ts` resolves the migrations the same way; the layout under `/app` in `deploy/api/Dockerfile` is load-bearing, and it breaks at run time rather than at build time |
 | The build says `Building using Buildpacks` | Wrong command. This one is `gcloud builds submit --config=deploy/api/cloudbuild.yaml`; `--source=.` cannot see this Dockerfile |
 | Cloud Build cannot push, or cannot write logs | Newer projects build as the compute service account, which may need `roles/artifactregistry.writer` and `roles/logging.logWriter`. The error names the missing permission; grant that one rather than a wider role |

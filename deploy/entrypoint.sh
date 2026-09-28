@@ -17,7 +17,20 @@
 # keeps the previous revision serving when a new one fails to start, so the
 # cost of failing closed is a failed deploy you can see, not an outage you
 # cannot.
+#
+# **Everything it writes goes to /tmp/nginx** (penetration test P06). The image
+# runs as the unprivileged `nginx` user and can run with a read-only root file
+# system, so nothing under /etc is written at start-up any more: the password
+# file, the port-substituted nginx.conf and the headers with the API origin
+# filled in are working copies in /tmp/nginx, and nginx is started on the copy.
+# A local check of the hardened mode:
+#
+#   docker run --read-only --tmpfs /tmp -e BASIC_AUTH_USER=... \
+#     -e BASIC_AUTH_HASH='...' -p 8088:8080 drainlens
 set -eu
+
+WORK=/tmp/nginx
+mkdir -p "${WORK}"
 
 if [ -z "${BASIC_AUTH_USER:-}" ] || [ -z "${BASIC_AUTH_HASH:-}" ]; then
   echo "FATAL: BASIC_AUTH_USER and BASIC_AUTH_HASH must both be set." >&2
@@ -56,26 +69,47 @@ esac
 # The password never exists here: BASIC_AUTH_HASH is already a hash, generated
 # on somebody's own machine and passed in at deploy time. Nothing in this image
 # or in the repository can be turned back into a password.
-printf '%s:%s\n' "${BASIC_AUTH_USER}" "${BASIC_AUTH_HASH}" > /etc/nginx/.htpasswd
+printf '%s:%s\n' "${BASIC_AUTH_USER}" "${BASIC_AUTH_HASH}" > "${WORK}/.htpasswd"
 
-# Readable by the worker, which is not the process that wrote it.
+# Readable by the worker.
 #
-# nginx opens `auth_basic_user_file` in a worker, and workers drop to an
-# unprivileged user; this script runs as root. At 600 and owned by root the
-# worker gets EACCES, and the failure is a nasty shape: a request with no
-# credentials never opens the file and still gets a clean 401, so the gate
-# looks like it is working, while a request with the *correct* password gets
-# 500. It fails only for the person who has the password.
+# nginx opens `auth_basic_user_file` in a worker. While this script ran as root
+# the worker was a different user, and at 600 it got EACCES in a nasty shape: a
+# request with no credentials never opens the file and still gets a clean 401,
+# so the gate looked like it was working, while the *correct* password got 500.
+# Master and workers are now the same user and 600 would do, but 444 is kept so
+# a later change back to a root master cannot bring that failure back quietly.
+# The file holds a username and a hash, and anything that can read it is
+# already inside the container.
+chmod 444 "${WORK}/.htpasswd"
+
+# The API the bundle was built to ask, as an origin for the CSP's connect-src.
 #
-# 444 rather than a tighter mode with a chown, because a chown that silently
-# fails puts it straight back. The file holds a username and a hash, and
-# anything that can read it is already inside the container.
-chmod 444 /etc/nginx/.htpasswd
+# VITE_API_BASE is inlined into the bundle at build time and handed to this
+# stage by the Dockerfile, so the policy and the bundle cannot name different
+# hosts. Reduced to scheme, host and port, and refused unless it looks like
+# one: this value is written into a response header, and a stray quote or
+# semicolon in it would rewrite the policy.
+api_origin=""
+if [ -n "${VITE_API_BASE:-}" ]; then
+  api_origin=$(printf '%s' "${VITE_API_BASE}" | sed -E 's#^(https://[A-Za-z0-9.-]+(:[0-9]+)?)(/.*)?$#\1#')
+  if ! printf '%s' "${api_origin}" | grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?$'; then
+    echo "FATAL: VITE_API_BASE is not an https URL this policy can name: ${VITE_API_BASE}" >&2
+    exit 1
+  fi
+fi
+sed "s#__API_ORIGIN__#${api_origin}#" /etc/nginx/security-headers.conf > "${WORK}/security-headers.conf"
 
 # Cloud Run sends traffic to $PORT and does not promise it is 8080. nginx has
 # no variable expansion in `listen`, so the port is substituted at start-up
 # rather than baked in — a container that ignores $PORT is one Cloud Run marks
 # unhealthy for reasons the logs do not explain.
-sed -i "s/listen 8080;/listen ${PORT:-8080};/" /etc/nginx/nginx.conf
+case "${PORT:-8080}" in
+  ''|*[!0-9]*)
+    echo "FATAL: PORT is not a number: ${PORT}" >&2
+    exit 1
+    ;;
+esac
+sed "s/listen 8080;/listen ${PORT:-8080};/" /etc/nginx/nginx.conf > "${WORK}/nginx.conf"
 
-exec nginx -g 'daemon off;'
+exec nginx -c "${WORK}/nginx.conf" -g 'daemon off;'

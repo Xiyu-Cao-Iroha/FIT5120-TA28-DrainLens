@@ -88,7 +88,7 @@ export async function criticalPath(base) {
 
   const assets = [...entry, ...workers];
 
-  const scene = await (await get(base + '/data/scene/scene.json')).json();
+  const terrain = await (await get(base + '/data/terrain-tiles/index.json')).json();
 
   /**
    * The arrays a reachable screen actually fetches, which is now one.
@@ -108,15 +108,22 @@ export async function criticalPath(base) {
    * this list is checked against `useScenario`'s `enabled` argument rather
    * than trusted. Verified against the source on 5 September.
    */
-  const REACHABLE = ['elevation'];
-  const arrays = REACHABLE.map((name) => `/data/scene/${scene.arrays[name].file}`);
+  //
+  // Since 14 September the map's Terrain layer is pre-coloured tiles for the
+  // whole council, `/data/terrain-tiles/`. What a map visit fetches before any
+  // tile is the index and the council overview; tiles follow the view, so they
+  // are not part of a fixed first visit and are not counted here.
+  const arrays = [
+    `/data/terrain-tiles/${terrain.overview.colour}`,
+    `/data/terrain-tiles/${terrain.overview.shade}`,
+  ];
 
   return {
     document: ['/'],
     code: assets,
-    artefacts: [...FIXED, '/data/scene/scene.json'],
+    artefacts: [...FIXED, '/data/terrain-tiles/index.json'],
     scene: arrays,
-    all: ['/', ...assets, ...FIXED, '/data/scene/scene.json', ...arrays],
+    all: ['/', ...assets, ...FIXED, '/data/terrain-tiles/index.json', ...arrays],
   };
 }
 

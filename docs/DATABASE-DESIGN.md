@@ -40,6 +40,13 @@ otherwise, but because two things already visible to a resident say so:
 - This repository's interface contract: *"the cheapest way to keep a promise
   about data is to never receive it."*
 
+> **14 September 2026.** The tour no longer carries that sentence; it was cut
+> on 12 September as the longer half of a coach mark (`apps/web/src/ui/tourPlan.ts`
+> says why). The promise is still on screen where an address is typed: the
+> homepage says *"The search happens on your device. Your address is not sent
+> or saved."* and the landing page *"Your search stays on this device and is
+> not saved."* The argument below is unchanged.
+
 An address search that calls a server sends every keystroke of somebody's home
 address to that server, and a log line is storage. Moving `addresses.json`
 behind an API would make both of those sentences false, and they would have to
@@ -48,7 +55,14 @@ what the product promises, not a decision about where data lives. It is not
 part of this one.
 
 At 4,089 addresses and 66 KB over the wire there is no technical reason to move
-it either.
+it either — and since 11 September, when the index began travelling grouped by
+street, it is 83 KB on disk and 31 KB gzipped.
+
+> **14 September 2026: the index is the council's**, 62,397 addresses and 490 KB
+> gzipped, and it stays a file for the same reason. That is a real cost on a
+> first visit; the
+> alternative is a search endpoint that receives every keystroke of a home
+> address, which is the cost this section exists to refuse.
 
 ---
 
@@ -63,6 +77,23 @@ it either.
 | Surface-water paths, low points, unavailable areas | **Database** | 38 + 310 + 46 shapes. |
 | The address index | **File** | See above. |
 | `scene/*.bin` — elevation, flow, depressions, coverage | **File** | A 1000 × 1000 `Int16Array` is not a table. Storing a million cells as rows to serve them back as a typed array is a worse version of a file, and the client reads them into `ArrayBuffer`s anyway. |
+
+> **14 September 2026.** The row counts above are Kensington's. Since 11
+> September the database can hold the whole City of Melbourne instead —
+> 21,113 pits, 17,242 pipes, 4,177 roads and 2,775 street labels in
+> `apps/api/data/city-of-melbourne/map.json`, and 990 paths, 14,926 low points
+> and 824 unavailable areas in its `derived.json` — which is still "tabular and
+> modest", only less modest. Kensington's own unavailable areas are 14 since
+> the coverage-gap thresholds changed on 13 September.
+>
+> The last row's reasoning now covers more files, none of them in the
+> database: `scene/` is no longer read by the site, and in its place are
+> `scene-tiles/` (the comparison's 500 m arrays, pre-gzipped),
+> `terrain-tiles/` (the *Ground height* layer as WebP images and contour
+> JSON) and `terrain/address-ground.json`. The flood map's `sa2-areas.json`,
+> `population.json`, `sa2-points.json` and `flood-events.json` are also read
+> from the container only; the API has no route for them yet, although
+> `flood_area_coverage` and `population` hold the same areas.
 
 **The pipeline stays the source of truth for derivation.** Nothing is computed
 in the database. `drainlens_pipeline` still does the D8 routing, the SMRF
@@ -82,8 +113,9 @@ The schema and the loader exist and were run. Against Postgres 16:
 | `pit` · `pipe` · `road` · `street_label` | 895 · 893 · 220 · 163 | `map.json` exactly |
 | `derived_shape` | 394 | 38 channels + 310 low points + 46 unavailable |
 | `trace_link` · `trace_reason` | 734 · 4 | `trace.json` exactly |
-| `flood_area` · `flood_area_coverage` | 180 · 30 | thirty areas over six years |
-| `flood_incident` · `population` | 0 · 0 | empty on purpose, see above |
+| `flood_area` · `flood_area_coverage` | 1,686 · 281 | every area in the scope over six years; thirty carry a `board_rank` |
+| `population` | 1,967 | 281 areas at seven 30 Junes |
+| `flood_incident` | 0 | empty on purpose, see above |
 
 **Two design decisions stopped being assertions and became measurements.**
 Sixty-nine of the 893 pipes name a downstream pit that is not in this extent —
@@ -99,7 +131,10 @@ one above the other.
 Twelve integration tests assert all of it, behind `npm run test:db` with its
 own CI job and a Postgres service container. They are not in the five-second
 suite, because tests that need a container do not fail without one — they
-refuse to start, and nobody could then test anything.
+refuse to start, and nobody could then test anything. (Twelve on 5 September;
+on 14 September the same job runs 62 tests across four files in
+`apps/api/test-db/`, covering the council extent and the full area scope as
+well.)
 
 ---
 
@@ -107,7 +142,13 @@ refuse to start, and nobody could then test anything.
 
 **`db/migrations/001_init.sql` is the schema. This section is not a copy of
 it** — a second copy drifts, and the one in a design document drifts silently.
-Read the migration; it carries a comment per decision.
+Read the migration; it carries a comment per decision. Since 11 and 12 September
+three more sit beside it and are part of the schema too: `002_second_extent.sql`
+(an artefact envelope per extent), `003_pipe_key.sql` (a surrogate key for
+`pipe`, because across the council 85 pipes carry no `ref` and one `ref` is used
+twice) and `004_scope_areas.sql` (`sa2_code` and `board_rank` on
+`flood_area_coverage`, so the flood tables hold all 281 areas and the board is
+the thirty that carry a rank).
 
 ### Three things the draft got wrong, found by running it
 
@@ -202,6 +243,17 @@ Built, running, and answering on every route. `apps/api`, Hono on Node, with
 | `GET` | `/api/derived/:extent` | Channels, low points, unavailable areas |
 | `GET` | `/api/trace/:extent` | Links and terminations |
 
+> **14 September 2026: two of these six were never built.** `apps/api/src/server.ts`
+> answers `/api/flood-history`, `/api/map/:extent`, `/api/derived/:extent` and
+> `/api/trace/:extent`, plus `/health`; the two `/api/flood-history/areas`
+> routes do not exist. The mentor's fifth point is met in the browser instead:
+> the flood history board's *Ranked by: Call-outs | Call-outs per 1,000
+> residents* toggle and the flood map's rate view join `sa2-areas.json`,
+> `population.json` and `sa2-points.json` from the container
+> (`apps/web/src/history/severity.ts`, `board.ts`), over the 274 areas with
+> enough residents for a rate. The same join runs against the database only in
+> `apps/api/test-db/load.test.ts`.
+
 **Every one of them is a `GET` with no body and no identifier for a person.**
 There is no `POST` in Iteration 2's scope: Epic 4's drain checks would add one,
 and that needs its own decision about moderation and abuse before a write path
@@ -242,9 +294,16 @@ thirty-area rollup; the 13,339 regions underneath it are computed by the
 pipeline and discarded at build time. Loading them means the pipeline emitting
 the full grain as a file, which means re-fetching the VICSES and ABS sources,
 which are downloaded per run and not kept in the repository. Until then
-`flood_incident` is declared and empty — as is `population` — because inventing
-SA1 codes to make a table look loaded would be fabricating the identifiers this
-product refuses to fabricate.
+`flood_incident` is declared and empty, because inventing SA1 codes to make a
+table look loaded would be fabricating the identifiers this product refuses to
+fabricate.
+
+**`population` is no longer one of them.** It was filled on 12 September, at
+SA2, from ABS 3218.0 — reconciled against its own documentation and matched to
+all 281 areas by two independent joins. That settles the grain question this
+paragraph was waiting on: the score is computed at SA2 from the published
+rollups, so `flood_incident` stays empty and this reasoning stays true of it.
+See [POPULATION-DATA.md](./POPULATION-DATA.md).
 
 ---
 
@@ -252,7 +311,10 @@ product refuses to fabricate.
 
 Generated from `db/migrations/001_init.sql` rather than drawn beside it, so a
 column that changes in one and not the other is a diff rather than a
-disagreement nobody notices.
+disagreement nobody notices. On 14 September it was brought up to
+`004_scope_areas.sql`: the three later migrations had changed two keys and
+added two columns without the diagram following, which is exactly that
+disagreement.
 
 **Read the line style first.** A solid line is a foreign key the database
 enforces. **A dashed line is a join the data cannot support**, and every one of
@@ -310,7 +372,7 @@ erDiagram
 
     artefact_envelope {
         text name PK
-        text extent_id FK
+        text extent_id PK,FK "one envelope per extent since 002"
         int version
         jsonb envelope "the prose and provenance, served back untouched"
     }
@@ -326,7 +388,8 @@ erDiagram
     }
 
     pipe {
-        bigint ref PK
+        bigint id PK "surrogate since 003"
+        bigint ref "nullable and not unique across the council"
         text extent_id FK
         text dataset_id FK
         bigint upstr_pit "not a foreign key"
@@ -405,6 +468,8 @@ erDiagram
         int regions
         int suppressed_regions
         bool complete "false where a region was withheld, so the total is a floor"
+        char9 sa2_code "the join to population, since 004"
+        int board_rank "set on exactly thirty rows: the board"
     }
 
     population {
@@ -416,10 +481,13 @@ erDiagram
     }
 ```
 
-**`flood_incident` and `population` are drawn and empty.** That is the state
-they are in, and a diagram that omitted them would hide the join the flood
-board is eventually meant to make — incidents per person — behind a table
-nobody can see is missing.
+**`flood_incident` is drawn and empty**, and a diagram that omitted it would
+hide the SA1 grain behind a table nobody can see is missing. `population` was
+beside it in that sentence until 12 September and is now loaded; the join it
+was drawn for — incidents per person — is made on
+`flood_area_coverage.sa2_code`, and `apps/api/test-db/load.test.ts` computes
+the Severity Score's own query against it. (Since 14 September the screen
+calls that figure *SES flood call-outs per 1,000 residents*.)
 
 **`schema_migration` is not drawn.** It records which migrations have run and
 has no relationship to anything the product is about.
@@ -493,28 +561,31 @@ mitigation, and it costs a cold start.
 
 ## Open questions, in the order they block work
 
-1. **The population dataset does not exist in this repository yet**, and
-   nothing can be joined until it does. It has to be located, downloaded,
-   reconciled against its own documentation and matched to ABS ASGS 2011 — the
-   same discipline the VICSES file went through in
-   [FLOOD-HISTORY-DATA.md](./FLOOD-HISTORY-DATA.md), where the file reconciled
-   exactly (13,339 rows, 144 suppressed) and the join was 13,339 of 13,339.
-   **This is the critical path, and it is data work rather than database work.**
+**Three of these four are answered.** They are kept rather than deleted,
+because what a question turned out to be is worth as much as the answer.
 
-2. **Which population, and at which grain.** The flood counts are per SA1 for
-   2011 boundaries. ABS publishes Estimated Resident Population by SA2 annually
-   and Census counts by SA1 for a census year. A count spanning 2009–2015
-   divided by a population from one year is a rate with a date on it, and the
-   board will have to say which year and why.
+1. ~~**The population dataset does not exist in this repository yet.**~~
+   Answered 12 September. ABS 3218.0, SA2 estimates 2005–2015, reconciled
+   against its own Explanatory Notes and matched to **281 of 281** areas by two
+   independent joins that agree on every one. It was the critical path and it
+   was data work rather than database work, as this said.
 
-3. **Per capita of what.** Incidents per resident is not obviously the right
-   normalisation for flooding — dwellings, or area, may be better, and the
-   mentor's phrasing (*"受灾人口/flood"*) is closer to *people affected*, which
-   is a quantity neither dataset holds. This needs to be settled before it is
-   built, because a ranking normalised the wrong way is more confidently wrong
-   than the unnormalised one it replaces.
+2. ~~**Which population, and at which grain.**~~ SA2, at **30 June 2012** — the
+   mid-point of the reporting period, and an ABS *revised* estimate rather than
+   a final one, which is recorded rather than smoothed over. The whole
+   2009–2015 series is loaded beside it, because a per-year view has to divide
+   by that year. [POPULATION-DATA.md](./POPULATION-DATA.md).
+
+3. ~~**Per capita of what.**~~ Per resident, and the number keeps its unit on
+   screen rather than becoming a 0–10 index.
+   [SEVERITY-SCORE.md](./SEVERITY-SCORE.md) is the definition, written before
+   anything computed it. **The question was right to be asked**: seven areas
+   have almost no residents, and one dispatch in an industrial estate of
+   fifteen people would have outscored everywhere in Greater Melbourne by four
+   times. They are published with no score rather than with a large one.
 
 4. **Whether Iteration 2 has a budget** for a continuously running instance.
+   Still open.
 
 ---
 

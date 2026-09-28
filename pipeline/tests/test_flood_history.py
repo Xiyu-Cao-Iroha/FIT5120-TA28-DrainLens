@@ -33,6 +33,7 @@ from drainlens_pipeline.flood_history import (
     join,
     main,
     rank,
+    scope_artefact,
     read_geography,
     read_incidents,
 )
@@ -79,24 +80,44 @@ def workbook_bytes(
 
 
 def allocation_bytes(records):
-    """`records` are `(sa1_7digit, sa2_name, gccsa_name, state_name)`."""
+    """`records` are `(sa1_7digit, sa2_name, gccsa_name, state_name)`.
+
+    `SA2_MAINCODE_2011` is derived from the SA1 code's first five digits, which
+    is how ASGS builds it: two SA1s in the same SA2 get the same code, and that
+    is what lets `join` count the regions per area. A record may
+    override it by giving a fifth element.
+    """
     header = (
         "SA1_MAINCODE_2011,SA1_7DIGITCODE_2011,SA2_MAINCODE_2011,SA2_5DIGITCODE_2011,"
         "SA2_NAME_2011,SA3_CODE_2011,SA3_NAME_2011,SA4_CODE_2011,SA4_NAME_2011,"
         "GCCSA_CODE_2011,GCCSA_NAME_2011,STATE_CODE_2011,STATE_NAME_2011,AREA_ALBERS_SQM"
     )
     lines = [header]
-    for code, area, gccsa, state in records:
+    for record in records:
+        code, area, gccsa, state = record[:4]
+        sa2 = record[4] if len(record) > 4 else f"{code[:5]}0000"
         lines.append(
-            f"2{code}0001,{code},2{code[1:5]},{code[1:6]},{area},20101,S3,201,S4,"
+            f"2{code}0001,{code},{sa2},{code[:5]},{area},20101,S3,201,S4,"
             f"2GMEL,{gccsa},2,{state},1000.0"
         )
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def melbourne(*pairs):
-    """Places in scope, from `(code, area_name)` pairs."""
-    return {code: Place(name, SCOPE) for code, name in pairs}
+    """Places in scope, from `(sa1_code, area_name)` pairs.
+
+    **One SA2 code per distinct name**, which is what an SA2 is: two SA1s that
+    roll up to the same area share a code, and two areas with different names
+    cannot. This used to derive the code from the SA1 code's first five digits,
+    which is how ASGS builds it and is right for the allocation fixture — but
+    the pairs here are written for readability, so `2100101` and `2100102` are
+    a common way to write "two areas" and were getting one code between them.
+    `join` now refuses that, correctly.
+    """
+    codes: dict[str, str] = {}
+    for _, name in pairs:
+        codes.setdefault(name, f"21{len(codes):03d}0000")
+    return {code: Place(name, SCOPE, codes[name]) for code, name in pairs}
 
 
 def flood(*counts):
@@ -203,7 +224,7 @@ def test_keeps_the_whole_state_not_just_the_scope():
     places = read_geography(data)
     # Both Victorian rows, so the join can tell "not ours" from "not found".
     assert set(places) == {"2100101", "2140012"}
-    assert places["2140012"] == Place("Mildura", "Rest of Vic.")
+    assert places["2140012"] == Place("Mildura", "Rest of Vic.", "214000000")
 
 
 def test_rejects_a_state_name_that_matches_nothing():
@@ -230,8 +251,8 @@ def test_drops_out_of_scope_regions_only_after_the_integrity_check():
         Region("2140012", (50,) * 6, False),
     ]
     places = {
-        "2100101": Place("Kensington", SCOPE),
-        "2140012": Place("Mildura", "Rest of Vic."),
+        "2100101": Place("Kensington", SCOPE, "210010000"),
+        "2140012": Place("Mildura", "Rest of Vic.", "217010000"),
     }
     areas = join(regions, places)
     assert [a.name for a in areas] == ["Kensington"]
@@ -360,7 +381,7 @@ def test_counts_reconcile_with_the_areas_published():
 def test_the_pilot_area_is_reported_when_it_is_in_scope():
     regions, places = sample()
     regions.append(Region("2100199", (4, 0, 0, 0, 0, 0), True))
-    places["2100199"] = Place("Kensington", SCOPE)
+    places["2100199"] = Place("Kensington", SCOPE, "219990000")
     artefact = build(regions, places)
     assert artefact["pilotArea"]["name"] == "Kensington"
     assert artefact["pilotArea"]["total"] == 4
@@ -406,14 +427,14 @@ def test_returns_the_member_of_each_archive():
 
 def sources_on_disk(tmp_path, count=6):
     """The two inputs as files, the way `main` is given them offline."""
-    rows = [(f"21001{i:02d}", flood(10 * (i + 1), 0, 0, 0, 0, 0)) for i in range(count)]
+    rows = [(f"210{i:02d}01", flood(10 * (i + 1), 0, 0, 0, 0, 0)) for i in range(count)]
     incidents = tmp_path / "incidents.xlsx"
     incidents.write_bytes(workbook_bytes(rows))
 
     geography = tmp_path / "sa1.csv"
     geography.write_bytes(
         allocation_bytes(
-            [(f"21001{i:02d}", f"Area {i:02d}", SCOPE, "Victoria") for i in range(count)]
+            [(f"210{i:02d}01", f"Area {i:02d}", SCOPE, "Victoria") for i in range(count)]
         )
     )
     return incidents, geography
@@ -474,3 +495,163 @@ def test_open_passes_the_timeout_through(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", urlopen)
     assert _open("https://example.test/file.zip", 12.5) == b"payload"
     assert seen == {"url": "https://example.test/file.zip", "timeout": 12.5}
+
+
+# --- the pairing every area carries ---------------------------------------
+
+
+def joined(*records):
+    """`join` over one region per record, so each area is its records."""
+    places = read_geography(allocation_bytes(records))
+    regions = [Region(code, (1,) * len(YEARS), False) for code, *_ in records]
+    return join(regions, places)
+
+
+def test_gives_every_area_the_code_it_was_grouped_by():
+    """Two SA1s in one SA2 and one in another.
+
+    The areas come back by code, with the regions that roll into each, and the
+    name beside a count is the name the allocation gives that code — checked,
+    not assumed.
+    """
+    areas = joined(
+        ("2100101", "Kensington", SCOPE, "Victoria"),
+        ("2100102", "Kensington", SCOPE, "Victoria"),
+        ("2100201", "Flemington", SCOPE, "Victoria"),
+        ("2140012", "Mildura", "Rest of Vic.", "Victoria"),
+    )
+    assert [(a.code, a.name, a.regions) for a in areas] == [
+        ("210010000", "Kensington", 2),
+        ("210020000", "Flemington", 1),
+    ]
+
+
+def test_refuses_two_names_under_one_code():
+    # The allocation disagreeing with itself. Whichever row was read last
+    # would win, and the name printed beside a count would be a coin toss.
+    with pytest.raises(FloodHistoryError, match="named both"):
+        joined(
+            ("2100101", "Kensington", SCOPE, "Victoria"),
+            ("2100102", "Kensington West", SCOPE, "Victoria"),
+        )
+
+
+def test_refuses_two_codes_under_one_name():
+    """The failure that matters, because it is the one nobody would see.
+
+    The artefact publishes names, so joining a population dataset by name is
+    what anybody reaches for first. If Greater Melbourne held two SA2s called
+    Richmond, that join would attach one area's residents to the other's
+    incidents and every number downstream would look ordinary.
+    """
+    with pytest.raises(FloodHistoryError, match="joining a population dataset by name"):
+        joined(
+            ("2100101", "Richmond", SCOPE, "Victoria", "210010000"),
+            ("2100201", "Richmond", SCOPE, "Victoria", "210020000"),
+        )
+
+
+def test_refuses_a_place_with_no_code():
+    # A `Place` built by hand, as every fixture in this file did before the
+    # code existed. An area without one cannot be joined to anything national.
+    with pytest.raises(FloodHistoryError, match="no SA2_MAINCODE_2011"):
+        join([Region("2100101", (1,) * len(YEARS), False)], {"2100101": Place("Kensington", SCOPE)})
+
+
+# --- the scope artefact ---------------------------------------------------
+
+
+def test_publishes_every_area_including_the_ones_with_nothing():
+    """The whole reason this artefact exists.
+
+    `rank` drops an area with no recorded incident, which is right for a list
+    of the most affected and wrong for a map: an area left out of a map reads
+    as an area with nothing there, and so does an area drawn with zero, and
+    only one of those is what the data says.
+    """
+    places = read_geography(
+        allocation_bytes(
+            [
+                ("2100101", "Kensington", SCOPE, "Victoria"),
+                ("2100201", "Flemington", SCOPE, "Victoria"),
+            ]
+        )
+    )
+    regions = [
+        Region("2100101", (3, 0, 0, 0, 0, 0), False),
+        Region("2100201", (0, 0, 0, 0, 0, 0), False),
+    ]
+    areas = join(regions, places)
+    assert len(rank(areas)) == 1
+
+    artefact = scope_artefact(areas)
+    assert artefact["counts"] == {
+        "areas": 2,
+        "withIncidents": 1,
+        "incomplete": 0,
+        "incidents": 3,
+    }
+    assert [a["name"] for a in artefact["areas"]] == ["Kensington", "Flemington"]
+    assert artefact["areas"][1]["total"] == 0
+
+
+def test_carries_the_floor_flag_onto_the_map_data():
+    # A suppressed region makes the area's total a lower bound, and the map
+    # has to draw that differently from a number. The flag travels with the
+    # area rather than being resolved at the join.
+    places = read_geography(allocation_bytes([("2100101", "Kensington", SCOPE, "Victoria")]))
+    areas = join([Region("2100101", (3, 0, 0, 0, 0, 0), True)], places)
+    artefact = scope_artefact(areas)
+    assert artefact["counts"]["incomplete"] == 1
+    assert artefact["areas"][0]["complete"] is False
+    assert artefact["areas"][0]["suppressedRegions"] == 1
+
+
+def test_names_both_sources_because_neither_alone_says_what_this_is():
+    # The counts are the SES's and the names are ABS's. An artefact citing one
+    # of them describes half of itself.
+    places = read_geography(allocation_bytes([("2100101", "Kensington", SCOPE, "Victoria")]))
+    artefact = scope_artefact(join([Region("2100101", (1,) * len(YEARS), False)], places))
+    assert artefact["source"]["publisher"] == "Victoria State Emergency Service"
+    assert artefact["geographySource"]["publisher"] == "Australian Bureau of Statistics"
+    assert artefact["geography"]["scope"] == SCOPE
+
+
+def test_main_writes_the_area_list_when_asked(tmp_path, capsys):
+    incidents, geography = sources_on_disk(tmp_path)
+    out = tmp_path / "flood-history.json"
+    areas = tmp_path / "sa2-areas.json"
+
+    assert (
+        main(
+            [
+                "--incidents",
+                str(incidents),
+                "--geography",
+                str(geography),
+                "--out",
+                str(out),
+                "--areas",
+                str(areas),
+            ]
+        )
+        == 0
+    )
+
+    written = json.loads(areas.read_text(encoding="utf-8"))
+    assert written["artefact"] == "sa2-areas"
+    assert written["geography"]["scope"] == SCOPE
+    assert written["counts"]["areas"] == len(written["areas"]) == 6
+    assert [a["name"] for a in written["areas"]] == [f"Area {i:02d}" for i in range(6)]
+    assert all("code" in a and "byYear" in a for a in written["areas"])
+    assert "6 areas" in capsys.readouterr().out
+
+
+def test_main_writes_no_area_list_unless_asked(tmp_path):
+    incidents, geography = sources_on_disk(tmp_path)
+    out = tmp_path / "flood-history.json"
+    assert (
+        main(["--incidents", str(incidents), "--geography", str(geography), "--out", str(out)])
+        == 0
+    )
+    assert not (tmp_path / "sa2-areas.json").exists()

@@ -1,24 +1,19 @@
 /**
  * The frame every screen sits in.
  *
- * The banner is not decoration and does not scroll away. This product shows a
- * simplified comparison built from a filtered photogrammetric surface, and the
- * one thing a resident must never take from it is that they are looking at an
- * official flood map. The line stays on every screen for the same reason the
- * provenance labels stay on every layer: the moment it is somewhere else, the
- * screen someone is actually reading does not carry it.
+ * **There is no advisory strip across the top any more.** It said *General
+ * information only · not a flood warning* on every screen, and the review of 14
+ * September asked for it to go: by then every screen said the same thing in
+ * its own place — the footer's always-visible *Not a flood warning*, the
+ * homepage's closing note, the notice before the full map, and the provenance
+ * tag on every layer — and a fifth copy pinned above all of them took a row
+ * of the map repeating what the reader had already been told.
  */
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
+import { CHANGES_NOTICE, type Credit } from './attribution.js';
 import {
-  CHANGES_NOTICE,
-  type Credit,
-  LICENCE_URL,
-  describeDatasets,
-} from './attribution.js';
-import {
-  advisory,
   brand,
   ink,
   line,
@@ -30,38 +25,25 @@ import {
   type,
   weight,
 } from './theme.js';
-
-export const INDICATIVE = 'Indicative local information';
-
-export const PILOT_BADGE = 'Kensington pilot · illustrative prototype geometry';
-
-/**
- * Drawn, not typed.
- *
- * The obvious character for this is `ⓘ`, and Source Sans 3 does not have it —
- * so setting it as text hands one glyph on every screen to whatever face the
- * reader's system supplies, in a different weight and on a different baseline
- * from the sentence beside it. Four characters in this interface are in that
- * position; all four are drawn instead. See `public/fonts/README.md`.
- */
-function InfoMark() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
-      <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="4.6" r="0.95" fill="currentColor" />
-      <path
-        d="M8 7.1v4.7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
+import { COVERAGE } from './terms.js';
+import { SourceLink, SourcesProvider } from './SourcesPanel.js';
 
 export interface ShellProps {
   readonly children: ReactNode;
+  /**
+   * Which screen this is, so a new one starts at the top.
+   *
+   * **The scrolling element is this shell's, not the screen's.** React keeps
+   * the same `<main>` across a screen change, and it keeps its scroll offset
+   * with it — so pressing *See flood history* from the band two thirds of the
+   * way down the homepage landed two thirds of the way down the flood board,
+   * under a heading nobody had read the top of.
+   *
+   * A person who changes screen has not asked to stay where they were. A
+   * person who presses Back has, but this product has no history stack to
+   * restore a position from, so the honest default is the top.
+   */
+  readonly at?: string;
   /** Shown at the right of the header, for "How this works" and the like. */
   readonly actions?: ReactNode;
   /** Where the person is, when they are somewhere with a way back. */
@@ -90,14 +72,13 @@ export interface ShellProps {
    * On the homepage the masthead says what this is to somebody who has just
    * arrived. On the map it says it again to somebody who is already inside,
    * and costs 56 pixels of the thing they came for — stacked with the
-   * advisory banner and the breadcrumb, the map was starting an eighth of the
-   * way down a laptop window. Nothing goes with it: the mark is not a link,
-   * and the way back is the Back control on the row below.
+   * breadcrumb, the map was starting well down a laptop window. Nothing goes
+   * with it: the mark is not a link, and the way back is the Back control on
+   * the row below.
    *
-   * **The advisory banner is not part of this and cannot be turned off.** It
-   * is the one line that stops a simplified drainage map being read as an
-   * official flood map, and the screen most likely to be mistaken for one is
-   * exactly the screen this prop exists for.
+   * **The footer is not part of this and cannot be turned off.** Its summary
+   * line says *Not a flood warning*, and the screen most likely to be mistaken
+   * for an official flood map is exactly the screen this prop exists for.
    */
   readonly masthead?: boolean;
   /**
@@ -108,15 +89,17 @@ export interface ShellProps {
    * requires the credit to be visible wherever the work is.
    */
   readonly credits?: readonly Credit[];
+  /** What was changed from the sources, for the credit. Defaults to the drainage map's. */
+  readonly creditNotice?: string;
   /**
-   * Where the artefacts on this screen came from: the API over the database,
-   * the copies bundled with the site, or some of each.
+   * Which extent is on screen, so the footer can say when the map got smaller.
    *
-   * Shown because a fallback nobody can see is indistinguishable from an API
-   * nobody is using -- and because "this map is the database's answer" is a
-   * claim, and a claim this product makes visible rather than asserts.
+   * Where the artefacts came from used to be said as well, and the copy review
+   * of 14 September cut it: which server answered is not something a resident
+   * can act on. What they can act on is the consequence -- the fallback covers
+   * one square kilometre instead of the council -- and that is still said.
    */
-  readonly servedFrom?: 'api' | 'bundled' | 'mixed';
+  readonly extentName?: string;
 }
 
 export function Shell({
@@ -127,9 +110,20 @@ export function Shell({
   trailing,
   masthead = true,
   credits,
-  servedFrom,
+  creditNotice,
+  extentName,
+  at,
 }: ShellProps) {
+  const scrolling = useRef<HTMLElement | null>(null);
+  // Not `scrollTo({ behavior: 'smooth' })`: a screen that arrives already
+  // scrolled and then slides to the top is a page that looks like it moved
+  // under the reader.
+  useEffect(() => {
+    scrolling.current?.scrollTo(0, 0);
+  }, [at]);
+
   return (
+    <SourcesProvider credits={credits ?? []} notice={creditNotice ?? CHANGES_NOTICE}>
     <div
       style={{
         position: 'fixed',
@@ -193,24 +187,6 @@ export function Shell({
         </header>
       )}
 
-      <div
-        role="note"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: space(2),
-          padding: `${String(space(2))}px ${String(space(6))}px`,
-          background: advisory.fill,
-          borderBottom: `1px solid ${advisory.line}`,
-          font: type(text.label, { leading: 1.4 }),
-          color: advisory.ink,
-          flexShrink: 0,
-        }}
-      >
-        <InfoMark />
-        {INDICATIVE}
-      </div>
-
       {(crumbs !== undefined || back !== undefined) && (
         <nav
           aria-label="Breadcrumb"
@@ -254,40 +230,52 @@ export function Shell({
         </nav>
       )}
 
-      <main style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}>
+      <main
+        ref={scrolling}
+        style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}
+      >
         {children}
       </main>
 
       {credits !== undefined && credits.length > 0 && (
-        <Attribution credits={credits} servedFrom={servedFrom} />
+        <Attribution extentName={extentName} />
       )}
     </div>
+    </SourcesProvider>
   );
 }
 
 /**
- * The data credit, on every screen.
+ * The line shown when the map is the bundled fallback.
  *
- * CC BY 4.0 requires the attribution to be visible to the person using the
- * work, so it sits in the frame rather than behind a link — the same argument
- * as the indicative banner above it. It is small and quiet, which the licence
- * permits; it is not absent, which the licence does not.
+ * The database holds the whole City of Melbourne and the container holds one
+ * square kilometre of Kensington, so when the instance is stopped the map does
+ * not merely come from somewhere else -- **it gets smaller**. Left unsaid,
+ * somebody finds that out by finding their street missing. The full extent
+ * needs no line: it is what `COVERAGE` already says.
  */
-const SERVED_BY: Record<'api' | 'bundled' | 'mixed', string> = {
-  api: 'Served from the DrainLens database.',
-  bundled: 'Served from the copy bundled with this site.',
-  mixed: 'Served partly from the DrainLens database and partly from the bundled copy.',
+const SMALLER_MAP: Record<string, string> = {
+  kensington:
+    'The full council map is not available right now, so this map shows only one square kilometre of Kensington.',
 };
 
+/**
+ * The data credit, on every screen.
+ *
+ * CC BY 4.0 requires the attribution to be reachable by the person using the
+ * work. It used to be spelled out on every screen as dataset ids, which the
+ * copy review of 14 September found nobody could read; it now sits one press
+ * behind a line that names what is there. Collapsed, which the licence
+ * permits; not absent, which it does not.
+ */
 function Attribution({
-  credits,
-  servedFrom,
+  extentName,
 }: {
-  readonly credits: readonly Credit[];
   // Required but possibly undefined, not optional: `exactOptionalPropertyTypes`
   // treats those as different, and the caller always passes the key.
-  readonly servedFrom: 'api' | 'bundled' | 'mixed' | undefined;
+  readonly extentName: string | undefined;
 }) {
+  const smaller = extentName === undefined ? undefined : SMALLER_MAP[extentName];
   return (
     <footer
       style={{
@@ -299,22 +287,19 @@ function Attribution({
         color: ink.subtle,
       }}
     >
-      {credits.map((credit) => (
-        <span key={`${credit.publisher} ${credit.licence}`} style={{ marginRight: space(3) }}>
-          {describeDatasets(credit.datasets)} © {credit.publisher}, licensed{' '}
-          <a
-            href={LICENCE_URL}
-            target="_blank"
-            rel="license noreferrer"
-            style={{ color: ink.muted, textDecorationColor: line.strong }}
-          >
-            {credit.licence}
-          </a>
-          {credit.lastModified === null ? '' : `, last updated ${credit.lastModified}`}.{' '}
-        </span>
-      ))}
-      <span>{CHANGES_NOTICE}</span>
-      {servedFrom !== undefined && <span> {SERVED_BY[servedFrom]}</span>}
+      {smaller !== undefined && (
+        <p role="status" style={{ margin: `0 0 ${String(space(1))}px`, color: ink.muted }}>
+          {smaller}
+        </p>
+      )}
+      {/*
+        The credits and the changes notice moved into "About the data"
+        (ui/SourcesPanel.tsx, section "privacy"), one press away as before.
+        "Not a flood warning" stays visible on every screen.
+      */}
+      <p style={{ margin: 0 }}>
+        Not a flood warning · <SourceLink id="footer" inline />
+      </p>
     </footer>
   );
 }
@@ -347,13 +332,13 @@ export function FixtureNotice({ note }: { readonly note: string }) {
 }
 
 /**
- * The pilot badge, which is a claim about scope rather than a label.
+ * The coverage badge, which is a claim about scope rather than a label.
  *
- * Exported because the landing page and the task page both carry it, and two
+ * Exported because the landing page and the homepage both carry it, and two
  * copies of a sentence about what this product does *not* cover is how they
- * drift apart.
+ * drift apart. The sentence itself is `COVERAGE.map`, for the same reason.
  */
-export function PilotBadge() {
+export function CoverageBadge() {
   return (
     <span
       style={{
@@ -366,7 +351,7 @@ export function PilotBadge() {
         color: brand.ink,
       }}
     >
-      {PILOT_BADGE}
+      {COVERAGE.map}
     </span>
   );
 }

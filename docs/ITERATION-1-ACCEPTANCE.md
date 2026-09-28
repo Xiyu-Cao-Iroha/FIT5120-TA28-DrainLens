@@ -54,6 +54,27 @@ AC 1.1.2's trigger also gained a fourth option: *drainage, water-flow, terrain *
 
 **Citation convention.** A comment in the source citing `AC 1.3.1` means the revised criterion. Comments about the deferred comparison say `(Aug-27 set)` after the number. Nothing else in the source carries a superseded number.
 
+### The names on screen changed on 14 September, and the criteria did not
+
+The plain-English copy pass on `develop` gave each thing one name, held in `apps/web/src/ui/terms.ts`, and a test keeps the retired ones out of the source. The criteria below are quoted as the document wrote them, and the notes under them use the names Iteration 1 shipped with. This is the mapping, so a criterion can be found on either build:
+
+| The criteria say | `iteration-1-frozen` shows | `develop` shows |
+| --- | --- | --- |
+| official recorded data (1.1.4.g, 1.1.7.d, 1.2.1.c) | *Official recorded data* | *From council records ›* (legend group title; foot of the pit and pipe popups) |
+| system-derived information (1.1.4.g, 1.1.7.d, 1.3.1.e) | *System-derived result* | *Estimated by DrainLens ›* (legend group title; foot of the address card) |
+| Drainage pits, Drainage pipes (1.1.5) | *Pits*, *Pipes* | *Drain pits*, *Drain pipes* |
+| Water Flow (1.1.4.d) | *Water flow* | *Likely water paths* |
+| Terrain (1.1.4.e, 1.3.1) | *Terrain*, *Ground surface* in Layers | *Ground height* |
+| Low Areas (1.1.4.f, 1.3.2) | *Low areas* | *Low areas* |
+| terrain information missing (1.3.1.f) | *Not enough ground measured* | *Ground data gaps* |
+| recorded incident count (2.1.1, 2.2.1) | incidents | *emergency responses*, under *Total emergency responses* |
+
+**15 September, copy audit v2: the source badges came off.** The team's second copy audit found a *Council record* or *Calculated by DrainLens* pill on nearly every card, and asked for them to go from the pit card, the address card, the Layers panel, the legend rows and the flood pages. They are gone, and the team owner decided the legend's tags go too. The distinction 1.1.4.g, 1.1.7.d and 1.3.1.e ask for is now said once, as the two sentences in the table above, in a closed *About this data* at the foot of the map legend (`PROVENANCE` in `ui/terms.ts`), and the pit card's recorded fields keep *Drain and pipe locations come from City of Melbourne records* inside *View technical details*. Whether a sentence in a fold meets *distinguish* as well as a tag on every row did is a judgement a marker may make differently; this is the trade the team chose for readability.
+
+**16 September, copy audit v4: the distinction is back on screen, as grey links, and *About this data* is gone.** A closed fold hid what 1.1.4.g, 1.1.7.d, 1.2.1.c and 1.3.1.e want shown, so the legend now **groups its rows by source** under two titles that are links: *From council records ›* over *Drain pits* and *Drain pipes*, and *Estimated by DrainLens ›* over the water paths, low areas, ground height and ground data gaps (`LEGEND_GROUPS` in `map/MapLayers.tsx`). The **pit and pipe popups end with a grey *From council records ›* line**, and the address card ends with *Estimated by DrainLens ›*. No coloured badges came back. Each link opens its section of the full-screen **About the data** page (`ui/sources.ts`, `ui/SourcesPanel.tsx`), where the details now live: the council's update dates, what the records do not say, the survey the ground height is estimated from and its accuracy. The page is also reached from *Data sources and limits ›* in the footer of every screen, and holds the data credits that the footer's *Data sources · Licensing* fold used to (still read from the artefacts). The pit card's *View technical details* still opens with *Drain and pipe locations come from City of Melbourne records.* The warning sign's card has no source line, at the industry mentor's request; the low areas' legend group says they are estimated.
+
+**No criterion's outcome moves with its name.** Each still asks for a distinction or a layer, and each is still there under the new word. Three things did change in behaviour on `develop` and contradict a note below, and each of those notes carries its own dated line: the advisory banner is gone, Terrain draws contour lines, and the comparison is back in the interface.
+
 ---
 
 ## Where this stands — 3 September 2026
@@ -121,6 +142,8 @@ Nine of eleven points from the mentor review are in. None of them changes a crit
 > **Two things a panel never had to handle, because a panel does not move.** A card taller than the map cannot sit above or below the pit, so it is capped and scrolls rather than falling back to the middle of the screen and covering the controls. And a selection survives panning — losing it because you looked next door would be worse — so a card whose anchor has left the canvas hides, and comes back with the mark, instead of sitting against an edge pointing at nothing.
 >
 > **The masthead goes with the panel, and only the masthead.** Inside the map, the name and mark at the top were telling somebody something they had worked out by arriving, and the map was starting 149 px down a laptop window; it starts at 82 px now, which is 67 px more of the thing they came for. Nothing went with it: the mark was never a link, and the way back is the Back control on the row below. **The advisory banner stays, and is the one piece of chrome that cannot be turned off** — it is the line that stops a simplified drainage map being read as an official flood map, and the map is the screen most likely to be mistaken for one. The CC BY footer stays for the same kind of reason: the licence requires it wherever the work is.
+>
+> **14 September 2026, on `develop`: the advisory banner is gone.** The review that day found every screen already saying the same thing in its own place — the footer's *Not a flood warning*, the homepage's closing note, the notice before the full map, and the source tag on every layer — and a fifth copy pinned above them took a row of the map to repeat it. The footer is now the chrome that cannot be turned off, and its summary line carries *Not a flood warning*. `iteration-1-frozen` still has the banner, so the sentence above stays true of the build it was written about.
 >
 > **The placement arithmetic is now shared with the tour** (`ui/callout.ts`), because it is one problem seen twice: a small target at a known position, a card of a known size, and a box neither may leave. Its tests came with it.
 >
@@ -211,7 +234,11 @@ Nine of eleven points from the mentor review are in. None of them changes a crit
 >
 > **1.1.4.e is an equivalent visualisation, not contour lines.** The surface is shaded by elevation, ramped across the ground actually present in the extent rather than against sea level. The reason it is not contours is in `map/terrain.ts`: the shipped array is the *conditioned routing surface*, which raises every building a hundred metres so water runs between them, and contour lines drawn on it would be lines around buildings presented as lines around terrain. The shading is fitted at robust percentiles and carries no metric legend, because the surface's own accuracy — about 25 cm — does not support one.
 >
-> **1.1.4.g is the legend's job.** Every layer currently drawn appears in it with *Official recorded data* or *System-derived result* beside it. It used to sit under each control; with the controls compressed into chips there is no room, and a tooltip is not something a layer *carries*.
+> **14 September 2026, on `develop`: the reason above no longer applies, and Terrain draws contour lines.** The layer stopped reading the conditioned routing surface. It is now the raw ground, coloured at build time on a fixed AHD ramp into 500 m tiles for the whole council, and the legend is in metres, because a fixed ramp gives a metre the same colour everywhere, which a percentile fit never could. At tile scale it draws ground-height lines at 1 m, bold every 5 m, smoothed first so the 25 cm noise is not drawn as rings round every kerb, and spot heights written with ≈ to the nearest 0.5 m (`pipeline/.../terrain_marks.py`, `map/terrainMarks.ts`). So on `develop` 1.1.4.e and 1.3.1.a are met by contour lines as written, not by an equivalent. `iteration-1-frozen` is the shading described above.
+>
+> **1.1.4.g is the legend's job.** On `iteration-1-frozen`, every layer currently drawn appears in it with *Official recorded data* or *System-derived result* beside it; from 15 September on `develop` the legend said it once, in *About this data*, and from 16 September it groups the rows under *From council records ›* and *Estimated by DrainLens ›*, each a link to About the data — see the notes under the names table. It used to sit under each control; with the controls compressed into chips there is no room, and a tooltip is not something a layer *carries*. On `develop` since 14 September the two tags read *Council record* and *Calculated by DrainLens* — see the names table at the top of this file.
+>
+> **From 10 September the full map opens with every chip off, and no box above changes.** Each of a to h is of the form *when X is selected, do Y*, and each still holds the moment X is selected; what changed is only what is selected on arrival, which no sub-criterion names. It is worth writing down because a marker who opens the full map and sees no pits will reach for 1.1.4.d before reading this: press *Water flow* and the paths are there. **The homepage cards are untouched** — AC 1.1.2 requires a card to open the map showing what it named, so `openingLayers` still turns on exactly the layer of the card that was pressed, and only the unguided *Explore the map* entry starts empty. **From 11 September the ground surface is off there too**: the unguided map opens with nothing on, and every layer on it is one the person turned on. 1.1.4.e is unaffected for the same reason as the rest — it asks what happens *when Terrain is selected*, and the elevation shading is one press away in the Layers panel. The cards still bring the ground with them.
 
 ### AC 1.1.5 — Control the drainage layers
 
@@ -230,7 +257,8 @@ Nine of eleven points from the mentor review are in. None of them changes a crit
 > independently, the untouched one keeps its visibility, the chips show which are on, the legend
 > follows, and the address and map position are untouched.
 >
-> The Layers panel still exists and carries *Ground surface* and *Not enough ground measured*.
+> The Layers panel still exists and carries *Ground surface* and *Not enough ground measured* —
+> *Ground height* and *Limited ground data* on `develop` since 14 September.
 > The hatching is deliberately never hidden by anything else: it is a statement about the
 > evidence rather than a view of the world, and it is the one mark that says the map is
 > guessing.
@@ -319,6 +347,8 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 - [x] **1.2.1.d** Provide an option to show its recorded downstream path
 
 > 1.2.1.c pushes provenance down to the individual value. Every value shown travels with the basis that produced it — see `packages/schema/src/provenance.ts`, where a value without a basis has no constructible shape.
+>
+> **16 September:** on `develop` the pit popup ends with a grey *From council records ›*, which opens the *Drains and pipes* section of About the data; the pipe popup ends the same way. The same holds for 1.1.7.d, and the address card ends with *Estimated by DrainLens ›*. See the copy audit v4 note under the names table.
 
 ### AC 1.2.2 — Follow the recorded downstream path
 
@@ -351,7 +381,7 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 >
 > **1.3.1.e is met by calling the surface what it is.** It is derived, not recorded, and it is not a LiDAR product: it comes from aerial photography filtered to bare earth. The legend says *System-derived result* beside it.
 >
-> See the note under AC 1.1.4.e for why this is shading rather than contours.
+> See the note under AC 1.1.4.e for why this is shading rather than contours, and for what `develop` draws instead. On `develop` the hatching is *Limited ground data* and the tag *Calculated by DrainLens*. **From 16 September** the hatching is *Ground data gaps*, and both it and *Ground height* sit in the legend under *Estimated by DrainLens ›*; the scale's *More about ground height ›* opens the About the data section that says what the surface is estimated from.
 
 ### AC 1.3.2 — View low areas
 
@@ -416,6 +446,8 @@ Unchanged by the revision, letters included. Both criteria were built on 29 Augu
 
 > **2.2.1.b is enforced where the data is, not where it is drawn.** The pipeline publishes thirty and no more, so the cap cannot be exceeded by a change to a screen. 275 of Greater Melbourne's 281 areas recorded at least one incident, so the cap binds rather than the data.
 >
+> **14 September 2026, on `develop`: one list is now drawn from more than thirty areas, and the cap holds there by a different means.** The board can be ranked by *Call-outs per 1,000 residents*, and that ranking is made from the area artefacts, which hold every area in the scope rather than thirty. `flood-history.json` still publishes thirty, and the rate list shows no more rows than it does (`RateList` in `screens/FloodHistory.tsx`), so 2.2.1.b is still met — but for that list the cap is a length read in a screen, which is weaker than the sentence above claims. In the database it is data again: exactly thirty rows carry a `board_rank` (migration 004).
+>
 > **2.2.1.d is free here and would not be if the page did the arithmetic.** One file, one incident type, one six-year period, one counting basis — nothing on the page recomputes anything.
 >
 > **The control is a toggle, and that is AC 2.1.1.h rather than a nicety.** It called the top five the default view, and a view somebody cannot return to is not a default -- it is a state the page leaves them in. Expanded, the button reads *Show the top 5 only*; collapsing scrolls the list back into sight, because folding thirty rows away from under the button would otherwise drop the reader below the whole section.
@@ -462,11 +494,13 @@ The engine (`packages/scenario`), the worker, the difference layer, the setup an
 
 Comments in `apps/web/src/scenario/`, `screens/ScenarioSetup.tsx`, `screens/Result.tsx`, `map/difference.ts` and the scenario parts of `session.ts` cite `AC 2.x (Aug-27 set)`. Those numbers refer to the 27 August document, not to the flood-history criteria above.
 
+> **On `develop` the comparison is back in the interface**, as Iteration 2's Epic 3 — a drain on the full map opens it, for any drain on the council map that has a scenario window — so AC 1.1.1.e holds only for `iteration-1-frozen`. Its criteria are in [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md), under AC 3.x, which is a third numbering again. On screen its bands are now *No clear difference* and *More water than with a clear drain* (14 September 2026).
+
 ---
 
 ## Definition of done
 
-From *Iteration 1 Requirements*. The revised criteria document does not restate these, and they still govern.
+From the current Iteration 1 requirements. These checks govern delivery but do not add interaction outcomes to the acceptance criteria above.
 
 ### Epic 1 — Interactive local drainage and water flow
 

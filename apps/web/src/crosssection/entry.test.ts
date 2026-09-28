@@ -19,7 +19,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { PIT_SUMMARY, SURFACE_ENTRY_NOTE, surfaceEntryOf } from './section.js';
+import { PIT_SUMMARY, SURFACE_ENTRY_NOTE, publicLabelOf, surfaceEntryOf } from './section.js';
 import type { Pit } from '../map/artefact.js';
 import type { SurfaceEntry } from './section.js';
 
@@ -116,5 +116,21 @@ describe('what the card and the figure say', () => {
     expect(PIT_SUMMARY['recorded-inlet']).toContain('from the street');
     expect(PIT_SUMMARY['not-an-inlet']).not.toContain('collects surface water');
     expect(PIT_SUMMARY['not-recorded']).not.toContain('collects surface water');
+  });
+});
+
+describe('the name a resident reads first', () => {
+  it('turns the council code into words, starting with the layer name', () => {
+    expect(publicLabelOf(pit('Lane Type'))).toBe('Drain pit beside a lane');
+    expect(publicLabelOf(pit('Grated Side Entry'))).toBe('Drain pit with a grate and kerb opening');
+    expect(publicLabelOf(pit('Junction'))).toBe('Drain pit where pipes join');
+    expect(publicLabelOf(pit('Not Known'))).toBe('Drain pit');
+    for (const type of ['Grated OFK', 'Side Entry', 'System Node', 'Run Through Inlet', 'Other']) {
+      expect(publicLabelOf(pit(type))).toMatch(/^Drain pit/);
+    }
+  });
+
+  it('never shows the raw council code as the name', () => {
+    expect(publicLabelOf(pit('Lane Type'))).not.toMatch(/SWD|Lane Type/);
   });
 });

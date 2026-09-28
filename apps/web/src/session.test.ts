@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  DEFAULT_RAINFALL_MM,
   EMPTY_SCENARIO,
   INITIAL_SESSION,
   type Session,
@@ -11,6 +10,7 @@ import {
   missingScenarioInput,
   reduce,
 } from './session.js';
+import { SECTION_ORDER, allLearned, countLearned } from './tutorial/sections.js';
 
 const GATEHOUSE: SupportedAddress = {
   id: 'kensington/46-gatehouse-drive',
@@ -58,11 +58,13 @@ describe('the golden path', () => {
     expect(INITIAL_SESSION.outcome).toBeNull();
   });
 
-  it('sends the follow task to the map and the compare task to the setup', () => {
+  it('sends the follow task to the map and the compare task to choosing a drain', () => {
+    // Step 1 of the comparison since 15 September, not the setup: an address
+    // with no comparable drain has to stop before anything is set up.
     const after = (task: 'follow' | 'compare' | 'full-map') =>
       play([{ type: 'address-accepted', address: GATEHOUSE }, { type: 'task-chosen', task }]).screen;
 
-    expect(after('compare')).toBe('scenario');
+    expect(after('compare')).toBe('drain');
     expect(after('follow')).toBe('explore');
     expect(after('full-map')).toBe('explore');
   });
@@ -76,16 +78,21 @@ describe('scenario inputs', () => {
     expect(canRunComparison(EMPTY_SCENARIO)).toBe(false);
   });
 
-  it('opens on the middle published comparison amount', () => {
-    expect(EMPTY_SCENARIO.rainfallMm).toBe(DEFAULT_RAINFALL_MM);
+  it('leaves the rainfall unchosen too', () => {
+    // It opened on 40 mm until 15 September. The Blockage Flow prototype keeps
+    // *Review your choices* disabled until the amount is chosen, for the reason
+    // the blockage starts unchosen: a pre-selected assumption is the interface's.
+    expect(EMPTY_SCENARIO.rainfallMm).toBeNull();
   });
 
   it('names the missing control in the order the setup asks for them', () => {
     expect(missingScenarioInput(EMPTY_SCENARIO)).toBe('pit');
     expect(missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14' })).toBe('blockage');
+    expect(missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' })).toBe('rainfall');
     expect(
-      missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' }),
+      missingScenarioInput({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear', rainfallMm: 20 }),
     ).toBeNull();
+    expect(canRunComparison({ ...EMPTY_SCENARIO, pitId: 'P-14', blockage: 'clear' })).toBe(false);
   });
 
   it('remembers whether the pit was suggested or actually chosen', () => {
@@ -103,6 +110,7 @@ describe('scenario inputs', () => {
       { type: 'pit-selected', pitId: 'P-14', suggested: false },
       { type: 'blockage-selected', blockage: 'partly-blocked' },
       { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'no-clear-change' } },
       { type: 'change-scenario' },
     ]);
@@ -185,8 +193,11 @@ describe('going back', () => {
   it.each([
     ['task', 'address'],
     ['explore', 'task'],
-    ['scenario', 'task'],
+    ['drain', 'address'],
+    ['scenario', 'drain'],
+    ['review', 'scenario'],
     ['result', 'scenario'],
+    ['no-match', 'address'],
     ['unsupported', 'address'],
   ] as const)('from %s returns to %s', (from, to) => {
     expect(reduce({ ...INITIAL_SESSION, screen: from }, { type: 'back' }).screen).toBe(to);
@@ -204,6 +215,63 @@ describe('going back', () => {
     expect(asked.screen).toBe('address');
     expect(reduce(asked, { type: 'back' }).screen).toBe('home');
   });
+
+  it('leaves the address screen for the chooser when a guide sent you there', () => {
+    /*
+     * The address screen was the one screen in the guided path with no way
+     * out on it -- no Back, no Home, only the browser's own button. It has
+     * both now, and *where* Back goes is decided here rather than in the
+     * view: a pending guide section is exactly what says the chooser asked
+     * for the address, and having the view read that would put the rule in
+     * two places.
+     */
+    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(chosen.screen).toBe('address');
+    expect(reduce(chosen, { type: 'address-abandoned' }).screen).toBe('choose');
+  });
+
+  it('leaves it for the homepage when nothing was waiting for the address', () => {
+    const asked = reduce(INITIAL_SESSION, { type: 'change-address' });
+    expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
+  });
+
+  it('opens every guide on the address screen and asks for the address again', () => {
+    /*
+     * Team decision, 16 September: the second guide skipped the address
+     * screen and started on the first guide's street. The screen now comes
+     * every time, empty.
+     */
+    const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(first.screen).toBe('address');
+
+    const withAddress = reduce(first, { type: 'address-accepted', address: GATEHOUSE });
+    expect(withAddress.screen).toBe('guide');
+
+    const second = reduce(
+      reduce(withAddress, { type: 'guide-finished' }),
+      { type: 'guide-chosen', section: 'water-flow' },
+    );
+    expect(second.screen).toBe('address');
+    expect(second.guideSection).toBe('water-flow');
+    expect(second.address).toBeNull();
+    expect(reduce(second, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('guide');
+  });
+
+  it('goes back from a guide to the address screen with the section still chosen', () => {
+    const inGuide = play([
+      { type: 'get-started' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    const back = reduce(inGuide, { type: 'change-address' });
+    expect(back.screen).toBe('address');
+    expect(back.guideSection).toBe('drainage');
+  });
+
+  it('keeps the chosen section, because Back is not un-choosing it', () => {
+    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
+  });
 });
 
 describe('the insufficient-information outcome', () => {
@@ -212,6 +280,7 @@ describe('the insufficient-information outcome', () => {
     // answer, "insufficient information" is the absence of one. A single
     // string field for both is how they get confused.
     const end = play([
+      { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'insufficient', reason: 'terrain_unavailable' } },
     ]);
 
@@ -228,7 +297,10 @@ describe('the insufficient-information outcome', () => {
     ] as const;
 
     for (const reason of reasons) {
-      const end = play([{ type: 'comparison-finished', outcome: { kind: 'insufficient', reason } }]);
+      const end = play([
+        { type: 'comparison-started' },
+        { type: 'comparison-finished', outcome: { kind: 'insufficient', reason } },
+      ]);
       expect(end.outcome).toEqual({ kind: 'insufficient', reason });
     }
   });
@@ -374,6 +446,245 @@ describe('searching from the map', () => {
   });
 });
 
+describe('arriving at the map', () => {
+  /*
+   * The map must start clean every time — no pit selected, no path traced, no
+   * chips left on from the last visit. That was true only because React
+   * unmounted the screen on the way out; nothing said so and nothing tested
+   * it. The map is keyed on this count now, so the guarantee is structural.
+   */
+  /*
+   * `map-opened` stopped landing on the map on 11 September: it lands on the
+   * notice, and `lock-passed` is what reaches the map. These tests were
+   * written against the one-step route and are edited rather than deleted,
+   * because the property is unchanged — an arrival is an arrival however many
+   * screens it took, and the rule still lives in one place in the reducer.
+   */
+  const OPEN_MAP: readonly SessionEvent[] = [{ type: 'map-opened' }, { type: 'lock-passed' }];
+
+  it('counts an arrival however the person got there', () => {
+    expect(play(OPEN_MAP).mapOpenings).toBe(1);
+    expect(
+      play([
+        { type: 'address-accepted', address: GATEHOUSE },
+        { type: 'task-chosen', task: 'follow' },
+      ]).mapOpenings,
+    ).toBe(1);
+  });
+
+  it('does not count the notice, which is not the map', () => {
+    // Reading a disclosure and then turning back has not started anything.
+    expect(play([{ type: 'map-opened' }]).mapOpenings).toBe(0);
+    expect(play([{ type: 'map-opened' }]).screen).toBe('locked');
+  });
+
+  it('counts leaving and coming back as a second arrival', () => {
+    const end = play([...OPEN_MAP, { type: 'leave-map' }, ...OPEN_MAP]);
+    expect(end.mapOpenings).toBe(2);
+  });
+
+  it('does not count anything done while already on the map', () => {
+    // Otherwise every search would throw away the layers the person had set,
+    // which is the opposite failure and just as bad.
+    const end = play([
+      ...OPEN_MAP,
+      { type: 'address-moved', address: NEALE },
+      { type: 'address-cleared' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: false },
+    ]);
+    expect(end.mapOpenings).toBe(1);
+    expect(end.screen).toBe('explore');
+  });
+
+  it('does not count screens that are not the map', () => {
+    expect(play([{ type: 'history-opened' }]).mapOpenings).toBe(0);
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }]).mapOpenings).toBe(0);
+  });
+});
+
+describe('the whole map, before the guide is finished', () => {
+  const ALL_FOUR: readonly SessionEvent[] = SECTION_ORDER.flatMap((section) => [
+    { type: 'guide-chosen', section },
+    { type: 'guide-finished' },
+  ]);
+
+  it('meets the notice on every route in, not just one', () => {
+    // The rule is in the reducer rather than at each route, because there are
+    // three ways to the map today and a lock written three times will be
+    // right at two of them.
+    expect(play([{ type: 'map-opened' }]).screen).toBe('locked');
+    expect(play([{ type: 'map-opened', mode: 'terrain' }]).screen).toBe('locked');
+    expect(play([{ type: 'map-opened', from: 'history' }]).screen).toBe('locked');
+  });
+
+  it('keeps the mode and the origin through the notice', () => {
+    // Otherwise reading four lines costs you the card you pressed and the page
+    // you came from, and Back stops obeying AC 1.1.10.
+    const end = play([
+      { type: 'map-opened', mode: 'low-areas', from: 'history' },
+      { type: 'lock-passed' },
+    ]);
+    expect(end.mapMode).toBe('low-areas');
+    expect(end.mapOrigin).toBe('history');
+  });
+
+  it('opens whether or not any of the guide was done', () => {
+    // Not a paywall. Five seconds buys a disclosure; it does not withhold the
+    // product from somebody who declines the lesson.
+    expect(play([{ type: 'map-opened' }, { type: 'lock-passed' }]).screen).toBe('explore');
+  });
+
+  it('stops appearing once all four sections are finished', () => {
+    const taught = play(ALL_FOUR);
+    expect(allLearned(taught.learned)).toBe(true);
+    expect(reduce(taught, { type: 'map-opened' }).screen).toBe('explore');
+  });
+
+  it('still appears when three of the four are finished', () => {
+    // All or nothing, which is the model the design owner chose. Three
+    // sections is not a partial unlock, it is three sections.
+    const three = play(ALL_FOUR.slice(0, 6));
+    expect(countLearned(three.learned)).toBe(3);
+    expect(reduce(three, { type: 'map-opened' }).screen).toBe('locked');
+  });
+
+  it('records nothing about having passed it', () => {
+    // A decision about one press, not a fact about the person. Passing the
+    // notice must not quietly count as having learned anything.
+    const passed = play([{ type: 'map-opened' }, { type: 'lock-passed' }]);
+    expect(countLearned(passed.learned)).toBe(0);
+  });
+
+  it('goes back where it came from rather than one screen up', () => {
+    expect(play([{ type: 'map-opened', from: 'history' }, { type: 'leave-map' }]).screen).toBe(
+      'history',
+    );
+  });
+});
+
+describe('starting and finishing a section of the guide', () => {
+  it('asks where you live before it can point at a pit near you', () => {
+    const end = play([{ type: 'guide-chosen', section: 'drainage' }]);
+    expect(end.screen).toBe('address');
+    expect(end.guideSection).toBe('drainage');
+  });
+
+  it('hands the address to the guide rather than to the task question', () => {
+    // The same screen answers two questions now, and which one it is
+    // answering is the whole of the difference.
+    const guided = play([
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(guided.screen).toBe('guide');
+
+    const unguided = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    expect(unguided.screen).toBe('task');
+  });
+
+  it('marks only the section that was running', () => {
+    const end = play([
+      { type: 'guide-chosen', section: 'water-flow' },
+      { type: 'guide-finished' },
+    ]);
+    expect(end.learned['water-flow']).toBe(true);
+    expect(countLearned(end.learned)).toBe(1);
+    expect(end.guideSection).toBeNull();
+  });
+
+  it('does nothing when no section is running', () => {
+    // `guide-finished` reaching the reducer from outside a section would
+    // otherwise mark whatever was last chosen, or crash on null.
+    const start = INITIAL_SESSION;
+    expect(reduce(start, { type: 'guide-finished' })).toBe(start);
+  });
+
+  it('goes back to the four without marking anything when a section is skipped', () => {
+    // *Skip for now* on the ground height guide's entry screen.
+    const end = play([
+      { type: 'guide-chosen', section: 'terrain' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'guide-left' },
+    ]);
+    expect(end.screen).toBe('choose');
+    expect(end.guideSection).toBeNull();
+    expect(countLearned(end.learned)).toBe(0);
+    expect(reduce(INITIAL_SESSION, { type: 'guide-left' })).toBe(INITIAL_SESSION);
+  });
+
+  it('carries the section through as the map mode', () => {
+    // So that finishing the guide and then opening the map shows the thing
+    // just taught rather than whatever was last looked at.
+    expect(play([{ type: 'guide-chosen', section: 'terrain' }]).mapMode).toBe('terrain');
+  });
+});
+
+describe('letting the address go', () => {
+  /*
+   * There was no way to do this, and the shape of the gap is worth keeping.
+   * The map's search box shows a chosen address as its *placeholder* and
+   * clears what was typed, so the clear button — which appeared only when
+   * there was typed text — vanished at the exact moment there was something
+   * to clear. The mark stayed on the map with no control that removed it.
+   */
+  it('drops the address without moving off the map', () => {
+    const reading = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+    ]);
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.address).toBeNull();
+    expect(end.screen).toBe(reading.screen);
+  });
+
+  it('drops a pit chosen near it, for the same reason a new address does', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'pit-selected', pitId: 'P-14', suggested: true },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.scenario.pitId).toBeNull();
+    expect(end.scenario.pitWasSuggested).toBe(false);
+    expect(end.outcome).toBeNull();
+  });
+
+  it('keeps the assumptions, which were never about the address', () => {
+    // Same rule as `address-moved`: the blockage setting and the rainfall are
+    // the person's, and re-asking for them would be the map forgetting
+    // something it was told.
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-chosen', task: 'follow' },
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 60 },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.scenario.blockage).toBe('fully-blocked');
+    expect(end.scenario.rainfallMm).toBe(60);
+  });
+
+  it('clears a rejected address too, so no stale complaint survives it', () => {
+    const end = play([
+      { type: 'address-rejected', typed: '12 Nowhere Street' },
+      { type: 'address-cleared' },
+    ]);
+
+    expect(end.rejectedAddress).toBeNull();
+  });
+
+  it('is harmless when there is no address', () => {
+    expect(play([{ type: 'address-cleared' }]).address).toBeNull();
+  });
+});
+
 describe('an action the reducer does not know', () => {
   it('leaves the session untouched instead of erasing it', () => {
     // The compiler makes this unreachable, which is why the cast is needed to
@@ -390,9 +701,18 @@ describe('an action the reducer does not know', () => {
 });
 
 describe('opening the map from the homepage', () => {
-  it('goes straight there without asking for an address first', () => {
-    const end = reduce(INITIAL_SESSION, { type: 'map-opened' });
+  it('meets the notice first, and never asks for an address', () => {
+    /*
+     * This said "goes straight there" until 11 September, when the guide's
+     * lock landed. The half that changed is the destination; the half that
+     * matters is unchanged and is why the test is edited rather than deleted:
+     * no route to the map invents an address or demands one.
+     */
+    const notice = reduce(INITIAL_SESSION, { type: 'map-opened' });
+    expect(notice.screen).toBe('locked');
+    expect(notice.address).toBeNull();
 
+    const end = reduce(notice, { type: 'lock-passed' });
     expect(end.screen).toBe('explore');
     // No address is invented on the way. The map opens over the pilot area
     // with nothing selected, and the search along its top is how somebody
@@ -405,7 +725,9 @@ describe('opening the map from the homepage', () => {
     expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
   });
 
-  it('keeps whatever the person had already chosen', () => {
+  it('forgets the address, and keeps the person’s own assumptions', () => {
+    // Team decision, 16 September: the full map asks for an address again on
+    // every visit. The blockage and rainfall are choices, not a place.
     const busy = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'blockage-selected', blockage: 'fully-blocked' },
@@ -413,7 +735,8 @@ describe('opening the map from the homepage', () => {
     ]);
     const end = reduce(busy, { type: 'map-opened' });
 
-    expect(end.address).toEqual(GATEHOUSE);
+    expect(end.address).toBeNull();
+    expect(end.scenario.pitId).toBeNull();
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
 
@@ -501,5 +824,486 @@ describe('opening the map from the homepage', () => {
 
     expect(viaTask.screen).toBe('explore');
     expect(viaTask.mapMode).toBeNull();
+  });
+});
+
+describe('a task chosen before there is an address', () => {
+  /*
+    AC 3.1.1 needs the comparison offered from the homepage, and the homepage
+    has no address. The route is: name the task, be asked for an address, then
+    arrive at the task — and the reducer is the only thing that remembers what
+    the address was collected for.
+
+    **The screen that used to carry this choice had no way in.** `screen:
+    'task'` is set by `address-accepted` with no guide section running, and
+    after the homepage was rebuilt around the guide, every route to the address
+    screen set one. That is why the tests below check both destinations: where
+    a pending task goes, and that an address given with nothing pending still
+    lands on the task question.
+  */
+
+  it('collects an address first, then opens what was asked for', () => {
+    const asked = play([{ type: 'task-wanted', task: 'compare' }]);
+    expect(asked.screen).toBe('address');
+    expect(asked.task).toBeNull();
+
+    const arrived = play([{ type: 'address-accepted', address: GATEHOUSE }], asked);
+    expect(arrived.screen).toBe('drain');
+    expect(arrived.task).toBe('compare');
+  });
+
+  it('asks for the address again for the comparison, even with one in hand', () => {
+    // It went straight to the comparison until 15 September. The blocked-drain
+    // flow begins with an address search, and the button that starts it says
+    // so; the address given earlier may have been for something else.
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-wanted', task: 'compare' },
+    ]);
+    expect(end.screen).toBe('address');
+    expect(end.pendingTask).toBe('compare');
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }], end).screen).toBe('drain');
+  });
+
+  it('still goes straight to any other task when an address is in hand', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-wanted', task: 'follow' },
+    ]);
+    expect(end.screen).toBe('explore');
+  });
+
+  it('still sends an address given for no particular task to the task question', () => {
+    // The other destination, and the one that restores a screen nothing could
+    // reach: changing an address from inside the comparison and re-entering it
+    // lands on `Choose a task`, which is what the breadcrumb already claims.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'change-address' },
+      { type: 'address-accepted', address: NEALE },
+    ]);
+    expect(end.screen).toBe('task');
+  });
+
+  it('drops a pending task when the address screen is backed out of', () => {
+    /*
+      The failure this prevents: press the comparison card, change your mind,
+      go and read the flood board, then give an address somewhere else for an
+      unrelated reason and be dropped into a comparison you abandoned. The
+      pending guide section is deliberately *not* dropped the same way — the
+      chooser sets it again every time it is used, and the homepage does not.
+    */
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-abandoned' },
+    ]);
+    expect(end.screen).toBe('home');
+    expect(end.pendingTask).toBeNull();
+
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }], end).screen).toBe('task');
+  });
+
+  it('does not let a pending task outlive a trip home', () => {
+    const end = play([{ type: 'task-wanted', task: 'compare' }, { type: 'go-home' }]);
+    expect(end.pendingTask).toBeNull();
+  });
+
+  it('leaves the guide in charge when both are waiting', () => {
+    // A section is chosen from the chooser, which is reached from the map,
+    // which can be reached after a pending task is set. The section is the
+    // more recent answer and it is the one being taught.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(end.screen).toBe('guide');
+  });
+
+  it('takes over from a guide section that was abandoned', () => {
+    /*
+      The other order, and the one the homepage's comparison button met: a
+      guide chosen, the address screen backed out of, a trip home — and the
+      section is still set, so an address given for the comparison opened the
+      guide instead. The task is the more recent answer.
+    */
+    const end = play([
+      { type: 'get-started' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-abandoned' },
+      { type: 'go-home' },
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(end.screen).toBe('drain');
+    expect(end.task).toBe('compare');
+    expect(end.guideSection).toBeNull();
+  });
+
+  it('goes back to the chooser when the chooser asked', () => {
+    // The chooser offers the comparison as a fifth card. Back from the address
+    // screen it sends you to should be the chooser, not the homepage behind it.
+    const fromChooser = play([
+      { type: 'get-started' },
+      { type: 'task-wanted', task: 'compare', from: 'choose' },
+    ]);
+    expect(fromChooser.screen).toBe('address');
+    expect(play([{ type: 'address-abandoned' }], fromChooser).screen).toBe('choose');
+
+    const fromHome = play([{ type: 'task-wanted', task: 'compare' }]);
+    expect(play([{ type: 'address-abandoned' }], fromHome).screen).toBe('home');
+  });
+
+  it('does not count the comparison as a guide finished', () => {
+    // The fifth card is not a lesson. Running the comparison from it must not
+    // move the chooser's "N guides completed".
+    const end = play([
+      { type: 'get-started' },
+      { type: 'task-wanted', task: 'compare', from: 'choose' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'comparison-started' },
+      { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      { type: 'go-home' },
+      { type: 'get-started' },
+    ]);
+    expect(end.screen).toBe('choose');
+    expect(end.learned).toEqual(INITIAL_SESSION.learned);
+  });
+});
+
+describe('the breadcrumb back to the task question', () => {
+  it('goes to the task question rather than the screen it was pressed on', () => {
+    // It dispatched `task-chosen` with the task already chosen, so the crumb
+    // labelled `Choose a task` returned to the comparison. A mislabelled
+    // control, unnoticed for as long as its destination was unreachable.
+    const end = play([
+      { type: 'task-wanted', task: 'compare' },
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'task-reconsidered' },
+    ]);
+    expect(end.screen).toBe('task');
+  });
+
+  it('stays put with no address, because the task question shows one', () => {
+    expect(play([{ type: 'task-reconsidered' }]).screen).toBe('home');
+  });
+})
+
+describe('rainfall is one of the validated levels', () => {
+  it('ignores an amount the explorer does not offer', () => {
+    // AC 3.2.3.b. A stored 35 mm would be shown in the summary as a choice.
+    const start = reduce(INITIAL_SESSION, { type: 'rainfall-selected', rainfallMm: 60 });
+    expect(start.scenario.rainfallMm).toBe(60);
+    for (const mm of [35, 0, 120, 500]) {
+      expect(reduce(start, { type: 'rainfall-selected', rainfallMm: mm }).scenario.rainfallMm).toBe(60);
+    }
+  });
+});
+
+describe('opening the comparison from a drain on the map', () => {
+  it('goes straight to the comparison with that drain chosen and nothing else assumed', () => {
+    // AC 3.1.1: from the local drainage map. No address is needed.
+    const onMap = reduce(INITIAL_SESSION, { type: 'map-opened' });
+    const next = reduce({ ...onMap, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1144908' });
+    expect(next.screen).toBe('scenario');
+    expect(next.scenario.pitId).toBe('1144908');
+    expect(next.scenario.pitWasSuggested).toBe(false);
+    expect(next.scenario.blockage).toBeNull();
+    expect(next.address).toBeNull();
+  });
+
+  it('goes back to the map it came from, not to a task question it never saw', () => {
+    const next = reduce({ ...INITIAL_SESSION, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1' });
+    expect(reduce(next, { type: 'back' }).screen).toBe('explore');
+  });
+
+  it('starts again at choosing a drain when the task question opens it instead', () => {
+    // It went back to the task question until 15 September, when the
+    // comparison gained a step before the setup: from the task question the
+    // comparison opens on step 1, and Back from step 1 is the address search.
+    const address = { id: 'a', label: '46 Gatehouse Drive', eastingM: 1, northingM: 1 };
+    const withAddress = { ...INITIAL_SESSION, address, screen: 'task' as const };
+    const fromMap = reduce({ ...withAddress, screen: 'explore' }, { type: 'scenario-from-map', pitId: '1' });
+    const fromTask = reduce(fromMap, { type: 'task-chosen', task: 'compare' });
+    expect(fromTask.screen).toBe('drain');
+    expect(fromTask.scenarioOrigin).toBe('task');
+    expect(fromTask.scenario.pitId).toBeNull();
+    expect(reduce(fromTask, { type: 'back' }).screen).toBe('address');
+  });
+});
+
+describe('the blocked-drain comparison, step by step', () => {
+  /*
+    The Blockage Flow prototype: address search, the eligibility check, then
+    step 1 (choose a drain), step 2 (choices), step 3 (review), comparing, and
+    the result — or the no-match stop. Each transition is the reducer's, so
+    each is tested here rather than trusted to the buttons.
+  */
+  const AT_STEP_ONE = play([
+    { type: 'task-wanted', task: 'compare', from: 'home' },
+    { type: 'address-accepted', address: GATEHOUSE },
+  ]);
+  const AT_STEP_TWO = play([{ type: 'pit-selected', pitId: '1144908', suggested: true }], AT_STEP_ONE);
+  const CHOSEN = play(
+    [
+      { type: 'blockage-selected', blockage: 'fully-blocked' },
+      { type: 'rainfall-selected', rainfallMm: 40 },
+    ],
+    AT_STEP_TWO,
+  );
+  const AT_REVIEW = play([{ type: 'choices-reviewed' }], CHOSEN);
+
+  it('lands on step 1 with nothing chosen, even for a drain chosen last time', () => {
+    expect(AT_STEP_ONE.screen).toBe('drain');
+    expect(AT_STEP_ONE.task).toBe('compare');
+    const again = play(
+      [
+        { type: 'another-address-wanted' },
+        { type: 'address-accepted', address: GATEHOUSE },
+      ],
+      AT_REVIEW,
+    );
+    expect(again.screen).toBe('drain');
+    expect(again.scenario.pitId).toBeNull();
+  });
+
+  it('completes step 1 with one click on a drain — no second confirmation', () => {
+    expect(AT_STEP_TWO.screen).toBe('scenario');
+    expect(AT_STEP_TWO.scenario.pitId).toBe('1144908');
+    expect(AT_STEP_TWO.scenario.pitWasSuggested).toBe(true);
+  });
+
+  it('keeps Review closed until the condition and the rainfall are both chosen', () => {
+    const blockageOnly = play([{ type: 'blockage-selected', blockage: 'fully-blocked' }], AT_STEP_TWO);
+    expect(reduce(blockageOnly, { type: 'choices-reviewed' }).screen).toBe('scenario');
+    const rainOnly = play([{ type: 'rainfall-selected', rainfallMm: 40 }], AT_STEP_TWO);
+    expect(reduce(rainOnly, { type: 'choices-reviewed' }).screen).toBe('scenario');
+    expect(AT_REVIEW.screen).toBe('review');
+  });
+
+  it('reviews only from step 2', () => {
+    expect(reduce({ ...CHOSEN, screen: 'drain' }, { type: 'choices-reviewed' }).screen).toBe('drain');
+  });
+
+  it('goes back from the review to the choices with everything still chosen', () => {
+    const back = reduce(AT_REVIEW, { type: 'choices-changed' });
+    expect(back.screen).toBe('scenario');
+    expect(back.scenario).toEqual(CHOSEN.scenario);
+    expect(reduce(AT_STEP_TWO, { type: 'choices-changed' }).screen).toBe('scenario');
+  });
+
+  it('re-runs the drain selection from step 2 and keeps the assumptions', () => {
+    // Decided, and written on `pit-selected`: the condition and the rainfall
+    // are the person's, so a different drain keeps them.
+    const other = reduce(CHOSEN, { type: 'pit-selected', pitId: '1144999', suggested: false });
+    expect(other.screen).toBe('scenario');
+    expect(other.scenario).toEqual({ pitId: '1144999', pitWasSuggested: false, blockage: 'fully-blocked', rainfallMm: 40 });
+  });
+
+  it('re-runs it from the review and the result too, without returning to step 1', () => {
+    const fromReview = reduce(AT_REVIEW, { type: 'pit-selected', pitId: '2', suggested: false });
+    expect(fromReview.screen).toBe('scenario');
+
+    const result = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      ],
+      AT_REVIEW,
+    );
+    const fromResult = reduce(result, { type: 'pit-selected', pitId: '2', suggested: false });
+    expect(fromResult.screen).toBe('scenario');
+    expect(fromResult.outcome).toBeNull();
+    expect(fromResult.scenario.blockage).toBe('fully-blocked');
+  });
+
+  it('shows the progress on step 3 and the answer on the result', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 7 });
+    expect(running.screen).toBe('review');
+    expect(running.running).toBe(true);
+    expect(running.run).toBe(7);
+
+    const done = reduce(running, {
+      type: 'comparison-finished',
+      run: 7,
+      outcome: { kind: 'comparison', band: 'no-clear-change' },
+    });
+    expect(done.screen).toBe('result');
+    expect(done.running).toBe(false);
+    expect(done.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+  });
+
+  it('does not change the drain under a run in progress', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 1 });
+    expect(reduce(running, { type: 'pit-selected', pitId: '2', suggested: false })).toBe(running);
+    expect(reduce(running, { type: 'choices-changed' })).toBe(running);
+  });
+
+  it('cancels back to the review, and ignores the cancelled run’s answer when it comes', () => {
+    const running = reduce(AT_REVIEW, { type: 'comparison-started', run: 3 });
+    const cancelled = reduce(running, { type: 'comparison-cancelled' });
+    expect(cancelled.screen).toBe('review');
+    expect(cancelled.running).toBe(false);
+    expect(cancelled.scenario).toEqual(AT_REVIEW.scenario);
+
+    const late = reduce(cancelled, {
+      type: 'comparison-finished',
+      run: 3,
+      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
+    });
+    expect(late).toBe(cancelled);
+    expect(late.screen).toBe('review');
+    expect(late.outcome).toBeNull();
+  });
+
+  it('ignores a cancel with nothing running', () => {
+    expect(reduce(AT_REVIEW, { type: 'comparison-cancelled' })).toBe(AT_REVIEW);
+  });
+
+  it('takes only the newest run’s answer when a second run was started', () => {
+    const second = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-cancelled' },
+        { type: 'comparison-started', run: 2 },
+      ],
+      AT_REVIEW,
+    );
+    const stale = reduce(second, {
+      type: 'comparison-finished',
+      run: 1,
+      outcome: { kind: 'comparison', band: 'higher-than-baseline' },
+    });
+    expect(stale).toBe(second);
+    const fresh = reduce(second, {
+      type: 'comparison-finished',
+      run: 2,
+      outcome: { kind: 'comparison', band: 'no-clear-change' },
+    });
+    expect(fresh.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+  });
+
+  describe('from the result', () => {
+    const RESULT = play(
+      [
+        { type: 'comparison-started', run: 1 },
+        { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
+      ],
+      AT_REVIEW,
+    );
+
+    it('changes the test on step 2, keeping the drain and the choices', () => {
+      const change = reduce(RESULT, { type: 'change-scenario' });
+      expect(change.screen).toBe('scenario');
+      expect(change.scenario).toEqual(RESULT.scenario);
+    });
+
+    it('returns to the map at step 1, letting the drain go and keeping the assumptions', () => {
+      const map = reduce(RESULT, { type: 'drains-reopened' });
+      expect(map.screen).toBe('drain');
+      expect(map.scenario.pitId).toBeNull();
+      expect(map.scenario.blockage).toBe('fully-blocked');
+      expect(map.scenario.rainfallMm).toBe(40);
+      expect(map.outcome).toBeNull();
+    });
+
+    it('returns to the full map instead when the comparison was opened from one', () => {
+      const fromMap = play(
+        [
+          { type: 'map-opened' },
+          { type: 'lock-passed' },
+          { type: 'scenario-from-map', pitId: '1144908' },
+          { type: 'blockage-selected', blockage: 'partly-blocked' },
+          { type: 'rainfall-selected', rainfallMm: 20 },
+          { type: 'choices-reviewed' },
+          { type: 'comparison-started', run: 1 },
+          { type: 'comparison-finished', run: 1, outcome: { kind: 'comparison', band: 'no-clear-change' } },
+          { type: 'drains-reopened' },
+        ],
+      );
+      expect(fromMap.screen).toBe('explore');
+      expect(fromMap.task).toBe('full-map');
+      expect(fromMap.mapOpenings).toBe(2);
+    });
+
+    it('moves between solved rainfall amounts without starting a run (AC 3.2.1)', () => {
+      const moved = reduce(RESULT, { type: 'result-rainfall', rainfallMm: 60, band: 'no-clear-change' });
+      expect(moved.screen).toBe('result');
+      expect(moved.running).toBe(false);
+      expect(moved.scenario.pitId).toBe('1144908');
+      expect(moved.scenario.blockage).toBe('fully-blocked');
+      expect(moved.scenario.rainfallMm).toBe(60);
+      expect(moved.outcome).toEqual({ kind: 'comparison', band: 'no-clear-change' });
+    });
+
+    it('refuses an amount nobody solved, and refuses off the result', () => {
+      expect(reduce(RESULT, { type: 'result-rainfall', rainfallMm: 35, band: 'no-clear-change' })).toBe(RESULT);
+      expect(reduce(AT_REVIEW, { type: 'result-rainfall', rainfallMm: 60, band: 'no-clear-change' })).toBe(AT_REVIEW);
+    });
+  });
+
+  describe('no drain near the address', () => {
+    const STOPPED = reduce(AT_STEP_ONE, { type: 'drains-none-nearby' });
+
+    it('stops before any setup', () => {
+      expect(STOPPED.screen).toBe('no-match');
+      expect(STOPPED.scenario.pitId).toBeNull();
+    });
+
+    it('only stops step 1, so a late check cannot pull somebody back', () => {
+      expect(reduce(AT_STEP_TWO, { type: 'drains-none-nearby' })).toBe(AT_STEP_TWO);
+      expect(reduce(INITIAL_SESSION, { type: 'drains-none-nearby' })).toBe(INITIAL_SESSION);
+    });
+
+    it('never reaches a drain, an assumption or a rainfall control from the stop', () => {
+      for (const event of [
+        { type: 'choices-reviewed' },
+        { type: 'choices-changed' },
+        { type: 'comparison-cancelled' },
+        { type: 'result-rainfall', rainfallMm: 40, band: 'no-clear-change' },
+      ] as const) {
+        expect(reduce(STOPPED, event).screen).toBe('no-match');
+      }
+    });
+
+    it('tries another address with the comparison still waiting', () => {
+      const search = reduce(STOPPED, { type: 'another-address-wanted' });
+      expect(search.screen).toBe('address');
+      expect(search.pendingTask).toBe('compare');
+      expect(reduce(search, { type: 'address-accepted', address: NEALE }).screen).toBe('drain');
+    });
+
+    it('tries the example address straight into step 1', () => {
+      const example = reduce(STOPPED, { type: 'example-address-chosen', address: NEALE });
+      expect(example.screen).toBe('drain');
+      expect(example.address).toBe(NEALE);
+      expect(example.task).toBe('compare');
+      expect(example.pendingTask).toBeNull();
+    });
+
+    it('opens the full map through the same notice as every other way in', () => {
+      expect(reduce(STOPPED, { type: 'map-opened', from: 'home' }).screen).toBe('locked');
+    });
+  });
+
+  it('keeps the address crumb inside the comparison', () => {
+    const search = reduce(AT_REVIEW, { type: 'another-address-wanted' });
+    expect(search.screen).toBe('address');
+    expect(search.pendingTask).toBe('compare');
+    expect(search.guideSection).toBeNull();
+  });
+
+  it('lands the full map’s drain on step 2 with that drain selected (AC 3.1.1)', () => {
+    const fromMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'scenario-from-map', pitId: '1144908' }]);
+    expect(fromMap.screen).toBe('scenario');
+    expect(fromMap.scenario.pitId).toBe('1144908');
+    expect(fromMap.scenarioOrigin).toBe('map');
+    expect(reduce(fromMap, { type: 'back' }).screen).toBe('explore');
+  });
+
+  it('leaves a pit chosen on the full map where it was', () => {
+    const onMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'pit-selected', pitId: '1', suggested: false }]);
+    expect(onMap.screen).toBe('explore');
   });
 });

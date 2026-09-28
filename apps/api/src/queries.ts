@@ -20,16 +20,29 @@ import { decimetre, pitFeature } from './artefacts.js';
 
 export class NotFound extends Error {}
 
+/** Greater Melbourne, which the flood board covers and no pilot extent does. */
+export const FLOOD_EXTENT = 'greater-melbourne';
+
+/**
+ * The prose and provenance an artefact carries around its data.
+ *
+ * **Named by extent as well as by name, since migration 002.** It used to be
+ * keyed on the name alone, which was unambiguous while one extent existed and
+ * became a way for one extent's sentences to answer for another's rows the
+ * moment a second was loaded -- a wrong answer with the right shape, which is
+ * the failure mode this repository spends most of its comments on.
+ */
 async function envelope(
   client: pg.ClientBase,
   name: string,
+  extentId: string,
 ): Promise<Record<string, unknown>> {
   const result = await client.query<{ envelope: Record<string, unknown> }>(
-    `SELECT envelope FROM artefact_envelope WHERE name = $1`,
-    [name],
+    `SELECT envelope FROM artefact_envelope WHERE name = $1 AND extent_id = $2`,
+    [name, extentId],
   );
   const row = result.rows[0];
-  if (!row) throw new NotFound(`no ${name} artefact has been loaded`);
+  if (!row) throw new NotFound(`no ${name} artefact has been loaded for ${extentId}`);
   return row.envelope;
 }
 
@@ -45,7 +58,7 @@ export async function mapArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'map');
+  const base = await envelope(client, 'map', extent);
 
   const pits = await client.query<{
     asset_number: string;
@@ -61,7 +74,9 @@ export async function mapArtefact(
   if (pits.rowCount === 0) throw new NotFound(`no extent called ${extent}`);
 
   const pipes = await client.query<{
-    ref: string;
+    // Nullable since migration 003. It was `string` here while it was the
+    // primary key, and the type said what the schema said.
+    ref: string | null;
     upstr_pit: string | null;
     dnstr_pit: string | null;
     diameter_mm: number | null;
@@ -69,7 +84,7 @@ export async function mapArtefact(
     path: [number, number][];
   }>(
     `SELECT ref, upstr_pit, dnstr_pit, diameter_mm, material, path
-     FROM pipe WHERE extent_id = $1 ORDER BY ref`,
+     FROM pipe WHERE extent_id = $1 ORDER BY id`,
     [extent],
   );
 
@@ -103,9 +118,17 @@ export async function mapArtefact(
       pipe: pipes.rows.map((r) => ({
         g: 'line',
         c: r.path,
-        ref: Number(r.ref),
         // Omitted rather than nulled, exactly as the file does it: the
         // frontend reads an absent key as "the council record has none".
+        //
+        // `ref` joined the others on 11 September, and the way it was found is
+        // the argument for the deep comparison in `tools/deploy/verify-api.mjs`.
+        // It stopped being the primary key in migration 003 and this line was
+        // not revisited, so `Number(null)` made **reference number 0** for the
+        // 85 council pipes the council identified with nothing -- a value that
+        // is not missing, is not flagged, and looks exactly like an asset id.
+        // Every check that compares shapes passed.
+        ...(r.ref === null ? {} : { ref: Number(r.ref) }),
         ...(r.upstr_pit === null ? {} : { upstr_pit: Number(r.upstr_pit) }),
         ...(r.dnstr_pit === null ? {} : { dnstr_pit: Number(r.dnstr_pit) }),
         ...(r.diameter_mm === null ? {} : { diameter: r.diameter_mm }),
@@ -127,7 +150,7 @@ export async function derivedArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'derived');
+  const base = await envelope(client, 'derived', extent);
 
   const shapes = await client.query<{
     layer: string;
@@ -153,7 +176,7 @@ export async function traceArtefact(
   client: pg.ClientBase,
   extent: string,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'trace');
+  const base = await envelope(client, 'trace', extent);
 
   // Left join from `pit`, so a pit with nothing leaving it comes back as an
   // empty array rather than vanishing. `traceDownstream` documents the two as
@@ -209,11 +232,22 @@ export async function traceArtefact(
  * a zero, and equal totals share a rank — are already written and tested in
  * `artefacts.ts`. Expressing them a second time as window functions would be a
  * second implementation of the same rule.
+ *
+ * **`board_rank IS NOT NULL` is AC 2.2.1.b, and it is not a `LIMIT`.** These
+ * tables hold all 281 areas in the scope since the map needed them; the board
+ * is the thirty the pipeline ranked. Selecting `LIMIT 30` here would move a
+ * cap that Iteration 1 recorded as enforced in the data into one SQL clause,
+ * where changing it would break nothing else. Asking for the rows that carry a
+ * rank keeps the count a property of what was loaded.
+ *
+ * The order within them is still recomputed rather than read from
+ * `board_rank`, because the tie flag depends on neighbouring totals and that
+ * rule lives in one place.
  */
 export async function floodHistoryArtefact(
   client: pg.ClientBase,
 ): Promise<Record<string, unknown>> {
-  const base = await envelope(client, 'flood-history');
+  const base = await envelope(client, 'flood-history', FLOOD_EXTENT);
   const years =
     ((base.reportingPeriod as { years?: readonly string[] } | undefined)?.years) ?? [];
 
@@ -230,6 +264,7 @@ export async function floodHistoryArtefact(
     FROM flood_area a
     JOIN flood_area_coverage c
       ON c.extent_scope = a.extent_scope AND c.area_name = a.area_name
+    WHERE c.board_rank IS NOT NULL
     ORDER BY a.area_name, a.financial_year
   `);
   if (rows.rowCount === 0) throw new NotFound('no flood history has been loaded');
@@ -281,15 +316,29 @@ export async function floodHistoryArtefact(
   return { ...base, areas };
 }
 
-/** The one number the health check needs, and nothing about anybody. */
-export async function loaded(client: pg.ClientBase): Promise<{ pits: number; areas: number }> {
-  const result = await client.query<{ pits: string; areas: string }>(`
+/**
+ * The few numbers the health check needs, and nothing about anybody.
+ *
+ * `areas` counts the board, not the table. It did both until the tables grew
+ * from thirty areas to 281, and a health check whose number silently changed
+ * meaning would have been read as "the board grew" by everything watching it —
+ * including `verify-api.mjs`, which compares it against the published
+ * artefact's own length.
+ *
+ * `scopeAreas` is the new number rather than a redefinition of the old one.
+ */
+export async function loaded(
+  client: pg.ClientBase,
+): Promise<{ pits: number; areas: number; scopeAreas: number }> {
+  const result = await client.query<{ pits: string; areas: string; scope: string }>(`
     SELECT (SELECT count(*) FROM pit)::text AS pits,
-           (SELECT count(*) FROM flood_area_coverage)::text AS areas
+           (SELECT count(*) FROM flood_area_coverage WHERE board_rank IS NOT NULL)::text AS areas,
+           (SELECT count(*) FROM flood_area_coverage)::text AS scope
   `);
   return {
     pits: Number(result.rows[0]?.pits ?? 0),
     areas: Number(result.rows[0]?.areas ?? 0),
+    scopeAreas: Number(result.rows[0]?.scope ?? 0),
   };
 }
 

@@ -1,0 +1,124 @@
+{
+  "artefact": "flood-events",
+  "version": 1,
+  "note": "A short list of flood events in Greater Melbourne, each written by the DrainLens team from the sources linked under it. It is not a complete record of historical flooding, and an area with no event here is not an area that has never flooded.",
+  "process": "An event is drafted from at least two official sources, such as government agencies and the Bureau of Meteorology; news reports are not used. Every sentence in its summary must be stated on one of its sources. It is shown on the site only after a team member has opened every source and confirmed every sentence, the places and the areas; that person's name and the date go in checkedBy and checkedOn. Until both are filled in, the event is kept in this file and not shown.",
+  "events": [
+    {
+      "id": "melbourne-storm-2010-03",
+      "name": "Melbourne storm and flash flooding, March 2010",
+      "date": "2010-03-06",
+      "places": ["Southern Cross Station", "Arts Centre", "Etihad Stadium"],
+      "areas": [
+        { "code": "206041122", "name": "Melbourne" },
+        { "code": "206041126", "name": "Southbank" },
+        { "code": "206041118", "name": "Docklands" }
+      ],
+      "summary": "Severe thunderstorms with large hail and heavy rain moved through Melbourne on the afternoon of 6 March 2010, causing widespread flash flooding. Hailstones of 2 to 10 centimetres damaged homes and major buildings, including Southern Cross Station, the Arts Centre and Etihad Stadium. The storm resulted in more than 7,500 calls to the Victoria State Emergency Service.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, 2010",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-2010/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Victoria in March 2010",
+          "publisher": "Bureau of Meteorology",
+          "url": "https://www.bom.gov.au/climate/current/month/vic/archive/201003.summary.shtml",
+          "accessed": "2026-09-16"
+        }
+      ],
+      "draftedOn": "2026-09-16",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "melbourne-storms-2011-02",
+      "name": "Victorian storms, February 2011",
+      "date": "2011-02-04",
+      "places": ["Oakleigh", "Narre Warren North", "Bonbeach"],
+      "areas": [
+        { "code": "212051326", "name": "Oakleigh - Huntingdale" },
+        { "code": "212021299", "name": "Narre Warren North" },
+        { "code": "208031186", "name": "Chelsea - Bonbeach" }
+      ],
+      "summary": "Severe thunderstorms on 4 February 2011 brought flash flooding across metropolitan Melbourne, and the south-eastern suburbs were among the most severely affected. Daily rainfall of 100 to 200 millimetres was widespread in the eastern and south-eastern suburbs, including 138.7 millimetres at Oakleigh, 156.2 millimetres at Narre Warren North and 112.0 millimetres at Bonbeach. More than 6,000 calls were made to the Victoria State Emergency Service.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, February 2011",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-february-2011/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Special Climate Statement 28: Extreme daily rainfall recorded in Mildura and across the Melbourne Metropolitan region",
+          "publisher": "Bureau of Meteorology",
+          "url": "https://www.bom.gov.au/climate/current/statements/scs28.pdf",
+          "accessed": "2026-09-16"
+        }
+      ],
+      "draftedOn": "2026-09-16",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "melbourne-storm-2011-12",
+      "name": "Christmas Day storm, 2011",
+      "date": "2011-12-25",
+      "places": ["Eltham", "Broadmeadows", "Keilor"],
+      "areas": [
+        { "code": "209031209", "name": "Eltham" },
+        { "code": "210051242", "name": "Broadmeadows" },
+        { "code": "210011228", "name": "Keilor" }
+      ],
+      "summary": "Thunderstorms developed over Melbourne's western and northern suburbs at about 2.30 pm on Christmas Day 2011 and lasted up to seven hours, bringing hail and flash flooding. Eltham, Broadmeadows and Keilor were among the worst hit, and thousands of homes were damaged. The State Emergency Service received more than 4,200 requests for assistance, most of them for hail damage, wind damage and flash flooding.",
+      "sources": [
+        {
+          "title": "Storm – Severe Storm, Melbourne, Victoria, 2011",
+          "publisher": "Australian Institute for Disaster Resilience",
+          "url": "https://knowledge.aidr.org.au/resources/storm-severe-storm-melbourne-victoria-2011/",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Victoria in December 2011",
+          "publisher": "Bureau of Meteorology",
+          "url": "https://www.bom.gov.au/climate/current/month/vic/archive/201112.summary.shtml",
+          "accessed": "2026-09-16"
+        }
+      ],
+      "draftedOn": "2026-09-16",
+      "checkedBy": null,
+      "checkedOn": null
+    },
+    {
+      "id": "maribyrnong-river-flood-2022-10",
+      "name": "Maribyrnong River flood, October 2022",
+      "date": "2022-10",
+      "places": ["Maribyrnong township", "Kensington Banks", "Ascot Chase"],
+      "areas": [
+        { "code": "213031349", "name": "Maribyrnong" },
+        { "code": "206041121", "name": "Kensington" },
+        { "code": "206031113", "name": "Ascot Vale" }
+      ],
+      "summary": "The Maribyrnong River flooded in October 2022. Melbourne Water's information on the flood covers Maribyrnong township, Kensington Banks and Ascot Chase beside the river. Melbourne Water appointed an independent panel led by Tony Pagone to review the flood, and accepted all 15 of its recommendations. The panel's final report, released on 3 May 2024, found that the Flemington Racecourse flood wall increased flood depth by 0.8 to 3 centimetres at about 240 properties in the Maribyrnong township area.",
+      "sources": [
+        {
+          "title": "Maribyrnong River flood",
+          "publisher": "Melbourne Water",
+          "url": "https://www.melbournewater.com.au/water-and-environment/flooding-and-drainage/maribyrnong-river-flood",
+          "accessed": "2026-09-13"
+        },
+        {
+          "title": "Maribyrnong flood independent review panel issues final report",
+          "publisher": "Melbourne Water",
+          "url": "https://www.melbournewater.com.au/about/publications/news/maribyrnong-flood-independent-review-panel-issues-final-report",
+          "accessed": "2026-09-13"
+        }
+      ],
+      "draftedOn": "2026-09-16",
+      "checkedBy": null,
+      "checkedOn": null
+    }
+  ]
+}

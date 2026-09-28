@@ -152,6 +152,186 @@ button:disabled {
  * its container, and a width measured in an effect is one frame late — which
  * here means the map is painted at the wrong size and then jumps.
  */
+/*
+ * The photograph behind the first screen, and the scrim that keeps it readable.
+ *
+ * **In CSS rather than inline because the answer depends on the layout.** Wide,
+ * the text sits in the left column and the scrim can ease off to the right so
+ * the wet kerb is not washed out. Narrow, the column is the whole width and the
+ * text runs into that easing — measured, the right end of the gradient is about
+ * 0.34 and white text there is under 4:1, which fails the gate this project set
+ * itself.
+ *
+ * So the narrow rule is a flat 0.78. Against the brightest pixel under the text
+ * — rgb(212, 218, 219), a reflection off the wet road — that leaves
+ * rgb(56, 64, 70), on which white measures 10.55, the lead 8.63, the quiet line
+ * 7.24 and the eyebrow's mint 6.48. Every one of those was computed rather than
+ * chosen, because a photograph's contrast changes with every pixel and the only
+ * number worth checking is the worst one.
+ */
+.home__hero-photo {
+  position: relative;
+  isolation: isolate;
+  /* Ends on 0.78, the sections' scrim below it, so there is no edge to see. */
+  background-image: linear-gradient(180deg, rgba(12, 20, 28, 0.8) 0%, rgba(12, 20, 28, 0.78) 100%);
+}
+
+/*
+ * The photograph behind the page, from the hero down to "How to use the map".
+ *
+ * Review 2, item 10: the picture used to be the hero's background and ended
+ * with the first screen. It now stays put while the page scrolls over it, down
+ * to the end of the comparison section, and the page returns to its own ground
+ * after that.
+ *
+ * **Not `background-attachment: fixed`.** The page does not scroll the window;
+ * the Shell's `<main>` does, and `fixed` is measured against the viewport,
+ * ignored on iOS Safari and repainted on every scroll frame inside an overflow
+ * container. So the picture is an element:
+ *
+ * - `.home__backdrop` wraps the four sections and is the stacking context the
+ *   picture is kept inside, so `z-index: -1` puts it under their content and
+ *   not under the page.
+ * - `.home__backdrop-layer` is exactly as tall as the four sections, which is
+ *   what stops the picture: a sticky box cannot leave its containing block.
+ * - `.home__backdrop-photo` is sticky at the top of `<main>`'s scrollport, one
+ *   screen tall. `100vh` is taller than `<main>` by the header and the footer,
+ *   so the last ~150 px of the wrapper scroll the picture with it — the edge
+ *   meets "How to use the map" rather than floating over it.
+ *
+ * Nothing moves by itself. Sticky is the browser holding an element still, not
+ * an animation, so there is nothing for `prefers-reduced-motion` to switch off.
+ */
+.home__backdrop {
+  position: relative;
+  isolation: isolate;
+  background-color: #0c141c;
+}
+
+.home__backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.home__backdrop-photo {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background-image: url('/hero-street.webp');
+  background-size: cover;
+  /* Low and right: that is where the grate and the running water are, and
+     `cover` crops whichever axis is long. */
+  background-position: 70% 65%;
+  background-repeat: no-repeat;
+}
+
+/*
+ * The sections over the photograph after the hero.
+ *
+ * A flat 0.78 — the hero's narrow scrim — because here the text can land over
+ * any part of the picture as the page scrolls, so it was measured against the
+ * brightest pixel in the whole photograph, which is pure white: under this
+ * scrim it becomes rgb(65, 72, 78), on which white measures 9.30, the lead
+ * 7.61, the quiet line 6.38 and the eyebrow's mint 6.28. Every card on these
+ * sections is opaque white, so nothing else is read against the picture.
+ *
+ * **No rule between them** (user test, 15 September). Each section used to
+ * start with a hairline of white at 0.08, and over a photograph that stays
+ * still while the page moves, a hairline reads as a crease in the picture
+ * rather than the start of a section. The same scrim on both sides of the edge
+ * is what makes it one picture; the headings already say where a section
+ * starts.
+ */
+.home__on-photo {
+  background-color: rgba(12, 20, 28, 0.78);
+}
+
+/* The flood section's two blocks: ranking and map. Stacked until there is room. */
+.home__split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+/*
+ * The frame of the flood area map's picture. 4:3 while the cards are stacked;
+ * beside the ranking it takes the height the ranking leaves (below), so the
+ * two cards end together without a gap above either button. The picture is
+ * absolutely placed inside, so it adds nothing to the row's height.
+ */
+.home__flood-thumb {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+/* A feature section: the figure and the words. Figure first on a phone too. */
+.home__feature {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+/*
+ * A row of the homepage's top five: rank, name, count on one line and the bar
+ * under the name. Narrow, the bar gets its own line rather than squeezing the
+ * name to one word a line.
+ *
+ * **The columns belong to the list, not the row** (user test, 15 September).
+ * With a grid per row, `auto` sized the count to that row's own text, so the
+ * two rows with a `+` had a wider count and a bar that started further left
+ * and ended sooner than the three above them. Each row is now a subgrid of
+ * `.home__ranks`, so the count column is as wide as the widest count and every
+ * bar starts and ends at the same x. A browser without subgrid keeps the
+ * per-row grid, which is the old layout rather than a broken one.
+ */
+.home__ranks {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  column-gap: 12px;
+}
+
+.home__rank {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  grid-template-areas:
+    'rank name count'
+    '. bar bar';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+@supports (grid-template-columns: subgrid) {
+  .home__rank {
+    grid-template-columns: subgrid;
+  }
+}
+
+@media (min-width: 560px) {
+  .home__ranks {
+    grid-template-columns: 20px minmax(96px, 0.9fr) 1.2fr auto;
+  }
+
+  .home__rank {
+    grid-template-columns: 20px minmax(96px, 0.9fr) 1.2fr auto;
+    grid-template-areas: 'rank name bar count';
+  }
+
+  @supports (grid-template-columns: subgrid) {
+    .home__rank {
+      grid-template-columns: subgrid;
+    }
+  }
+}
+
 .home__hero {
   display: grid;
   grid-template-columns: 1fr;
@@ -174,6 +354,75 @@ button:disabled {
 }
 
 @media (min-width: 900px) {
+  /* Wide enough for the text to keep to its own column, so the scrim can ease
+     off over the half of the picture no text is placed on. At 52% — past the
+     text column — it is still 0.72, where the same worst pixel becomes
+     rgb(68, 75, 81) and the four colours measure 8.86, 7.24, 6.08 and 5.44. */
+  .home__hero-photo {
+    background-image: none;
+  }
+
+  .home__hero-photo::before,
+  .home__hero-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .home__hero-photo::before {
+    background-image: linear-gradient(
+      100deg,
+      rgba(12, 20, 28, 0.84) 0%,
+      rgba(12, 20, 28, 0.72) 52%,
+      rgba(12, 20, 28, 0.34) 100%
+    );
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 140px), transparent 100%);
+    mask-image: linear-gradient(180deg, #000 calc(100% - 140px), transparent 100%);
+  }
+
+  /*
+   * The hand-over to the sections' flat 0.78 (user test, 15 September).
+   *
+   * The easing above is 0.34 at its right edge and the section under it is
+   * 0.78, so where one ended and the other began there was a hard line across
+   * the picture. Over the last 200 px the flat scrim fades in and the easing
+   * fades out, so the hero's bottom edge is exactly the section's 0.78.
+   *
+   * The two fades overlap rather than meet — the flat one is whole by 60 px
+   * from the bottom, the easing starts to go at 140 px — because stacked
+   * scrims combine as 1 - (1 - a)(1 - b), and without the overlap the middle
+   * of the band came out lighter than either side. With it, computed over
+   * every easing value from 0.34 to 0.84, the combined scrim is never below
+   * the lighter of the two it blends and at most 0.07 darker than the darker,
+   * so no text over the band is on less than the 0.72 measured above.
+   */
+  .home__hero-photo::after {
+    background-color: rgba(12, 20, 28, 0.78);
+    -webkit-mask-image: linear-gradient(180deg, transparent calc(100% - 200px), #000 calc(100% - 60px));
+    mask-image: linear-gradient(180deg, transparent calc(100% - 200px), #000 calc(100% - 60px));
+  }
+
+  /* The ranking a little wider than the map. The map's card gives up height to
+     match the ranking rather than the ranking stretching to match a 4:3
+     picture, which left a gap above "See flood history". */
+  .home__split {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 24px;
+  }
+
+  .home__flood-thumb {
+    flex: 1 1 0;
+    aspect-ratio: auto;
+    min-height: 200px;
+  }
+
+  .home__feature {
+    grid-template-columns: 1fr minmax(320px, 44%);
+    gap: 56px;
+  }
+
   .home__hero {
     grid-template-columns: minmax(360px, 46%) 1fr;
     gap: 56px;
@@ -256,5 +505,216 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 4s;
+  }
+}
+
+/*
+ * The chooser's landscape: the city, the river and a wet kerb, under a wash.
+ *
+ * The wash is heaviest where the words are and lifts towards the bottom, so the
+ * picture shows under the cards and below them rather than behind the heading.
+ * The heading and the line under it sit on at least 0.9 of the page colour, and
+ * the cards are opaque, so no text on this screen is read against the painting
+ * itself. The captions under the cards get their own pale chip for the same
+ * reason: at that height the wash is already thinning over the trees.
+ */
+.choose__backdrop {
+  min-height: 100%;
+  background-color: #f5f8f7;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(245, 248, 247, 0.94) 0%,
+      rgba(245, 248, 247, 0.88) 38%,
+      rgba(245, 248, 247, 0.5) 72%,
+      rgba(245, 248, 247, 0.12) 100%
+    ),
+    url('/choose-landscape.webp');
+  background-size: cover;
+  /* The skyline is in the upper third and the grate in the lower left; centring
+     low keeps both when `cover` crops a tall window's sides. */
+  background-position: 40% 70%;
+  background-repeat: no-repeat;
+}
+
+/*
+ * The blocked-drain comparison: a panel beside the map, or under it.
+ *
+ * Here rather than in style attributes because the layout the Blockage Flow
+ * prototype asks for depends on the window. On a laptop the panel is 320 px
+ * on the left and the map narrows beside it (step 1 has no panel and the map
+ * is full width). On a phone there is no room for both side by side, so the
+ * map sits on top at a fixed share of the screen and the panel follows it,
+ * scrolling with the page.
+ *
+ * The colours are `line.base` and `surface.raised` from `theme.ts`.
+ */
+.comparison {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.comparison__panel {
+  width: 320px;
+  flex-shrink: 0;
+  overflow: auto;
+  background: #ffffff;
+  border-right: 1px solid #dbe4e4;
+  animation: drainlens-panel-in 180ms ease-out;
+}
+
+.comparison__map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes drainlens-panel-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The map key, bottom left, clear of the zoom controls at the bottom right. */
+.comparison__key {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  max-width: 280px;
+}
+
+/* Step 1's pointer-free way through, pinned to the bottom of the map. */
+.comparison__maplink {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 2;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/*
+ * The keyboard targets over the drains. Invisible until focused, and then a
+ * 3 px dashed ring in a pink no layer on this map uses (`DRAIN_FOCUS_COLOUR`),
+ * so it cannot be read as a mark.
+ */
+.comparison__drain:focus-visible {
+  outline: 3px dashed #db2777;
+  outline-offset: 2px;
+}
+
+@media (max-width: 759px) {
+  .comparison {
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .comparison__map {
+    order: 0;
+    flex: none;
+    height: 58vh;
+    min-height: 320px;
+  }
+
+  /* Step 1 has no panel, so on a phone the map takes the whole screen. */
+  .comparison--map-only {
+    height: 100%;
+  }
+
+  .comparison--map-only .comparison__map {
+    flex: 1;
+    height: auto;
+  }
+
+  .comparison__panel {
+    order: 1;
+    width: auto;
+    overflow: visible;
+    border-right: none;
+    border-top: 1px solid #dbe4e4;
+    animation-name: none;
+  }
+
+  /*
+   * On steps 2 and 3 the panel under the map already names the drain, and a
+   * key over a third of a phone's map costs more than it says.
+   */
+  /* `!important` because the card's own display is an inline style. */
+  .comparison__key--later {
+    display: none !important;
+  }
+
+  /*
+   * Above the bottom link, not at the top. At the top it sat on step 1's coach
+   * card, which the fit puts near the middle of a short phone map; the bottom
+   * third is where the fit leaves padding, so the key costs nothing there.
+   */
+  .comparison__key {
+    top: auto;
+    bottom: 64px;
+    left: 12px;
+    max-width: min(220px, calc(100% - 180px));
+  }
+
+  .comparison__maplink {
+    bottom: 12px;
+    white-space: normal;
+    width: max-content;
+    max-width: calc(100% - 96px);
+    left: 12px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparison__panel {
+    animation: none;
+  }
+}
+
+/*
+ * The guide's "press this" on a map chip.
+ *
+ * It replaced the line *Waiting for you to try it* under every step that waits
+ * for a press (copy audit v2, #21). An outline in the amber of the teaching
+ * pit's ring on the map (`palette.suggested`), with a ring
+ * that swells and fades around it. The outline is a box-shadow rather than the
+ * border, because the chip's border is an inline style and a class cannot
+ * override it.
+ *
+ * Under `prefers-reduced-motion` the ring holds still: the outline stays, since
+ * it is the information, and only the movement goes. `animation: none` rather
+ * than leaning on the global rule above, which would run one frame and leave
+ * the ring wherever the keyframes end, which is invisible.
+ */
+@keyframes drainlens-chip-pulse {
+  0% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 2px rgba(180, 105, 14, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+  }
+}
+
+.chip--pulse {
+  animation: drainlens-chip-pulse 1.6s ease-out infinite;
+  box-shadow: 0 0 0 2px #b4690e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip--pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 2px #b4690e, 0 0 0 5px rgba(180, 105, 14, 0.3);
   }
 }

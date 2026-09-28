@@ -2,7 +2,9 @@
 
 DrainLens · TA28 · 27 August 2026 · **decided and built**
 
-> This was written as a proposal. The recommendation below was adopted and everything downstream — the terrain surface, the drainage graph, the map geometry, the trace and the scene pack — is built from it. It is kept as written because the *reasoning* is what a reader needs; the extent itself now lives as data in `pipeline/geo.py`, which is authoritative.
+> This was written as a proposal. The recommendation below was adopted and everything downstream — the terrain surface, the drainage graph, the map geometry, the trace and the scene pack — is built from it. It is kept as written because the *reasoning* is what a reader needs; the extent itself now lives as data in `pipeline/src/drainlens_pipeline/geo.py`, which is authoritative.
+>
+> **14 September 2026: Kensington is no longer the only extent built.** A second, `city-of-melbourne`, was measured from the drainage record on 11 September, and by 14 September the map, the terrain, the derived layers and the comparison all exist for it — from every point-cloud tile the archive has, 211 of that extent's 306. Kensington remains what the site bundles for when the database cannot answer, the only extent the address index covers, and where 46 Gatehouse Drive is. The Kensington scene pack is no longer read by the site. And the CBD concern below turned out to be real: around the tallest buildings the council ground surface reaches 50 to 110 m AHD outside the footprints, where the filter kept structure — recorded in [pipeline/README.md](../pipeline/README.md), not fixed.
 >
 > One figure has moved. The **22-hop** downstream trace quoted below was measured against the council-wide graph. Inside the mapped square kilometre a trace from the nearest inlet is shorter, because the record leaves the extent before it runs out; the trace artefact reports which of the two happened rather than merging them.
 
@@ -59,9 +61,9 @@ In the CBD the surface is towers, and the apparent 45–60 m of "relief" in a 50
 
 ## The tie the team already has
 
-The Problem Statement's own evidence list includes the ABC report on **Kensington Banks** and new Melbourne Water flood mapping — residents told their homes are newly flagged, and worried about what it means for them. The street names the analysis surfaced are that estate: **Gatehouse Drive, McAllister Mews, Stockmans Way, Fairbairn Drive**.
+Melbourne Water's own flood information covers **Kensington Banks**, the estate beside the Maribyrnong River. The street names the analysis surfaced are that estate: **Gatehouse Drive, McAllister Mews, Stockmans Way, Fairbairn Drive**. (This paragraph cited a news report until 16 September; the project uses official sources only.)
 
-We did not pick Kensington to fit the story. The measurements pointed there, and the story was already on file.
+We did not pick Kensington to fit the story. The measurements pointed there.
 
 This also settles **D1b**, the open question about the persona. Daniel Chan lives in Lilydale, outside any council that publishes drainage data. Moving him to Kensington puts him inside the pilot area and inside the evidence the project already cites, without inventing anything.
 

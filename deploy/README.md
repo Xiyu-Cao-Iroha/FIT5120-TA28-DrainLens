@@ -1,14 +1,16 @@
 # Deploying DrainLens
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app
+**Live:** https://drainlens-205559161217.australia-southeast1.run.app — **Iteration 1, and holding there.** From 10 September 2026 this URL is the *published iteration* rather than the newest good code: it serves `iteration-1-frozen`, and Iteration 2 goes to `drainlens-dev` until it is finished. See [Preserving each iteration](#preserving-each-iteration).
 
-**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four of its five artefacts from it**, falling back to the copies in this container when it cannot answer — so a change to the API does not need the site redeployed, and the API being stopped does not take the site down.
+**This file is about the site.** The API over the database is a second Cloud Run service, live since 5 September 2026 at https://drainlens-api-205559161217.australia-southeast1.run.app/health, with its own runbook, its own image and its own cost: [`deploy/API-DEPLOYMENT.md`](API-DEPLOYMENT.md). **Since 5 September the site reads four artefacts from it** — the map, the derived layers, the drainage graph and the flood board — falling back to the copies in this container when it cannot answer, so a change to the API does not need the site redeployed, and the API being stopped does not take the site down. Everything else the site reads comes only from this container.
 
-Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving **twenty static files** — twelve artefacts, `index.html`, three hashed bundles, the self-hosted font and its licence, and `robots.txt`. This container runs no application server of its own: everything it serves is a build product, and the scenario engine — when it is reachable at all — runs in the browser. Since 5 September the *browser* also reads four of those artefacts from the API instead, and the files here are what it falls back to.
+Cloud Run, `australia-southeast1`, project `fit5120-504507`. nginx serving what `apps/web/public` holds plus `index.html` and the hashed bundles. **On `develop` on 14 September that is 1,927 public files**, not the two dozen this line counted until 12 September, because the council's two tile packs are static files too: **1,267 under `data/scene-tiles/`** (211 scenario tiles of five gzipped arrays and a `tile.json` each, and an index naming the 9,239 drains that have a calculation window) and **636 under `data/terrain-tiles/`** (211 terrain tiles of a colour image, a shade image and `marks.json`, an index, and the two overview images). The rest are nine top-level JSON artefacts, `data/terrain/address-ground.json`, the seven files of `data/scene/`, two photographs, the self-hosted font with its licence and README, `quality.html` and `robots.txt`. This container runs no application server of its own: everything it serves is a build product, and the scenario engine runs in the browser.
 
 **What a visit actually fetches has changed, and mostly downwards.** The homepage takes the five JSON artefacts; opening the map adds `scene.json` and `elevation.bin` for the ground surface. **Five of the six binary arrays are now fetched on no reachable path at all** — `flow`, `depressions`, `coverage`, `rim-depth` and `measured`, **5.25 MB between them** — because the only thing that read them was the scenario worker, and the comparison is out of the Iteration 1 interface. Measured with the network panel rather than reasoned about.
 
-Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. Everything below was run, not planned, and every command was run by the team on their own machine.
+> **That paragraph is the Iteration 1 build the root still serves, and `develop` has moved on from it** (14 September 2026, read from the source rather than a network panel). The homepage still takes the same five JSON artefacts. The map no longer reads `data/scene/` at all: it takes the terrain index and the two 4 m overview images (373 KB and 397 KB), then 500 m tiles as the view reaches half a pixel per metre, and `address-ground.json` (467 KB). The flood map, and the board's per-1,000-residents ranking, add `sa2-areas`, `population`, `sa2-points` and `flood-events`. The comparison is reachable again and reads `data/scene-tiles/`. **So the seven files of `data/scene/`, 7.3 MB, are read by nothing on `develop`** — still published, and a candidate for removal rather than a thing to measure.
+
+Deployed **31 August 2026**, redeployed **1 September 2026** for the difference layer, again on **3 September 2026** to put the access gate in front of it, and three times on **5 September 2026** — with the mentor review's changes, again that afternoon so the map tour opens by itself, again so the site reads its artefacts from the database, and twice on **7 September 2026** — with the team's own review list, and again with the pit card redrawn to the design and a spinner on the loading screen. **That last one is the last.** Iteration 1 was frozen on 8 September and Iteration 2 began on 10 September, so this service is not redeployed again until Iteration 2 is complete. Everything below was run, not planned, and every command was run by the team on their own machine.
 
 | Redeployed 1 September | |
 |---|---|
@@ -69,6 +71,8 @@ The map tour now opens once for a visitor who has not been shown it, which is th
 
 The map, the derived layers, the drainage graph and the flood board are fetched from the API. Each falls back to the copy in this container if the API cannot answer, and the footer of every screen names which source answered — see [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md) and `apps/web/src/data/source.ts`.
 
+> **On `develop` from 14 September the footer no longer names the source when the database answers.** The copy review removed *"Served from the DrainLens database."* along with the other two variants. What remains is the case a visitor can be misled by: when the map is the bundled Kensington copy, the footer says *"The full council map is not available right now, so this map shows only one square kilometre of Kensington."* (`SMALLER_MAP` in `ui/Shell.tsx`). **On a dev deployment the check below therefore changes shape:** the database is load-bearing when that line is *absent* and the map reaches beyond Kensington, which is an absence, and an absence is only evidence once you have seen the line appear with the API stopped. The root and the archive still serve the Iteration 1 footer, and the row below still describes them.
+
 **The API was deployed first, deliberately.** In the other order the site's first request is refused by CORS, it falls back to its bundled copies, and the result looks exactly like a working deployment that is not using the database.
 
 | Redeployed 5 September, both services | |
@@ -125,6 +129,86 @@ Eight changes, all in `apps/web`: the six items on the team's own review list, t
 > The p95 moved 273.6 ms to 283.3 ms and is **not** part of that. Ten kilobytes do not cost ten milliseconds on a link that has moved 185 ms between two runs with nothing deployed at all. The rule this file has used since 1 September holds: the transfer figure is the one to read, and the latency is recorded rather than interpreted.
 
 > **The revision id for the earlier deployment on this day was not captured**, which is why that row has none. `gcloud run revisions list --service=drainlens --region=australia-southeast1` still holds it; it is recorded here as missing rather than filled in from a guess about the numbering.
+
+### 11 September: two more services, and the root untouched
+
+The three-URL scheme stopped being a plan. **`drainlens` was not redeployed and
+does not appear below** — that is the point of the day.
+
+| | `drainlens-iteration1` | `drainlens-dev` |
+|---|---|---|
+| Revision | `drainlens-iteration1-00001-r8w` | `drainlens-dev-00001-dch` |
+| Built from | **image digest `sha256:93c4277b…`** — the one `drainlens-00015-lxc` runs | `develop` at `e5e0f01`, `--source=.` |
+| Build line | none, and that is correct: it did not build | `Building using Dockerfile` |
+| Expected bundle | `index-DFGygy6v.js` — guaranteed, not checked: same digest | `index-DPyTUEqn.js`, from a local build of `e5e0f01` with `VITE_API_BASE` set |
+| Gate | **401**, realm `DrainLens - FIT5120 TA28 prototype` | **401**, same realm |
+| Holds | Iteration 1, permanently | Iteration 2, redeployed as the work needs it |
+
+> **Before: a bare 404 with no `server: nginx` and no `www-authenticate`.
+> After: 401 on both.** That is the whole verification and it is worth naming,
+> because "the service exists" was the one thing this scheme had been asserting
+> without evidence for three days. Neither service existed when the tables that
+> described them were written.
+>
+> **The dev bundle differs from the archive's by 0.68 KB**, which is the three
+> map fixes and nothing else: `index-DFGygy6v.js` at 341.55 KB against
+> `index-DPyTUEqn.js` at 342.23 KB. Two different hashes is the evidence the
+> dev service built the new code rather than the same code twice — a dev URL
+> serving the archive's build would look exactly like a working dev URL on any
+> screen nobody had changed yet.
+
+### 11 September, later: dev carries the guide and the whole council
+
+The same service, redeployed — this is the "as often as the work needs it" the section above promised, and the first time it has been taken up.
+
+| | `drainlens-dev` |
+|---|---|
+| Revision | `drainlens-dev-00002-fb4`, replacing `-00001-dch` |
+| Built from | `develop` at `8cd079b`, `--source=.` |
+| Expected bundle | `index-BxUcrnih.js` at 361.02 KB, from a local build of `8cd079b` with `VITE_API_BASE` set — against `index-DPyTUEqn.js` at 342.23 KB on the previous revision |
+| Gate | **401**, realm `DrainLens - FIT5120 TA28 prototype` |
+| Carries | The guided tutorial, and a map that is the whole City of Melbourne rather than the Kensington square |
+| API behind it | `drainlens-api-00003-g7k`, holding `city-of-melbourne`: 21,113 pits against the 895 this URL served an hour earlier |
+| Root URL | **not redeployed.** `drainlens` still answers 401 and still serves `iteration-1-frozen` |
+
+> **No environment variables were passed, and that is the check rather than a shortcut.** `gcloud run deploy` inherits what it is not given, but only from a service that already exists — and this image *refuses to start* without `BASIC_AUTH_USER` and `BASIC_AUTH_HASH`. A revision that is serving 401 has therefore proved the inheritance worked; there was no need to handle the hash again, and handling it again is how it got mangled the first time.
+>
+> **19 KB of bundle between the two revisions**, which is the guide, the four cards, the lock notice and the legibility limit. The API's own numbers are the other half of the evidence: the two services were deployed forty minutes apart and the map behind this one went from 895 pits to 21,113 in between.
+
+### 12 September: dev is behind, and this is the record of that
+
+**`drainlens-dev` has not been redeployed since the revision above.** It serves
+`8cd079b` — that number is a fact about the running container and does not
+drift. Written down rather than left as a gap, because a dev URL that is
+quietly stale is the same failure as a dev URL that quietly serves the wrong
+extent, which this page already records once, eight days of CORS ago.
+
+What it does not carry: **the drain-blockage comparison, which is offered from
+the homepage again** (AC 3.1.1). That is the only user-visible thing behind, and
+naming it is more use than naming a commit.
+
+> **The first version of this paragraph also said what `develop` was, and the
+> merge that added the paragraph made it wrong within the hour.** A branch tip
+> is not a fact a document can hold — it is a fact `git rev-parse develop`
+> holds. The deployed revision belongs here because a container cannot be asked;
+> the branch does not, because it can. This is the same lesson as the test
+> counts three files away, arrived at from the other direction.
+
+> **14 September: not re-checked, and "the only thing behind" is the part that
+> has gone stale.** Whether `drainlens-dev` still serves `8cd079b` is a question
+> for `gcloud run services describe drainlens-dev`, run by the team, and nothing
+> since has been recorded here. If it does, the comparison is no longer the only
+> user-visible difference: the council terrain tiles with contours and spot
+> heights, the address insight, the suburb names, the flood map's area shapes
+> and checked events, the board's per-1,000-residents ranking and the copy pass
+> all merged into `develop` afterwards.
+
+```bash
+gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
+```
+
+The root URL stays where it is. It serves `iteration-1-frozen` until Iteration 2
+is finished, and nothing in the last three merges changes that.
 
 | Still true of every deployment | |
 |---|---|
@@ -234,7 +318,7 @@ that lands in shell history. Let it prompt.
 **Use `-apr1`, not bcrypt, for this image.** nginx implements apr1 itself, in
 `ngx_crypt.c`, so it works regardless of what the container's libc offers. For
 `$2y$` it hands off to the platform's `crypt()`, which is a dependency on musl
-in `nginx:1.27-alpine` rather than on nginx — a needless thing to be right
+in the Alpine base image rather than on nginx — a needless thing to be right
 about when apr1 is guaranteed. The gate is website-level protection on a
 student project, not a credential store.
 
@@ -298,7 +382,8 @@ that rule is what produced the second one rather than a rewrite of the first.
 | Tag | Commit | Marks |
 |---|---|---|
 | `iteration-1-final` | `0a0a4d6` | the **5 September** deployment, `drainlens-00011-pzw`, bundle `index-etSUqsfy.js` |
-| `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` -- what is live |
+| `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` |
+| `iteration-2-frozen` | `main` at the freeze | the **28 September** freeze, bundle `index-B4AIZ7xS.js` -- what is live |
 
 ```bash
 git tag -a iteration-1-frozen <commit> -m "Iteration 1 frozen, 8 September 2026"
@@ -315,7 +400,20 @@ git push origin iteration-1-frozen
 > what happened. One tag pointed at the newer commit would say the 5 September
 > deployment never had its own figures.
 
-**What the freeze verified, on the day.** Every gate re-run rather than read
+**What the Iteration 2 freeze verified, 28 September 2026.** The same pass,
+run again rather than cited: 1,447 Node tests across 78 files at 95.53%, 636
+Python across 28 at 93.83%, the 62 database tests in CI on the freeze pull
+request, `tsc --build --force` clean, `tools/docs/check.mjs` clean, all seven
+`tools/data/check-*.mjs` clean, and a local build with `VITE_API_BASE` set
+producing `index-B4AIZ7xS.js`. The last is the check that the tag and the
+running service are the same code, and it is made against the deployed URL
+after the tag is deployed -- not assumed from the build.
+
+> **The freeze is a tag and a deployment, not a branch that stops moving.**
+> `develop` carries Iteration 3 from here, and `main` holds Iteration 2 until
+> that one is finished, in the shape the row below describes.
+
+**What the Iteration 1 freeze verified, on the day.** Every gate re-run rather than read
 off the last record: 683 Node tests across 37 files at 92.56%, 377 Python at
 91.79%, `tsc --build --force` clean, `tools/docs/check.mjs` clean, and a local
 build **with `VITE_API_BASE` set** reproducing `index-DFGygy6v.js` -- the
@@ -334,29 +432,57 @@ freeze.
 **The URL.** Cloud Run gives every *service* its own hostname, so a service per
 role is the closest thing available to the subdomain pattern the studio draws:
 
-| Role | The studio's shape | Here |
-|---|---|---|
-| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev`, **not yet created** |
-| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` |
-| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration, preserved | `drainlens-iteration1`, then one per iteration |
+| Role | The studio's shape | Service | Built from | Holds |
+|---|---|---|---|---|
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | the iteration being built -- Iteration 3 from 28 September |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 2** since 28 September 2026 |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1`, `drainlens-iteration2` | tags `iteration-1-frozen`, `iteration-2-frozen` | deployed once, then left alone |
 
-> **`drainlens` has been filling two of those roles at once, and the freeze is
-> the moment that stops being safe.** It has been redeployed eight times as
-> work continued, which is the *dev* behaviour -- correct while there was no
+> **`drainlens` filled two of those roles at once until 10 September, and the
+> freeze is what stopped that being safe.** It had been redeployed eight times
+> as work continued, which is the *dev* behaviour -- correct while there was no
 > completed iteration to protect, and that is the studio's own first case: at
 > the start there is no previous version, so the root can carry the work.
 >
-> From the first Iteration 2 deployment it is wrong. The root must keep showing
-> Iteration 1 while Iteration 2 is built, so **Iteration 2 work deploys to
-> `drainlens-dev` and never to `drainlens`**, and `drainlens` moves only when
-> Iteration 2 is complete -- deployed from its tag to the root and to
-> `drainlens-iteration2` in the same pass.
->
-> **Today the rule is already satisfied without touching the root.** The studio
-> asks that after Iteration 1 the same stable build be reachable from both the
-> root and the Iteration 1 URL, and `drainlens` is already serving
-> `index-DFGygy6v.js`, which is what `iteration-1-frozen` builds. So the freeze
-> is **one deployment** -- `drainlens-iteration1` -- and nothing else moves.
+> **Iteration 2 began on 10 September**, and from that moment the root must
+> keep showing Iteration 1 while Iteration 2 is built.
+
+### What changed for the branches on 10 September
+
+**`develop` no longer flows to `main` at the end of a change.** Every pull
+request until now ended with a second one merging `develop` into `main`,
+because `main` was the thing that got deployed. `main` is now the *published
+iteration* rather than the newest good code, so it holds at
+`iteration-1-frozen` until Iteration 2 is finished.
+
+| | Until 8 September | From 10 September |
+|---|---|---|
+| Branch off | `develop` | `develop`, unchanged |
+| Feature PR into | `develop` | `develop`, unchanged |
+| Then | a second PR, `develop` into `main` | **nothing** -- work stops on `develop` |
+| Deployed to | `drainlens`, the root | `drainlens-dev` |
+| `main` moves | every release | **once**, when Iteration 2 is complete |
+
+> **The one that will be got wrong is the third row**, because two pull
+> requests in a row is the habit this repository has had since 26 August and a
+> `develop` into `main` merge is one click away at any time. The check is the
+> same one the empty-diff incident produced: after merging, read where the
+> commit landed rather than trusting the routine. `git rev-parse origin/main`
+> must still be `138a002` for the whole of Iteration 2. **It moved once, at the
+> freeze on 28 September**, which is the single move that row allows.
+
+**Completing Iteration 2** is then one pass, and it is the same shape as the
+Iteration 1 freeze: merge `develop` into `main`, re-run every gate rather than
+citing the last recorded numbers, tag `iteration-2-frozen`, deploy that tag to
+**both** `drainlens` and a new `drainlens-iteration2`, and check the served
+bundle hash against a local build on each. `drainlens-iteration1` is not
+touched, then or ever.
+
+> **The dev service is the one place a deployment is allowed to be routine.**
+> It exists so that Iteration 2 can be shown to the team on a real URL without
+> that showing anything to a marker reading the root. It carries the same
+> access gate: an unlisted URL is not a gate, and a half-built iteration is
+> exactly what should not be found by accident.
 
 A subdirectory (`/iteration1`) is **not** an option here and the reason is
 already recorded above: every path this app fetches is absolute from `/`, which
@@ -364,36 +490,150 @@ is the same constraint that ruled out serving it from a Cloud Storage
 sub-path. Reaching a subdirectory layout would mean an HTTPS load balancer,
 which needs a domain, which the team does not have.
 
-No iteration *branch* is needed. The studio says to create one only when the
-hosting platform requires a branch to deploy from; `gcloud run deploy --source`
-takes whatever is checked out, so a tag is enough.
+A *real* subdomain -- `iteration1.drainlens.example` -- is the shape the studio
+draws and it needs the same three things: a domain the team would have to buy,
+an HTTPS load balancer in front of Cloud Run, and a managed certificate. A
+Cloud Run service already gets its own hostname and its own certificate for
+nothing, so what is lost against the drawing is only that the name reads
+`drainlens-iteration1-…run.app` instead of `iteration1.…`. Every property the
+requirement is actually about -- a fixed URL, reachable, serving one iteration
+and not moving -- is there.
+
+### How to tell whether an iteration URL exists
+
+A service that does not exist and a service that is up both answer, and they
+answer differently:
 
 ```bash
-git checkout iteration-1-frozen
-gcloud run deploy drainlens-iteration1 --project=fit5120-504507 --source=. \
+curl -s -o /dev/null -w "%{http_code}\n" https://drainlens-iteration1-205559161217.australia-southeast1.run.app/
+```
+
+| Answer | What it is |
+|---|---|
+| **401** | the service is up and the gate is in front of it -- what a preserved iteration should return |
+| **404**, with no `server: nginx` and no `www-authenticate` | **no such service.** This is Google's front end, not ours |
+
+> **The two are easy to confuse and the confusion runs one way only**, which is
+> why it is worth a table: a 404 from a URL you expected to work reads as "the
+> site is broken", and it is not the site at all. `drainlens-api` answers 404
+> at `/` for the opposite reason -- it is running and has no route there, which
+> `/health` returning 200 is what distinguishes.
+
+### What "preserved" does and does not cover
+
+**The code is preserved. What the page reads is not, and the two are different
+claims.** The Dockerfile's `VITE_API_BASE` defaults to the shared API, so
+`drainlens-iteration1` will point at the same `drainlens-api` that Iteration 2
+goes on developing. The archive is frozen in its own image; it is not sealed
+off from everything outside it.
+
+What that costs, in the three cases that can actually happen:
+
+| If Iteration 2… | The archive shows |
+|---|---|
+| leaves the API alone, or adds to it | Iteration 1, unchanged |
+| stops the API -- **the normal state between demos** | Iteration 1 from the artefacts baked into its own image, with the footer saying so |
+| **changes the shape of a response** | whatever the frozen client's guards make of it -- and the database suite found **four** shape changes those guards accept that a reader would not survive |
+
+**So the rule has a trigger rather than a default.** If Iteration 2 changes the
+shape of anything the API returns, that change is additive or the archive is
+rebuilt against no API at all. It is written as a trigger because sealing it
+is not one flag: `gcloud run deploy --source` has no `--build-arg` -- checked,
+not assumed -- so an image built with `VITE_API_BASE=` empty needs the
+`cloudbuild.yaml` route the API already uses, and standing that up for a
+service deployed once is machinery that has to be worth something.
+
+> **The argument for leaving it pointed at the API is that reading from the
+> database is part of what Iteration 1 *was*** -- it landed on 5 September and
+> is in that iteration's record. An archive that provably never calls the API
+> would document the feature out of existence. The fallback is designed,
+> visible in the footer, and already what a visitor sees on any day the
+> database is stopped.
+
+No iteration *branch* is needed. The studio says to create one only when the
+hosting platform requires a branch to deploy from, and nothing here does.
+
+**Deploy the archive from the image the root is already running, not from
+source.** This is a change from what this file said before it was done, and the
+reason is that it removes the check it used to prescribe rather than passing
+it. A rebuild is a second build that *should* produce the same thing; the
+digest **is** the thing.
+
+```powershell
+gcloud run deploy drainlens-iteration1 --project=fit5120-504507 `
+  --image=australia-southeast1-docker.pkg.dev/fit5120-504507/cloud-run-source-deploy/drainlens@sha256:93c4277b1ffd69cd5985d0663be079c3cd7c8c7ebfb509a6d478587c15e0e1c2 `
+  --region=australia-southeast1 --allow-unauthenticated --port=8080 `
+  --memory=512Mi --max-instances=1 `
+  --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
+```
+
+| | Rebuild from the tag | Point at the digest |
+|---|---|---|
+| What you get | a build that should match | **byte for byte what is running** |
+| Depends on | a clean working tree, the branch not moving mid-upload, Cloud Build not falling back to Buildpacks | nothing |
+| Takes | minutes | seconds |
+| Needs a checkout | yes | **no** |
+
+> **The warning this replaces was "a container that quietly built something
+> else looks identical from the outside".** That is true, and the answer turned
+> out not to be a better check -- it was not building. The digest comes from
+> `gcloud run services describe drainlens`, under the running container's
+> `image:`, and it is the image revision `drainlens-00015-lxc` serves.
+>
+> The tag `iteration-1-frozen` is not made redundant by this. It preserves the
+> *source*; the digest preserves the *artefact*, and the two are checked
+> against each other by building the tag with `VITE_API_BASE` set and comparing
+> the bundle hash -- which is how `index-DFGygy6v.js` was confirmed on
+> 8 September. Source without an artefact is a build you hope reproduces;
+> an artefact without source is a binary nobody can read.
+
+> **Single quotes around `--set-env-vars` are not optional on PowerShell**, for
+> two separate reasons and both have bitten. A comma makes an array, which is
+> rejoined with spaces -- recorded in [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md),
+> where it hit `--database-flags` first. And an apr1 hash is full of `$`, so
+> double quotes expand `$apr1`, `$uJ7o8kGu` and the rest into nothing: the
+> value arrives short, wrong, and *not empty*, so the fail-closed guard passes
+> it and the site is locked against everybody who has the password.
+>
+> The trailing `/` many apr1 hashes end with is part of the hash. A first
+> attempt at the command above lost the closing quote and PowerShell sat
+> waiting at `>>` for the rest of a string -- which is the harmless failure of
+> the two, because it does not run.
+
+> `--allow-unauthenticated` stays on all of them. It governs Cloud Run's own
+> IAM, which is a different gate from the one in nginx: leaving it off would
+> demand a Google identity and a signed request, which is not something a
+> mentor can do from a browser. The password prompt is the gate; IAM is not
+> being used as one.
+
+**The dev service**, created when Iteration 2 began and redeployed as often as
+the work needs it. Same image, same gate, same flags -- the only differences
+are the service name and that it is built from `develop` rather than a tag.
+
+```bash
+git checkout develop
+gcloud run deploy drainlens-dev --project=fit5120-504507 --source=. \
   --region=australia-southeast1 --allow-unauthenticated --port=8080 \
   --memory=512Mi --max-instances=1 \
   --set-env-vars 'BASIC_AUTH_USER=<user>,BASIC_AUTH_HASH=<hash>'
-git checkout main
 ```
 
-> **Two things to read from the build output, in this order.** The first line
-> must say `Building using Dockerfile` -- `--source=.` falls back to Buildpacks
-> without erroring, and this repository has already shipped that failure once.
-> Then check the served bundle is `index-DFGygy6v.js`: the frozen service is
-> only frozen if it built the tag's code, and a container that quietly built
-> something else looks identical from the outside.
+> **`--max-instances=1` is what makes four services cost about what one does.**
+> Cloud Run scales each of them to zero when nobody is asking, so an idle
+> archive is free and the dev service costs only while it is being looked at.
+> The instance cap also means a runaway loop cannot quietly scale out; the
+> always-on cost in this project is the Cloud SQL instance, and that is stopped
+> between demos.
 >
-> Single quotes around `--set-env-vars` are not optional on PowerShell. A comma
-> makes an array there, which is rejoined with spaces, so the variables arrive
-> as a value nobody typed. That is recorded in full in
-> [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md); it bit a `--database-flags` first.
-
-> `--allow-unauthenticated` stays on both. It governs Cloud Run's own IAM,
-> which is a different gate from the one in nginx: leaving it off would demand
-> a Google identity and a signed request, which is not something a mentor can
-> do from a browser. The password prompt is the gate; IAM is not being used as
-> one.
+> **The environment variables have to be given the first time.** `gcloud run
+> deploy` inherits variables you do not name, but only from a service that
+> already exists -- and the container refuses to start without them, which is
+> the fail-closed behaviour verified above. Read them off the running root
+> rather than retyping the hash: `gcloud run services describe drainlens
+> --region=australia-southeast1 --project=fit5120-504507 --format=yaml`. Keep
+> `--format=yaml` as one unquoted token; `gcloud.cmd` strips inner double
+> quotes, which is what broke the logging filters in
+> [`API-DEPLOYMENT.md`](API-DEPLOYMENT.md).
 
 ---
 
@@ -405,10 +645,59 @@ Verified against the live URL, not only locally.
 |---|---|---|
 | **Module worker content type** | `text/javascript`, one header | A module worker is refused outright at any other type. **The map still draws, so losing the entire comparison feature looks like nothing happening.** |
 | **gzip** | `content-encoding: gzip` on `.bin` and `.json` | The first visit is 6.42 MB instead of 1.36 MB. The site works; it is four times heavier. |
-| **Cache, in three classes** | `immutable` / `max-age=300` / `no-cache` | `/data` is not content-hashed. A rebuilt artefact behind a long cache is a map that silently disagrees with the model it was built beside. |
+| **Cache, in three classes** | `private, …immutable` / `private, max-age=300` / `private, no-cache` (all `private` from 16 September) | `/data` is not content-hashed. A rebuilt artefact behind a long cache is a map that silently disagrees with the model it was built beside. |
 | **`/data/*` returns 404** | A missing artefact 404s | Otherwise the single-page rewrite returns `index.html`, which reaches `assertUsable` as a parse error rather than as a missing file. |
 
 The content types are set with a `types` block, not `add_header`. `add_header` **appends**, so the first version sent every response with two `Content-Type` headers — caught by `curl -I` before it went anywhere.
+
+**Two types have been added since, and neither has been checked against a deployed URL.** `application/gzip` for the scenario tiles, which the pipeline gzips once and the worker decompresses, and `image/webp` for the terrain tiles. Neither type is in `gzip_types`, and that is the point: both are already compressed, and nginx should send them as they are rather than compress compressed bytes again. The table above was verified live; these two types are only configuration until somebody runs `curl -sI` against a tile on a deployment that carries them.
+
+---
+
+## Hardening after the penetration test (16 September)
+
+The team's penetration test ran against a local build of this image and found five things the site container did not do. All five are fixed in configuration; none changes what a visitor sees.
+
+| Finding | What changed | Where |
+|---|---|---|
+| **P02, P08** No defence headers | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HSTS (one year, no subdomains), `Referrer-Policy: no-referrer`, a `Permissions-Policy` and `Cross-Origin-Opener-Policy`, on every response including the 401 | `deploy/security-headers.conf`, included by `nginx.conf` |
+| **P03** The signed-in site could be framed | `frame-ancestors 'none'` and `X-Frame-Options: DENY` | the same file |
+| **P05** A shared cache handed protected data to a visitor who never signed in | Every response behind the gate is `Cache-Control: private` | `nginx.conf` |
+| **P06** Root master process, no read-only mode, stale base image | Runs as `nginx` (uid 101); writes only under `/tmp/nginx`; base images pinned by digest | `Dockerfile`, `entrypoint.sh` |
+| **P04** (defence in depth) | `script-src 'self'` with no inline script anywhere; `quality.html`'s inline `<style>` moved to `quality.css` so `style-src 'self'` needs no exception | `apps/web/public/quality.css` |
+
+The API sends its own set through Hono's `secureHeaders` (`default-src 'none'`, `DENY`, HSTS, `nosniff`, `no-referrer`), tested in `apps/api/src/server.test.ts` on answers and on failures alike.
+
+**The CSP names one other host, and it is filled in at start-up.** `connect-src` must allow the API, and the API's address is baked into the bundle at build time (`VITE_API_BASE`). The Dockerfile hands the same build argument to the runtime stage, and `entrypoint.sh` reduces it to an origin and writes it into `/tmp/nginx/security-headers.conf`, refusing to start on anything that is not a plain `https://host[:port]` — the value goes into a response header, and a semicolon in it would rewrite the policy. A build with `--build-arg VITE_API_BASE=` gets `connect-src 'self'`.
+
+**Headers are included in every location that sets one.** nginx inherits `add_header` into a `location` only when that location declares none, and three of them declare `Cache-Control`. Leaving out the `include` there drops the whole policy from `/assets`, `/data` and `index.html` without an error.
+
+### Checked on 16 September, against a local build of this image
+
+- `docker run --read-only --tmpfs /tmp …` starts; `docker top` shows master and workers as uid 101.
+- Without credentials: `/`, `/index.html`, `/data/map.json`, `/assets/`, `//data/map.json`, `/DATA/map.json`, five other methods, `X-Original-URL` and a wrong password all return 401; `/%2e%2e/etc/passwd` and a `%00` suffix return 400. With the test credential, 200.
+- Every header above is present once on `/`, `/data/…`, `/assets/…`, a single-page route and the 401.
+- **P05 repeated**: an nginx caching proxy keyed on the URL alone, in front of the container. A signed-in request is a cache `MISS` every time, and the same URL without credentials through the proxy is 401.
+- **The CSP breaks nothing**, checked by serving the built site with the same headers in Chrome: the council map from the API, all six layers, Ground height tiles, both flood pages, the whole blocked-drain comparison (the module worker and its tiles), the self-hosted font and `quality.html` — no `securitypolicyviolation` event.
+- It still fails closed: no credentials, or a `VITE_API_BASE` with a `;` in it, and the container exits before nginx starts.
+
+### Rebuilding on a schedule
+
+A pinned digest stops a base image changing under a build; it also stops it getting fixes. The CI `security` job scans both images on every pull request and every week on the default branch, and **a new fixable HIGH or CRITICAL finding is the signal to move the pin**:
+
+```bash
+# The digest behind a tag (multi-architecture index). Repeat for node:<tag>.
+TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/nginx:pull" | sed -E 's/.*"token":"([^"]+)".*/\1/')
+curl -sI -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json" -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" https://registry-1.docker.io/v2/library/nginx/manifests/1.30.5-alpine3.24 | grep -i docker-content-digest
+```
+
+Change the `FROM` lines in both Dockerfiles, open a pull request so the scan runs on the new images, merge, and redeploy `drainlens-dev` and the API. Otherwise redeploy at least once a month even without an application change, so the running revision is never older than the scan that passed it.
+
+After a deploy, check the headers on the live URL; they are on the 401, so no password is needed:
+
+```bash
+curl -sI https://drainlens-dev-205559161217.australia-southeast1.run.app/ | grep -iE 'content-security|x-frame|strict-transport|x-content-type|referrer|permissions'
+```
 
 ---
 

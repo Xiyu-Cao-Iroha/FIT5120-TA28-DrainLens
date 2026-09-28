@@ -7,9 +7,10 @@
  * cannot read, and the browser reports it as a network error with no body.
  */
 
-import { describe, expect, it } from 'vitest';
+import pg from 'pg';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ARTEFACT_CACHE, DEFAULT_ORIGINS, allowedOrigins } from './server.js';
+import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createApp, createMemo } from './server.js';
 
 describe('who may read this from a browser', () => {
   it('allows the deployed site and the local dev server by default', () => {
@@ -18,6 +19,28 @@ describe('who may read this from a browser', () => {
       'https://drainlens-205559161217.australia-southeast1.run.app',
     );
     expect(DEFAULT_ORIGINS).toContain('http://localhost:5183');
+  });
+
+  it('allows the dev service, which is where Iteration 2 is looked at', () => {
+    /*
+     * **This was missing for a day and nothing failed.** Iteration 2 moved to
+     * three URLs on 11 September and this list did not move with them, so the
+     * browser dropped every API response on the dev origin and the site fell
+     * back to the square kilometre in its own container. It reported that
+     * honestly — *the wider council map needs the database, which is not
+     * answering* — and the sentence was true from where the browser stood.
+     *
+     * It read as the council extent being broken. It was an array.
+     */
+    expect(DEFAULT_ORIGINS).toContain(
+      'https://drainlens-dev-205559161217.australia-southeast1.run.app',
+    );
+  });
+
+  it('leaves the archive out, so it cannot depend on a database that moved on', () => {
+    // `drainlens-iteration1` serves the frozen bundle, which asks for an
+    // extent this database no longer holds. Its own copies are the point.
+    expect(DEFAULT_ORIGINS.join(' ')).not.toContain('drainlens-iteration1');
   });
 
   it('is not a wildcard', () => {
@@ -55,5 +78,58 @@ describe('how long an answer may be reused', () => {
     // is re-fetched, or a performance comparison between the two measures the
     // cache policy instead of the source.
     expect(ARTEFACT_CACHE).toBe('public, max-age=300');
+  });
+});
+
+describe('remembering a rebuilt artefact', () => {
+  it('builds once for everybody who asks within the window, and again after it', async () => {
+    let clock = 0;
+    let builds = 0;
+    const memo = createMemo(1000, () => clock);
+    const build = () => Promise.resolve(++builds);
+    const [a, b] = await Promise.all([memo.get('map/x', build), memo.get('map/x', build)]);
+    expect([a, b, builds]).toEqual([1, 1, 1]);
+    clock = 999;
+    expect(await memo.get('map/x', build)).toBe(1);
+    clock = 1000;
+    expect(await memo.get('map/x', build)).toBe(2);
+    expect(await memo.get('map/y', build)).toBe(3);
+  });
+
+  it('forgets a failed build, so a missing extent is not remembered as missing', async () => {
+    const memo = createMemo(60_000, () => 0);
+    await expect(memo.get('map/x', () => Promise.reject(new Error('not loaded')))).rejects.toThrow('not loaded');
+    expect(await memo.get('map/x', () => Promise.resolve('loaded'))).toBe('loaded');
+  });
+
+  it('keeps an answer for ten minutes', () => {
+    expect(REBUILT_FOR_MS).toBe(600_000);
+  });
+});
+
+describe('the defence headers on every answer', () => {
+  // A pool that cannot connect: the headers must be on the failure as well,
+  // and no test here needs a database to check them.
+  const down = { connect: () => Promise.reject(new Error('no database here')) } as unknown as pg.Pool;
+  // The server logs the failure it answers with; that log is not this test's.
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(['/health', '/api/flood-history', '/nowhere'])('sends them on %s, whatever the status', async (route) => {
+    const response = await createApp(down).request(route);
+    expect(response.headers.get('content-security-policy')).toBe("default-src 'none'; frame-ancestors 'none'");
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it('leaves cross-origin reading to CORS, so the site can still fetch it', async () => {
+    const response = await createApp(down).request('/health');
+    expect(response.headers.get('cross-origin-resource-policy')).toBeNull();
   });
 });

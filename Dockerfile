@@ -16,7 +16,15 @@
 # something other than this — which would have shipped none of the content
 # types, gzip settings or cache policy verified below.
 
-FROM node:22-alpine AS build
+# **Base images are pinned by digest** (penetration test P06, P07). A moving
+# name such as `nginx:1.27-alpine` meant two builds of one commit could ship
+# different operating-system packages, and the image only picked up fixes when
+# the application happened to change. The tag is kept beside the digest so a
+# reader can see what it is; the digest is what Docker uses. To move to a newer
+# base, look up the new digest (deploy/README.md, "Rebuilding on a schedule"),
+# change both Dockerfiles, and let CI's image scan run on the pull request.
+
+FROM node:22.23.2-alpine3.24@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 WORKDIR /repo
 
 # The lockfile first, so a dependency change is the only thing that busts the
@@ -51,9 +59,29 @@ ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build --workspace @drainlens/web
 
-FROM nginx:1.27-alpine AS runtime
+# Repinned on 28 September 2026, to the current build of the same tag. It is
+# not what fixed the finding below — the rebuilt image ships the same libexpat
+# — but a pin a fortnight behind the tag it names is worth moving while the
+# scan is being read.
+FROM nginx:1.30.5-alpine3.24@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94 AS runtime
+
+# **Then the OS packages are brought up to date**, as `deploy/api/Dockerfile`
+# has done since 16 September. The Iteration 2 freeze scan found CVE-2026-93990
+# (HIGH) against libexpat 2.8.4-r0, fixed in 2.8.5-r0 and shipped by Alpine but
+# not yet by the nginx image: repinning to the tag's newest digest still
+# carried 2.8.4-r0, which is the reason this line exists rather than a second
+# digest bump. nginx's own binary comes from the pinned digest and `apk` does
+# not replace it, so what moves here is the operating system around it.
+RUN apk upgrade --no-cache
+
+# The same API base the bundle was built with, so deploy/entrypoint.sh can name
+# its origin in the Content-Security-Policy. An ARG does not cross stages; it
+# is declared again here and passed on as an environment variable.
+ARG VITE_API_BASE=https://drainlens-api-205559161217.australia-southeast1.run.app
+ENV VITE_API_BASE=$VITE_API_BASE
 
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY deploy/security-headers.conf /etc/nginx/security-headers.conf
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Strip carriage returns before making it executable.
 #
@@ -71,4 +99,12 @@ COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 # behaviour that matters: a deployment that quietly loses its gate looks exactly
 # like one that never had it.
 ENV PORT=8080
+
+# **Not root** (penetration test P06). The official image starts as root and
+# its master process stayed root; nothing here needs it. Port 8080 is above
+# 1024, and every file nginx writes is under /tmp/nginx, so the container also
+# runs with `--read-only --tmpfs /tmp`. `nginx` is the user the base image
+# already creates for its workers.
+USER nginx
+
 CMD ["/usr/local/bin/entrypoint.sh"]

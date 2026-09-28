@@ -80,7 +80,7 @@ export interface CrossSectionProps {
 export function CrossSection({ outcome }: CrossSectionProps) {
   return (
     <section>
-      <span style={LABEL}>STREET CROSS-SECTION</span>
+      <span style={LABEL}>Illustrative drain cross-section</span>
       {outcome.kind === 'unavailable' ? (
         <Unavailable reasons={outcome.reasons} />
       ) : (
@@ -302,12 +302,12 @@ function Figure({ section, all }: { readonly section: Section; readonly all: rea
       <text x={pitMid} y={PIT_BOTTOM + 16} fontSize="10" fill={RECORDED} textAnchor="middle">
         Pit {section.assetNumber}
       </text>
-      <text x={pitMid} y={PIT_BOTTOM + 29} fontSize="10" fill={WATER_INK} textAnchor="middle">
-        collects and passes water
+      <text x={pitMid} y={PIT_BOTTOM + 29} fontSize="10" fill={RECORDED} textAnchor="middle">
+        connects recorded pipes
       </text>
 
       <text x="14" y={HEIGHT - 8} fontSize="10" fill={CAPTION}>
-        Horizontal: recorded · Vertical: illustrative · Blue: what a pit does, not a measurement
+        Pipe connections and sizes: council record · Vertical position: illustrative
       </text>
     </svg>
   );

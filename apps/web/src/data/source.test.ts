@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { fetchArtefact, served } from './source.js';
+import { fetchArtefact, fetchTogether, served } from './source.js';
 
 const ok = (body: unknown): Response =>
   ({ ok: true, status: 200, json: () => Promise.resolve(body) }) as Response;
@@ -198,5 +198,117 @@ describe('describing where a screenful came from', () => {
 
   it('treats nothing at all as bundled rather than throwing', () => {
     expect(served([])).toBe('bundled');
+  });
+});
+
+describe('artefacts that must agree with each other', () => {
+  const ok = (body: unknown) =>
+    new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+  /** Answers each url from a table; anything absent is a 500. */
+  const serving = (table: Record<string, unknown>): typeof fetch =>
+    ((url: string) =>
+      Promise.resolve(
+        url in table ? ok(table[url]) : new Response('no', { status: 500 }),
+      )) as unknown as typeof fetch;
+
+  const three = (fetchImpl: typeof fetch) => [
+    { api: '/api/map', bundled: '/data/map.json', guard: () => {}, fetchImpl },
+    { api: '/api/derived', bundled: '/data/derived.json', guard: () => {}, fetchImpl },
+    { api: '/api/trace', bundled: '/data/trace.json', guard: () => {}, fetchImpl },
+  ];
+
+  it('takes all three from the API when all three answer', async () => {
+    const impl = serving({
+      '/api/map': { m: 'api' },
+      '/api/derived': { d: 'api' },
+      '/api/trace': { t: 'api' },
+    });
+    const got = await fetchTogether(three(impl) as never);
+    expect(got.from).toBe('api');
+    expect(got.values).toEqual([{ m: 'api' }, { d: 'api' }, { t: 'api' }]);
+  });
+
+  it('takes all three from the container when any one of them refuses', async () => {
+    /*
+     * The rule this function exists for. The API's extent is the council and
+     * the container's is the pilot square kilometre, so one of each would draw
+     * the water paths a kilometre and a half from the streets they run down --
+     * silently, and looking like a map.
+     */
+    const impl = serving({
+      '/api/map': { m: 'api' },
+      '/api/trace': { t: 'api' },
+      '/data/map.json': { m: 'bundled' },
+      '/data/derived.json': { d: 'bundled' },
+      '/data/trace.json': { t: 'bundled' },
+    });
+    const got = await fetchTogether(three(impl) as never);
+    expect(got.from).toBe('bundled');
+    expect(got.values).toEqual([{ m: 'bundled' }, { d: 'bundled' }, { t: 'bundled' }]);
+  });
+
+  it('never returns one from each side', async () => {
+    // Asserted as a property rather than as a case: whatever fails, the three
+    // values come from one place.
+    for (const missing of ['/api/map', '/api/derived', '/api/trace']) {
+      const table: Record<string, unknown> = {
+        '/api/map': { v: 'api' },
+        '/api/derived': { v: 'api' },
+        '/api/trace': { v: 'api' },
+        '/data/map.json': { v: 'bundled' },
+        '/data/derived.json': { v: 'bundled' },
+        '/data/trace.json': { v: 'bundled' },
+      };
+      delete table[missing];
+      const got = await fetchTogether(three(serving(table)) as never);
+      expect(new Set((got.values as { v: string }[]).map((x) => x.v)).size).toBe(1);
+    }
+  });
+
+  it('goes straight to the container when there is no API configured', async () => {
+    const impl = serving({ '/data/map.json': { v: 1 }, '/data/derived.json': { v: 2 }, '/data/trace.json': { v: 3 } });
+    const got = await fetchTogether(
+      three(impl).map((r) => ({ ...r, api: null })) as never,
+    );
+    expect(got.from).toBe('bundled');
+  });
+
+  it('reports the fallback once for the set, not once per artefact', async () => {
+    // Three lines in a console would suggest three faults. There was one.
+    const said: string[] = [];
+    const impl = serving({
+      '/data/map.json': { v: 1 },
+      '/data/derived.json': { v: 2 },
+      '/data/trace.json': { v: 3 },
+    });
+    await fetchTogether(
+      three(impl).map((r) => ({ ...r, onFallback: (u: string) => said.push(u) })) as never,
+    );
+    expect(said).toHaveLength(1);
+  });
+
+  it('throws when the container cannot answer either', async () => {
+    // Nothing left to try, and `App` already has a screen for it.
+    await expect(fetchTogether(three(serving({})) as never)).rejects.toThrow();
+  });
+
+  it('refuses a payload the guard refuses, on either side', async () => {
+    const impl = serving({
+      '/api/map': { v: 'api' },
+      '/api/derived': { v: 'api' },
+      '/api/trace': { v: 'api' },
+      '/data/map.json': { v: 'bundled' },
+      '/data/derived.json': { v: 'bundled' },
+      '/data/trace.json': { v: 'bundled' },
+    });
+    const strict = three(impl).map((r) => ({
+      ...r,
+      guard: (value: unknown) => {
+        if ((value as { v: string }).v === 'api') throw new Error('refused');
+      },
+    }));
+    const got = await fetchTogether(strict as never);
+    expect(got.from).toBe('bundled');
   });
 });

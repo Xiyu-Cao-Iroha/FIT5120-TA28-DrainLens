@@ -7,9 +7,12 @@ import {
   ViewportError,
   clamp,
   fit,
+  fitWithin,
   focus,
   LOCAL_SCALE,
+  scaleForAddress,
   pan,
+  scaleToContain,
   scaleToCover,
   toLocal,
   toScreen,
@@ -153,6 +156,12 @@ describe('zooming', () => {
     expect(zoomAt(view, 1000, [400, 400], KENSINGTON).scale).toBe(MAX_SCALE);
   });
 
+  it('stops sooner when a map says its own detail runs out sooner', () => {
+    // The flood map's boundaries are simplified to 25 m; it passes its own cap.
+    const view = { ...square(), scale: 0.01 };
+    expect(zoomAt(view, 1000, [400, 400], KENSINGTON, 0.001, 0.05).scale).toBe(0.05);
+  });
+
   it('refuses a factor that is not positive', () => {
     expect(() => zoomAt(square(), 0, [0, 0], KENSINGTON)).toThrow(ViewportError);
     expect(() => zoomAt(square(), -2, [0, 0], KENSINGTON)).toThrow(/positive/);
@@ -256,5 +265,68 @@ describe('focus', () => {
       expect(seen.minN).toBeGreaterThanOrEqual(-0.001);
       expect(seen.maxN).toBeLessThanOrEqual(1000.001);
     }
+  });
+});
+
+describe('containing an extent instead of covering it', () => {
+  /*
+    **The flood map hid areas on its first render**, and this is the function
+    that came out of it. `scaleToCover` fills the canvas and lets the extent
+    overflow, which is right for the drainage map — its extent is a crop of a
+    larger city and blank margin would be a border around an arbitrary
+    rectangle. It is wrong where the extent *is* the subject: an area off the
+    edge of the opening view reads as an area with nothing in it.
+  */
+  const WIDE: Bounds = { widthM: 109_000, heightM: 116_000 };
+
+  it('picks the scale that leaves the whole extent on screen', () => {
+    // 800 by 300 over 109 by 116 km: height is the binding constraint, and
+    // covering would pick width and push 60% of the map off the sides.
+    expect(scaleToContain(800, 300, WIDE)).toBeCloseTo(300 / 116_000, 12);
+    expect(scaleToCover(800, 300, WIDE)).toBeCloseTo(800 / 109_000, 12);
+    expect(scaleToContain(800, 300, WIDE)).toBeLessThan(scaleToCover(800, 300, WIDE));
+  });
+
+  it('puts every corner of the extent inside the canvas', () => {
+    const viewport = fitWithin(800, 300, WIDE);
+    for (const corner of [
+      [0, 0],
+      [WIDE.widthM, 0],
+      [0, WIDE.heightM],
+      [WIDE.widthM, WIDE.heightM],
+    ] as const) {
+      const [x, y] = toScreen(viewport, corner);
+      expect(x).toBeGreaterThanOrEqual(-0.001);
+      expect(x).toBeLessThanOrEqual(800.001);
+      expect(y).toBeGreaterThanOrEqual(-0.001);
+      expect(y).toBeLessThanOrEqual(300.001);
+    }
+  });
+
+  it('refuses a canvas or an extent with no area, like its sibling', () => {
+    expect(() => scaleToContain(0, 300, WIDE)).toThrow(ViewportError);
+    expect(() => scaleToContain(800, 300, { widthM: 0, heightM: 1 })).toThrow(ViewportError);
+  });
+
+  it('lets zoom out reach the contained scale when it is told to', () => {
+    /*
+      Without the floor, zooming out stops at the covering scale — some of the
+      extent still off screen, and no gesture that brings it back.
+    */
+    const start = fitWithin(800, 300, WIDE);
+    const floor = scaleToContain(800, 300, WIDE);
+    const out = zoomAt(start, 0.25, [400, 150], WIDE, floor);
+    expect(out.scale).toBeCloseTo(floor, 12);
+
+    const defaulted = zoomAt(start, 0.25, [400, 150], WIDE);
+    expect(defaulted.scale).toBeGreaterThan(floor);
+  });
+});
+
+describe('the scale a newly chosen address opens at', () => {
+  it('comes in to local from the whole council, and keeps a closer view', () => {
+    expect(scaleForAddress(0.1)).toBe(LOCAL_SCALE);
+    expect(scaleForAddress(LOCAL_SCALE)).toBe(LOCAL_SCALE);
+    expect(scaleForAddress(6)).toBe(6);
   });
 });

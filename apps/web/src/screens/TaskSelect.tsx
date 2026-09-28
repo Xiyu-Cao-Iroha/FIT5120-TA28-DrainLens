@@ -119,12 +119,21 @@ export interface TaskSelectProps {
 /**
  * The guided tasks on offer.
  *
- * The drain-blockage comparison used to be the second of these. AC 1.1.1
- * requires it to be absent from the Iteration 1 interface, so the entry is
- * gone; `Task` still admits `'compare'` and the screens behind it are intact,
- * because Iteration 2 turns it back on by restoring one entry here.
+ * The drain-blockage comparison is the second of these again. AC 1.1.1
+ * required it to be absent from the Iteration 1 interface, so the entry was
+ * removed for exactly one iteration while `Task`, the reducer, both screens
+ * and all of their tests stayed where they were. Iteration 2's AC 3.1.1 asks
+ * for it back, and it is the same three sentences it carried before, taken
+ * out of the commit that removed them rather than written again: what the
+ * screen offers should not have drifted while it was switched off.
+ *
+ * **It is one of two ways in.** AC 3.1.1 opens the explorer from the map, and
+ * since 13 September a drain's card on the full map offers the comparison
+ * where one can be calculated and says why not where it cannot
+ * (`scenario-from-map` in session.ts). This route, by address, came back
+ * first because it already ran end to end.
  */
-const GUIDED: readonly {
+export const GUIDED: readonly {
   readonly task: Task;
   readonly title: string;
   readonly body: string;
@@ -135,6 +144,12 @@ const GUIDED: readonly {
     title: 'Follow local water and drainage',
     body: 'See where rainwater may move near this address, and follow the recorded drainage connections downstream.',
     action: 'Follow water and drainage',
+  },
+  {
+    task: 'compare',
+    title: 'What changes if a drain is blocked',
+    body: 'Choose a nearby drain, how blocked it is and a total rainfall amount, then compare it with the same drain clear. This is a model comparison, not an observation of the drain.',
+    action: 'Set up a comparison',
   },
 ];
 

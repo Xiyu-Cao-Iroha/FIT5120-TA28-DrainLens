@@ -9,6 +9,8 @@
  * geometry, and geometry that is only ever seen is geometry nobody checked.
  */
 
+import { LAYER } from './terms.js';
+
 /**
  * The control a step is about.
  *
@@ -40,44 +42,58 @@ export interface TourStep {
  *
  * Step 5 was *"a picture of the water flow on the surface and where it will
  * flow to"*. That is a prediction, and this product does not make one — the
- * homepage says so under *DrainLens does not provide*, and the card for the
- * same layer says *which way water tends to run, not how much of it or how
- * deep*. A tour is where somebody learns what the words on the screen mean,
- * so it is the worst place to define them more strongly than the rest of the
- * interface does.
+ * homepage says so under *DrainLens does not provide*. A tour is where
+ * somebody learns what the words on the screen mean, so it is the worst place
+ * to define them more strongly than the rest of the interface does.
  *
  * Steps 3 and 6 were ungrammatical in a way that changed the meaning — *"the
  * recorded pits function as catching the water flow"* and *"low areas where
  * are prone to have water catchments"*. Rewritten to say what those layers
  * are, in the vocabulary the map itself uses.
+ *
+ * **Steps 3 to 5 were cut again by copy audit v2** (#54, #55, #56): each had a
+ * second sentence about the data's source or limits, and a coach mark is
+ * there to say how to read one control. The limits are said beside the
+ * layers, in More information.
  */
 export const TOUR_STEPS: readonly TourStep[] = [
   {
     target: 'address',
-    body: 'Type an address here and choose it from the list. The search runs in your browser — nothing about the address is sent anywhere.',
+    /*
+      **The second sentence is gone, and it was true.** It said the search runs
+      in the browser and that nothing about the address is sent anywhere. The
+      address screen says it where an address is actually typed, and the
+      homepage says it again under *Find a street*; here it was the longer half
+      of a coach mark that exists to point at a search box.
+
+      A promise repeated in three places is not three times as trusted. It is
+      three copies to keep true, and the two that remain are the ones a person
+      is reading at the moment it matters.
+    */
+    body: 'Search for an address, then select a result.',
   },
   {
     target: 'chips',
-    body: 'These switch the map’s layers on and off. Press one to show a layer, press it again to hide it, and combine as many as you find useful.',
+    body: 'Use these buttons to show or hide map layers. You can turn on more than one.',
   },
   {
     target: 'chip-pit',
-    body: 'Pits are the drainage openings the council has recorded — the places surface water can enter the underground network.',
+    body: `${LAYER.pits} are street drains. Rain from the road flows into them.`,
   },
   {
     target: 'chip-pipe',
-    body: 'Pipes are the recorded underground network those pits connect to. Following one shows where the record stops, which is not always where the water does.',
+    body: `${LAYER.pipes} are the underground pipes that join the drains.`,
   },
   {
     target: 'chip-channel',
-    body: 'Water flow shows the paths surface water is likely to take, calculated from the measured ground. It says which way water tends to run, not how much of it or how deep.',
+    body: 'Arrows show which way rain may flow downhill.',
   },
   {
     target: 'chip-lowPoint',
-    body: 'Low areas are the places the calculated surface says water can collect. Indicative, and not a statement that any of them has flooded or will.',
+    body: `${LAYER.lowAreas} are calculated places where water may collect. They do not show where flooding has happened or will happen.`,
   },
   {
     target: 'layers',
-    body: 'The ground surface, and anything without a button of its own, is behind Layers.',
+    body: `Open Layers to show ${LAYER.ground} and ${LAYER.limited}.`,
   },
 ];

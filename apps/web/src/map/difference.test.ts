@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference } from './difference.js';
+import { DIFFERENCE_FILL, MIN_CELL_PX, drawDifference, footprintCorners, intoMapFrame } from './difference.js';
 import type { Local, Viewport } from './viewport.js';
 
 /** 200 px square, one pixel per metre, centred on (100, 100). */
@@ -90,5 +90,48 @@ describe('drawing where the two runs disagree', () => {
     // Culling on the centre rather than the extent would clip the patch a
     // pixel early at every border, which reads as a straight-edged result.
     expect(at([[200, 100]], 10, VIEW).rects).toHaveLength(1);
+  });
+});
+
+describe('which map the difference is drawn over', () => {
+  const kensington = { minE: 316_500, minN: 5_814_500 };
+
+  it('moves Kensington cells onto the council map by the difference between the corners', () => {
+    // The council's corner is 315,000 / 5,808,500: Kensington's origin is its (1500, 6000).
+    const moved = intoMapFrame([[10, 20]], kensington, { min_e: 315_000, min_n: 5_808_500 });
+    expect(moved).toEqual([[1510, 6020]]);
+  });
+
+  it('leaves them where they are on the map they came from', () => {
+    const cells = [[10, 20], [11, 20]] as const;
+    expect(intoMapFrame(cells, kensington, { min_e: 316_500, min_n: 5_814_500 })).toEqual(cells);
+  });
+});
+
+describe('the box the result refits to', () => {
+  it('reaches the far corner of the last cell, not its south-west key', () => {
+    const cells: Local[] = [[10, 20], [14, 20], [12, 26]];
+    expect(footprintCorners({ cells, cellSizeM: 1 })).toEqual([
+      [10, 20],
+      [15, 27],
+    ]);
+    expect(footprintCorners({ cells: [[0, 0]], cellSizeM: 2 })).toEqual([
+      [0, 0],
+      [2, 2],
+    ]);
+  });
+
+  it('takes in the route where it bends outside the patch', () => {
+    const cells: Local[] = [[10, 20]];
+    const route: Local[] = [[4.5, 30.5], [10.5, 20.5]];
+    expect(footprintCorners({ cells, cellSizeM: 1, route })).toEqual([
+      [4.5, 20],
+      [11, 30.5],
+    ]);
+  });
+
+  it('has nothing to fit when there is no difference', () => {
+    expect(footprintCorners(null)).toEqual([]);
+    expect(footprintCorners({ cells: [], cellSizeM: 1 })).toEqual([]);
   });
 });

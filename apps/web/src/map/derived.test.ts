@@ -11,6 +11,9 @@
  * recording context, because it is a property of the calls, not of the pixels.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
@@ -20,12 +23,15 @@ import {
   type DerivedArtefact,
   DerivedError,
   HATCH_SPACING_PX,
+  LOW_POINTS_PER_PATH,
+  MIN_STEP_PX,
   arrowsAlong,
   assertDerived,
   drawDerived,
+  joinedToPrevious,
 } from './derived.js';
 import { drawMap } from './draw.js';
-import { type Bounds, fit } from './viewport.js';
+import { type Bounds, type Local, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
 const view = fit(1000, 1000, KENSINGTON);
@@ -79,6 +85,45 @@ function recorder() {
     measureText: (text: string) => ({ width: text.length * 6 }),
   };
   return context as typeof context & CanvasRenderingContext2D;
+}
+
+/**
+ * How many recorded fills paint this screen point, under the non-zero rule.
+ *
+ * Replays the path calls rather than trusting their count, because what went
+ * wrong was not the number of fills but which rings shared one: a hole in a
+ * path without its outline is painted, and with it is not.
+ */
+function fillsCovering(calls: readonly Call[], point: readonly [number, number]): number {
+  let rings: [number, number][][] = [];
+  let current: [number, number][] = [];
+  let painted = 0;
+  const [px, py] = point;
+  for (const call of calls) {
+    const [x, y] = call.args as [number, number];
+    if (call.op === 'beginPath') {
+      rings = [];
+      current = [];
+    } else if (call.op === 'moveTo') {
+      current = [[x, y]];
+      rings.push(current);
+    } else if (call.op === 'lineTo') {
+      current.push([x, y]);
+    } else if (call.op === 'fill') {
+      let winding = 0;
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length; i += 1) {
+          const [ax, ay] = ring[i]!;
+          const [bx, by] = ring[(i + 1) % ring.length]!;
+          const side = (bx - ax) * (py - ay) - (px - ax) * (by - ay);
+          if (ay <= py && by > py && side > 0) winding += 1;
+          else if (ay > py && by <= py && side < 0) winding -= 1;
+        }
+      }
+      if (winding !== 0) painted += 1;
+    }
+  }
+  return painted;
 }
 
 const line = (points: readonly (readonly [number, number])[]) =>
@@ -218,6 +263,40 @@ describe('the unavailable areas', () => {
     expect(ops.filter((op) => op === 'restore')).not.toHaveLength(0);
   });
 
+  it('clips to every unavailable area, not only the last one', () => {
+    /*
+      **Reported as areas flickering and disappearing while the map is
+      dragged**, and this is what it was. `hatch` composed its clip region by
+      calling `trace` once per ring, and `trace` opened with `beginPath` — so
+      every ring but the last was thrown away and only one area was ever
+      hatched. Which one changed as the view moved, because the rings are
+      filtered by visibility first, so panning changed which was last.
+
+      The test is the shape of the path: one `beginPath` before the `clip`,
+      with both rings inside it.
+    */
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({
+        unavailable: [
+          polygon([[100, 800], [300, 800], [300, 950], [100, 950], [100, 800]]),
+          polygon([[600, 100], [800, 100], [800, 250], [600, 250], [600, 100]]),
+        ],
+      }),
+      view,
+    );
+
+    const ops = context.calls.map((call) => call.op);
+    const clip = ops.indexOf('clip');
+    expect(clip).toBeGreaterThan(0);
+    // Two rings are two s, and they must both be inside one path.
+    const before = context.calls.slice(0, clip);
+    expect(before.filter((call) => call.op === 'beginPath')).toHaveLength(1);
+    expect(before.filter((call) => call.op === 'moveTo')).toHaveLength(2);
+    expect(before.filter((call) => call.op === 'closePath')).toHaveLength(2);
+  });
+
   it('restore every save, or the clip leaks into the next layer', () => {
     const context = recorder();
     drawDerived(context, ALL, view);
@@ -268,6 +347,142 @@ describe('what is drawn and what is not', () => {
     const context = recorder();
     drawDerived(context, crossing, zoomed);
     expect(context.calls.some((call) => call.op === 'stroke')).toBe(true);
+  });
+
+  it('draws low points a few rings to a path, every edge still dashed', () => {
+    // One fill and stroke per hollow was 30,000 draw calls a frame over the
+    // council; one path for all of them hung the tab. Batches of ten were the
+    // fastest measured.
+    const boxAt = (i: number) => {
+      const e = 20 + (i % 10) * 90;
+      const n = 20 + Math.floor(i / 10) * 90;
+      return polygon([[e, n], [e + 50, n], [e + 50, n + 50], [e, n + 50], [e, n]]);
+    };
+    const count = LOW_POINTS_PER_PATH * 2 + 3;
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ 'low-point': Array.from({ length: count }, (_, i) => boxAt(i)) }),
+      view,
+      { show: { channel: false, lowPoint: true, unavailable: false } },
+    );
+    const ops = context.calls.map((call) => call.op);
+    expect(ops.filter((op) => op === 'closePath')).toHaveLength(count);
+    expect(ops.filter((op) => op === 'beginPath')).toHaveLength(3);
+    expect(ops.filter((op) => op === 'fill')).toHaveLength(3);
+    const strokes = context.calls.filter((call) => call.op === 'stroke');
+    expect(strokes).toHaveLength(3);
+    for (const stroke of strokes) expect(stroke.dash.length).toBeGreaterThan(0);
+  });
+
+  it('never cuts a hole off from its outline, whatever else is on screen', () => {
+    /*
+     * The report: a large low area filled blue at one zoom, and white inside
+     * one step further in. The pipeline writes a hole as its own ring, wound
+     * the other way, and the non-zero fill only leaves it empty when the
+     * outline is in the same path. Nine small hollows before the outline put
+     * the batch boundary exactly between the two while they are on screen,
+     * and zooming in past them moved it away -- so the hole was painted over
+     * in one view and correctly empty in the next.
+     */
+    const clockwise = (e0: number, n0: number, e1: number, n1: number) =>
+      polygon([[e0, n0], [e0, n1], [e1, n1], [e1, n0], [e0, n0]]);
+    const specks = Array.from({ length: LOW_POINTS_PER_PATH - 1 }, (_, i) =>
+      clockwise(20, 100 + i * 90, 60, 140 + i * 90),
+    );
+    const outline = clockwise(200, 200, 900, 900);
+    const hole = polygon([[450, 450], [650, 450], [650, 650], [450, 650], [450, 450]]);
+    const artefact = derived({ 'low-point': [...specks, outline, hole] });
+    const show = { channel: false, lowPoint: true, unavailable: false };
+
+    for (const viewport of [
+      { ...view, scale: 1, centre: [500, 500] as const }, // the specks in view
+      { ...view, scale: 2.4, centre: [550, 550] as const }, // zoomed past them
+    ]) {
+      const context = recorder();
+      drawDerived(context, artefact, viewport, { show });
+      expect(fillsCovering(context.calls, toScreen(viewport, [550, 550]))).toBe(0);
+      expect(fillsCovering(context.calls, toScreen(viewport, [400, 400]))).toBe(1);
+    }
+  });
+
+  it('finds the outline a hole belongs to past other pieces of the same hollow', () => {
+    // At a diagonal pinch the pipeline can close an outline early and trace
+    // the rest as a second ring, between the outline and its hole.
+    const clockwise = (e0: number, n0: number, e1: number, n1: number) =>
+      polygon([[e0, n0], [e0, n1], [e1, n1], [e1, n0], [e0, n0]]);
+    const shapes = [
+      clockwise(0, 0, 10, 10),
+      clockwise(100, 100, 900, 900),
+      clockwise(910, 910, 990, 990),
+      polygon([[400, 400], [600, 400], [600, 600], [400, 600], [400, 400]]),
+    ];
+    expect([...joinedToPrevious(shapes)]).toEqual([0, 0, 1, 1]);
+    // Anticlockwise outlines work the same way: the winding is read, not assumed.
+    const flipped = shapes.map((shape) => ({ ...shape, c: shape.c.map((ring) => [...ring].reverse()) }));
+    expect([...joinedToPrevious(flipped)]).toEqual([0, 0, 1, 1]);
+  });
+
+  it('keeps every hole of the published low areas unfilled at every zoom', () => {
+    // The shape from the report, measured on the committed artefact: the
+    // largest low area in Kensington and the 1,119 m² hole in it.
+    const published = JSON.parse(
+      readFileSync(path.resolve(__dirname, '../../public/data/derived.json'), 'utf8'),
+    ) as DerivedArtefact;
+    const inHole: Local = [450, 640];
+    const inArea: Local = [450, 680];
+    const show = { channel: false, lowPoint: true, unavailable: false };
+    for (const scale of [0.7, 1, 1.55, 2.4, 3.7]) {
+      const viewport = { widthPx: 1000, heightPx: 700, scale, centre: inHole };
+      const context = recorder();
+      drawDerived(context, published, viewport, { show });
+      expect(fillsCovering(context.calls, toScreen(viewport, inHole))).toBe(0);
+      expect(fillsCovering(context.calls, toScreen(viewport, inArea))).toBe(1);
+    }
+  });
+
+  it('leaves out vertices closer together on screen than a couple of pixels, but never the ends', () => {
+    // 400,000 low-point vertices over the whole council, most a fraction of a
+    // pixel apart when zoomed out.
+    const dense = Array.from({ length: 101 }, (_, i) => [100 + i, 500] as const);
+    const show = { channel: true, lowPoint: false, unavailable: false };
+
+    const far = recorder();
+    drawDerived(far, derived({ channel: [line(dense)] }), { ...view, scale: 0.25, centre: [150, 500] as const }, { show });
+    const farPoints = far.calls.filter((c) => (c.op === 'moveTo' || c.op === 'lineTo') && c.dash.length > 0);
+    expect(farPoints.length).toBeLessThan(20);
+    const [firstX] = toScreen({ ...view, scale: 0.25, centre: [150, 500] }, [100, 500]);
+    const [lastX] = toScreen({ ...view, scale: 0.25, centre: [150, 500] }, [200, 500]);
+    expect(farPoints[0]?.args[0]).toBeCloseTo(firstX);
+    expect(farPoints.at(-1)?.args[0]).toBeCloseTo(lastX);
+
+    const near = recorder();
+    drawDerived(near, derived({ channel: [line(dense)] }), { ...view, scale: MIN_STEP_PX, centre: [150, 500] as const }, { show });
+    const nearPoints = near.calls.filter((c) => (c.op === 'moveTo' || c.op === 'lineTo') && c.dash.length > 0);
+    expect(nearPoints).toHaveLength(101);
+  });
+
+  it('leaves out a low point smaller than a pixel, and draws it again zoomed in', () => {
+    // A display filter that moves with the zoom, not a claim about the ground.
+    const speck = derived({ 'low-point': [polygon([[500, 500], [502, 500], [502, 502], [500, 502], [500, 500]])] });
+    const show = { channel: false, lowPoint: true, unavailable: false };
+
+    const far = recorder();
+    drawDerived(far, speck, { ...view, scale: 0.4, centre: [500, 500] as const }, { show });
+    expect(far.calls.some((call) => call.op === 'fill')).toBe(false);
+
+    const near = recorder();
+    drawDerived(near, speck, { ...view, scale: 0.5, centre: [500, 500] as const }, { show });
+    expect(near.calls.some((call) => call.op === 'fill')).toBe(true);
+  });
+
+  it('draws nothing at all when no low point is on screen', () => {
+    const context = recorder();
+    drawDerived(context, derived({ 'low-point': [polygon([[-9000, -9000], [-8000, -9000], [-8000, -8000], [-9000, -9000]])] }), view, {
+      show: { channel: false, lowPoint: true, unavailable: false },
+    });
+    expect(context.calls.some((call) => call.op === 'fill' || call.op === 'stroke')).toBe(false);
+    expect(context.getLineDash()).toEqual([]);
   });
 
   it('draws low points beneath the channels that feed them', () => {
@@ -409,5 +624,86 @@ describe('which way the water runs', () => {
     const fills = context.calls.filter((c) => c.op === 'fill');
     expect(fills.length).toBeGreaterThan(0);
     for (const fill of fills) expect(fill.dash).toHaveLength(0);
+  });
+});
+
+describe('the hatching, while the map is moving', () => {
+  /*
+    **Reported as the areas wobbling while the map is dragged.** The lines were
+    laid out from the canvas's left edge, so they stayed put while the ground
+    moved under them and appeared to crawl through the shapes they belong to.
+
+    Every line satisfies `x - y = offset`, so a pan of `(dx, dy)` moves the
+    ground by `dx - dy` in that quantity. The test is that the pattern moves by
+    the same amount the ground does.
+  */
+  const hatchOffsets = (centre: readonly [number, number]) => {
+    const context = recorder();
+    drawDerived(
+      context,
+      derived({ unavailable: [polygon([[0, 0], [1000, 0], [1000, 1000], [0, 1000], [0, 0]])] }),
+      { ...view, centre },
+    );
+    // The hatch is the only thing drawn after the clip.
+    const clip = context.calls.findIndex((call) => call.op === 'clip');
+    return context.calls
+      .slice(clip)
+      .filter((call) => call.op === 'moveTo')
+      .map((call) => Number(call.args[0]));
+  };
+
+  /**
+   * Where one fixed point of ground sits within the pattern.
+   *
+   * A line satisfies `x - y = offset`, so this is that quantity for a chosen
+   * place on the map, measured from the first line and taken modulo the
+   * spacing. If the hatching is painted on the ground it is the same number
+   * wherever the map has been dragged to.
+   */
+  const phaseAtGround = (centre: readonly [number, number]) => {
+    const offsets = hatchOffsets(centre);
+    const [x, y] = toScreen({ ...view, centre }, [500, 500]);
+    return ((((x - y - offsets[0]!) % HATCH_SPACING_PX) + HATCH_SPACING_PX) % HATCH_SPACING_PX);
+  };
+
+  it('travels with the ground rather than staying on the canvas', () => {
+    /*
+      **Written twice.** The first version compared the *shift* of the first
+      line against an arithmetic prediction, and at this fixture's scale of one
+      pixel per metre the pan it chose moved the pattern by exactly one whole
+      spacing — so the prediction was zero, the buggy code also shifted by
+      zero, and the test passed against the defect it was written for.
+
+      This one cannot go quiet that way: it asks where a fixed piece of ground
+      sits inside the pattern, which is the property being claimed, and any pan
+      that breaks it changes the answer.
+    */
+    const [e, n] = view.centre;
+    const before = phaseAtGround([e, n]);
+    for (const [de, dn] of [
+      [11, 0],
+      [0, 5],
+      [-23, 17],
+      [400, -250],
+    ] as const) {
+      expect(phaseAtGround([e + de, n + dn])).toBeCloseTo(before, 6);
+    }
+  });
+
+  it('does not change the spacing, only where the pattern starts', () => {
+    // The density on screen is the same at every zoom, which is why the
+    // spacing is in pixels. Anchoring must not quietly change that.
+    const offsets = hatchOffsets(view.centre);
+    for (let index = 1; index < offsets.length; index += 1) {
+      expect(offsets[index]! - offsets[index - 1]!).toBeCloseTo(HATCH_SPACING_PX, 6);
+    }
+  });
+
+  it('still covers the canvas from edge to edge', () => {
+    // A phase shift that moved the first line inside the canvas would leave a
+    // wedge of unhatched ground in the corner.
+    const offsets = hatchOffsets(view.centre);
+    expect(offsets[0]).toBeLessThanOrEqual(-view.heightPx + HATCH_SPACING_PX);
+    expect(offsets[offsets.length - 1]).toBeGreaterThanOrEqual(view.widthPx - HATCH_SPACING_PX);
   });
 });
