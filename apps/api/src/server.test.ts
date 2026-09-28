@@ -37,10 +37,23 @@ describe('who may read this from a browser', () => {
     );
   });
 
-  it('leaves the archive out, so it cannot depend on a database that moved on', () => {
-    // `drainlens-iteration1` serves the frozen bundle, which asks for an
-    // extent this database no longer holds. Its own copies are the point.
+  it('leaves the Iteration 1 archive out, so it cannot depend on a database that moved on', () => {
+    // It serves the frozen bundle, which asks for an extent this database no
+    // longer holds. Its own copies are the point.
     expect(DEFAULT_ORIGINS.join(' ')).not.toContain('drainlens-iteration1');
+  });
+
+  it('carries the Iteration 2 archive, which asks for the extent this database holds', () => {
+    /*
+     * The same omission as the dev origin, found the same way and a fortnight
+     * later: deployed at the freeze on 28 September, every API response
+     * dropped, the archive URL serving one square kilometre. The team chose
+     * an archive that shows the whole council over one that cannot be
+     * affected by the database (29 September).
+     */
+    expect(DEFAULT_ORIGINS).toContain(
+      'https://drainlens-iteration2-205559161217.australia-southeast1.run.app',
+    );
   });
 
   it('is not a wildcard', () => {

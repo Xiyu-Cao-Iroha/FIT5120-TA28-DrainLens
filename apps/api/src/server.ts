@@ -70,6 +70,26 @@ export const DEFAULT_ORIGINS = [
     the whole Iteration 2 URL had been serving one square kilometre for a day.
   */
   'https://drainlens-dev-205559161217.australia-southeast1.run.app',
+  /*
+    The Iteration 2 archive, and the same omission a second time.
+
+    It was deployed at the freeze on 28 September and its every request was
+    dropped for the same reason, with the same symptom: the archive URL served
+    one square kilometre of Kensington, two example addresses instead of
+    three, and said so honestly in the footer. Found by reading the browser's
+    network log against a curl with an `Origin` header, which is the check
+    this list needs and does not get from any test.
+
+    **Why this one is in the list when `drainlens-iteration1` is not.** The
+    Iteration 1 archive asks for an extent this database no longer holds, so
+    letting it through would buy it a 404 and the fallback it already has. The
+    Iteration 2 archive asks for the extent the database *does* hold, and the
+    choice is between an archive that shows the whole council and one that
+    shows a kilometre of it. The team took the first on 29 September, knowing
+    what it costs: this archive is frozen in its code, not in what it reads,
+    and if the database moves on it degrades to its own copies.
+  */
+  'https://drainlens-iteration2-205559161217.australia-southeast1.run.app',
   // `npm run dev`, from .claude/launch.json.
   'http://localhost:5183',
   'http://127.0.0.1:5183',
