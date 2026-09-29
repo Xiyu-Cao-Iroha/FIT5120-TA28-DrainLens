@@ -1,0 +1,20 @@
+-- Who operates a pipe, because Iteration 3 asks and forbids guessing.
+--
+-- AC 6.2.2 wants three different sentences about a selected pipe -- the
+-- operator named, the operator not recorded, and an operator code nobody has
+-- identified -- and none of them could be said, because the column did not
+-- exist. The field was in the council's export the whole time; `network.py`
+-- kept five columns and this was not one of them, so the artefact, the
+-- database and the browser were each faithfully carrying nothing.
+--
+-- **Text, nullable, and not a foreign key to anything.** The published values
+-- are `City of Melbourne` on 16,302 pipes, absent on 87, and the string `4` on
+-- 853. That last one is not an organisation this project can name: it is a
+-- code the portal does not explain, and the interface says so rather than
+-- resolving it. A lookup table here would have to invent the row that explains
+-- it, which is the guess the criterion forbids.
+--
+-- The stormwater pits dataset carries no operator field at all, which is why
+-- there is no matching column on `pit` and why AC 6.2.2 forbids inferring one
+-- from a connected pipe.
+ALTER TABLE pipe ADD COLUMN IF NOT EXISTS operator text;
