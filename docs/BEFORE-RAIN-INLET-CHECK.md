@@ -188,6 +188,11 @@ Written so the team can adopt either branch. **Branch A** is the recommendation;
 
 > - provide *Check the street drains near you* for every supported address, showing all recorded surface drain inlets within the 200-metre radius, using the pit types approved as surface inlets in the preparation rules register, **grouped by street and listed in a panel rather than numbered on the map**, without selecting, numbering or ranking them;
 > - state how many recorded inlets were found, and that the list is every recorded inlet near the address rather than a selection;
+> - list the street of the selected address first, expanded, and collapse the remaining streets in order of how many inlets each contains;
+> - where no recorded inlet is labelled with the street of the selected address, expand the street with the most inlets instead, and state that no recorded inlet is labelled with the user's own street;
+> - group inlets whose nearest street label is more than 30 metres away under *Other drains near you*, rather than assigning them to the closest street name.
+
+The last three are measured requirements, not layout preferences: §8.1 has the numbers behind each.
 
 **AC 5.1.3, add one bullet** (the zero case is 0.5% of addresses and currently unstated):
 
@@ -247,9 +252,46 @@ The problem the ranking was meant to solve is real: *show all inlets within 200 
 3. **One action for all of them**, which is what the guidance actually supports: look from a safe place for a blocked or damaged grate before heavy rain, and report through the existing pathway.
 4. **Select a drain on the map** to carry it into US 6.3, exactly as AC 6.3.2 already requires.
 
+### 8.1 · What street grouping actually produces
+
+Measured 1 October over all 62,397 addresses, after the team proposed putting the reader's own street first.
+
+| Inlets on the address's own street, within 200 m | |
+|---|---|
+| median | **4** |
+| p75 / p90 | 7 / 11 |
+| max | 27 |
+| addresses with **none** on their own street | **9,605 (15.4%)** |
+| addresses with 1–3 | 27.2% |
+
+**A median of four is the set the ranking was trying to find, arrived at without a hydrological claim.** The reader's own street is a fact about the address, not a judgement about the drains.
+
+Three things the measurement forces into the criteria:
+
+| Finding | Consequence |
+|---|---|
+| **15.4% of addresses have no inlet labelled with their own street** — laneways, apartment addresses, and labels further than 30 m away | The first group cannot be assumed to exist. Expand the largest street instead, and say the reader's own street carries none |
+| **Grouping still leaves a median of 11 streets**, 23 at the 90th percentile and 37 at the worst address | Only the first group opens; the rest collapse, ordered by size. One card per street would be worse than the 50 markers it replaces |
+| **Only 6,634 of 9,239 inlets (72%) have a street label within 30 m** — 85% within 50 m, and the median label is 15 m away | Widening the rule misfiles a drain onto the next street, which is worse than saying nothing. The 28% belong under *Other drains near you* |
+
+| Address | Labelled inlets within 200 m | Street groups | On the reader's own street |
+|---|---|---|---|
+| 46 Gatehouse Drive, Kensington | 107 | 25 | 8 |
+| 89 Market Street, Kensington | 29 | 13 | 3 |
+| 35 Poplar Road, Parkville | 7 | 3 | 2 |
+| 93 Dudley Street, West Melbourne | 50 | 9 | 6 |
+
 This keeps every promise made to the mentors, needs no score, and can be built from data already published. The one honest hydrological statement available per inlet — its modelled drainage area — can still be shown **on a drain the reader selected**, where it is a fact about that drain rather than a reason to choose it over its neighbours.
 
 ---
+
+## 8.2 · The coverage gate, as a defect
+
+Worth raising separately from this note, because it is about Iteration 2's AC 3.1.4 rather than Epic 5:
+
+> **The data-sufficiency check has never been able to fail.** `stitchWindow` (`sceneTiles.ts:306`) passes a per-cell coverage mask of all ones, meaning "the archive has this tile"; the engine's `coveredFraction` compares it against `minimumCoveredFraction: 1`, so `terrain_unavailable` cannot be reached for any scene-tile window. The real measured share is 31–86% per window (median 61%) and is carried separately as `measuredShare`, which the result screen shows correctly.
+>
+> **The fix is not simply to pass the true mask.** At `minimumCoveredFraction: 1` that would refuse every comparison in the council and switch the feature off. The team has to decide the lowest measured share a comparison may run on, and the mask and the threshold have to change together.
 
 ## 9 · What would change the answer
 
