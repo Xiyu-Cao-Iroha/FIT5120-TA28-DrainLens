@@ -81,9 +81,10 @@ export async function mapArtefact(
     dnstr_pit: string | null;
     diameter_mm: number | null;
     material: string | null;
+    operator: string | null;
     path: [number, number][];
   }>(
-    `SELECT ref, upstr_pit, dnstr_pit, diameter_mm, material, path
+    `SELECT ref, upstr_pit, dnstr_pit, diameter_mm, material, operator, path
      FROM pipe WHERE extent_id = $1 ORDER BY id`,
     [extent],
   );
@@ -133,6 +134,7 @@ export async function mapArtefact(
         ...(r.dnstr_pit === null ? {} : { dnstr_pit: Number(r.dnstr_pit) }),
         ...(r.diameter_mm === null ? {} : { diameter: r.diameter_mm }),
         ...(r.material === null ? {} : { material: r.material }),
+        ...(r.operator === null ? {} : { operator: r.operator }),
       })),
       pit: pits.rows.map(pitFeature),
       'street-name': labels.rows.map((r) => ({

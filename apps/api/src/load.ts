@@ -410,8 +410,8 @@ export async function load(
   const pipes = layers.pipe ?? [];
   for (const pipe of pipes) {
     await client.query(
-      `INSERT INTO pipe (ref, extent_id, upstr_pit, dnstr_pit, diameter_mm, material, path, dataset_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO pipe (ref, extent_id, upstr_pit, dnstr_pit, diameter_mm, material, operator, path, dataset_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         /*
           Nullable since migration 003, and not because the guard was
@@ -427,6 +427,9 @@ export async function load(
         pipe.dnstr_pit ?? null,
         pipe.diameter ?? null,
         pipe.material ?? null,
+        // Absent on 87 of the council's pipes, which is a state AC 6.2.2 has
+        // its own sentence for. Stored as NULL and read back as an absent key.
+        pipe.operator ?? null,
         JSON.stringify(pipe.c),
         datasetFor('pipe'),
       ],
