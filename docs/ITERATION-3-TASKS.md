@@ -91,7 +91,8 @@ The measurements behind the first three are in the acceptance file.
 | W4.2 | The guidance content register: every official channel, phone number and quotation, with the source and the date checked | 5.3.2, 6.2.1, 6.3.2 |
 | W4.3 | Three to four general preparation actions, each one short sentence, each traceable to official guidance | 5.2.3 |
 | W4.4 | The subcatchment classification register, signed off name by name | 6.1.2 |
-| W4.5 | Checking the four flood events still waiting from Iteration 2, so the flood pages stop saying *No checked flood events yet* | carried over |
+| W4.5 | ~~Checking the four flood events still waiting from Iteration 2~~ — done 29 September; all four are checked and shown | carried over |
+| W4.6 | Deciding the *Check the street drains near you* branch: the measured design note is [BEFORE-RAIN-INLET-CHECK.md](./BEFORE-RAIN-INLET-CHECK.md), which recommends keeping the approved no-ranking behaviour and changing AC 5.2.3 for volume rather than for a score | 5.2.3, DoD |
 
 ---
 
