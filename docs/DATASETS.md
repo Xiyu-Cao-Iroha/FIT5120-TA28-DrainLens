@@ -22,6 +22,7 @@ Detailed verification of three of them is in their own files: [FLOOD-HISTORY-DAT
 | 8 | VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015 | Victoria State Emergency Service (via data.vic) | CC BY 4.0 | `victoria-ses-incidents-per-sa1-abs-census-areas-2009-2015` | Flood history board, flood map counts |
 | 9 | ASGS 2011, Volume 1 — SA1 and SA2 | Australian Bureau of Statistics | CC BY 2.5 AU | 1270.0.55.001 | Area names, SA2 boundaries on the flood map, suburb-name positions on the Full map |
 | 10 | Population Estimates by SA2, 2005 to 2015 | Australian Bureau of Statistics | CC BY 2.5 AU | 3218.0 | Denominator of *Emergency responses per 1,000 people* |
+| 11 | Catchments — Waterways and Drains Subcatchments | Melbourne Water Corporation (via data.vic) | CC BY 4.0 | `catchments-waterways-and-drains-subcatchments` | The drainage area an address is in, and what receives its water |
 
 Licence deeds: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [CC BY 2.5 AU](https://creativecommons.org/licenses/by/2.5/au/). The footer links each credit to its own licence (`apps/web/src/ui/attribution.ts`); the ABS is **not** CC BY 4.0.
 
@@ -144,3 +145,17 @@ Everything below is described as estimated by DrainLens on the site, and is not 
 - the blockage comparison (*No clear difference* / *More water than with a clear drain*);
 - *Emergency responses per 1,000 people* (the Severity Score, in the model's own documents);
 - where each statistical area is drawn, its simplified boundary, and where the suburb names sit.
+
+---
+
+## Melbourne Water Corporation
+
+### 11 · Catchments — Waterways and Drains Subcatchments
+
+The drainage areas Epic 6 is built on: 3,409 subcatchments over Melbourne Water's operating region, of which **35 reach the City of Melbourne extent** and addresses fall inside **20** of them.
+
+- **Portal:** [data.vic](https://discover.data.vic.gov.au/dataset/catchments-waterways-and-drains-subcatchments), which lists the layer's own ArcGIS feature service beside the file downloads. Portal metadata last modified 2025-02-10.
+- **Fetched from the feature service, by bounding box**, in EPSG:28355 both ways: 35 features and 292 KB for the council, against 23 MB for the published GeoJSON of the whole region. **This is the only layer that needs no projection** — the service speaks the frame the pipeline already works in.
+- **Fields kept:** the subcatchment number and name, the major, primary and river-basin names, the recorded area in km², and both dates — `DATE_CAPTURED` and `DATE_LAST_UPDATED`. The record's own date is what AC 6.1.4 shows; the portal's metadata date is a different thing and the criterion forbids presenting one as the other. Every one of the 35 carries a last-updated date, and all of them read 2013-11-20.
+- **Pipeline:** `subcatchments.py`. **Artefact:** `subcatchments.json` (57 KB), published in the council extent's frame and shifted into whichever map the browser has, as the address index is.
+- **Boundaries are published whole** — never clipped to the extent — because AC 6.1.1 asks for the complete boundary, and simplified to **5 m** for drawing. The simplification is a drawing tolerance and not a record: tested over all 62,397 addresses, deciding membership from the published rings instead of the service's geometry would put **287 addresses (0.46%)** in a different area, leave 8 in none and 43 in two. Which area an address is in is therefore decided in the pipeline, against the geometry as fetched.
