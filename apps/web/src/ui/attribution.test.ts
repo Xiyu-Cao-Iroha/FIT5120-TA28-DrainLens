@@ -16,6 +16,8 @@ import {
   LICENCE_URL,
   creditLine,
   creditsFor,
+  creditsForSources,
+  licenceUrl,
   describeDatasets,
 } from './attribution.js';
 
@@ -70,6 +72,28 @@ describe('creditsFor', () => {
       ]),
     );
     expect(credits).toHaveLength(3);
+  });
+
+  it('does not merge two different publishers whose names run into their licences', () => {
+    // The separator, finally tested. `keeps a publisher whose name contains
+    // spaces intact` reads like it covers this and does not: the credit holds
+    // the publisher and the licence as their own fields, so the name survives
+    // whatever the grouping key is made of. What the key can still do is
+    // *collide* — "Water Corp" + "CC BY 4.0" and "Water" + "Corp CC BY 4.0"
+    // join on a space to the same string, and one of these two credits would
+    // disappear.
+    //
+    // It failed for thirty seconds on 5 September, when a quality pass rewrote
+    // the line and put the space back. Nothing went red, which is why this is
+    // here.
+    const credits = creditsFor(
+      artefactWith([
+        source({ publisher: 'Water Corp', licence: 'CC BY 4.0' }),
+        source({ publisher: 'Water', licence: 'Corp CC BY 4.0' }),
+      ]),
+    );
+    expect(credits).toHaveLength(2);
+    expect(credits.map((c) => c.publisher)).toEqual(['Water Corp', 'Water']);
   });
 
   it('reports the most recent update across the group', () => {
@@ -145,5 +169,27 @@ describe('what the licence requires', () => {
 
   it('does not claim the derived layers are the council own work', () => {
     expect(CHANGES_NOTICE.toLowerCase()).not.toMatch(/published by the city|official/);
+  });
+});
+
+describe('the flood map credits its own sources', () => {
+  it('names the SES and the ABS, one line per publisher and licence', () => {
+    const credits = creditsForSources([
+      { publisher: 'Victoria State Emergency Service', licence: 'CC BY 4.0', dataset_id: 'vicses' },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', dataset_id: '1270.0.55.001' },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', dataset_id: '3218.0' },
+      undefined,
+    ]);
+    expect(credits).toEqual([
+      { publisher: 'Victoria State Emergency Service', licence: 'CC BY 4.0', datasets: ['vicses'], lastModified: null },
+      { publisher: 'Australian Bureau of Statistics', licence: 'CC BY 2.5 AU', datasets: ['1270.0.55.001', '3218.0'], lastModified: null },
+    ]);
+  });
+
+  it('links each licence to its own deed', () => {
+    // Every credit linked CC BY 4.0 while every source was the council's; the
+    // ABS publishes under CC BY 2.5 Australia.
+    expect(licenceUrl('CC BY 2.5 AU')).toBe('https://creativecommons.org/licenses/by/2.5/au/');
+    expect(licenceUrl('CC BY 4.0')).toBe(LICENCE_URL);
   });
 });

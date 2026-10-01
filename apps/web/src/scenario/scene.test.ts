@@ -202,7 +202,7 @@ describe('the worker turns outcomes into replies', () => {
   it('returns every position it solved, not only the last', async () => {
     // The engine solves them all in one pass whether or not anybody asks, so
     // returning one threw away the answer to the next question the person
-    // asks. AC 2.2.2 is a lookup because of this, which is what stops the
+    // asks. AC 2.2.2 (Aug-27 set) is a lookup because of this, which is what stops the
     // rainfall control re-solving and possibly disagreeing with itself.
     const scene = await runnableScene();
 
@@ -264,5 +264,41 @@ describe('the worker turns outcomes into replies', () => {
       status: 'insufficient-information',
       reason: 'scenario_calculation_failed',
     });
+  });
+});
+
+describe('rim depth', () => {
+  const cells = 16;
+  const withRim: SceneHeader = {
+    ...HEADER,
+    arrays: { ...HEADER.arrays, 'rim-depth': { file: 'rim-depth.bin', scale: 100 } },
+  };
+
+  const load = (header: SceneHeader, rim: ArrayBuffer | undefined) =>
+    loadScene('/scene', {
+      fetchJson: async () => header,
+      fetchBinary: async (url) => {
+        if (url.endsWith('elevation.bin')) return Int16Array.from({ length: cells }, () => 1000).buffer;
+        if (url.endsWith('flow.bin')) return new Int8Array(cells).buffer;
+        if (url.endsWith('depressions.bin')) return new Int16Array(cells).fill(-1).buffer;
+        if (url.endsWith('rim-depth.bin') && rim) return rim;
+        if (url.endsWith('coverage.bin')) return new Uint8Array([0xff, 0xff]).buffer;
+        throw new Error(`no fixture for ${url}`);
+      },
+    });
+
+  it('reads it as metres below the rim when the header lists it', async () => {
+    const scene = await load(withRim, Int16Array.from({ length: cells }, (_, i) => (i === 5 ? 60 : 0)).buffer);
+    expect(scene.rimDepthM?.[5]).toBeCloseTo(0.6);
+    expect(scene.rimDepthM?.[0]).toBe(0);
+  });
+
+  it('leaves it absent when the header does not list it, rather than inventing zeros', async () => {
+    const scene = await load(HEADER, undefined);
+    expect(scene.rimDepthM).toBeUndefined();
+  });
+
+  it('refuses a rim-depth array of the wrong length', async () => {
+    await expect(load(withRim, Int16Array.from([1, 2, 3]).buffer)).rejects.toThrow(/rim-depth array/);
   });
 });

@@ -2,6 +2,8 @@
 
 DrainLens · TA28 · **before re-taken and after taken, 31 August 2026**
 
+> **A dated record, not a description of the current build.** Each block below was measured on the day it names and is left as it was taken. The most recent is **5 September**, at the foot of this file.
+
 **Deployed:** https://drainlens-205559161217.australia-southeast1.run.app
 
 | | before | after |
@@ -53,6 +55,8 @@ node tools/perf/measure.mjs https://the-deployed-url 100
 ```
 
 The resource list is **discovered, not hard-coded** — read from the served `index.html`, the bundle (for the worker's hashed name) and `scene.json`. A hand-written list stops matching the next build, and probing URLs that 404 looks fast.
+
+> **14 September 2026: the discovery no longer reads `scene.json`.** The map's ground is now pre-coloured tiles for the whole council, so `tools/perf/critical-path.mjs` reads `data/terrain-tiles/index.json` and counts it with the two overview images it names, and nothing under `data/scene/`. The tiles themselves follow the view and are not part of a fixed first visit, so they are not counted. **A run today is therefore a different critical path from every table below** — `elevation.bin`, 788 KB over the wire on 5 September, is replaced by two WebP images of 373 KB and 397 KB that nginx sends as they are — and it must be compared against a "before" taken with the same script, not against these.
 
 To reproduce the "before" exactly:
 
@@ -132,8 +136,34 @@ The local server in `tools/perf/serve.mjs` sets these, and the deployment must m
 | `/assets/*` | `max-age=31536000, immutable` — the names are content-hashed |
 | `/data/*` | short max-age. These are **not** hashed, and a rebuilt artefact behind a long cache is a map that silently disagrees with itself |
 
+> **The deployment has two types this table does not, and the local server does not match them** (14 September 2026). `deploy/nginx.conf` serves the scenario tiles' `.gz` as `application/gzip` and the terrain tiles as `image/webp`, and compresses neither, because both are compressed already. `serve.mjs` has no entry for either: it sends them as `application/octet-stream` and gzips them again. The transfer figure for those files would differ between the two servers for that reason alone, so a local "before" that includes them is not the same measurement as a deployed "after" until `serve.mjs` learns both types.
+
 ---
 
 ## Still to do, and not mine to take
 
 **The log exclusion filter must be configured before the first request, not after.** A filter added later cannot unwrite the lines already stored, and an IP in a log is exactly what AD1 says this product does not keep. This is the one deployment step that is a correctness requirement rather than an operational one.
+
+---
+
+## Re-measured 5 September, after the mentor review's changes
+
+Against the live site, from a laptop, with `DRAINLENS_BASIC_AUTH` set — the site has been behind a password gate since 3 September and an unauthenticated run would have measured 401s.
+
+| | 1 Sep | 5 Sep |
+|---|---:|---:|
+| First visit, p95 | 692.4 ms | **217.5 ms** |
+| First visit, p50 | — | **191.4 ms** |
+| Transfer | 1.36 MB (21%) | **1.03 MB (29%)** |
+| Decoded | 6.43 MB | **3.51 MB** |
+| Fetch failures | 0 of 60 | **0 of 1,000** |
+
+> **The transfer fell because five arrays stopped being fetched.** `flow`, `depressions`, `coverage`, `rim-depth` and `measured` — about 4.5 MB — are still published and are read by nothing on any reachable screen. `loadScene` runs in the scenario worker; `useScenario` is enabled only on the scenario and result screens, and the Iteration 1 interface routes to neither. `tools/perf/critical-path.mjs` was measuring all four of the arrays `loadScene` reads, which reported a first visit nobody makes; it now measures the one `terrain.ts` fetches.
+>
+> **The ratio moved from 21% to 29% and that is not a regression.** The arrays that left compressed better than what remains. `elevation.bin` is 788 KB of the 1.03 MB — 76% of the visit — and the slowest single resource, at a p95 of 126 ms.
+>
+> **Do not read the whole 475 ms of the p95 improvement as the payload.** Both figures are from a laptop over a home connection to Sydney, and that link moved 185 ms between 31 August and 1 September with the payload unchanged. Some of this is 4.5 MB that is no longer requested and some is the link; one pair of runs cannot separate them. The transfer figure is the one that is comparable, which is why it is the one quoted elsewhere.
+>
+> **0 of 1,000 requests failed**, so not one was answered 401 — the gate and the credentials held for the whole run.
+
+**AD1, verified again after real traffic:** five requests, then ninety seconds, then `httpRequest.remoteIp:*` returned nothing, while `system`, `system_event` and `stderr` entries were being written and no `requests` log existed. The second query is what makes the first mean anything: an empty log during a quiet hour proves nothing.

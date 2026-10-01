@@ -1,6 +1,6 @@
 # Interface contract — frontend and backend
 
-DrainLens · TA28 · **current as of 30 August 2026**
+DrainLens · TA28 · **current as of 30 August 2026**, with the artefact table and the notes dated 14 September re-checked against the code on **14 September 2026**
 
 What the browser sends, what the server answers, and what may never cross between them.
 
@@ -23,17 +23,36 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | Path | Size | Built by | Contents |
 |---|---:|---|---|
 | `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
-| `/data/derived.json` | 183 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
+| `/data/derived.json` | 175 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
-| `/data/addresses.json` | 678 KB | `drainlens_pipeline.addresses` | The address index **and the pilot boundary** |
-| `/data/scene/scene.json` | 92 KB | `drainlens_pipeline.scene` | Grid header, depression table, drains |
-| `/data/scene/*.bin` | 1.28 MB gzipped | `drainlens_pipeline.scene` | Elevation, flow, depressions, rim depth, coverage, measured |
+| `/data/addresses.json` | 1.33 MB, 490 KB gzipped | `drainlens_pipeline.addresses` | The address index for the City of Melbourne **and the coverage boundary**; clipped in the browser to the Kensington map when that is the map served |
+| `/data/flood-history.json` | 5 KB | `drainlens_pipeline.flood_history` | Recorded flood incidents by named area, and what a count is |
+| `/data/scene-tiles/index.json` | 176 KB | `drainlens_pipeline.scene_tiles` | Which 500 m tiles exist; for every inlet, the window it is calculated in |
+| `/data/scene-tiles/Tile_*/` | ~300 KB each, 64 MB in all | `drainlens_pipeline.scene_tiles` | Pre-gzipped elevation, flow, depressions, rim depth, measured; `tile.json` with the depressions and drains in it |
+| `/data/terrain-tiles/index.json` | 29 KB | `drainlens_pipeline.terrain_tiles` | The *Ground height* layer's tile grid, colour ramp and hillshade settings |
+| `/data/terrain-tiles/overview-colour.webp`, `overview-shade.webp` | 373 KB + 397 KB | `drainlens_pipeline.terrain_tiles` | The whole council at 4 m a pixel, drawn below 0.5 px/m and under any tile still loading |
+| `/data/terrain-tiles/Tile_*/` | ~78 KB each, 17.1 MB in all with the overview | `drainlens_pipeline.terrain_tiles` | `colour.webp`, `shade.webp` and `marks.json` (contours and spot heights), fetched as each 500 m square comes into view |
+| `/data/terrain/address-ground.json` | 558 KB, 137 KB gzipped | `drainlens_pipeline.address_ground` | Which way the ground falls around each address: version 2, the index's street list and one `number=code` per address |
+| `/data/sa2-areas.json` | 38 KB | `drainlens_pipeline.flood_history --areas` | All 281 Greater Melbourne areas with their recorded call-outs |
+| `/data/population.json` | 28 KB | `drainlens_pipeline.population` | Residents per area, and the minimum below which no rate is given |
+| `/data/sa2-points.json` | 181 KB | `drainlens_pipeline.area_points` | Each area's simplified boundary and name point |
+| `/data/flood-events.json` | 7 KB | written by the team | Verified flood events, shown only once checked |
+
+> **14 September 2026.** `/data/scene/` (`scene.json` and six `.bin` arrays, 7.3 MB) is still in the container and no longer fetched: the comparison reads `scene-tiles/` and the *Ground height* layer reads `terrain-tiles/`. The single-extent terrain files that briefly sat in `/data/terrain/` are gone; only `address-ground.json` remains there. The last four rows are loaded only when the flood map or the board's ranking per 1,000 residents is opened, and only from the container — the API has no route for them.
 
 **Coordinates in every artefact are metres east and north of the extent's south-west corner**, to a decimetre. Not latitude and longitude. The projection was done at build time, so no projection runs in the browser and there is no second place for the map and the model to disagree about where a pit is.
 
 ### What the backend must do about these
 
-Serve them, gzipped, with a cache policy that lets a version be replaced. Nothing else. There is no endpoint behind them and no request to authorise.
+Serve them, gzipped, with a cache policy that lets a version be replaced. The two exceptions are already compressed and go out as they are: the scenario tiles as `application/gzip`, the terrain tiles as `image/webp` (`deploy/nginx.conf`). There is still no endpoint that takes anything from a person and nothing to authorise.
+
+> **This changed on 5 September 2026, and the change is smaller than it sounds.** Four of the five JSON artefacts — `map`, `derived`, `trace` and `flood-history` — are now read from the API over the database, in the same shapes, checked by the same guards. What the browser asks for is an extent id and an area board; what it sends is nothing.
+>
+> **Each one falls back to the copy in the site's own container** if the API cannot answer, and the footer says which source answered. That is not defensiveness for its own sake: the Cloud SQL instance behind the API is expected to be *stopped between demonstrations to save money*, so "the API is unavailable" is a planned state rather than an incident, and a site that went blank in it would be a worse product than one that never used its database. `apps/web/src/data/source.ts` holds the rule and its tests.
+>
+> **The address index is the exception and stays bundled.** The landing page tells a resident the search runs in their browser and that nothing about the address is sent anywhere. It is fetched directly in `App.tsx` rather than through `fetchArtefact`, so no later edit to the fallback can route it through a server by accident.
+>
+> The derivation story is unchanged: the pipeline computes, the database stores, the API reassembles. See [DATABASE-DESIGN.md](./DATABASE-DESIGN.md).
 
 They are **versioned build products**, not a database. When the extent changes, the pipeline is re-run and the files are replaced wholesale. A backend that tried to assemble these per request would be rebuilding a pipeline that already exists and can be checked offline.
 
@@ -124,11 +143,17 @@ Listed because each looks like a natural thing to move, and each would break som
 
 **What crosses the worker boundary.** The engine produces a band for each of the 1,000,000 cells; the worker replies with a summary band, a count, and the **cells that differ** — 652 for the demonstration pit, so a few kilobytes rather than a few megabytes, capped at 60,000 so a future artefact whose hollows connect cannot post an unbounded message. They cross **already converted to local metres**, on the side the grid lives on. That is not a style preference: the one time this repository carried a cell index across a boundary and rebuilt the coordinate on the other side, all 895 drains disagreed with the scene and every comparison returned `invalid_inlet`. None of this is a network request — it is a `postMessage` inside the tab, so it carries no address, no identity and nothing that could reach a server.
 
-**The scenario engine.** `@drainlens/scenario` runs in a Web Worker over the shipped scene. Moving it server-side would mean sending the selected pit and rainfall — survivable — but the reason to keep it local is that the answer must be reproducible from artefacts anyone can check, and a service that could quietly change its assumptions between two runs breaks AC 2.2.
+**The scenario engine.** `@drainlens/scenario` runs in a Web Worker over the shipped scene — since 13 September, the four `scene-tiles/` squares around the chosen drain. Moving it server-side would mean sending the selected pit and rainfall — survivable — but the reason to keep it local is that the answer must be reproducible from artefacts anyone can check, and a service that could quietly change its assumptions between two runs breaks AC 2.2.
 
 **The photo classification.** AD10. The photograph never leaves the device.
 
 **All navigation state.** Address, chosen task and scenario inputs live in one object for the life of the tab: not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. Enforced by a test that stubs traps in place of both storages, `history` and `document.cookie` and plays a whole session.
+
+**One exception, and it is the only one: `drainlens.tour.seen`.** Since 5 September 2026 the map tour opens by itself for somebody who has not been shown it, which needs one `localStorage` key holding the string `"1"`. It records that a tour was shown once on this browser and nothing else — no address, no identifier, no timestamp, no count, no record of what was looked at. `apps/web/src/ui/tourGate.ts` is the only code that reads or writes it, and `tourGate.test.ts` asserts the value is exactly that one character, so a later addition of a step number or a date fails a test rather than passing review.
+
+> **This reverses a decision, deliberately.** The tour originally had no stored state at all, on the argument that a product whose position is that it holds nothing about you should not start by writing a fact about you in order to be helpful. What changed is the weighing: a first-time visitor should not have to find a button to be told what an unlabelled map is, and a tour that reopens on every visit is a larger imposition than one boolean. The principle is unchanged — the session reducer still writes to nothing, and the address rule above is untouched and still enforced by its own test.
+
+> **14 September 2026: there are now two keys, not one.** Since 11 September the guide remembers which of its four sections this browser has finished, in `drainlens.learned` — four characters, each `1` or `0`, and nothing else. It is the same shape of fact as the tour's: what the page has shown, not who was shown it. `apps/web/src/tutorial/progress.ts` is the only code that touches it, and `progress.test.ts` asserts it is one key holding four characters and carries no address, identifier, timestamp or count. The session in memory stays authoritative; the key is a mirror, and a browser that refuses storage still finishes the guide.
 
 ---
 
@@ -154,6 +179,8 @@ Three distinctions in that table are load-bearing:
 
 **A network limitation never becomes an insufficiency.** Where a pipe leads has no bearing on the surface calculation, so a missing downstream connection travels alongside a successful result rather than replacing it.
 
+> **The identifiers are not the words on screen.** Since 14 September `higher-than-baseline` reads *More water than with a clear drain* and `no-clear-change` reads *No clear difference*, and since 17 September its heading reads *No visible difference nearby* while the summary row keeps *No clear difference* (`apps/web/src/scenario/outcome.ts`); on-screen names in general come from `apps/web/src/ui/terms.ts`. The values above are the contract and did not change, so nothing on the wire or in a stored result moved with the copy.
+
 ---
 
 ## Provenance, and why the backend has to carry it
@@ -167,7 +194,7 @@ Every value the interface displays carries a **basis** — `packages/schema/src/
 | `assumed` | A model value where no record exists — the capture fraction, for one |
 | `inferred` | An indicative relationship read from available records |
 
-The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source.
+The basis is **not optional and not a label bolted on at render time**. It travels inside the record: `{ value, unit, label, basis }`. Anything the backend returns for display must carry one, because a value that cannot say where it came from cannot go on screen — `assertUsable` and `assertDerived` in the frontend already refuse artefacts that name no source, and `assertFloodHistory` goes further: it refuses one that names no reporting period, no geographic unit, or no sentence saying what a count is. A ranking of suburbs with nothing qualifying it is the one shape that page must never take, so a missing *sentence* fails the load exactly as a missing number does.
 
 For drain checks specifically: a stored check is `sourceProvided` when a resident confirmed it, and the `wasModelProposed` flag is what lets a later reader tell how much of the dataset began as a machine's suggestion.
 
@@ -183,6 +210,8 @@ Two things that might look like backend work and are not:
 - **The rainfall endpoint** is conditional on a permission that does not exist.
 
 If a backend is stood up for Iteration 1, its job is to serve files and to have a health check. Building endpoints against a contract nobody is calling yet is how a system acquires surface area it then has to defend.
+
+> **14 September 2026: `apps/api` exists, and still receives nothing.** It was started on 5 September to serve the drainage, derived, trace and flood-board artefacts from Postgres (see the note under *What the frontend loads today*). Its routes are `GET /health`, `GET /api/map/:extent`, `GET /api/derived/:extent`, `GET /api/trace/:extent` and `GET /api/flood-history` (`apps/api/src/server.ts`) — none takes a body, and `POST /api/drain-checks` and the rainfall endpoint above are still unbuilt. [DATABASE-DESIGN.md](./DATABASE-DESIGN.md) records why the database was added.
 
 ---
 

@@ -10,7 +10,18 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MapArtefact } from './artefact.js';
-import { DAY, LABEL_MIN_SCALE, PIT_MIN_SCALE, drawMap } from './draw.js';
+import {
+  COMPARISON_MARK_R,
+  DAY,
+  LABEL_MIN_SCALE,
+  OTHER_COMPARABLE_ALPHA,
+  PIN_DROP,
+  PIN_HEAD_R,
+  PIT_MIN_SCALE,
+  drawMap,
+} from './draw.js';
+import { ICON_MIN_SCALE } from './pitIcon.js';
+import { PLACE_FULL_SCALE, PLACE_HIDDEN_SCALE, tracked } from './places.js';
 import { type Bounds, fit, toScreen } from './viewport.js';
 
 const KENSINGTON: Bounds = { widthM: 1000, heightM: 1000 };
@@ -44,14 +55,21 @@ function recorder() {
     moveTo: note('moveTo'),
     lineTo: note('lineTo'),
     arc: note('arc'),
+    ellipse: note('ellipse'),
+    // The pit marker transforms the context to place the grate inside
+    // its ring. A double that does not answer for the whole surface a
+    // caller uses fails as a missing function rather than as a wrong
+    // drawing, which is a slower way to find out the same thing.
+    save: note('save'),
+    restore: note('restore'),
+    translate: note('translate'),
+    scale: note('scale'),
+    arcTo: note('arcTo'),
     fill: note('fill'),
     stroke: note('stroke'),
     fillRect: note('fillRect'),
     fillText: note('fillText'),
     strokeText: note('strokeText'),
-    save: note('save'),
-    restore: note('restore'),
-    translate: note('translate'),
     rotate: note('rotate'),
     measureText: (text: string) => ({ width: text.length * 6 }),
   };
@@ -125,7 +143,35 @@ describe('drawing the map', () => {
   it('draws nothing but the ground when the artefact has no layers', () => {
     const context = recorder();
     drawMap(context, artefact({}), view());
-    expect(context.calls.map((call) => call.op)).toEqual(['fillRect']);
+    // Two rectangles: what is beyond the extent, then the extent over it.
+    expect(context.calls.map((call) => call.op)).toEqual(['fillRect', 'fillRect']);
+  });
+
+  it('paints the ground over the extent and not over the canvas', () => {
+    /*
+      **This mattered the moment the map could be zoomed out past covering
+      its extent.** The ground used to be a fill over the whole canvas, which
+      was indistinguishable while no margin could exist. With one, the ground
+      colour outside the extent says *land the council recorded nothing on*,
+      when the truth is that the city continues and the map stops.
+    */
+    const context = recorder();
+    // Half the scale that covers, so the extent is a rectangle inside the
+    // canvas with margin on every side.
+    const zoomedOut = { ...view(), scale: view().scale / 2 };
+    drawMap(context, artefact({}), zoomedOut);
+
+    const [beyond, ground] = context.calls;
+    expect(beyond!.args).toEqual([0, 0, zoomedOut.widthPx, zoomedOut.heightPx]);
+
+    const [x, y, width, height] = ground!.args as number[];
+    expect(width).toBeLessThan(zoomedOut.widthPx);
+    expect(height).toBeLessThan(zoomedOut.heightPx);
+    expect(x).toBeGreaterThan(0);
+    expect(y).toBeGreaterThan(0);
+    // And it is the extent, not an arbitrary inset.
+    expect(width).toBeCloseTo(1000 * zoomedOut.scale, 6);
+    expect(height).toBeCloseTo(1000 * zoomedOut.scale, 6);
   });
 });
 
@@ -161,14 +207,37 @@ describe('what is left out', () => {
   it('hides street names before they become noise', () => {
     const context = recorder();
     drawMap(context, FULL, view(LABEL_MIN_SCALE - 0.01));
-    expect(context.calls.some((call) => call.op === 'fillText')).toBe(false);
+    // By text, not by any `fillText`: at this scale the suburb name is still
+    // fading out over the same extent, and that is not a street name.
+    expect(context.calls.some((call) => call.op === 'fillText' && call.args[0] === 'Neale Street')).toBe(false);
   });
 
   it('shows both again once there is room', () => {
     const context = recorder();
-    drawMap(context, FULL, view(2));
+    // Above the label floor and below the grate threshold, so pits are still
+    // the circle this asserts on. The two appearances are covered separately
+    // below -- the point here is that neither is culled at this scale.
+    drawMap(context, FULL, view(1));
     expect(context.calls.some((call) => call.op === 'arc')).toBe(true);
     expect(context.calls.some((call) => call.op === 'fillText')).toBe(true);
+  });
+
+  it('draws pits as a dot while they are too small to be a grate', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(ICON_MIN_SCALE - 0.01));
+    expect(context.calls.some((call) => call.op === 'arc')).toBe(true);
+  });
+
+  it('draws pits as a grate once one would be legible', () => {
+    // A grate at six pixels is a smudge that claims to show ten bars, so the
+    // icon only replaces the dot when there is room to count them.
+    const context = recorder();
+    drawMap(context, FULL, view(ICON_MIN_SCALE));
+    // The ring is an arc too, so `arc` no longer separates the two
+    // appearances. The grate does: a transform, then ten round-capped bars.
+    expect(context.calls.some((call) => call.op === 'scale')).toBe(true);
+    expect(context.calls.filter((call) => call.op === 'moveTo').length).toBeGreaterThanOrEqual(10);
+    expect(context.calls.some((call) => call.op === 'restore')).toBe(true);
   });
 
   it('draws a street name with a halo behind it, or it is unreadable over a road', () => {
@@ -178,6 +247,61 @@ describe('what is left out', () => {
     const fill = context.calls.findIndex((call) => call.op === 'fillText');
     expect(stroke).toBeGreaterThan(-1);
     expect(stroke).toBeLessThan(fill);
+  });
+});
+
+describe('suburb names', () => {
+  const KENSINGTON_NAME = tracked('Kensington');
+  const named = (context: ReturnType<typeof recorder>, op: 'fillText' | 'strokeText') =>
+    context.calls.findIndex((call) => call.op === op && call.args[0] === KENSINGTON_NAME);
+
+  it('names the suburb when the map is zoomed out', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(PLACE_FULL_SCALE));
+    expect(named(context, 'fillText')).toBeGreaterThan(-1);
+  });
+
+  it('writes it where Kensington is in this extent, not in the council frame', () => {
+    // The bundled artefact's corner is 316,500 / 5,814,500. The same anchor
+    // read as council-frame metres would land 1.5 km west and 6 km south.
+    const context = recorder();
+    const at = view(PLACE_FULL_SCALE);
+    drawMap(context, FULL, at);
+    const call = context.calls[named(context, 'fillText')]!;
+    const [x, y] = toScreen(at, [317280 - 316500, 5814994 - 5814500]);
+    expect(call.args[1]).toBeCloseTo(x);
+    expect(call.args[2]).toBeCloseTo(y);
+  });
+
+  it('draws no suburb name at street scale', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(PLACE_HIDDEN_SCALE));
+    expect(named(context, 'fillText')).toBe(-1);
+  });
+
+  it('draws them on top of the network, and under the street names', () => {
+    const context = recorder();
+    // Where both are on screen: the suburb name is fading, the streets are in.
+    drawMap(context, FULL, view(LABEL_MIN_SCALE));
+    const pit = context.calls.map((call) => call.op === 'arc').lastIndexOf(true);
+    const suburb = named(context, 'fillText');
+    const street = context.calls.findIndex((call) => call.op === 'fillText' && call.args[0] === 'Neale Street');
+    expect(suburb).toBeGreaterThan(pit);
+    expect(street).toBeGreaterThan(suburb);
+  });
+
+  it('puts a halo behind the name, and leaves no transparency behind it', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(LABEL_MIN_SCALE));
+    const stroke = named(context, 'strokeText');
+    expect(stroke).toBeGreaterThan(-1);
+    expect(stroke).toBeLessThan(named(context, 'fillText'));
+    // Faded with `globalAlpha` inside save/restore: a fade that leaked out
+    // would dim the street names and the address pin drawn after it.
+    const restore = context.calls.findIndex((call, index) => index > stroke && call.op === 'restore');
+    const street = context.calls.findIndex((call) => call.op === 'fillText' && call.args[0] === 'Neale Street');
+    expect(restore).toBeGreaterThan(stroke);
+    expect(restore).toBeLessThan(street);
   });
 });
 
@@ -202,6 +326,28 @@ describe('selection', () => {
     expect(Math.max(...radii(chosen))).toBeGreaterThan(Math.max(...radii(plain)));
   });
 
+  it('rings the drains a comparison can use, and only those', () => {
+    // AC 3.1.1.a: marked before anybody chooses. A ring, not a fill, so the
+    // recorded pit underneath still reads as the council's.
+    const two = artefact({
+      pit: [
+        { g: 'point', c: [450, 500], asset_number: 111 },
+        { g: 'point', c: [550, 500], asset_number: 222 },
+      ],
+    });
+    const context = recorder();
+    const at = view();
+    drawMap(context, two, at, { comparablePits: new Set(['222']) });
+    const arcsAt = (east: number) => {
+      const [x] = toScreen(at, [east, 500]);
+      return context.calls.filter((call) => call.op === 'arc' && Math.abs((call.args[0] as number) - x) < 0.01);
+    };
+    expect(arcsAt(450)).toHaveLength(1);
+    expect(arcsAt(550)).toHaveLength(2);
+    const [dot, ring] = arcsAt(550).map((call) => call.args[2] as number);
+    expect(ring).toBeGreaterThan(dot!);
+  });
+
   it('leaves the others alone', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { selectedPit: 999999 });
@@ -216,29 +362,60 @@ describe('selection', () => {
 });
 
 describe('the address marker', () => {
-  /** The ring is radius 8; no pit at these scales is drawn larger than 7. */
-  const ringCalls = (context: ReturnType<typeof recorder>) =>
-    context.calls.filter((call) => call.op === 'arc' && call.args[2] === 8);
+  /**
+   * The pin's head, found by its radius.
+   *
+   * `PIN_HEAD_R` is 7.5 and no pit at these scales is drawn at that radius,
+   * so the head is identifiable without the drawing code cooperating. The
+   * eye inside it is 2.8, which is why the radius is matched exactly rather
+   * than by "the largest arc".
+   */
+  const headCalls = (context: ReturnType<typeof recorder>) =>
+    context.calls.filter((call) => call.op === 'arc' && call.args[2] === PIN_HEAD_R);
 
   it('is drawn when an address is given', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
-    expect(ringCalls(context).length).toBeGreaterThan(0);
+    expect(headCalls(context).length).toBeGreaterThan(0);
   });
 
   it('is not drawn when there is no address', () => {
     const context = recorder();
     drawMap(context, FULL, view());
-    expect(ringCalls(context)).toHaveLength(0);
+    expect(headCalls(context)).toHaveLength(0);
   });
 
-  it('is drawn where the address is', () => {
+  it('puts its tip on the address and its head above', () => {
+    // The whole point of a pin over a ring: the mark is beside the place, and
+    // exactly one part of it claims a position. If the head were what landed
+    // on the address the marker would be off by its own height.
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
     const [x, y] = toScreen(view(), [400, 400]);
-    const ring = ringCalls(context)[0];
-    expect(ring?.args[0]).toBeCloseTo(x);
-    expect(ring?.args[1]).toBeCloseTo(y);
+
+    const head = headCalls(context)[0];
+    expect(head?.args[0]).toBeCloseTo(x);
+    expect(head?.args[1]).toBeCloseTo(y - PIN_DROP);
+
+    const tip = context.calls.filter(
+      (call) =>
+        call.op === 'lineTo' &&
+        Math.abs((call.args[0] as number) - x) < 0.001 &&
+        Math.abs((call.args[1] as number) - y) < 0.001,
+    );
+    expect(tip.length).toBeGreaterThan(0);
+  });
+
+  it('closes its outline on the tangents, so it is one shape and not a lollipop', () => {
+    // The tangent is the only thing that makes a circle and a point read as a
+    // teardrop, and it is arithmetic rather than taste: get it wrong and the
+    // sides either cross the head or leave a notch beside it.
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [400, 400] });
+    const head = headCalls(context)[0];
+    const spread = Math.acos(PIN_HEAD_R / PIN_DROP);
+    expect(head?.args[3]).toBeCloseTo(Math.PI / 2 + spread);
+    expect(head?.args[4]).toBeCloseTo(Math.PI / 2 - spread);
   });
 
   it('does not borrow the pit colour', () => {
@@ -251,9 +428,11 @@ describe('the address marker', () => {
   it('is drawn after every layer, so nothing paints over it', () => {
     const context = recorder();
     drawMap(context, FULL, view(), { address: [400, 400] });
-    const lastRing = context.calls.map((c) => c.op === 'arc' && c.args[2] === 8).lastIndexOf(true);
+    const lastHead = context.calls
+      .map((c) => c.op === 'arc' && c.args[2] === PIN_HEAD_R)
+      .lastIndexOf(true);
     const lastLabel = context.calls.map((c) => c.op === 'fillText').lastIndexOf(true);
-    expect(lastRing).toBeGreaterThan(lastLabel);
+    expect(lastHead).toBeGreaterThan(lastLabel);
   });
 
   it('is drawn even when it sits outside the visible window', () => {
@@ -261,6 +440,105 @@ describe('the address marker', () => {
     // know which way to pan back, so it is never culled.
     const context = recorder();
     drawMap(context, FULL, { ...view(4), centre: [100, 100] }, { address: [900, 900] });
-    expect(ringCalls(context).length).toBeGreaterThan(0);
+    expect(headCalls(context).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the pits while the comparison asks for a drain', () => {
+  /*
+    The Blockage Flow prototype's reading: teal for a drain that can be tested,
+    grey for one that cannot, and nothing hidden. Checked through the calls,
+    with the fill colour and opacity captured at the moment each is painted.
+  */
+  const THREE = artefact({
+    pit: [
+      { g: 'point', c: [400, 500], asset_number: 111 },
+      { g: 'point', c: [500, 500], asset_number: 222 },
+      { g: 'point', c: [600, 500], asset_number: 333 },
+    ],
+  });
+
+  function painted() {
+    const context = recorder();
+    const strokes: { alpha: number; style: string }[] = [];
+    const fills: { alpha: number; style: string }[] = [];
+    const withAlpha = context as typeof context & { globalAlpha: number };
+    withAlpha.globalAlpha = 1;
+    const alphas: number[] = [];
+    context.save = () => {
+      alphas.push(withAlpha.globalAlpha);
+    };
+    context.restore = () => {
+      withAlpha.globalAlpha = alphas.pop() ?? 1;
+    };
+    context.fill = () => {
+      fills.push({ alpha: withAlpha.globalAlpha, style: String(context.fillStyle) });
+    };
+    context.stroke = () => {
+      strokes.push({ alpha: withAlpha.globalAlpha, style: String(context.strokeStyle) });
+    };
+    return { context, strokes, fills };
+  }
+
+  const arcsAt = (context: ReturnType<typeof recorder>, east: number) => {
+    const [x] = toScreen(view(), [east, 500]);
+    return context.calls.filter((call) => call.op === 'arc' && Math.abs((call.args[0] as number) - x) < 0.01);
+  };
+
+  it('keeps a drain the comparison cannot use on the map, grey and smaller', () => {
+    const { context, fills } = painted();
+    drawMap(context, THREE, view(), { comparison: { comparable: new Set(['222']), suggested: null, selected: null } });
+    const grey = arcsAt(context, 400);
+    const teal = arcsAt(context, 500);
+    expect(grey).toHaveLength(1);
+    expect(grey[0]!.args[2] as number).toBeLessThan(teal[0]!.args[2] as number);
+    expect(fills.some((fill) => fill.style === DAY.unavailable)).toBe(true);
+  });
+
+  it('rings the other comparable drains in teal at 40%', () => {
+    const { context, strokes } = painted();
+    drawMap(context, THREE, view(), { comparison: { comparable: new Set(['222']), suggested: null, selected: null } });
+    expect(arcsAt(context, 500)).toHaveLength(2);
+    expect(strokes).toContainEqual({ alpha: OTHER_COMPARABLE_ALPHA, style: DAY.comparable });
+  });
+
+  it('draws the highlighted drain last, with a ripple, so no neighbour covers it', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), {
+      comparison: { comparable: new Set(['111', '222', '333']), suggested: 222, selected: null },
+    });
+    const arcs = context.calls.filter((call) => call.op === 'arc');
+    const [x] = toScreen(view(), [500, 500]);
+    const last = arcs.slice(-3);
+    expect(last.every((call) => Math.abs((call.args[0] as number) - x) < 0.01)).toBe(true);
+    expect(Math.max(...last.map((call) => call.args[2] as number))).toBeGreaterThan(COMPARISON_MARK_R * 2);
+    expect(arcsAt(context, 500)).toHaveLength(3);
+  });
+
+  it('gives the chosen drain a tick and no ripple', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), {
+      comparison: { comparable: new Set(['111', '222', '333']), suggested: 222, selected: 333 },
+    });
+    expect(arcsAt(context, 600)).toHaveLength(1);
+    expect(arcsAt(context, 600)[0]!.args[2]).toBe(COMPARISON_MARK_R);
+    const [x] = toScreen(view(), [600, 500]);
+    const tick = context.calls.filter((call) => call.op === 'lineTo' && Math.abs((call.args[0] as number) - x) < 7);
+    expect(tick.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('uses the council’s grate on a comparable drain when zoomed in', () => {
+    const { context } = painted();
+    drawMap(context, THREE, { ...view(3), centre: [500, 500] }, {
+      comparison: { comparable: new Set(['222']), suggested: null, selected: null },
+    });
+    expect(context.calls.some((call) => call.op === 'translate')).toBe(true);
+  });
+
+  it('leaves the ordinary pit drawing alone when not asked', () => {
+    const { context } = painted();
+    drawMap(context, THREE, view(), { comparablePits: new Set(['222']) });
+    expect(arcsAt(context, 400)).toHaveLength(1);
+    expect(arcsAt(context, 500)).toHaveLength(2);
   });
 });

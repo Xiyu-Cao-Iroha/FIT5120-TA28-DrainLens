@@ -6,6 +6,10 @@ What to do. Every task names the criterion it serves in [ITERATION-1-ACCEPTANCE.
 
 **Re-mapped 27 August** against the revised criteria document, which replaced six broad criteria with twenty and added navigation and state-retention requirements that had no tasks before.
 
+> **Every AC number in this file is the 27 August set.** *Epic 1-2 Revised*, received 3 September, renumbered the criteria and replaced Epic 2 entirely. This is a record of how Iteration 1 was planned and sequenced, kept as it was written; the mapping from these numbers to the current ones is at the top of [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md), which is the file to work from.
+
+> **14 September 2026: the words some ticked tasks quote are no longer the words on screen on `develop`.** The plain-English copy pass gave each thing one name, in `apps/web/src/ui/terms.ts`: *official recorded data* is now *Council record*, system-derived results are *Calculated by DrainLens*, and the result bands *No clear change* and *Higher than baseline* read *No clear difference* and *More water than with a clear drain*. The shared vocabulary's identifiers, `no-clear-change` and `higher-than-baseline`, did not change, so the tasks that name them are still accurate about the code. Two things were rebuilt rather than renamed: the **ground-surface layer** is pre-coloured 500 m tiles for the whole City of Melbourne rather than the Kensington elevation raster, so the tiling W4 dropped now exists after all, as static files rather than range requests, because the extent stopped being one square kilometre; and W4's *"no `apps/api` exists"* stopped being true on 5 September. The ticks stand — they record what Iteration 1 built, and `iteration-1-frozen` still serves it.
+
 **The critical path is W1.** Everything visually interesting in Epic 2 depends on a D8 flow-direction grid and depression tables that do not yet exist, and the offline pipeline is the only workstream with genuine uncertainty in it.
 
 ---
@@ -192,7 +196,7 @@ Take in order, and take early. Each is already permitted by the criteria.
 | Gate | When | Status |
 |---|---|---|
 | Tests written before or alongside every judgement-carrying component | Continuous | holding |
-| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 92.75% Node · 91.05% Python. **Node 5 s on the runner — at the limit · Python 51–67 s ✗**. Locally 3.6 s and 105 s |
+| ≥90% coverage on judgement-carrying modules, ≥88% overall, suite under 5 s | Every pull request | 93.76% Node · 91.79% Python. **Node 6 s on the runner ✗ · Python 68 s ✗** — both breached as of 5 September. Locally 3.2–3.5 s and 62 s |
 | `npm ci`, never `npm install`, before every push | CI | enforced |
 | 100% of merges via pull request with written technical feedback | Continuous | enforced by ruleset |
 | Zero direct pushes to `main` | Continuous | enforced and tested |

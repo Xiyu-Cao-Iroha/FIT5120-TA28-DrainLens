@@ -190,3 +190,23 @@ def test_main_accepts_an_explicit_extent(tmp_path, monkeypatch):
     argv = ["--out", str(tmp_path), "--extent", "316500", "5814500", "317000", "5815000"]
     assert main(argv) == 0
     assert [p.stem for p in tmp_path.iterdir()] == ["Tile_+007_+015"]
+
+
+def test_skips_tiles_the_archive_lacks_when_asked(tmp_path, capsys):
+    # The council extent: a rectangle round a municipality the archive covers.
+    blob = archive_of(DEMO_TILES[:3])
+    import sys
+
+    result = fetch_extent(
+        reader_of(blob), len(blob), DEMONSTRATION_EXTENT, tmp_path, allow_missing=True, log=sys.stderr
+    )
+    assert result["missing"] == [DEMO_TILES[3]]
+    assert sorted(result["written"]) == sorted(DEMO_TILES[:3])
+    assert sorted(p.stem for p in tmp_path.iterdir()) == sorted(DEMO_TILES[:3])
+    assert "1 of 4 tiles are not in the archive" in capsys.readouterr().err
+
+
+def test_a_complete_extent_reports_nothing_missing(tmp_path):
+    blob = archive_of(DEMO_TILES)
+    result = fetch_extent(reader_of(blob), len(blob), DEMONSTRATION_EXTENT, tmp_path, allow_missing=True)
+    assert result["missing"] == []

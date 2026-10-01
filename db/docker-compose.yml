@@ -1,0 +1,29 @@
+# Postgres for development and for the test suite.
+#
+# The deployed database is Cloud SQL; this is the same major version so that
+# a migration which applies here applies there. It is not a substitute for
+# checking against the real instance -- Cloud SQL differs in extensions,
+# flags and the connector -- but it means nobody has to be online, or
+# spending money, to run a test.
+#
+# The port is 5433, not 5432. A developer with their own Postgres already
+# running should not have this quietly bind over it, or worse, silently
+# connect to theirs and write rows into it.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: drainlens-db
+    environment:
+      POSTGRES_USER: drainlens
+      POSTGRES_PASSWORD: drainlens-local-only
+      POSTGRES_DB: drainlens
+    ports:
+      - '5433:5432'
+    # No volume. This database is disposable by design: it is rebuilt from
+    # migrations and reloaded from the artefacts, and anything that cannot
+    # survive `docker compose down` was not meant to live here.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U drainlens -d drainlens']
+      interval: 2s
+      timeout: 3s
+      retries: 20

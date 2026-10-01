@@ -7,7 +7,7 @@
  * self-audit then traced to the worker: the engine computes a band for every
  * cell, and only a count of them ever crossed back to the interface.
  *
- * **It is a difference, never a depth.** AD7 and AC 2.2.1.c allow one output
+ * **It is a difference, never a depth.** AD7 and AC 2.2.1.c (Aug-27 set) allow one output
  * and one only — where the two runs disagree. Nothing here encodes how much
  * water, and the fill is deliberately flat for that reason: a ramp would
  * invite reading a quantity off a legend this product does not publish.
@@ -32,12 +32,23 @@ import { type Local, type Viewport, toScreen } from './viewport.js';
 export const DIFFERENCE_FILL = 'rgba(124, 58, 237, 0.55)';
 
 /**
+ * The route the extra water takes, a darker violet than the patch it ends in,
+ * dashed so it reads as a direction rather than as more water.
+ */
+export const ROUTE_STROKE = '#5b21b6';
+
+/**
  * A cell is one square of the calculation grid, keyed by its south-west
  * corner in local metres.
  */
 export interface DifferenceArea {
   readonly cells: readonly Local[];
   readonly cellSizeM: number;
+  /**
+   * From the blocked drain to the first cell marked, as points in local
+   * metres (`extraWaterRoute` in the worker). Empty when there is none.
+   */
+  readonly route?: readonly Local[];
 }
 
 /**
@@ -52,6 +63,63 @@ export interface DifferenceArea {
  * indicative.
  */
 export const MIN_CELL_PX = 3;
+
+/**
+ * Cells from the scene's frame into the frame of the map they are drawn over.
+ *
+ * Every artefact's metres are measured from its own extent's south-west
+ * corner. The scene is Kensington's; the map is Kensington's when it comes
+ * from the bundled copy and the whole council's when the API answers, whose
+ * corner is 1.5 km west and 6 km south. Drawn unshifted, a difference lands
+ * that far from the drain it belongs to -- on a real street, looking like a
+ * result.
+ */
+export function intoMapFrame(
+  cells: readonly Local[],
+  sceneOrigin: { readonly minE: number; readonly minN: number },
+  mapExtent: { readonly min_e: number; readonly min_n: number },
+): Local[] {
+  const de = sceneOrigin.minE - mapExtent.min_e;
+  const dn = sceneOrigin.minN - mapExtent.min_n;
+  if (de === 0 && dn === 0) return [...cells];
+  return cells.map(([east, north]) => [east + de, north + dn] as const);
+}
+
+/**
+ * The two corners of the box around a difference, for fitting the view to it.
+ *
+ * The result refits to the address, the drain and **the whole footprint**, so
+ * the far corner of the last cell counts rather than its south-west key — a
+ * footprint that ends one cell past the edge of the view is a footprint the
+ * person reads as smaller than it is. Empty for no difference, which is the
+ * No clear difference result: nothing to fit, so the view holds the address
+ * and the drain.
+ */
+export function footprintCorners(area: DifferenceArea | null): Local[] {
+  if (area === null || area.cells.length === 0) return [];
+  let minE = Infinity;
+  let minN = Infinity;
+  let maxE = -Infinity;
+  let maxN = -Infinity;
+  for (const [east, north] of area.cells) {
+    minE = Math.min(minE, east);
+    minN = Math.min(minN, north);
+    maxE = Math.max(maxE, east + area.cellSizeM);
+    maxN = Math.max(maxN, north + area.cellSizeM);
+  }
+  // The route runs between the drain and the patch, so it is inside the box
+  // already unless it bends outside it on the way.
+  for (const [east, north] of area.route ?? []) {
+    minE = Math.min(minE, east);
+    minN = Math.min(minN, north);
+    maxE = Math.max(maxE, east);
+    maxN = Math.max(maxN, north);
+  }
+  return [
+    [minE, minN],
+    [maxE, maxN],
+  ];
+}
 
 export function drawDifference(
   context: CanvasRenderingContext2D,
@@ -77,5 +145,54 @@ export function drawDifference(
     }
     context.fillRect(x, y - lift, side, lift);
   }
+  context.restore();
+  drawRoute(context, area.route ?? [], viewport);
+}
+
+/** The arrowhead's length along the route, in pixels. */
+const ARROW_PX = 10;
+
+/**
+ * The extra water's route, over the patch: a white casing so it reads on any
+ * base, a dashed violet line, and an arrowhead where it reaches the purple.
+ */
+export function drawRoute(context: CanvasRenderingContext2D, route: readonly Local[], viewport: Viewport): void {
+  if (route.length < 2) return;
+  const points = route.map((point) => toScreen(viewport, point));
+  const trace = () => {
+    context.beginPath();
+    points.forEach(([x, y], index) => (index === 0 ? context.moveTo(x, y) : context.lineTo(x, y)));
+  };
+
+  context.save();
+  context.lineJoin = 'round';
+  context.lineCap = 'round';
+  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  context.lineWidth = 6;
+  trace();
+  context.stroke();
+  context.strokeStyle = ROUTE_STROKE;
+  context.lineWidth = 3;
+  context.setLineDash([8, 6]);
+  trace();
+  context.stroke();
+  context.setLineDash([]);
+
+  // The arrowhead points along the last segment long enough to have a heading.
+  const [tipX, tipY] = points[points.length - 1]!;
+  let from = points.length - 2;
+  while (from > 0 && Math.hypot(tipX - points[from]![0], tipY - points[from]![1]) < 1) from -= 1;
+  const [fromX, fromY] = points[from]!;
+  const angle = Math.atan2(tipY - fromY, tipX - fromX);
+  context.fillStyle = ROUTE_STROKE;
+  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(tipX, tipY);
+  context.lineTo(tipX - ARROW_PX * Math.cos(angle - 0.45), tipY - ARROW_PX * Math.sin(angle - 0.45));
+  context.lineTo(tipX - ARROW_PX * Math.cos(angle + 0.45), tipY - ARROW_PX * Math.sin(angle + 0.45));
+  context.closePath();
+  context.fill();
+  context.stroke();
   context.restore();
 }

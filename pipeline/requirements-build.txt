@@ -1,0 +1,4 @@
+# The build backend named in pyproject.toml, listed here only so that it is
+# locked and hashed along with everything else: CI installs the pipeline with
+# --no-build-isolation, so nothing is fetched unhashed (penetration test P07).
+setuptools>=68

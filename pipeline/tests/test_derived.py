@@ -81,6 +81,24 @@ class TestTraceChannels:
             columns = [c for _, c in path]
             assert columns == sorted(columns), "a channel on an eastward slope runs east"
 
+    def test_never_runs_uphill(self):
+        """Vertex order *is* flow direction, and the map now says so out loud.
+
+        The web map draws an arrowhead along each channel's vertex order. That
+        turns the ordering from an implementation detail into a claim a reader
+        can act on: reversed, the arrows would point confidently upstream. So
+        the invariant is asserted on the conditioned surface the tracing
+        actually walks, rather than left to `test_follows_the_slope`, which
+        only holds for a fixture that happens to fall eastward.
+        """
+        surface = condition(valley(30, 30))
+        direction = d8(surface)
+        paths = dv.trace_channels(direction, dv.flow_accumulation(direction, surface), percentile=TEST_PERCENTILE)
+        assert paths
+        for path in paths:
+            heights = [surface[r, c] for r, c in path]
+            assert heights == sorted(heights, reverse=True), "a channel runs downhill, in order"
+
     def test_draws_a_shared_trunk_once(self):
         # Without claiming, every headwater redraws the whole trunk below it
         # and the map goes solid where the most water is.
@@ -134,6 +152,18 @@ class TestSimplify:
             staircase.append((float(step), float(step)))
             staircase.append((float(step + 1), float(step)))
         assert len(dv.simplify(staircase, 0.1)) > len(dv.simplify(staircase, 2.0))
+
+    def test_keeps_the_order_it_was_given(self):
+        # Simplification runs after tracing and before the arrows are drawn.
+        # It may drop vertices; reversing or reordering them would flip an
+        # arrowhead without changing the shape of the line under it.
+        path = [(0.0, 0.0), (5.0, 0.0), (10.0, 5.0), (10.0, 10.0), (20.0, 30.0)]
+        simplified = dv.simplify(path, 0.5)
+        assert simplified[0] == path[0]
+        assert simplified[-1] == path[-1]
+        assert [path.index(point) for point in simplified] == sorted(
+            path.index(point) for point in simplified
+        )
 
     def test_a_short_path_is_returned_as_it_is(self):
         assert dv.simplify([(0.0, 0.0), (1.0, 1.0)], 0.5) == [(0.0, 0.0), (1.0, 1.0)]
@@ -231,6 +261,55 @@ class TestCoverageGaps:
     def test_finds_a_block_with_too_little_measured_ground(self):
         observed = np.ones((100, 100), dtype=bool)
         observed[0:25, 0:25] = False
+        gaps = dv.coverage_gaps(
+            observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0, min_blocks=1
+        )
+        assert len(gaps) == 1
+
+    def test_leaves_out_a_gap_the_size_of_one_building(self):
+        # One block with nothing measured under it is, almost always, a roof —
+        # and there is no ground under a roof for the map to be wrong about.
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:25, 0:25] = False
+        assert dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0) == []
+
+    def test_draws_a_gap_of_four_blocks(self):
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
+        assert len(gaps) == 1
+        assert dv.ring_area_m2(gaps[0]) == 2500.0
+
+    def test_counts_blocks_that_touch_only_at_a_corner_as_one_gap(self):
+        # Four blocks on a diagonal are one place to the eye, and the outline
+        # tracer already joins them the same way.
+        observed = np.ones((100, 100), dtype=bool)
+        for step in range(4):
+            observed[step * 25 : (step + 1) * 25, step * 25 : (step + 1) * 25] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
+        assert sum(dv.ring_area_m2(ring) for ring in gaps) == 4 * 625.0
+
+    def test_keeps_the_measured_hole_inside_a_large_gap(self):
+        # The reason small gaps are dropped by counting blocks rather than by
+        # ring area: an area filter drops the hole too, and the one measured
+        # block in the middle would be hatched as though it were not.
+        observed = np.zeros((75, 75), dtype=bool)
+        observed[25:50, 25:50] = True
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 75, 75), CELL, block_m=25.0)
+        assert sorted(dv.ring_area_m2(ring) for ring in gaps) == [625.0, 5625.0]
+
+    def test_does_not_flag_a_block_that_is_a_quarter_ground(self):
+        # Terraced housing: roofs, with the street through them measured. The
+        # threshold was 0.35 and flagged these, which hatched a third of the map.
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        observed[0:50:2, 0:50:2] = True  # a quarter of those cells measured
+        assert dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0) == []
+
+    def test_flags_a_block_that_is_a_tenth_ground(self):
+        observed = np.ones((100, 100), dtype=bool)
+        observed[0:50, 0:50] = False
+        observed[0:50:10, 0:50] = True  # a tenth of those cells measured
         gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0)
         assert len(gaps) == 1
 
@@ -292,7 +371,73 @@ class TestBuild:
         assert "display filter" in settings["display_only"]
         assert settings["min_drawn_depression_m2"] == dv.MIN_DRAWN_DEPRESSION_M2
 
+    def test_states_what_it_takes_to_be_drawn_as_unavailable(self):
+        settings = self.artefact()["settings"]
+        assert settings["coverage_min_measured"] == dv.COVERAGE_MIN_MEASURED
+        assert settings["coverage_min_blocks"] == dv.COVERAGE_MIN_BLOCKS
+
     def test_uses_the_same_frame_as_the_map_geometry(self):
         artefact = self.artefact()
         assert "south-west corner" in artefact["coordinates"]
         assert artefact["extent"]["width_m"] == 40.0
+
+
+class TestGroundOutsideTheArchive:
+    def test_a_block_in_a_missing_tile_is_not_a_gap(self):
+        # Nothing was measured there because there was nothing to measure
+        # from. Hatching it "not enough ground measured" would claim the
+        # opposite of what happened.
+        observed = np.zeros((100, 100), dtype=bool)
+        valid = np.ones((100, 100), dtype=bool)
+        valid[:, 50:] = False
+        gaps = dv.coverage_gaps(observed, Extent("t", 0, 0, 100, 100), CELL, block_m=25.0, valid=valid)
+        assert sum(dv.ring_area_m2(ring) for ring in gaps) == 5000.0
+
+    def test_the_channel_share_is_of_ground_that_exists(self):
+        # Half the grid missing, each missing cell accumulating 1, would halve
+        # the bar a channel has to clear.
+        surface = valley(20, 40)
+        valid = np.ones(surface.shape, dtype=bool)
+        valid[:, 20:] = False
+        direction = d8(condition(surface, valid=valid), valid=valid)
+        accumulated = dv.flow_accumulation(direction, surface)
+        bar = np.percentile(accumulated[valid], 90.0)
+        assert bar > np.percentile(accumulated, 90.0), "the missing half would lower the bar"
+
+        traced = dv.trace_channels(direction, accumulated, percentile=90.0, min_length=1, valid=valid)
+        cells = [(r, c) for path in traced for r, c in path]
+        assert cells, "something is still a channel"
+        assert all(c < 20 for _, c in cells), "none of it is off the measured ground"
+        # A path may end by stepping onto the trunk it meets; every cell before
+        # that has to clear the bar set by measured ground alone.
+        heads = [path[:-1] if len(path) > 1 else path for path in traced]
+        assert all(accumulated[r, c] >= bar for path in heads for r, c in path)
+
+    def test_no_bar_is_low_enough_to_draw_on_missing_ground(self):
+        # A missing cell accumulates exactly 1 -- itself -- so any bar at or
+        # below 1 would admit every one of them without the mask.
+        surface = valley(20, 40)
+        valid = np.ones(surface.shape, dtype=bool)
+        valid[:, 20:] = False
+        direction = d8(condition(surface, valid=valid), valid=valid)
+        accumulated = dv.flow_accumulation(direction, surface)
+        traced = dv.trace_channels(direction, accumulated, percentile=0.0, min_length=1, valid=valid)
+        assert traced
+        assert all(c < 20 for path in traced for _, c in path)
+
+
+class TestSayingWhatWasNotMeasured:
+    def test_it_lists_the_missing_tiles_and_says_nothing_is_claimed_there(self):
+        from drainlens_pipeline.geo import CITY_OF_MELBOURNE
+
+        said = dv.covering(CITY_OF_MELBOURNE, ["Tile_+004_+003", "Tile_+005_+003"])
+        assert said["missing_tiles"] == ["Tile_+004_+003", "Tile_+005_+003"]
+        assert "304 of the 306" in said["covers"]
+        assert "has not been measured" in said["covers"]
+        assert "nothing is claimed" in said["covers"]
+
+    def test_it_refuses_a_tile_that_is_not_part_of_the_extent(self):
+        from drainlens_pipeline.geo import DEMONSTRATION_EXTENT
+
+        with pytest.raises(dv.DerivedError, match=r"Tile_\+020_\+020"):
+            dv.covering(DEMONSTRATION_EXTENT, ["Tile_+020_+020"])

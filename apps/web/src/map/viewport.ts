@@ -75,6 +75,40 @@ export function scaleToCover(widthPx: number, heightPx: number, bounds: Bounds):
   return Math.max(widthPx / bounds.widthM, heightPx / bounds.heightM);
 }
 
+/**
+ * The largest scale at which the whole extent is on screen.
+ *
+ * **The opposite trade to `scaleToCover`, and which is right depends on
+ * whether anything outside the extent matters.** The drainage map covers: its
+ * extent is a rectangle of city with more city beyond it, so blank margin
+ * would be a border around an arbitrary crop. The flood map contains: its
+ * extent is exactly the 281 areas, there is nothing outside it, and an area
+ * off the edge of the opening view reads as an area with nothing in it — which
+ * is the one reading that map exists to prevent.
+ *
+ * Covering hid areas on the first render of the flood map, which is how this
+ * function came to exist.
+ */
+export function scaleToContain(widthPx: number, heightPx: number, bounds: Bounds): number {
+  if (widthPx <= 0 || heightPx <= 0) {
+    throw new ViewportError('a canvas with no area has no viewport');
+  }
+  if (bounds.widthM <= 0 || bounds.heightM <= 0) {
+    throw new ViewportError('an extent with no area has no viewport');
+  }
+  return Math.min(widthPx / bounds.widthM, heightPx / bounds.heightM);
+}
+
+/** The whole extent, centred, with every part of it on screen. */
+export function fitWithin(widthPx: number, heightPx: number, bounds: Bounds): Viewport {
+  return {
+    widthPx,
+    heightPx,
+    scale: scaleToContain(widthPx, heightPx, bounds),
+    centre: [bounds.widthM / 2, bounds.heightM / 2],
+  };
+}
+
 /** The whole extent, centred, filling the canvas. */
 export function fit(widthPx: number, heightPx: number, bounds: Bounds): Viewport {
   return {
@@ -95,6 +129,19 @@ export function fit(widthPx: number, heightPx: number, bounds: Bounds): Viewport
  * "where does water near me go" is actually about.
  */
 export const LOCAL_SCALE = 3;
+
+/**
+ * The scale to show a newly chosen address at: never further out than local.
+ *
+ * Moving to an address at the scale the view already had was right while the
+ * map was one square kilometre. Over the council the full map opens at the
+ * whole extent, about a tenth of a pixel per metre, and the user test of
+ * 15 September searched 10 Lygon Street from there: the map slid to Carlton
+ * and stayed so far out that the pin was a dot and no drain was visible. A view
+ * already closer than local is kept, so somebody zoomed in to one street is not
+ * pulled back out.
+ */
+export const scaleForAddress = (current: number): number => Math.max(current, LOCAL_SCALE);
 
 /**
  * The whole extent, centred on `at`, at `scale`.
@@ -145,12 +192,22 @@ export function zoomAt(
   factor: number,
   anchor: Screen,
   bounds: Bounds,
+  /**
+   * How far out is far enough, defaulting to the scale that fills the canvas.
+   *
+   * A map whose extent is exactly its subject wants `scaleToContain` here:
+   * with the default, zooming out stops while some of the extent is still off
+   * screen, and there is no gesture that brings it back.
+   */
+  minScale = scaleToCover(viewport.widthPx, viewport.heightPx, bounds),
+  /** How far in is far enough. The flood map's data stops being true long before the drainage map's does. */
+  maxScale = MAX_SCALE,
 ): Viewport {
   if (!(factor > 0)) throw new ViewportError('a zoom factor must be positive');
 
   const held = toLocal(viewport, anchor);
-  const floor = scaleToCover(viewport.widthPx, viewport.heightPx, bounds);
-  const scale = Math.min(Math.max(viewport.scale * factor, floor), MAX_SCALE);
+  const floor = minScale;
+  const scale = Math.min(Math.max(viewport.scale * factor, floor), maxScale);
 
   const zoomed: Viewport = { ...viewport, scale };
   const movedTo = toLocal(zoomed, anchor);

@@ -1,8 +1,12 @@
-# Paired walkthrough — 77 criteria, in the order you click them
+# Paired walkthrough — the 77 criteria of 27 August, in the order you click them
 
 DrainLens · TA28 · a working sheet for a paired session, **not a record of one**
 
 Fill it in while doing it. An entry written afterwards from memory is worth less than a blank one, and a blank one is honest.
+
+> **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
+>
+> **14 September: `develop` has moved well past those three places**, and `drainlens-dev` will show all of it once it is redeployed. The drain-blockage comparison is back, reached from a drain on the *Full map*; the ground height covers the council; the address panel shows which way the ground falls; and the site also stores `drainlens.learned` — guide progress, four `0`/`1` characters and nothing else — which row 1.1.1.e would otherwise mark as a defect. The words this sheet quotes have been brought to the names the copy review settled. **For the Iteration 2 criteria, work from [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md)**; there is no click-order sheet for them yet.
 
 ---
 
@@ -41,7 +45,7 @@ Do not spend the session rediscovering these.
 
 | | |
 |---|---|
-| **The ground surface was broken and is now fixed — confirm the fix** | It was drawn and then erased by the map's own opening fill, and the ramp was fitted to a surface whose buildings are raised 100 m for routing, so 26% of the extent sat at one end of it. Measured after the fix: 100 distinct colours became 210. **Toggling "Ground surface" must produce an obviously different map**, and the only large block of a single colour should be the buildings. |
+| **The ground surface was broken and is now fixed — confirm the fix** | It was drawn and then erased by the map's own opening fill, and the ramp was fitted to a surface whose buildings are raised 100 m for routing, so 26% of the extent sat at one end of it. Measured after the fix: 100 distinct colours became 210. **Toggling "Ground height" must produce an obviously different map**, and the only large block of a single colour should be the buildings. |
 | **The pit pin, click-to-select and the difference layer are all now seen working** | All three were clicked through on the deployed site and on the dev server on 1 September. A chosen pit shows a violet-labelled pin with its asset number, clicking another inlet selects it, and a result that finds a difference paints it on the map. Confirm them, but do not expect to be the first. |
 | **Three inlets, and only three, produce a visible difference** | An earlier sample of 40 found none and that was reported as "none exist" — 3 of 475 is 0.6%, which a sample of 40 misses about four times in five. **Use pit 1363621 to demonstrate the comparison working** (652 cells, 132 m³, and a violet patch about 35 m across immediately north of the pit); 1363588 and 1730246 also work. It sits about 490 m north-east of 46 Gatehouse Drive, so reaching it means panning — worth rehearsing rather than discovering on the day. Any other pit honestly returns *No clear difference*, and the screen should explain why rather than just say it. |
 | **Why those three** | All three have **no recorded downstream pipe** and a large catchment. Blocked, their water has no next inlet to reach; the other 472 sit in a redundant chain. Terminal inlets with small catchments release 0.00–0.04 m³ — three orders of magnitude less. |
@@ -59,7 +63,7 @@ Type `46 Gatehouse Drive` — do not paste, so you see the suggestions appear.
 | 1.1.1.a | The chosen address is shown on the next screen | | |
 | 1.1.1.b | The task page opens | | |
 | 1.1.1.c | All three tasks are offered, named as the criterion words them | | |
-| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too | | |
+| 1.1.1.e | Open DevTools → Application. **`localStorage`, `sessionStorage` and cookies hold no address.** Check the URL too. One key is expected and is not a failure: `drainlens.tour.seen`, holding `1` — it says the map tour has been shown once on this browser and nothing more. Anything else in there is a defect | | |
 
 Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 
@@ -94,11 +98,11 @@ Now try `10 Harper Street`, then `10 Nonexistent Boulevard`.
 | | What to look at | Result | Note |
 |---|---|---|---|
 | 1.1.3.a | Centred on and marking the address | | |
-| 1.1.3.b | Five controls: pits, pipes, ground surface, water paths, low points | | |
+| 1.1.3.b | Five controls: *Drain pits*, *Drain pipes*, *Ground height*, *Likely water paths*, *Low areas* | | |
 | 1.1.3.c | Each one turns its layer off and on **individually** | | |
-| | **Ground surface off → on is obviously different** (see above) | | |
-| 1.1.3.d | Every layer carries *Official recorded data* or *System-derived result* | | |
-| 1.1.3.e | The "not enough ground measured" layer is available and legible | | |
+| | **Ground height off → on is obviously different** (see above) | | |
+| 1.1.3.d | The legend groups its rows under *From council records ›* (pits, pipes) and *Estimated by DrainLens ›* (water paths, low areas, ground height, ground data gaps); each title opens About the data at its section | | |
+| 1.1.3.e | The *Ground data gaps* layer — not enough ground measured — is available and legible | | |
 
 ---
 
@@ -111,7 +115,7 @@ Select a pit near the address. **Pit 1145091 is a good one** — 33 pipes, 15 st
 | 1.2.1.a | The selected pit is visibly highlighted | | |
 | 1.2.1.b | Its recorded fields are shown | | |
 | | A field the record does not hold says **Not recorded**, not blank | | |
-| 1.2.1.c | Labelled *Official recorded data* | | |
+| 1.2.1.c | The pit popup ends with a grey *From council records ›* that opens About the data at *Drains and pipes*; its technical details still say the record is City of Melbourne's | | |
 | 1.2.1.d | A follow-downstream action is offered | | |
 | 1.2.2.a | The path highlights the pit and its pipes | | |
 | 1.2.2.b | Arrows show which way water runs — **check one against the map** | | |
@@ -173,10 +177,10 @@ Open it on the same pit, then on one the record connects nothing to.
 | | **On pit 1363621 a violet patch appears on the map, just north of the pin.** The panel promises highlighted areas; check they are there | | |
 | | On a pit that reports *No clear difference*, the panel says *"no difference is drawn on the map for this result"* and **nothing is painted**. Both directions matter | | |
 | 2.2.1.d | The selected pit **and its downstream path** stay visible on the map | | |
-| 2.2.1.e | The band is *No clear change* or *Higher than baseline* | | |
+| 2.2.1.e | The heading is *No visible difference nearby* or *More water than with a clear drain*; the summary row says *Comparison: No clear difference* for the first | | |
 | 2.2.1.f | Where the data cannot support a comparison, *Insufficient information* appears instead of a band — tested properly in section 8 | | |
 | 2.2.1.g | It is described as indicative, not a flood prediction | | |
-| | **Open "Why this is usually the answer here"** — does it explain, or excuse? | | |
+| | **Open "Why?"** — does it explain, or excuse? | | |
 | 2.2.2.a | Rainfall shown in millimetres | | |
 | 2.2.2.c | Change it: the pit and blockage do **not** change | | |
 | 2.2.2.b | Both conditions move to the same amount | | |
@@ -207,7 +211,7 @@ Reach an insufficient state — a pit the scene cannot place will do.
 | 2.3.2.c | No strong result category is assigned | | |
 | 2.3.2.d | It is not presented as evidence about real flood accuracy | | |
 
-> **The distinction to test out loud:** *No clear change* means the calculation ran and found nothing. *Insufficient information* means it could not be made. Ask the navigator to say which one they are looking at without being told.
+> **The distinction to test out loud:** *No clear difference* means the calculation ran and found nothing. *Insufficient information* means it could not be made. Ask the navigator to say which one they are looking at without being told.
 
 ---
 
@@ -215,9 +219,11 @@ Reach an insufficient state — a pit the scene cannot place will do.
 
 | | What to look at | Result | Note |
 |---|---|---|---|
-| — | The *Indicative local information* banner never scrolls away | | |
-| — | The data credit is in the footer, with a working licence link | | |
-| — | It says the derived layers are **calculated, not published by the council** | | |
+| — | The footer's *Not a flood warning · Data sources and limits ›* line is on every screen | | |
+| — | *Data sources and limits ›* opens the full-screen **About the data** page; its section menu jumps to each section, and *Back* returns to the same screen with nothing lost | | |
+| — | The data credits are on that page, under *Your privacy and data licences*, with a working licence link | | |
+| — | The page says the derived layers are **calculated, not published by the council** | | |
+| — | A grey link in context (for example *Past records ›* in a flood area panel) opens the page at its own section, not at the top | | |
 | 1.1.5.a | "Choose a task" returns to the task page | | |
 | 1.1.5.b | The address survives it | | |
 | — | Browser **back** never lands on a screen with lost state | | |

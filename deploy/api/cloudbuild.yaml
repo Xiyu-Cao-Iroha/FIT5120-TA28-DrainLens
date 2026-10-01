@@ -1,0 +1,36 @@
+# Build the API image from the repository root, naming its Dockerfile.
+#
+# `gcloud run deploy --source=.` and `gcloud builds submit --tag=...` both look
+# for `./Dockerfile`, which belongs to the site. Naming the file here is the
+# only way a second service can be built from this repository without moving
+# the API away from the artefacts it loads.
+#
+# It also removes the failure the site's deployment already shipped once: a
+# `--source=.` that found no Dockerfile fell back to Buildpacks and built
+# something else without erroring. There is nothing to fall back to here.
+#
+#   gcloud builds submit --config=deploy/api/cloudbuild.yaml \
+#     --substitutions=_TAG=$(git rev-parse --short HEAD) --project=fit5120-504507
+
+substitutions:
+  _REPO: australia-southeast1-docker.pkg.dev/fit5120-504507/drainlens
+  # Overridden with the commit it was built from. `latest` is a default, not a
+  # recommendation: two revisions both serving `:latest` cannot be told apart
+  # afterwards from anything but their digests.
+  _TAG: latest
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=deploy/api/Dockerfile
+      - --tag=${_REPO}/api:${_TAG}
+      - --tag=${_REPO}/api:latest
+      - .
+
+images:
+  - ${_REPO}/api:${_TAG}
+  - ${_REPO}/api:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

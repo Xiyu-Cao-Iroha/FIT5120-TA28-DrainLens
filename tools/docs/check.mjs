@@ -83,7 +83,10 @@ function brokenLinks(file, text) {
   return broken;
 }
 
-const files = execFileSync('git', ['ls-files', '*.md'], { encoding: 'utf8' }).split('\n').filter(Boolean);
+const tracked = (pattern) =>
+  execFileSync('git', ['ls-files', pattern], { encoding: 'utf8' }).split('\n').filter(Boolean);
+
+const files = tracked('*.md');
 
 let total = 0;
 for (const file of files) {
@@ -94,5 +97,35 @@ for (const file of files) {
   }
 }
 
-console.log(`checked ${String(files.length)} markdown files, ${String(total)} problem(s)`);
+/**
+ * No tracked text file may contain a raw NUL byte.
+ *
+ * `attribution.ts` carried one for a week as the separator in a grouping key.
+ * It was the right separator and the wrong way to write it: `file`, `git` and
+ * every `grep` classify a file containing NUL as binary, so that source file
+ * was skipped **silently** by every code search run against this repository —
+ * including the ones looking for the string it holds. Nothing failed. It was
+ * found by noticing that a search had answered "Binary file matches" where it
+ * should have answered with a line.
+ *
+ * Write the escape instead. It compiles to the same character and leaves the
+ * file readable by the tools everybody uses on it.
+ *
+ * This check is here rather than in its own script because this is the one
+ * that already runs over what is tracked, and a check nobody runs is what
+ * `docs/check.mjs` was written after in the first place.
+ */
+const TEXT = /\.(ts|tsx|js|mjs|cjs|jsx|md|json|yml|yaml|sql|py|sh|html|css|toml|txt)$/;
+const textFiles = tracked('*').filter((f) => TEXT.test(f));
+
+for (const file of textFiles) {
+  if (readFileSync(file).includes(0)) {
+    console.log(`${file}  contains a raw NUL byte, which makes it binary to git and grep`);
+    total += 1;
+  }
+}
+
+console.log(
+  `checked ${String(files.length)} markdown files and ${String(textFiles.length)} text files, ${String(total)} problem(s)`,
+);
 process.exit(total === 0 ? 0 : 1);

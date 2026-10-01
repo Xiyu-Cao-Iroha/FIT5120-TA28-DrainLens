@@ -79,7 +79,15 @@ PIPES = Dataset(
     id="drainpipes",
     kind="pipe",
     modified="2023-02-26",
-    keep=("ref", "upstr_pit", "dnstr_pit", "diameter", "material"),
+    #: `operator` was added on 30 September for Iteration 3's AC 6.2.2, which
+    #: asks a selected pipe who operates it and forbids guessing. The field was
+    #: in the export all along and this list did not keep it, so every pipe
+    #: reached the browser with the question unanswerable. It has three states
+    #: in the published data and the criterion has a sentence for each:
+    #: `City of Melbourne` on 16,302 pipes, empty on 87, and the string `4` on
+    #: 853 — a code the portal does not explain, which is displayed as a code
+    #: not yet identified rather than resolved to an organisation.
+    keep=("ref", "upstr_pit", "dnstr_pit", "diameter", "material", "operator"),
 )
 
 ROADS = Dataset(
@@ -283,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
     from pathlib import Path
 
-    from .geo import DEMONSTRATION_EXTENT
+    from .geo import EXTENTS, resolve_extent
 
     parser = argparse.ArgumentParser(
         prog="python -m drainlens_pipeline.network",
@@ -292,13 +300,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("../data/map/map.json"))
     parser.add_argument(
         "--extent",
+        choices=sorted(EXTENTS),
+        help="a published extent; defaults to the Iteration 1 demonstration extent",
+    )
+    parser.add_argument(
+        "--bounds",
         nargs=4,
         type=float,
         metavar=("MIN_E", "MIN_N", "MAX_E", "MAX_N"),
-        help="MGA55 bounds; defaults to the Iteration 1 demonstration extent",
+        help="raw MGA55 bounds, for a one-off that is not published under a name",
     )
     args = parser.parse_args(argv)
-    extent = Extent("custom", *args.extent) if args.extent else DEMONSTRATION_EXTENT
+    extent = resolve_extent(args.extent, args.bounds)
 
     def log(message: str) -> None:
         print(message, file=sys.stderr)

@@ -53,7 +53,7 @@ export type ResultStatus = (typeof RESULT_STATUSES)[number];
  * Why a comparison could not be made.
  *
  * Each reason is something the interface must explain in its own words
- * (AC 2.3.2.b), so the set is small and each member names a distinct cause
+ * (AC 2.3.2.b (Aug-27 set)), so the set is small and each member names a distinct cause
  * rather than a severity.
  */
 export const INSUFFICIENCY_REASONS = [

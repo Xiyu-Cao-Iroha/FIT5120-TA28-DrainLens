@@ -113,16 +113,20 @@ class Depression:
 
 
 def cell_labels(
-    depressions: Iterable[Depression], rows: int, cols: int
+    depressions: Iterable[Depression], rows: int, cols: int, dtype: type = np.int16
 ) -> np.ndarray:
     """Depression id per cell, `-1` where the cell is in none.
 
     The same shape as the engine's `cellDepression`, so the browser can use it
     as it arrives instead of rebuilding it from a list of cell indices.
+
+    `int16` by default because that is what the engine reads. An extent the
+    engine never loads -- the council, which only the map layers are built
+    from -- can ask for a wider type rather than being refused.
     """
-    labels = np.full(rows * cols, -1, dtype=np.int16)
+    labels = np.full(rows * cols, -1, dtype=dtype)
     for depression in depressions:
-        if depression.id > np.iinfo(np.int16).max:
+        if depression.id > np.iinfo(dtype).max:
             raise HydrologyError(
                 f"depression id {depression.id} does not fit the label raster's width"
             )
@@ -130,32 +134,67 @@ def cell_labels(
     return labels.reshape(rows, cols)
 
 
-def fill(elevation: np.ndarray, *, epsilon_m: float = 0.0) -> np.ndarray:
+def fill(
+    elevation: np.ndarray, *, epsilon_m: float = 0.0, valid: np.ndarray | None = None
+) -> np.ndarray:
     """Priority-flood fill (Barnes, Lehman and Mulla, 2014).
 
     Water is raised from the edges inward: every cell ends at the lowest level
     from which it can still reach the edge. With `epsilon_m` above zero each
     step inland is nudged fractionally higher, which leaves basins draining
     towards their outlet instead of dead flat.
+
+    `valid` marks the cells that hold ground at all. **Where no ground was
+    measured -- a point-cloud tile the archive does not have -- is an edge, not
+    a wall.** Water reaching it leaves the calculation, exactly as it does at
+    the boundary of the grid, so the flood is seeded from every valid cell that
+    touches an invalid one as well as from the border. Invalid cells are
+    returned unchanged and never raised.
     """
     if elevation.ndim != 2:
         raise HydrologyError("elevation must be a 2-D grid")
     rows, cols = elevation.shape
     if rows < 3 or cols < 3:
         raise HydrologyError("the grid is too small to have an interior")
+    if valid is not None and valid.shape != elevation.shape:
+        raise HydrologyError(
+            f"the validity mask is {valid.shape} but the surface is {elevation.shape}"
+        )
 
     filled = np.array(elevation, dtype=np.float64)
-    closed = np.zeros((rows, cols), dtype=bool)
 
+    if valid is None or valid.all():
+        closed = np.zeros((rows, cols), dtype=bool)
+        seeds = np.zeros((rows, cols), dtype=bool)
+        seeds[0, :] = seeds[-1, :] = seeds[:, 0] = seeds[:, -1] = True
+    else:
+        closed = ~valid
+        touching = ndimage.binary_dilation(closed, structure=np.ones((3, 3), dtype=bool))
+        seeds = valid & touching
+        seeds[0, :] |= valid[0, :]
+        seeds[-1, :] |= valid[-1, :]
+        seeds[:, 0] |= valid[:, 0]
+        seeds[:, -1] |= valid[:, -1]
+
+    # Seeded in the order the border loop always used, so a grid with no
+    # invalid cells floods in exactly the sequence it did before the mask
+    # existed and produces the same surface to the bit.
     queue: list[tuple[float, int, int]] = []
     for r in range(rows):
         for c in (0, cols - 1):
-            heapq.heappush(queue, (float(filled[r, c]), r, c))
-            closed[r, c] = True
+            if seeds[r, c] and not closed[r, c]:
+                heapq.heappush(queue, (float(filled[r, c]), r, c))
+                closed[r, c] = True
     for c in range(1, cols - 1):
         for r in (0, rows - 1):
-            heapq.heappush(queue, (float(filled[r, c]), r, c))
-            closed[r, c] = True
+            if seeds[r, c] and not closed[r, c]:
+                heapq.heappush(queue, (float(filled[r, c]), r, c))
+                closed[r, c] = True
+    inner = seeds.copy()
+    inner[0, :] = inner[-1, :] = inner[:, 0] = inner[:, -1] = False
+    for r, c in np.argwhere(inner & ~closed):
+        heapq.heappush(queue, (float(filled[r, c]), int(r), int(c)))
+        closed[r, c] = True
 
     push = heapq.heappush
     pop = heapq.heappop
@@ -177,17 +216,25 @@ def find_depressions(
     cell_size_m: float,
     *,
     min_depth_m: float = MIN_DEPRESSION_DEPTH_M,
+    valid: np.ndarray | None = None,
 ) -> list[Depression]:
     """Hollows in the **raw** surface, with what each one holds.
 
     Pass the ground surface, not a conditioned one. Filling is what this
     measures against; measuring a filled surface would find nothing.
+
+    Each hollow is measured inside its own bounding box. Comparing the whole
+    label raster against every id was fine at one square kilometre; the
+    central city's 3 x 2.5 km ran past ten minutes on it, and the City of
+    Melbourne is ten times that.
     """
     if cell_size_m <= 0:
         raise HydrologyError("cell size must be positive")
 
-    filled = fill(elevation)
+    filled = fill(elevation, valid=valid)
     depth = filled - elevation
+    # No mask needed here: `fill` never raises a cell outside `valid`, so its
+    # depth is zero and it cannot be a hollow.
     hollow = depth > 1e-9
 
     # Eight-connected, so a hollow is one hollow under the same neighbour rule
@@ -197,34 +244,47 @@ def find_depressions(
     if count == 0:
         return []
 
+    rows, cols = elevation.shape
     cell_area = cell_size_m * cell_size_m
     neighbourhood = np.ones((3, 3), dtype=bool)
 
     found: list[Depression] = []
-    for index in range(1, count + 1):
-        mask = labels == index
-        if depth[mask].max() < min_depth_m:
+    for index, box in enumerate(ndimage.find_objects(labels), start=1):
+        if box is None:
+            continue
+        # One cell of margin, so the rim is inside the window.
+        r0, r1 = max(box[0].start - 1, 0), min(box[0].stop + 1, rows)
+        c0, c1 = max(box[1].start - 1, 0), min(box[1].stop + 1, cols)
+        mask = labels[r0:r1, c0:c1] == index
+        local_depth = depth[r0:r1, c0:c1]
+        if local_depth[mask].max() < min_depth_m:
             continue
 
-        cells = np.flatnonzero(mask.ravel())
-        capacity = float(depth[mask].sum() * cell_area)
-        spill_elevation = float(filled[mask].max())
+        local_rows, local_cols = np.nonzero(mask)
+        cells = (local_rows + r0) * cols + (local_cols + c0)
+        capacity = float(local_depth[mask].sum() * cell_area)
+        local_filled = filled[r0:r1, c0:c1]
+        spill_elevation = float(local_filled[mask].max())
 
         # Always a real cell, never `LEAVES_WINDOW`. A hollow that touches the
         # grid boundary is seeded at its own elevation by the flood and so does
-        # not fill at all — it is a valley draining off the edge, not a basin —
+        # not fill at all -- it is a valley draining off the edge, not a basin --
         # which means no depression reaching the border is ever found here. The
         # engine still accepts `LEAVES_WINDOW` for a spill; this producer has
         # no way to emit one. Water that spills onto a boundary cell leaves
         # through that cell's own flow direction instead.
         rim = ndimage.binary_dilation(mask, structure=neighbourhood) & ~mask
-        rim_cells = np.flatnonzero(rim.ravel())
-        spill_cell = int(rim_cells[np.argmin(filled.ravel()[rim_cells])])
+        rim_rows, rim_cols = np.nonzero(rim)
+        rim_values = local_filled[rim_rows, rim_cols]
+        # First minimum in row-major order, which is what argmin over the
+        # flattened global grid chose before.
+        at = int(np.argmin(rim_values))
+        spill_cell = int((rim_rows[at] + r0) * cols + (rim_cols[at] + c0))
 
         found.append(
             Depression(
                 id=len(found),
-                cells=cells,
+                cells=cells.astype(np.intp),
                 capacity_m3=capacity,
                 spill_elevation_m=spill_elevation,
                 spill_cell=spill_cell,
@@ -233,7 +293,11 @@ def find_depressions(
     return found
 
 
-def condition(elevation: np.ndarray, barriers: np.ndarray | None = None) -> np.ndarray:
+def condition(
+    elevation: np.ndarray,
+    barriers: np.ndarray | None = None,
+    valid: np.ndarray | None = None,
+) -> np.ndarray:
     """A **separate** surface for routing: filled, with buildings as barriers.
 
     Barriers are raised rather than removed. Water then runs around a building
@@ -251,10 +315,10 @@ def condition(elevation: np.ndarray, barriers: np.ndarray | None = None) -> np.n
                 f"the barrier mask is {barriers.shape} but the surface is {elevation.shape}"
             )
         surface[barriers] += BARRIER_RAISE_M
-    return fill(surface, epsilon_m=CONDITIONING_EPSILON_M)
+    return fill(surface, epsilon_m=CONDITIONING_EPSILON_M, valid=valid)
 
 
-def d8(conditioned: np.ndarray) -> np.ndarray:
+def d8(conditioned: np.ndarray, valid: np.ndarray | None = None) -> np.ndarray:
     """Steepest-descent flow direction per cell, as D8 codes 0-7.
 
     `LEAVES_WINDOW` where no neighbour is lower, which on a conditioned surface
@@ -263,25 +327,38 @@ def d8(conditioned: np.ndarray) -> np.ndarray:
     Ties go to the lowest code, matching the engine, so the same surface always
     routes the same way. A run that routed differently each time would make
     every result built on it unreproducible.
+
+    Cells outside `valid` are treated like cells off the grid: nothing points
+    into them, and they point nowhere.
     """
     rows, cols = conditioned.shape
+    surface = conditioned
+    if valid is not None:
+        if valid.shape != conditioned.shape:
+            raise HydrologyError(
+                f"the validity mask is {valid.shape} but the surface is {conditioned.shape}"
+            )
+        surface = np.where(valid, conditioned, np.inf)
     best_slope = np.zeros((rows, cols), dtype=np.float64)
     direction = np.full((rows, cols), LEAVES_WINDOW, dtype=np.int8)
 
-    for code, (dc, dr) in enumerate(D8_OFFSETS):
-        # Out-of-bounds neighbours are padded high, so a cell never gains a
-        # downhill step by pointing off the grid.
-        neighbour = np.full((rows, cols), np.inf)
-        src_r = slice(max(dr, 0), rows + min(dr, 0))
-        src_c = slice(max(dc, 0), cols + min(dc, 0))
-        dst_r = slice(max(-dr, 0), rows + min(-dr, 0))
-        dst_c = slice(max(-dc, 0), cols + min(-dc, 0))
-        neighbour[dst_r, dst_c] = conditioned[src_r, src_c]
+    with np.errstate(invalid="ignore"):
+        for code, (dc, dr) in enumerate(D8_OFFSETS):
+            # Out-of-bounds neighbours are padded high, so a cell never gains a
+            # downhill step by pointing off the grid.
+            neighbour = np.full((rows, cols), np.inf)
+            src_r = slice(max(dr, 0), rows + min(dr, 0))
+            src_c = slice(max(dc, 0), cols + min(dc, 0))
+            dst_r = slice(max(-dr, 0), rows + min(-dr, 0))
+            dst_c = slice(max(-dc, 0), cols + min(-dc, 0))
+            neighbour[dst_r, dst_c] = surface[src_r, src_c]
 
-        distance = np.hypot(dc, dr)
-        slope = (conditioned - neighbour) / distance
-        better = slope > best_slope
-        best_slope[better] = slope[better]
-        direction[better] = code
+            distance = np.hypot(dc, dr)
+            slope = (surface - neighbour) / distance
+            better = slope > best_slope
+            best_slope[better] = slope[better]
+            direction[better] = code
 
+    if valid is not None:
+        direction[~valid] = LEAVES_WINDOW
     return direction
