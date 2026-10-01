@@ -134,6 +134,12 @@ jobs:
       - name: Check the verified flood events against the map's areas
         run: node tools/data/check-events.mjs
 
+      # A pipe operator the mapping cannot explain is a decision, not a
+      # default: AC 6.2.2 names an organisation or calls the value an
+      # unidentified code, and a resident reporting a blockage acts on which.
+      - name: Check the pipe operator values against the mapping
+        run: node tools/data/check-operators.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage
