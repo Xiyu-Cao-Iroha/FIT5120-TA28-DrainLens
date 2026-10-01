@@ -140,6 +140,12 @@ jobs:
       - name: Check the pipe operator values against the mapping
         run: node tools/data/check-operators.mjs
 
+      # The assignment is keyed to the address index and nothing in the file
+      # system says so: rebuilding one without the other leaves both valid and
+      # tells people about a drainage area belonging to another street.
+      - name: Check the drainage areas against the address index
+        run: node tools/data/check-subcatchments.mjs
+
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
       - name: Test with coverage
