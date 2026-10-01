@@ -17,4 +17,11 @@
 -- The stormwater pits dataset carries no operator field at all, which is why
 -- there is no matching column on `pit` and why AC 6.2.2 forbids inferring one
 -- from a connected pipe.
+BEGIN;
+
 ALTER TABLE pipe ADD COLUMN IF NOT EXISTS operator text;
+
+INSERT INTO schema_migration (version) VALUES (5)
+ON CONFLICT (version) DO NOTHING;
+
+COMMIT;
