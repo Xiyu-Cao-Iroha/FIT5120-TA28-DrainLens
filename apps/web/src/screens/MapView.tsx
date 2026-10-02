@@ -70,6 +70,8 @@ import {
   placesNear,
 } from '../prepare/places.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
+import { ReportProblem } from './ReportProblem.js';
+import { REPORT_HEADING } from '../report/problems.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
@@ -398,6 +400,19 @@ export function MapView({
   const [openPlace, setOpenPlace] = useState<number | null>(null);
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
+  /*
+    The reporting pathway, which is its own thing (AC 6.2.3).
+
+    It carries a drain only where the reader had one selected when they opened
+    it, which is the only way a drain can reach a report: nothing is attached
+    because it happens to be near, and `Remove` takes it off again.
+  */
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportDrain, setReportDrain] = useState<string | null>(null);
+  const openReport = (drain: string | null) => {
+    setReportDrain(drain);
+    setReportOpen(true);
+  };
   /*
     Whether the before-rain callout on the address is showing.
 
@@ -1018,9 +1033,48 @@ export function MapView({
         </MapNote>
       )}
 
-      {panel && viewport !== null && layers.help && (
+      {panel && viewport !== null && layers.help && !reportOpen && (
         <MapNote title={WHO_CAN_HELP}>
           <WhoCanHelpLevels />
+          {/*
+            Reporting is its own pathway, reached from the card about who
+            holds what rather than from the preparation plan (AC 6.2.3).
+          */}
+          <span style={{ display: 'block', marginTop: space(3) }}>
+            <button
+              type="button"
+              onClick={() => {
+                openReport(hit?.kind === 'pit' ? String(hit.feature.asset_number) : null);
+              }}
+              style={planLinkStyle}
+            >
+              {REPORT_HEADING}
+            </button>
+          </span>
+        </MapNote>
+      )}
+
+      {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
+      {panel && viewport !== null && reportOpen && (
+        <MapNote title={REPORT_HEADING}>
+          <ReportProblem
+            address={address?.label ?? null}
+            drain={reportDrain}
+            onForgetDrain={() => {
+              setReportDrain(null);
+            }}
+          />
+          <span style={{ display: 'block', marginTop: space(3) }}>
+            <button
+              type="button"
+              onClick={() => {
+                setReportOpen(false);
+              }}
+              style={planLinkStyle}
+            >
+              Close
+            </button>
+          </span>
         </MapNote>
       )}
 
@@ -1093,6 +1147,18 @@ export function MapView({
     </>
   );
 }
+
+/** The map's own underlined link, for the ways between its cards. */
+const planLinkStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: type(text.small),
+  color: brand.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+} as const;
 
 /**
  * Is the thing the card points at still on the map?
