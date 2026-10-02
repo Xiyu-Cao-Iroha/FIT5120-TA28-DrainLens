@@ -53,6 +53,7 @@ describe('which sections are on offer', () => {
       'low-areas',
       'terrain',
       'drainage-area',
+      'heavy-rain',
     ]);
     for (const id of GUIDED_SECTIONS) expect(lessonFor(id)).toBeDefined();
   });
@@ -195,6 +196,8 @@ describe.each(written)('%s', (id, lesson) => {
       unmeasured: true,
       catchment: true,
       help: true,
+      planOpen: true,
+      placesReviewed: 1,
     });
     const atStart = lesson.chips(0, everything);
     const atEnd = lesson.chips(lesson.steps.length, everything);
@@ -251,6 +254,10 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, layersOpen: true });
     case 'terrain-shown':
       return latch(state, { ...state, terrain: true });
+    case 'plan-opened':
+      return latch(state, { ...state, planOpen: true });
+    case 'place-reviewed':
+      return latch(state, { ...state, placesReviewed: state.placesReviewed + 1 });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'help-on':

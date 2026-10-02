@@ -59,6 +59,19 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { WHO_CAN_HELP } from '../catchment/help.js';
+import { PREPARE_HEADING } from '../prepare/actions.js';
+import {
+  BEFORE_RAIN_CHIP,
+  type Place,
+  type Relevance,
+  checkButton,
+  numberOf,
+  placeTitle,
+  placesNear,
+} from '../prepare/places.js';
+import { PlaceCard, PreparePlan } from './PrepareForRain.js';
+import { ReportProblem } from './ReportProblem.js';
+import { REPORT_HEADING } from '../report/problems.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
@@ -74,18 +87,7 @@ import {
 } from '../map/warnings.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
-import {
-  ink,
-  line,
-  radius,
-  shadow,
-  space,
-  surface,
-  text,
-  tracking,
-  type,
-  weight,
-} from '../ui/theme.js';
+import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 import { PitDetail } from './PitDetail.js';
 
 /**
@@ -124,6 +126,15 @@ export interface MapViewProps {
    * then offers no drainage area rather than an empty one.
    */
   readonly catchments?: { readonly areas: SubcatchmentsArtefact; readonly assignment: AddressCatchmentsArtefact } | null;
+  /**
+   * What the reader has said about each numbered place, and how to say more.
+   *
+   * Held in the session rather than here, because it survives a step back to
+   * the address screen and a return, and dies with the tab (AC 5.4.1).
+   */
+  readonly relevance?: Readonly<Record<number, Relevance>>;
+  readonly onReviewPlace?: ((place: number, relevance: Relevance) => void) | undefined;
+  readonly onResetPlaces?: (() => void) | undefined;
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
@@ -247,6 +258,9 @@ export function MapView({
   mode = null,
   panel = true,
   catchments = null,
+  relevance = {},
+  onReviewPlace,
+  onResetPlaces,
   index,
   onAddress,
   onClearAddress,
@@ -279,6 +293,7 @@ export function MapView({
     and published position, and the session carries a label and a coordinate.
     Matching on the label is matching on what the person searched for.
   */
+
   const indexed =
     address === null ? null : (index?.addresses.find((entry) => entry.label === address.label) ?? null);
   const area: Subcatchment | null = areaFor(catchments?.areas ?? null, catchments?.assignment ?? null, indexed);
@@ -352,6 +367,63 @@ export function MapView({
     the layer is.
   */
   const [warningPoints, setWarningPoints] = useState<readonly WarningPoint[] | null>(null);
+
+  /*
+    Epic 5's places: the published markers near the address, numbered.
+
+    Worked out here rather than in the session, because they are a fact about
+    the map and the address rather than a thing the reader chose — and because
+    the markers arrive asynchronously, so a session that held them would hold
+    them stale.
+  */
+  const addressEastingM = address?.eastingM ?? null;
+  const addressNorthingM = address?.northingM ?? null;
+  /*
+    Held across renders.
+
+    `placesNear` returns a new array every call, and this list is read by the
+    effect that reports the map to a guide. An unheld list made that effect
+    fire on every render, the guide set state, and the two rendered each other
+    until React gave up -- with the map half laid out, which is how it showed.
+  */
+  const places = useMemo(
+    () =>
+      placesNear(
+        addressEastingM === null || addressNorthingM === null
+          ? null
+          : [addressEastingM, addressNorthingM],
+        warningPoints ?? [],
+      ),
+    [addressEastingM, addressNorthingM, warningPoints],
+  );
+  /** The place whose card is open, or null. */
+  const [openPlace, setOpenPlace] = useState<number | null>(null);
+  /** Whether the plan is open. The guide's first step waits on it. */
+  const [planOpen, setPlanOpen] = useState(false);
+  /*
+    The reporting pathway, which is its own thing (AC 6.2.3).
+
+    It carries a drain only where the reader had one selected when they opened
+    it, which is the only way a drain can reach a report: nothing is attached
+    because it happens to be near, and `Remove` takes it off again.
+  */
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportDrain, setReportDrain] = useState<string | null>(null);
+  const openReport = (drain: string | null) => {
+    setReportDrain(drain);
+    setReportOpen(true);
+  };
+  /*
+    Whether the before-rain callout on the address is showing.
+
+    Its own state rather than the address card's: the full card is suppressed
+    in the guides, and this callout is the only place AC 5.1.1's button can be
+    where it is. Pressing the chip again brings it back.
+  */
+  const [beforeRainCallout, setBeforeRainCallout] = useState(true);
+  useEffect(() => {
+    setBeforeRainCallout(true);
+  }, [address, layers.beforeRain]);
   /** The sign whose card is open. One card on the map at a time, as ever. */
   const [warning, setWarning] = useState<WarningPoint | null>(null);
   const { name: extentName, width_m: extentWidth, height_m: extentHeight } = map.extent;
@@ -476,6 +548,11 @@ export function MapView({
   const unmeasuredOn = layers.unavailable;
   const terrainOn = layers.terrain;
   const selectedId = selected === null ? null : String(selected);
+  // A count rather than the answers themselves: the effect below reports it to
+  // a guide, and a number compares where an object would not.
+  const placesReviewed = places.filter(
+    (place) => (relevance[place.number] ?? null) !== null,
+  ).length;
   useEffect(() => {
     onMapNow?.({
       pits: pitsOn,
@@ -492,6 +569,8 @@ export function MapView({
       terrainShown: terrainOn,
       catchment: layers.catchment,
       help: layers.help,
+      planOpen,
+      placesReviewed,
     });
   }, [
     terrainOn,
@@ -507,6 +586,9 @@ export function MapView({
     // run when they change.
     layers.catchment,
     layers.help,
+    // Epic 5's two, for the same reason.
+    planOpen,
+    placesReviewed,
     onMapNow,
   ]);
 
@@ -529,7 +611,8 @@ export function MapView({
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
-        warnings={layers.lowPoint ? warningPoints : null}
+        warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
+        numberOfWarning={(point) => (layers.beforeRain ? numberOf(places, point) : null)}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
           // one map is one too many.
@@ -828,9 +911,170 @@ export function MapView({
         </MapNote>
       )}
 
-      {panel && viewport !== null && layers.help && (
+      {/*
+        The address's own card for this layer, where the map suppresses the
+        full one (Figma G1).
+
+        The guides hide the address card — they are teaching one thing at a
+        time — but AC 5.1.1 puts this button on the address, and the design
+        draws it there in the guide too. So it gets a card of its own: the
+        address, and the way into the plan.
+      */}
+      {panel &&
+        viewport !== null &&
+        address !== null &&
+        !addressCard &&
+        beforeRainCallout &&
+        layers.beforeRain &&
+        !planOpen &&
+        openPlace === null &&
+        onScreen([address.eastingM, address.northingM], viewport) && (
+          <MapCallout
+            at={toScreen(viewport, [address.eastingM, address.northingM])}
+            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            title={address.label}
+            onClose={() => {
+              // Closing it leaves the layer on: the markers are the point, and
+              // the chip is what takes them off.
+              setBeforeRainCallout(false);
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setPlanOpen(true);
+                setOpenPlace(places[0]?.number ?? null);
+              }}
+              style={{
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                borderRadius: radius.pill,
+                border: `1px solid ${brand.tint}`,
+                background: brand.wash,
+                color: brand.ink,
+                font: type(text.small, { weight: weight.semibold }),
+                cursor: 'pointer',
+              }}
+            >
+              {checkButton(places)}
+            </button>
+          </MapCallout>
+        )}
+
+      {/*
+        One place's card (Figma G2). Opened by the button above and by a press
+        on a numbered marker, and closed when its answer sends the reader on.
+      */}
+      {panel && viewport !== null && openPlace !== null && (() => {
+        const place = places.find((candidate) => candidate.number === openPlace);
+        if (place === undefined) return null;
+        const next = places.find((candidate) => candidate.number === place.number + 1);
+        return (
+          <MapNote title={placeTitle(place)}>
+            <PlaceCard
+              place={place}
+              relevance={relevance[place.number] ?? null}
+              onReview={(answer) => {
+                onReviewPlace?.(place.number, answer);
+                /*
+                  The answer sends the reader on, as the design draws it: to
+                  the next numbered place, or — on the last one — to the plan,
+                  which is where the answer has just changed something. Staying
+                  on a card whose question has been answered leaves the reader
+                  looking for what their press did.
+                */
+                setOpenPlace(next?.number ?? null);
+              }}
+              {...(next === undefined
+                ? {}
+                : {
+                    // Without answering: a reader may want to read all three
+                    // before deciding any of them.
+                    onNext: () => {
+                      setOpenPlace(next.number);
+                    },
+                  })}
+            />
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenPlace(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: type(text.small),
+                  color: ink.muted,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  cursor: 'pointer',
+                }}
+              >
+                Back to the plan
+              </button>
+            </span>
+          </MapNote>
+        );
+      })()}
+
+      {/* The plan itself (Figma G3), which the place card sits in front of. */}
+      {panel && viewport !== null && planOpen && openPlace === null && (
+        <MapNote title={PREPARE_HEADING}>
+          <PreparePlan
+            address={address?.label ?? ''}
+            places={places}
+            relevance={relevance}
+            onShowOnMap={(place) => {
+              setOpenPlace(place.number);
+            }}
+            {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
+          />
+        </MapNote>
+      )}
+
+      {panel && viewport !== null && layers.help && !reportOpen && (
         <MapNote title={WHO_CAN_HELP}>
           <WhoCanHelpLevels />
+          {/*
+            Reporting is its own pathway, reached from the card about who
+            holds what rather than from the preparation plan (AC 6.2.3).
+          */}
+          <span style={{ display: 'block', marginTop: space(3) }}>
+            <button
+              type="button"
+              onClick={() => {
+                openReport(hit?.kind === 'pit' ? String(hit.feature.asset_number) : null);
+              }}
+              style={planLinkStyle}
+            >
+              {REPORT_HEADING}
+            </button>
+          </span>
+        </MapNote>
+      )}
+
+      {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
+      {panel && viewport !== null && reportOpen && (
+        <MapNote title={REPORT_HEADING}>
+          <ReportProblem
+            address={address?.label ?? null}
+            drain={reportDrain}
+            onForgetDrain={() => {
+              setReportDrain(null);
+            }}
+          />
+          <span style={{ display: 'block', marginTop: space(3) }}>
+            <button
+              type="button"
+              onClick={() => {
+                setReportOpen(false);
+              }}
+              style={planLinkStyle}
+            >
+              Close
+            </button>
+          </span>
         </MapNote>
       )}
 
@@ -841,6 +1085,8 @@ export function MapView({
         warning === null &&
         !layers.catchment &&
         !layers.help &&
+        !planOpen &&
+        openPlace === null &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
@@ -867,11 +1113,52 @@ export function MapView({
               Select a drain pit or pipe to read what the council recorded about it.
             </span>
           )}
+          {/*
+            AC 5.1.1: the count where there are places, the same words without
+            it where there are none — and the plan is reachable either way,
+            because the general actions are for every home.
+          */}
+          {layers.beforeRain && (
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  setPlanOpen(true);
+                  setOpenPlace(places[0]?.number ?? null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: type(text.small, { weight: weight.semibold }),
+                  color: ink.base,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  cursor: 'pointer',
+                }}
+              >
+                {checkButton(places)}
+              </button>
+            </span>
+          )}
         </MapCallout>
       )}
     </>
   );
 }
+
+/** The map's own underlined link, for the ways between its cards. */
+const planLinkStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: type(text.small),
+  color: brand.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+} as const;
 
 /**
  * Is the thing the card points at still on the map?

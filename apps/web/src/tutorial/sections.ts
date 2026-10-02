@@ -30,6 +30,8 @@ export const SECTION_ORDER: readonly SectionId[] = [
   // about the map, and the four before it are what its wording assumes the
   // reader has seen.
   'drainage-area',
+  // Iteration 3, Epic 5.
+  'heavy-rain',
 ];
 
 export interface Section {
@@ -79,6 +81,11 @@ export const SECTIONS: Record<SectionId, Section> = {
     label: 'Your drainage area',
     locked: 'Start guide',
   },
+  'heavy-rain': {
+    id: 'heavy-rain',
+    label: 'Get ready for heavy rain',
+    locked: 'Start guide',
+  },
 };
 
 /** What has been finished. One boolean per section and nothing else. */
@@ -90,6 +97,7 @@ export const NOTHING_LEARNED: Learned = {
   'low-areas': false,
   terrain: false,
   'drainage-area': false,
+  'heavy-rain': false,
 };
 
 export const allLearned = (learned: Learned): boolean =>

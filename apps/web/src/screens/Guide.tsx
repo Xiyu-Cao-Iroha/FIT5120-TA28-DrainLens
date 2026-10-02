@@ -28,6 +28,7 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, us
 
 import type { AddressIndex } from '../address/search.js';
 import type { AddressCatchmentsArtefact, SubcatchmentsArtefact } from '../catchment/artefact.js';
+import type { Relevance } from '../prepare/places.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import { NOTHING_ON } from '../map/modes.js';
@@ -99,6 +100,10 @@ export interface GuideProps {
     readonly areas: SubcatchmentsArtefact;
     readonly assignment: AddressCatchmentsArtefact;
   } | null;
+  /** The reader's answers about the places near them, for Epic 5's guide. */
+  readonly relevance?: Readonly<Record<number, Relevance>>;
+  readonly onReviewPlace?: ((place: number, relevance: Relevance) => void) | undefined;
+  readonly onResetPlaces?: (() => void) | undefined;
   /** Chosen before the guide starts. The guide has nothing to point at without one. */
   readonly address: SupportedAddress;
   /** Which section is being taught. Its lesson decides everything below. */
@@ -125,6 +130,9 @@ export function Guide({
   address,
   section,
   catchments = null,
+  relevance = {},
+  onReviewPlace,
+  onResetPlaces,
   onFinish,
   onLeave,
   onBack,
@@ -364,11 +372,14 @@ export function Guide({
           index={index}
           address={address}
           catchments={catchments}
+          relevance={relevance}
+          onReviewPlace={onReviewPlace}
+          onResetPlaces={onResetPlaces}
           task="follow"
           // Nothing on. Every lesson opens with an empty map and the first
           // instruction turns something on -- and the guided preset had
           // already pressed it. See `openWith` in MapView.
-          openWith={NOTHING_ON}
+          openWith={lesson.opensWith ?? NOTHING_ON}
           chipKeys={lesson.chips(index0, now)}
           pulseChip={pulseChip}
           highlight={highlight}

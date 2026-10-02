@@ -629,6 +629,13 @@ export function App() {
               address={session.address}
               section={session.guideSection}
               catchments={catchments}
+              relevance={session.relevance}
+              onReviewPlace={(place, relevance) => {
+                dispatch({ type: 'place-reviewed', place, relevance });
+              }}
+              onResetPlaces={() => {
+                dispatch({ type: 'places-reset' });
+              }}
               onFinish={() => {
                 dispatch({ type: 'guide-finished' });
               }}
@@ -1092,6 +1099,13 @@ function MapScreen({
         mode={session.mapMode}
         index={loaded.index}
         catchments={catchments}
+        relevance={session.relevance}
+        onReviewPlace={(place, relevance) => {
+          dispatch({ type: 'place-reviewed', place, relevance });
+        }}
+        onResetPlaces={() => {
+          dispatch({ type: 'places-reset' });
+        }}
         onAddress={(picked) =>
           dispatch({
             type: 'address-moved',

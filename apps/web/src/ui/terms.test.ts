@@ -55,6 +55,7 @@ describe('the names the site uses', () => {
       // Epic 6's two, from Iteration 3's design.
       'My drainage area',
       'Who can help',
+      'Before-rain checks',
     ]);
     expect(FULL_MAP).toBe('Full map');
   });

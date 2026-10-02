@@ -28,6 +28,7 @@ const ALL_LAYERS: readonly LayerKey[] = [
   // the three levels of who looks after what.
   'catchment',
   'help',
+  'beforeRain',
   'channel',
   'lowPoint',
   'unavailable',
@@ -43,7 +44,15 @@ describe('where each control lives', () => {
     // The departure from AC 1.1.4 and 1.1.5, asserted rather than left to a
     // comment: pits and pipes are chips, terrain is not. See the note at the
     // top of `modes.ts` and the deviation recorded in the acceptance file.
-    expect(CHIP_KEYS).toEqual(['pit', 'pipe', 'channel', 'lowPoint', 'catchment', 'help']);
+    expect(CHIP_KEYS).toEqual([
+      'pit',
+      'pipe',
+      'channel',
+      'lowPoint',
+      'catchment',
+      'help',
+      'beforeRain',
+    ]);
     expect(PANEL_KEYS).toEqual(['terrain', 'unavailable']);
   });
 
@@ -110,6 +119,7 @@ describe('openingLayers', () => {
       // press the chip, and a boundary already drawn makes that a no-op.
       catchment: false,
       help: false,
+      beforeRain: false,
     });
     expect(openingLayers('water-flow').channel).toBe(true);
     expect(openingLayers('water-flow').pit).toBe(false);
@@ -139,6 +149,7 @@ describe('openingLayers', () => {
       unavailable: false,
       catchment: false,
       help: false,
+      beforeRain: false,
     });
   });
 
