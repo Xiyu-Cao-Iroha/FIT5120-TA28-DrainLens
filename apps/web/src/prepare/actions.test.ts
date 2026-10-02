@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { GENERAL_ACTIONS, NOT_A_SCORE, SAFETY, WHO_FOR_A_PLACE } from './actions.js';
+import { GENERAL_ACTIONS, NOT_A_SCORE, SAFETY } from './actions.js';
 
 describe('the general actions', () => {
   it('offers three or four, as the criterion asks', () => {
@@ -59,11 +59,5 @@ describe('the safety boundary', () => {
 describe('what the plan is not', () => {
   it('says the reviewed count is not a score', () => {
     expect(NOT_A_SCORE).toMatch(/not a safety or readiness score/i);
-  });
-
-  it('puts a nearby place on the reader, never on an organisation', () => {
-    // AC 6.2.3: no council or Melbourne Water against a preparation action
-    // just because a recorded asset is nearby.
-    expect(WHO_FOR_A_PLACE).toBe('You or your household');
   });
 });

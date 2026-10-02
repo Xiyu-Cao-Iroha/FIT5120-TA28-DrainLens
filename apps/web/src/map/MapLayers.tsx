@@ -586,9 +586,18 @@ export function MapLegend({
  * estimated (AC 1.1.4, 1.3.1). The order within a group is the audit's, not
  * the stacking order. A group with nothing switched on is not drawn.
  */
-const LEGEND_GROUPS: readonly { readonly link: 'recorded' | 'derived'; readonly keys: readonly LayerKey[] }[] = [
+export const LEGEND_GROUPS: readonly {
+  readonly link: 'recorded' | 'derived';
+  readonly keys: readonly LayerKey[];
+}[] = [
   { link: 'recorded', keys: ['pit', 'pipe'] },
-  { link: 'derived', keys: ['channel', 'lowPoint', 'terrain', 'unavailable'] },
+  /*
+    The before-rain markers are in here because they are estimated, and they
+    are in here at all because AC 5.1.1 asks the key to say what they are.
+    They were drawn on the map for a day with no line in the legend, which is
+    the state this module's own opening paragraph says not to be in.
+  */
+  { link: 'derived', keys: ['channel', 'lowPoint', 'terrain', 'unavailable', 'beforeRain'] },
 ];
 
 /**

@@ -82,9 +82,6 @@ export function numberOf(places: readonly Place[], marker: WarningPoint): number
 /** The chip that turns the layer on, as the design labels it. */
 export const BEFORE_RAIN_CHIP = 'Before-rain checks';
 
-/** The legend line beside the numbered markers (AC 5.1.1). */
-export const PLACES_LEGEND = 'Places to check before heavy rain · Estimated by DrainLens';
-
 /** The button on the address card, with the count where there is one. */
 export function checkButton(places: readonly Place[]): string {
   return places.length === 0

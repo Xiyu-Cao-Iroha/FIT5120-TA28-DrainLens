@@ -19,6 +19,7 @@ import {
   openingLayers,
   visibilityOf,
 } from './modes.js';
+import { LEGEND_GROUPS } from './MapLayers.js';
 
 const ALL_LAYERS: readonly LayerKey[] = [
   'pit',
@@ -161,5 +162,34 @@ describe('openingLayers', () => {
     for (const way of WAYS_IN) {
       expect(openingLayers(way).unavailable).toBe(false);
     }
+  });
+});
+
+describe('the legend against the marks on the map', () => {
+  // A layer that draws on the canvas and is missing from the legend is a map
+  // that disagrees with its own key, and nothing on screen says so: the marks
+  // simply appear unexplained. The before-rain markers shipped that way for a
+  // day, which is why this is a test and not a glance.
+  it('gives every layer that draws marks a line in the legend', () => {
+    const listed = new Set(LEGEND_GROUPS.flatMap((group) => group.keys));
+    for (const key of ['pit', 'pipe', 'channel', 'lowPoint', 'terrain', 'unavailable', 'beforeRain'] as const) {
+      expect(listed.has(key)).toBe(true);
+    }
+  });
+
+  it('leaves out the layers that draw no mark of their own', () => {
+    // `help` is a card about who to contact. `catchment` draws a boundary but
+    // is Melbourne Water's record rather than the council's, and neither of
+    // the legend's two groups says that; its own card carries the source.
+    const listed = new Set(LEGEND_GROUPS.flatMap((group) => group.keys));
+    expect(listed.has('help')).toBe(false);
+  });
+
+  it('calls the before-rain markers an estimate, never a record', () => {
+    // AC 5.1.1: they are the lowest street cell of a modelled hollow.
+    const derived = LEGEND_GROUPS.find((group) => group.link === 'derived');
+    expect(derived?.keys).toContain('beforeRain');
+    const recorded = LEGEND_GROUPS.find((group) => group.link === 'recorded');
+    expect(recorded?.keys).not.toContain('beforeRain');
   });
 });
