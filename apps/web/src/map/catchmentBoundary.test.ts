@@ -34,6 +34,7 @@ function recorder() {
     closePath: vi.fn(),
     fill: vi.fn((rule?: string) => calls.push(`fill:${rule ?? ''}`)),
     stroke: vi.fn(() => calls.push('stroke')),
+    setLineDash: vi.fn((dash) => calls.push(`dash:${(dash ?? []).join(",")}`)),
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 0,
@@ -89,7 +90,8 @@ describe('drawing it', () => {
     drawCatchmentBoundary(r.context, [[[0, 0], [100, 0], [100, 100], [0, 100]]], VIEW);
     expect(r.spy.fillStyle).toBe(BOUNDARY_FILL);
     expect(r.spy.strokeStyle).toBe(BOUNDARY_STROKE);
-    expect(r.calls).toEqual(['save', 'fill:evenodd', 'stroke', 'restore']);
+    // Dashed, as the design draws it, and the dash put back for the next layer.
+    expect(r.calls).toEqual(['save', 'fill:evenodd', 'dash:7,5', 'stroke', 'dash:', 'restore']);
   });
 
   it('fills even-odd, so a ring inside another is a hole', () => {

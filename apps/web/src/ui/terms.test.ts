@@ -52,6 +52,9 @@ describe('the names the site uses', () => {
       'Low areas',
       'Ground height',
       'Ground data gaps',
+      // Epic 6's two, from Iteration 3's design.
+      'My drainage area',
+      'Who can help',
     ]);
     expect(FULL_MAP).toBe('Full map');
   });

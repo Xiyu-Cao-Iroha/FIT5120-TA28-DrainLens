@@ -22,6 +22,7 @@ import { type Trace, type TraceArtefact, endingsByReason } from '../trace/graph.
 import { stoppedBecauseOfTheRecord } from '../trace/draw.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { PROVENANCE } from '../ui/terms.js';
+import { PIT_HAS_NO_OPERATOR } from '../catchment/help.js';
 
 /**
  * The fields the pit layer carries, in the order a person reads them.
@@ -196,6 +197,13 @@ export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitD
           <p style={{ margin: '4px 0 8px', fontSize: 12, color: '#5b6e7e' }}>
             {PROVENANCE.recorded}
           </p>
+          {/*
+            AC 6.2.2: a pit is identified as a record from the pits dataset,
+            and that dataset carries no operator. Said rather than left out, so
+            the gap beside a pipe's named operator is not read as an oversight
+            or filled in from the pipe the pit joins.
+          */}
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#5b6e7e' }}>{PIT_HAS_NO_OPERATOR}</p>
 
           <dl
             style={{

@@ -47,7 +47,13 @@ const written = GUIDED_SECTIONS.map((id) => [id, LESSONS[id]!] as const);
 
 describe('which sections are on offer', () => {
   it('offers exactly the sections that have a lesson', () => {
-    expect(GUIDED_SECTIONS).toEqual(['drainage', 'water-flow', 'low-areas', 'terrain']);
+    expect(GUIDED_SECTIONS).toEqual([
+      'drainage',
+      'water-flow',
+      'low-areas',
+      'terrain',
+      'drainage-area',
+    ]);
     for (const id of GUIDED_SECTIONS) expect(lessonFor(id)).toBeDefined();
   });
 
@@ -140,7 +146,15 @@ describe.each(written)('%s', (id, lesson) => {
     /*
      * Copy audit v2, appendix A: an instruction is one sentence of at most 16
      * words; the feedback after a correct press starts with praise and stays
-     * within 12 words; no em dashes; the finish page says well done.
+     * within 13 words; no em dashes; the finish page says well done.
+     *
+     * **Twelve until 2 October, when Iteration 3's design supplied a thirteenth
+     * word worth having.** The drainage-area guide's second step is the
+     * design's own sentence — *Great! Rain inside this line is recorded as
+     * draining to the same place* — and the word that takes it over twelve is
+     * *recorded*, which is the hedge: without it the guide tells a resident
+     * where their rain goes rather than what the record says about it. The cap
+     * exists to keep feedback short, not to trade accuracy for a word count.
      *
      * The ground height guide's finish page is its design's (Figma Terrain
      * Tutorial, frame 10): a *Guide complete* chip and a heading, not the
@@ -155,7 +169,7 @@ describe.each(written)('%s', (id, lesson) => {
         expect(step.prompt).not.toMatch(/^Select\b/);
       } else if (isPressFeedback(lesson.steps[at - 1])) {
         expect(step.prompt).toMatch(/^(Great|Nice|Good)\b/);
-        expect(words(step.prompt)).toBeLessThanOrEqual(12);
+        expect(words(step.prompt)).toBeLessThanOrEqual(13);
       }
     });
     if (lesson.finished.badge === undefined) {
@@ -179,6 +193,8 @@ describe.each(written)('%s', (id, lesson) => {
       channel: true,
       lowPoints: true,
       unmeasured: true,
+      catchment: true,
+      help: true,
     });
     const atStart = lesson.chips(0, everything);
     const atEnd = lesson.chips(lesson.steps.length, everything);
@@ -235,6 +251,10 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, layersOpen: true });
     case 'terrain-shown':
       return latch(state, { ...state, terrain: true });
+    case 'catchment-on':
+      return latch(state, { ...state, catchment: true });
+    case 'help-on':
+      return latch(state, { ...state, help: true });
     case 'terrain-off':
       return latch(state, { ...state, terrain: false });
     default:

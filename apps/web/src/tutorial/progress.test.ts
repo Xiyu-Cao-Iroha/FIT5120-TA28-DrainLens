@@ -48,22 +48,24 @@ const learned = (...ids: readonly string[]): Learned =>
   Object.fromEntries(SECTION_ORDER.map((id) => [id, ids.includes(id)])) as Learned;
 
 describe('what is written to the device', () => {
-  it('is one key holding four characters, and nothing else', () => {
+  it('is one key holding one character per section, and nothing else', () => {
     const store = workingStore();
     makeProgress(store).write(learned('drainage'));
 
     expect(store.length).toBe(1);
-    expect(store.getItem('drainlens.learned')).toBe('1000');
+    expect(store.getItem('drainlens.learned')).toBe('10000');
   });
 
   it('carries no address, identifier, timestamp or count', () => {
-    // The rule AD1 is about. A value of four characters cannot hold any of
-    // them, which is the reason for the shape rather than a happy accident.
+    // The rule AD1 is about. A value of one character per section cannot hold
+    // any of them, which is the reason for the shape rather than a happy
+    // accident. It grew from four to five with Iteration 3's drainage-area
+    // guide, and the shape is what keeps that growth harmless.
     const store = workingStore();
     makeProgress(store).write(learned('drainage', 'terrain'));
 
     const raw = store.getItem('drainlens.learned') ?? '';
-    expect(raw).toMatch(/^[01]{4}$/);
+    expect(raw).toMatch(/^[01]{5}$/);
     expect(raw.length).toBe(SECTION_ORDER.length);
   });
 
@@ -83,7 +85,7 @@ describe('what is written to the device', () => {
 describe('a stored value that is not what we wrote', () => {
   it.each([
     ['too short', '100'],
-    ['too long', '10000'],
+    ['too long', '100000'],
     ['not binary', '1x00'],
     ['a JSON blob somebody upgraded us to', '{"drainage":true}'],
     ['empty', ''],

@@ -24,6 +24,10 @@ const ALL_LAYERS: readonly LayerKey[] = [
   'pit',
   'pipe',
   'terrain',
+  // Epic 6's two, from Iteration 3's Figma: the drainage area's boundary and
+  // the three levels of who looks after what.
+  'catchment',
+  'help',
   'channel',
   'lowPoint',
   'unavailable',
@@ -39,7 +43,7 @@ describe('where each control lives', () => {
     // The departure from AC 1.1.4 and 1.1.5, asserted rather than left to a
     // comment: pits and pipes are chips, terrain is not. See the note at the
     // top of `modes.ts` and the deviation recorded in the acceptance file.
-    expect(CHIP_KEYS).toEqual(['pit', 'pipe', 'channel', 'lowPoint']);
+    expect(CHIP_KEYS).toEqual(['pit', 'pipe', 'channel', 'lowPoint', 'catchment', 'help']);
     expect(PANEL_KEYS).toEqual(['terrain', 'unavailable']);
   });
 
@@ -102,6 +106,10 @@ describe('openingLayers', () => {
       lowPoint: false,
       terrain: true,
       unavailable: false,
+      // Off even under the drainage-area card: its guide's first step is to
+      // press the chip, and a boundary already drawn makes that a no-op.
+      catchment: false,
+      help: false,
     });
     expect(openingLayers('water-flow').channel).toBe(true);
     expect(openingLayers('water-flow').pit).toBe(false);
@@ -129,6 +137,8 @@ describe('openingLayers', () => {
       lowPoint: false,
       terrain: true,
       unavailable: false,
+      catchment: false,
+      help: false,
     });
   });
 

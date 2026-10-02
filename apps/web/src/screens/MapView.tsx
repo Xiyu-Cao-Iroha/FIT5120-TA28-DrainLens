@@ -58,7 +58,9 @@ import { AddressInsight } from '../map/AddressInsight.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
-import { DrainageArea, OPEN_DRAINAGE_AREA, openLinkStyle } from './DrainageArea.js';
+import { WHO_CAN_HELP } from '../catchment/help.js';
+import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
+import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
@@ -270,15 +272,6 @@ export function MapView({
   const guided = task !== 'full-map';
   const [layers, setLayers] = useState<LayerState>(() => openWith ?? openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
-  /**
-   * Whether the drainage-area card is open.
-   *
-   * Not session state: it is a thing being read on this map, like a pit's
-   * card, and reopening the map should not reopen it. Closing it takes the
-   * boundary off the map with it — the drawing explains the card, not the
-   * other way round.
-   */
-  const [areaOpen, setAreaOpen] = useState(false);
   /*
     The address's own drainage area, read from the published answer.
 
@@ -497,6 +490,8 @@ export function MapView({
       // The map says what is true now; the guide latches these (`latch`).
       layersOpened: layersOpen,
       terrainShown: terrainOn,
+      catchment: layers.catchment,
+      help: layers.help,
     });
   }, [
     terrainOn,
@@ -508,6 +503,10 @@ export function MapView({
     unmeasuredOn,
     selectedId,
     following,
+    // Epic 6's two: the guide waits for these presses, so the report has to
+    // run when they change.
+    layers.catchment,
+    layers.help,
     onMapNow,
   ]);
 
@@ -529,7 +528,7 @@ export function MapView({
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
-        catchment={areaOpen && catchmentRings !== null ? catchmentRings : null}
+        catchment={layers.catchment ? catchmentRings : null}
         warnings={layers.lowPoint ? warningPoints : null}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
@@ -757,6 +756,15 @@ export function MapView({
               out for almost every asset here.
             </>
           )}
+          {/*
+            AC 6.2.2: who the record says operates this pipe, in its own three
+            states. 853 of the council's pipes carry a code the portal does not
+            explain, and this says so rather than naming an organisation for
+            them.
+          */}
+          <span style={{ display: 'block', marginTop: space(2), color: ink.muted }}>
+            {OPERATOR_LABEL}: {operatorLine(hit.feature.operator)}
+          </span>
         </MapCallout>
       )}
 
@@ -799,26 +807,31 @@ export function MapView({
         are reading.
       */}
       {/*
-        The drainage-area card. Anchored on the address, like the address's
-        own card, because the area it describes is the one the address is in
-        and the boundary is drawn around them both.
+        Epic 6's two cards, each drawn by its own chip, as the design has them
+        (Figma D2 and D4): a corner of the map rather than a popup anchored on
+        a feature, because neither is about a point — one is about the area the
+        boundary encloses, the other about the system as a whole.
       */}
-      {panel && viewport !== null && address !== null && areaOpen && (
-        <MapCallout
-          at={toScreen(viewport, [address.eastingM, address.northingM])}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
-          title={DRAINAGE_AREA}
-          onClose={() => {
-            setAreaOpen(false);
-          }}
-        >
+      {/*
+        One card at a time, as the design has it: step four shows Who can help
+        and not the area card behind it. Two stacked cards on a phone-width map
+        is the thing the map chrome was broken up to avoid.
+      */}
+      {panel && viewport !== null && layers.catchment && !layers.help && (
+        <MapNote title={DRAINAGE_AREA}>
           <DrainageArea area={area} />
           {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
             <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
               The boundary is outside this view. Zoom out to see it.
             </span>
           )}
-        </MapCallout>
+        </MapNote>
+      )}
+
+      {panel && viewport !== null && layers.help && (
+        <MapNote title={WHO_CAN_HELP}>
+          <WhoCanHelpLevels />
+        </MapNote>
       )}
 
       {panel &&
@@ -826,7 +839,8 @@ export function MapView({
         address !== null &&
         hit === null &&
         warning === null &&
-        !areaOpen &&
+        !layers.catchment &&
+        !layers.help &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
@@ -851,25 +865,6 @@ export function MapView({
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
               Select a drain pit or pipe to read what the council recorded about it.
-            </span>
-          )}
-          {/*
-            The way into Epic 6's first screen (AC 6.1.1), offered only where
-            there is an answer to open: no files, no link, rather than a link
-            to a card that says nothing.
-          */}
-          {catchments !== null && indexed !== null && (
-            <span style={{ display: 'block', marginTop: space(2) }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setAddressCardOpen(false);
-                  setAreaOpen(true);
-                }}
-                style={openLinkStyle}
-              >
-                {OPEN_DRAINAGE_AREA}
-              </button>
             </span>
           )}
         </MapCallout>

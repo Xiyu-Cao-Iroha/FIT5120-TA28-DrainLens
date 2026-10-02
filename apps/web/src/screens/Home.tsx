@@ -52,6 +52,7 @@ import { HATCH_ON_LIGHT, RAMPS } from '../history/drawAreas.js';
 import { ACTIVITY_BREAKS } from '../history/severity.js';
 import { BlockedDrainFigure } from './BlockedDrain.js';
 import { DAY } from '../map/draw.js';
+import { BOUNDARY_FILL, BOUNDARY_STROKE } from '../map/catchmentBoundary.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
@@ -138,6 +139,14 @@ export const PATHS: readonly {
     title: 'Low areas',
     body: 'Dips in the ground where rainwater may pool.',
     accent: DERIVED_DAY.lowPointEdge,
+  },
+  {
+    // Iteration 3, Epic 6 (Figma, *Your drainage area*). Last, because it is
+    // about where the street's water goes rather than about the street.
+    mode: 'drainage-area',
+    title: 'Your drainage area',
+    body: 'The area your street drains with, and who looks after each part.',
+    accent: BOUNDARY_STROKE,
   },
 ];
 
@@ -523,6 +532,25 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
 export function PathThumb({ mode }: { readonly mode: MapMode }) {
   const frame = { width: '100%', height: 104, display: 'block' } as const;
   const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
+
+  if (mode === 'drainage-area') {
+    // A dashed boundary around a street corner: the thing the guide's first
+    // press draws, in the colours it draws it in.
+    return (
+      <svg {...common}>
+        <rect width="200" height="104" fill={DAY.ground} />
+        <path d="M-8 70h216M70 -8v120" stroke={DAY.road} strokeWidth="13" fill="none" />
+        <path
+          d="M34 20h104l26 26v30l-30 26H52L26 70V38Z"
+          fill={BOUNDARY_FILL}
+          stroke={BOUNDARY_STROKE}
+          strokeWidth="2.5"
+          strokeDasharray="7 5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
 
   if (mode === 'drainage') {
     return (

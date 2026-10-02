@@ -23,14 +23,23 @@
 import type { Local, Viewport } from './viewport.js';
 import { toScreen } from './viewport.js';
 
-/** The outline: a recorded boundary, in the same family as the other records. */
-export const BOUNDARY_STROKE = '#5b21b6';
+/**
+ * The outline, dashed, in the teal the design draws it in (Figma D2).
+ *
+ * Dashed because the boundary continues past the map on all but six of the
+ * thirty-five areas, and a solid line would read as an edge where the area
+ * stops rather than as one the view cuts off.
+ */
+export const BOUNDARY_STROKE = '#2f6f68';
 
 /** The wash inside it, light enough to read a street name through. */
-export const BOUNDARY_FILL = 'rgba(91, 33, 182, 0.06)';
+export const BOUNDARY_FILL = 'rgba(47, 111, 104, 0.10)';
 
 /** How wide the outline is drawn, in pixels, at any zoom. */
 export const BOUNDARY_WIDTH_PX = 2;
+
+/** The dash pattern, in pixels. */
+export const BOUNDARY_DASH: readonly number[] = [7, 5];
 
 /**
  * The rings in the frame of the map they are drawn over.
@@ -104,6 +113,9 @@ export function drawCatchmentBoundary(
   context.strokeStyle = BOUNDARY_STROKE;
   context.lineWidth = BOUNDARY_WIDTH_PX;
   context.lineJoin = 'round';
+  // Dashed, as the design draws it.
+  context.setLineDash(BOUNDARY_DASH);
   context.stroke();
+  context.setLineDash([]);
   context.restore();
 }

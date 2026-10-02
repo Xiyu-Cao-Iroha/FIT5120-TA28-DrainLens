@@ -34,7 +34,21 @@
 
 import type { DerivedVisibility } from './derived.js';
 
-export type LayerKey = 'pit' | 'pipe' | 'terrain' | 'channel' | 'lowPoint' | 'unavailable';
+export type LayerKey =
+  | 'pit'
+  | 'pipe'
+  | 'terrain'
+  | 'channel'
+  | 'lowPoint'
+  | 'unavailable'
+  /*
+    Epic 6's two, from the team's Figma for Iteration 3 (node 22:566, *Your
+    drainage area*). They are chips like the rest, and they are offered only
+    inside their own guide: the drainage area is about the address, and a chip
+    for it on a map with no address chosen would draw nothing.
+  */
+  | 'catchment'
+  | 'help';
 
 export type LayerState = Record<LayerKey, boolean>;
 
@@ -44,7 +58,7 @@ export type LayerState = Record<LayerKey, boolean>;
  * The recorded network first, because it is what the product is for, and the
  * two derived layers after it.
  */
-export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint'];
+export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint', 'catchment', 'help'];
 
 /**
  * The switches behind the Layers button.
@@ -60,7 +74,7 @@ export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoi
 export const PANEL_KEYS: readonly LayerKey[] = ['terrain', 'unavailable'];
 
 /** The ways in from the homepage. Not the chip row — see the note above. */
-export type MapMode = 'drainage' | 'water-flow' | 'terrain' | 'low-areas';
+export type MapMode = 'drainage' | 'water-flow' | 'terrain' | 'low-areas' | 'drainage-area';
 
 export function visibilityOf(state: LayerState): DerivedVisibility {
   return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
@@ -106,6 +120,8 @@ export const NOTHING_ON: LayerState = {
   channel: false,
   lowPoint: false,
   unavailable: false,
+  catchment: false,
+  help: false,
 };
 
 /** Everything on. Still what the legend and the comparison map mean. */
@@ -116,6 +132,8 @@ export const ALL_ON: LayerState = {
   channel: true,
   lowPoint: true,
   unavailable: true,
+  catchment: true,
+  help: true,
 };
 
 /** The guided task: what its question needs, without the rest in the way. */
@@ -126,6 +144,8 @@ export const GUIDED_ON: LayerState = {
   channel: true,
   lowPoint: false,
   unavailable: false,
+  catchment: false,
+  help: false,
 };
 
 /**
@@ -147,5 +167,9 @@ export function openingLayers(requested: MapMode): LayerState {
     lowPoint: requested === 'low-areas',
     terrain: true,
     unavailable: false,
+    // Off even under its own card: the guide's first step is to press the
+    // chip, and a boundary already drawn would make that step a no-op.
+    catchment: false,
+    help: false,
   };
 }

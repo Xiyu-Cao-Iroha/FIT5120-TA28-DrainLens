@@ -41,6 +41,9 @@ export const LAYER = {
   lowAreas: 'Low areas',
   ground: 'Ground height',
   limited: 'Ground data gaps',
+  /* Epic 6's two, from Iteration 3's Figma (D1 and D3). */
+  catchment: 'My drainage area',
+  help: 'Who can help',
 } as const;
 
 /**

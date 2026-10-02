@@ -26,10 +26,11 @@ import {
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { LAYER } from '../ui/terms.js';
+import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
-type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch';
+type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch' | 'outline' | 'levels';
 
 export interface LayerSpec {
   readonly key: LayerKey;
@@ -59,6 +60,8 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'channel', chip: LAYER.paths, label: LAYER.paths, swatch: 'flow' },
   { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, swatch: 'blob' },
   { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
+  { key: 'catchment', chip: LAYER.catchment, label: LAYER.catchment, swatch: 'outline' },
+  { key: 'help', chip: LAYER.help, label: LAYER.help, swatch: 'levels' },
 ];
 
 /** The look-up the controls and the legend both go through. */
@@ -128,6 +131,33 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
             </linearGradient>
           </defs>
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
+        </svg>
+      );
+    case 'outline':
+      // The dashed boundary the design draws (Figma D2): a line that reads as
+      // continuing past the map, over a wash light enough for a street name.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          <rect
+            x="1.5"
+            y="2"
+            width="17"
+            height="8"
+            rx="2"
+            fill={BOUNDARY_FILL}
+            stroke={BOUNDARY_STROKE}
+            strokeWidth="1.4"
+            strokeDasharray="3 2"
+          />
+        </svg>
+      );
+    case 'levels':
+      // Three levels of the drainage system, as three stacked bars.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          {[2, 5.5, 9].map((y) => (
+            <line key={y} x1="2" y1={y} x2="18" y2={y} stroke={BOUNDARY_STROKE} strokeWidth="1.6" strokeLinecap="round" />
+          ))}
         </svg>
       );
     case 'hatch':
