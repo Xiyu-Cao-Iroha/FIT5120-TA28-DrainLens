@@ -58,6 +58,48 @@ for (const number of numbers) {
   }
 }
 
+/*
+ * The four classes AC 6.1.2 allows, and the register that decides which one an
+ * area may publish.
+ *
+ * `unclassified` is the only one that needs no approval, and it is what the
+ * register returns for an unapproved row however strong the area's name is as
+ * evidence. An artefact carrying a stronger class than the register approved
+ * would be the Epic 6 definition of done's one named prohibition — a
+ * subcatchment described as a Melbourne Water drain without an approved
+ * classification — so it is checked here rather than trusted to whoever
+ * rebuilt the file.
+ */
+const CLASSES = new Set(['main-drain', 'waterway-section', 'council-direct', 'unclassified']);
+const register = await readFile(
+  path.resolve(HERE, '../../pipeline/src/drainlens_pipeline/subcatchment_register.py'),
+  'utf8',
+);
+const approvedInRegister = new Set(
+  [...register.matchAll(/Entry\(\s*"(\d+)"[^)]*?\(\s*"[^"]+"\s*,\s*"\d{4}-\d{2}-\d{2}"\s*\)/g)].map((m) => m[1]),
+);
+
+for (const area of areas.areas ?? []) {
+  const label = `subcatchment ${String(area.number)}`;
+  if (!CLASSES.has(area.class)) {
+    note(`${label} is published as ${JSON.stringify(area.class)}, which is not one of the four AC 6.1.2 allows`);
+  } else if (area.class !== 'unclassified' && !approvedInRegister.has(String(area.number))) {
+    note(
+      `${label} is published as ${area.class} and the register has not approved it. No subcatchment is ` +
+        `described as a Melbourne Water drain without an approved classification — see ` +
+        `docs/SUBCATCHMENT-CLASSIFICATION.md.`,
+    );
+  }
+  if (typeof area.displayName !== 'string' || area.displayName.trim() === '') {
+    note(`${label} has no name for a reader (AC 6.1.1)`);
+  } else if (/^\d/.test(area.displayName) || area.displayName.includes('M.D.')) {
+    note(
+      `${label} reads "${area.displayName}" on screen, which still carries a numeric prefix or an ` +
+        `abbreviation AC 6.1.1 asks to be written out`,
+    );
+  }
+}
+
 /* Every area carries what the card and More information read off it. */
 for (const area of areas.areas ?? []) {
   const label = `subcatchment ${String(area.number)}`;
@@ -127,8 +169,10 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
+const unapproved = (areas.areas ?? []).filter((area) => area.class === 'unclassified').length;
 console.log(
-  `drainage areas: ${String((areas.areas ?? []).length)} area(s) published, ${String(addresses)} address(es) ` +
+  `drainage areas: ${String((areas.areas ?? []).length)} area(s) published, ${String(unapproved)} unclassified ` +
+    `(the register has approved ${String((areas.areas ?? []).length - unapproved)}), ${String(addresses)} address(es) ` +
     `assigned across ${String(Object.keys(streets).length)} street(s) — ${String(used.size)} area(s) used, ` +
     `${String(unmatched)} address(es) in no recorded area`,
 );
