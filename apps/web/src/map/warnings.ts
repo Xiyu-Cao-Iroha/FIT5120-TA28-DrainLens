@@ -131,7 +131,11 @@ export function pickWarning(
 
 /** Amber, with a dark mark: the road-sign convention people already read. */
 const FILL = '#f2b01e';
+
+/** The sign's colours, for a thumbnail that has to match the map. */
+export const WARNING_FILL = FILL;
 const EDGE = '#5c3b00';
+export const WARNING_EDGE = EDGE;
 
 /**
  * One sign, centred on the point.
@@ -184,10 +188,19 @@ export function drawWarnings(
   context: CanvasRenderingContext2D,
   points: readonly WarningPoint[],
   viewport: Viewport,
+  /**
+   * The number to draw on a marker, or null for the plain sign.
+   *
+   * AC 5.1.1: a numbered marker replaces the unnumbered one at that place,
+   * and markers outside the search distance are left exactly as they were.
+   */
+  numberOf: (point: WarningPoint) => number | null = () => null,
 ): void {
   for (const point of warningsInView(points, viewport)) {
     const [x, y] = toScreen(viewport, point.c);
-    drawWarning(context, x, y);
+    const number = numberOf(point);
+    if (number === null) drawWarning(context, x, y);
+    else drawNumberedWarning(context, x, y, number);
   }
 }
 
@@ -242,4 +255,47 @@ export async function loadWarnings(
   const value = await fetchJson(warningsUrl(extent.name));
   assertWarnings(value, extent);
   return value;
+}
+
+/**
+ * The number on a before-rain check, drawn on the sign rather than beside it.
+ *
+ * AC 5.1.1 asks for the numbered marker to **replace** the unnumbered one, not
+ * to join it: two marks on one hollow read as two places, and the count on the
+ * address card would then disagree with the map. So this is the same sign with
+ * a badge on its shoulder, and `MapCanvas` draws one or the other.
+ *
+ * The badge sits up and to the right, clear of the exclamation mark, with a
+ * white ring so it reads over the sign's amber and over whatever the map has
+ * underneath it.
+ */
+export const BADGE_RADIUS_PX = 8;
+
+export function drawNumberedWarning(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  number: number,
+): void {
+  drawWarning(context, x, y);
+
+  const cx = x + WARNING_WIDTH_PX / 2 - 1;
+  const cy = y - WARNING_HEIGHT_PX / 2 + 1;
+
+  context.save();
+  context.beginPath();
+  context.arc(cx, cy, BADGE_RADIUS_PX, 0, Math.PI * 2);
+  context.fillStyle = '#ffffff';
+  context.fill();
+  context.lineWidth = 1.5;
+  context.strokeStyle = EDGE;
+  context.stroke();
+
+  context.fillStyle = EDGE;
+  context.font = '600 11px system-ui, sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  // The number, not an index: a reader counts from one and so does the plan.
+  context.fillText(String(number), cx, cy + 0.5);
+  context.restore();
 }

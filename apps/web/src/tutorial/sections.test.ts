@@ -87,8 +87,8 @@ describe('what has been finished', () => {
       expect(SECTIONS[id].id).toBe(id);
       expect(SECTIONS[id].label.length).toBeGreaterThan(3);
     }
-    // Five since Iteration 3's drainage-area guide.
-    expect(SECTION_ORDER).toHaveLength(5);
+    // Six since Iteration 3's two new guides.
+    expect(SECTION_ORDER).toHaveLength(6);
   });
 });
 

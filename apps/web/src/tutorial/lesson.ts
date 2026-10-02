@@ -22,7 +22,7 @@
  * that no longer matches the words beside it.
  */
 
-import type { LayerKey } from '../map/modes.js';
+import type { LayerKey, LayerState } from '../map/modes.js';
 import type { TerrainPoints } from './terrainPoints.js';
 
 
@@ -50,7 +50,10 @@ export type Requirement =
   | 'terrain-off'
   /* Epic 6's two chips (Figma, *Your drainage area* D1 and D3). */
   | 'catchment-on'
-  | 'help-on';
+  | 'help-on'
+  /* Epic 5's two (Figma, *Get ready for heavy rain*, G1 and G2). */
+  | 'plan-opened'
+  | 'place-reviewed';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -188,6 +191,10 @@ export interface MapNow {
   readonly catchment: boolean;
   /** Who can help, drawn now. */
   readonly help: boolean;
+  /** The preparation plan, open now. */
+  readonly planOpen: boolean;
+  /** How many numbered places the reader has answered for. */
+  readonly placesReviewed: number;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -205,6 +212,8 @@ export const NOTHING_ON_MAP: MapNow = {
   terrainShown: false,
   catchment: false,
   help: false,
+  planOpen: false,
+  placesReviewed: 0,
 };
 
 /**
@@ -294,6 +303,15 @@ export interface Lesson {
   readonly previous?: boolean;
   readonly mapChrome?: MapChrome;
   /**
+   * What the map draws when this lesson opens, where it is not an empty map.
+   *
+   * Every lesson but one opens with nothing on and turns something on in its
+   * first step. Epic 5's does not: AC 5.1.1 puts the numbered markers on the
+   * map as soon as an address is chosen, and its first step asks for the
+   * button that comes with them rather than for the layer.
+   */
+  readonly opensWith?: LayerState;
+  /**
    * The steps, given the ground near the address.
    *
    * The ground height guide names real heights, and which it can name depends
@@ -330,6 +348,11 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'catchment';
     case 'help-on':
       return 'help';
+    case 'plan-opened':
+    case 'place-reviewed':
+      // Neither is a chip: the first is the address card's button and the
+      // second is a choice on a place's own card.
+      return null;
     case 'pit-selected':
     case 'trace-following':
     case 'layers-opened':
@@ -379,6 +402,12 @@ export function satisfied(
   teachingPit: string | null,
 ): boolean {
   switch (requires) {
+    case 'plan-opened':
+      return now.planOpen;
+    case 'place-reviewed':
+      // Any answer counts, including *doesn't apply to me*: the step asks for
+      // a decision, and both are decisions (AC 5.4.1).
+      return now.placesReviewed > 0;
     case 'catchment-on':
       return now.catchment;
     case 'help-on':

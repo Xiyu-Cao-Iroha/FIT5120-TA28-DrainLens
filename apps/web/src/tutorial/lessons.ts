@@ -17,6 +17,7 @@ import type { Lesson } from './lesson.js';
 import { SECTION_ORDER, type SectionId } from './sections.js';
 import { DRAINAGE } from './drainage.js';
 import { DRAINAGE_AREA } from './drainageArea.js';
+import { HEAVY_RAIN } from './heavyRain.js';
 import { LOW_AREAS } from './lowAreas.js';
 import { TERRAIN } from './terrain.js';
 import { WATER_FLOW } from './waterFlow.js';
@@ -27,6 +28,7 @@ export const LESSONS: Partial<Record<SectionId, Lesson>> = {
   'low-areas': LOW_AREAS,
   terrain: TERRAIN,
   'drainage-area': DRAINAGE_AREA,
+  'heavy-rain': HEAVY_RAIN,
 };
 
 /**

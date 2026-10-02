@@ -53,7 +53,7 @@ describe('what is written to the device', () => {
     makeProgress(store).write(learned('drainage'));
 
     expect(store.length).toBe(1);
-    expect(store.getItem('drainlens.learned')).toBe('10000');
+    expect(store.getItem('drainlens.learned')).toBe('100000');
   });
 
   it('carries no address, identifier, timestamp or count', () => {
@@ -65,7 +65,7 @@ describe('what is written to the device', () => {
     makeProgress(store).write(learned('drainage', 'terrain'));
 
     const raw = store.getItem('drainlens.learned') ?? '';
-    expect(raw).toMatch(/^[01]{5}$/);
+    expect(raw).toMatch(/^[01]{6}$/);
     expect(raw.length).toBe(SECTION_ORDER.length);
   });
 
@@ -85,7 +85,7 @@ describe('what is written to the device', () => {
 describe('a stored value that is not what we wrote', () => {
   it.each([
     ['too short', '100'],
-    ['too long', '100000'],
+    ['too long', '1000000'],
     ['not binary', '1x00'],
     ['a JSON blob somebody upgraded us to', '{"drainage":true}'],
     ['empty', ''],

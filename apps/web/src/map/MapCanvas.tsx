@@ -147,6 +147,14 @@ export interface MapCanvasProps {
    * it is about to draw at. See `map/warnings.ts`.
    */
   readonly warnings?: readonly WarningPoint[] | null;
+  /**
+   * Which warning markers are numbered before-rain checks, and what number.
+   *
+   * Passed as a function rather than a list so the canvas asks about the
+   * markers it is already drawing. Returning null everywhere is the map as it
+   * was before Epic 5.
+   */
+  readonly numberOfWarning?: (point: WarningPoint) => number | null;
   /** A sign was pressed. Tested before the pits, and only where a sign is drawn. */
   readonly onWarningPress?: (point: WarningPoint) => void;
   readonly onSelect?: (hit: Hit | null) => void;
@@ -194,6 +202,7 @@ export function MapCanvas({
   difference = null,
   catchment = null,
   warnings = null,
+  numberOfWarning,
   onWarningPress,
   onSelect,
   onAddressPress,
@@ -308,7 +317,9 @@ export function MapCanvas({
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // Over the low areas they mark and the pits beside them: a press on a sign
     // goes to the sign, so the sign has to be the thing on top.
-    if (warnings && warningsVisible(true, viewport.scale)) drawWarnings(context, warnings, viewport);
+    if (warnings && warningsVisible(true, viewport.scale)) {
+      drawWarnings(context, warnings, viewport, numberOfWarning);
+    }
     // Over the derived layers, under the followed path. The difference is the
     // answer to the question that was just asked, so nothing calculated
     // beforehand should cover it — but a trace the person is actively
@@ -319,7 +330,7 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
-      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings]);
+      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings, numberOfWarning]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

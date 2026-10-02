@@ -27,10 +27,11 @@ import { RAMP, RAMP_GRADIENT } from './terrain.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { LAYER } from '../ui/terms.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
+import { WARNING_EDGE, WARNING_FILL } from './warnings.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
-type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch' | 'outline' | 'levels';
+type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch' | 'outline' | 'levels' | 'check';
 
 export interface LayerSpec {
   readonly key: LayerKey;
@@ -62,6 +63,7 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
   { key: 'catchment', chip: LAYER.catchment, label: LAYER.catchment, swatch: 'outline' },
   { key: 'help', chip: LAYER.help, label: LAYER.help, swatch: 'levels' },
+  { key: 'beforeRain', chip: LAYER.beforeRain, label: LAYER.beforeRain, swatch: 'check' },
 ];
 
 /** The look-up the controls and the legend both go through. */
@@ -131,6 +133,17 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
             </linearGradient>
           </defs>
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
+        </svg>
+      );
+    case 'check':
+      // The numbered sign the layer draws, in the sign's own colours.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          <path d="M8 1.5l5.5 9H2.5Z" fill={WARNING_FILL} stroke={WARNING_EDGE} strokeWidth="1.2" strokeLinejoin="round" />
+          <circle cx="15" cy="3.5" r="3.4" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1" />
+          <text x="15" y="5.2" fontSize="5" fontWeight="600" textAnchor="middle" fill={WARNING_EDGE}>
+            1
+          </text>
         </svg>
       );
     case 'outline':

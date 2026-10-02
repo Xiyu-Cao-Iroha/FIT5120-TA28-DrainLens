@@ -48,7 +48,9 @@ export type LayerKey =
     for it on a map with no address chosen would draw nothing.
   */
   | 'catchment'
-  | 'help';
+  | 'help'
+  /* Epic 5's layer: the numbered places to check before heavy rain. */
+  | 'beforeRain';
 
 export type LayerState = Record<LayerKey, boolean>;
 
@@ -58,7 +60,15 @@ export type LayerState = Record<LayerKey, boolean>;
  * The recorded network first, because it is what the product is for, and the
  * two derived layers after it.
  */
-export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint', 'catchment', 'help'];
+export const CHIP_KEYS: readonly LayerKey[] = [
+  'pit',
+  'pipe',
+  'channel',
+  'lowPoint',
+  'catchment',
+  'help',
+  'beforeRain',
+];
 
 /**
  * The switches behind the Layers button.
@@ -74,7 +84,13 @@ export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoi
 export const PANEL_KEYS: readonly LayerKey[] = ['terrain', 'unavailable'];
 
 /** The ways in from the homepage. Not the chip row — see the note above. */
-export type MapMode = 'drainage' | 'water-flow' | 'terrain' | 'low-areas' | 'drainage-area';
+export type MapMode =
+  | 'drainage'
+  | 'water-flow'
+  | 'terrain'
+  | 'low-areas'
+  | 'drainage-area'
+  | 'heavy-rain';
 
 export function visibilityOf(state: LayerState): DerivedVisibility {
   return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
@@ -122,6 +138,7 @@ export const NOTHING_ON: LayerState = {
   unavailable: false,
   catchment: false,
   help: false,
+  beforeRain: false,
 };
 
 /** Everything on. Still what the legend and the comparison map mean. */
@@ -134,6 +151,7 @@ export const ALL_ON: LayerState = {
   unavailable: true,
   catchment: true,
   help: true,
+  beforeRain: true,
 };
 
 /** The guided task: what its question needs, without the rest in the way. */
@@ -146,6 +164,7 @@ export const GUIDED_ON: LayerState = {
   unavailable: false,
   catchment: false,
   help: false,
+  beforeRain: false,
 };
 
 /**
@@ -171,5 +190,9 @@ export function openingLayers(requested: MapMode): LayerState {
     // chip, and a boundary already drawn would make that step a no-op.
     catchment: false,
     help: false,
+    // On under its own card, and only there: AC 5.1.1 puts the numbered
+    // markers on the map as soon as an address is chosen, and the guide's
+    // first step is the button they come with rather than the layer itself.
+    beforeRain: requested === 'heavy-rain',
   };
 }

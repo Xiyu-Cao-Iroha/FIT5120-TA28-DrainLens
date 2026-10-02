@@ -53,6 +53,7 @@ import { ACTIVITY_BREAKS } from '../history/severity.js';
 import { BlockedDrainFigure } from './BlockedDrain.js';
 import { DAY } from '../map/draw.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from '../map/catchmentBoundary.js';
+import { WARNING_EDGE, WARNING_FILL } from '../map/warnings.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
@@ -139,6 +140,15 @@ export const PATHS: readonly {
     title: 'Low areas',
     body: 'Dips in the ground where rainwater may pool.',
     accent: DERIVED_DAY.lowPointEdge,
+  },
+  {
+    // Iteration 3, Epic 5 (Figma, *Get ready for heavy rain*). Before the
+    // drainage area, because it is the one that asks the reader to do
+    // something rather than to understand something.
+    mode: 'heavy-rain',
+    title: 'Get ready for heavy rain',
+    body: 'Places to check near you, and what every home can do.',
+    accent: WARNING_FILL,
   },
   {
     // Iteration 3, Epic 6 (Figma, *Your drainage area*). Last, because it is
@@ -532,6 +542,43 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
 export function PathThumb({ mode }: { readonly mode: MapMode }) {
   const frame = { width: '100%', height: 104, display: 'block' } as const;
   const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
+
+  if (mode === 'heavy-rain') {
+    // Three numbered checks on a street corner: what the guide's first step
+    // puts on the map.
+    return (
+      <svg {...common}>
+        <rect width="200" height="104" fill={DAY.ground} />
+        <path d="M-8 72h216M72 -8v120" stroke={DAY.road} strokeWidth="13" fill="none" />
+        {([
+          [44, 40],
+          [120, 30],
+          [150, 78],
+        ] as const).map(([cx, cy], index) => (
+          <g key={index}>
+            <path
+              d={`M${String(cx)} ${String(cy - 11)}l12 21H${String(cx - 12)}Z`}
+              fill={WARNING_FILL}
+              stroke={WARNING_EDGE}
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <circle cx={cx + 11} cy={cy - 10} r="7" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1.4" />
+            <text
+              x={cx + 11}
+              y={cy - 6.5}
+              fontSize="9"
+              fontWeight="600"
+              textAnchor="middle"
+              fill={WARNING_EDGE}
+            >
+              {index + 1}
+            </text>
+          </g>
+        ))}
+      </svg>
+    );
+  }
 
   if (mode === 'drainage-area') {
     // A dashed boundary around a street corner: the thing the guide's first
