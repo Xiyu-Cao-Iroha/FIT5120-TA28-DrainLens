@@ -56,6 +56,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .area_points import simplify
 from .geo import Extent
+from .subcatchment_register import classify, clean_name, proposal
 
 #: Who publishes the areas, for the provenance line the screen shows.
 SOURCE = {
@@ -324,6 +325,13 @@ def build(
         },
         "source": dict(SOURCE),
         "settings": {"simplified_m": tolerance, "padding_m": FETCH_PADDING_M},
+        # What the register has approved, which is what the classes below are
+        # allowed to say. An unapproved area publishes "unclassified" however
+        # strong its name is as evidence; see subcatchment_register.py.
+        "classification": {
+            "approved": sum(1 for area in areas if classify(area.number) != "unclassified"),
+            "unapproved": sum(1 for area in areas if classify(area.number) == "unclassified"),
+        },
         "counts": {
             "areas": len(areas),
             "vertices": sum(area.vertices for area in areas),
@@ -331,7 +339,11 @@ def build(
         "areas": [
             {
                 "number": area.number,
+                # The record's own name, kept so the published artefact can be
+                # checked against the source, and the reader's name beside it.
                 "name": area.name,
+                "displayName": clean_name(area.name),
+                "class": classify(area.number),
                 **({} if area.major_number is None else {"majorNumber": area.major_number}),
                 **({} if area.major_name is None else {"majorName": area.major_name}),
                 **({} if area.primary_name is None else {"primaryName": area.primary_name}),
