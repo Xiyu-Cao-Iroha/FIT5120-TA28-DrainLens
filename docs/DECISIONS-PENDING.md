@@ -239,3 +239,26 @@ Those are different statements and the map currently makes them look identical. 
 3. **Grey the derived chips outside the square**, so they cannot be turned on where there is nothing to show. Prevents the confusion by removing the control, which this repository has argued against before: a control that vanishes reads as a control that was never there.
 
 **Deferred by the design owner on 11 September to 13 September.** It is recorded here rather than left in a conversation because the map shipping without it is the one thing in this expansion that can mislead somebody, and a deferral that nobody wrote down is indistinguishable from an oversight.
+
+---
+
+## 9 · Three registers, written and unapproved — **OPEN, 3 October 2026, and the only thing between Iteration 3 and its definition of done**
+
+Every Must Have screen in Epic 5 and Epic 6 is built. Three registers now sit between them and the words the design asks for, and none of them can be approved by code.
+
+| Register | What it decides | What the product says until it is approved |
+|---|---|---|
+| [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md) | Which of the four receiving-drain classes each of the 35 drainage areas is | *The type of drain or waterway that receives its water has not been confirmed* — for every address |
+| [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) | The channels, telephone numbers and quotations the reporting pathway cites | The channels are shown, sourced from the publishers' own pages, with nobody's name against the choice |
+| [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md) | Which markers qualify as places, the 200 m, the three, the nearest-first | The rules are in force, measured but not agreed |
+
+**The product is honest in the meantime, deliberately.** `classify()` returns `unclassified` for every unapproved row however strongly its name reads, and a data check fails the build if the artefact ever claims a class the register has not approved. That is the safe state, not the finished one: a reader is currently told nothing where the design promises a sentence.
+
+### The fourth preparation action
+
+The design shows **Move valuable items above floor level**. No official page carrying it was found on 2 October, so it is not in the product — three actions is within what AC 5.2.3 asks for, and a mock-up is not a source. The decision is whether to keep looking for a source or to drop it from the design. Either is fine; shipping it without one is not.
+
+### Two operational jobs, neither urgent and both easy to forget
+
+- `--min-instances=1` on the API is billing continuously. It was set for a demonstration and should go back to 0 after the next one.
+- The gate password was exposed in a screenshot on 28 September and should be rotated across all four services.
