@@ -36,6 +36,7 @@ import {
   type SectionId,
   allLearned,
 } from './tutorial/sections.js';
+import type { Relevance } from './prepare/places.js';
 
 /**
  * Which screen the person is on.
@@ -258,6 +259,20 @@ export interface Session {
    * has no task question behind it, and may have no address at all.
    */
   readonly scenarioOrigin: 'task' | 'map';
+  /**
+   * What the reader has said about each numbered place near their address.
+   *
+   * Keyed by the place's number, 1 to 3. **In memory and nowhere else**: AC
+   * 5.4.1 says the selections are kept for the current browser session only
+   * and are never sent to a server, and this is the same rule the address has
+   * lived under since Iteration 1 — nothing here reaches storage, the URL or
+   * a request.
+   *
+   * Cleared whenever the address changes (AC 5.4.2), because the places are
+   * renumbered for the new address and a selection made about Place 2 at one
+   * address says nothing about Place 2 at another.
+   */
+  readonly relevance: Readonly<Record<number, Relevance>>;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -295,10 +310,18 @@ export const INITIAL_SESSION: Session = {
   scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
+  relevance: {},
   running: false,
   run: null,
 };
 
+/**
+ * What the reader said about one numbered place, or that they reset them all.
+ *
+ * AC 5.4.1 asks for a selection that can be changed and for all of them to be
+ * resettable, and forbids *Done* or *Completed* for a future conditional
+ * action: these say whether a place applies, not that work is finished.
+ */
 export type SessionEvent =
   | { readonly type: 'address-accepted'; readonly address: SupportedAddress }
   /**
@@ -311,6 +334,8 @@ export type SessionEvent =
    * that belongs to the old neighbourhood.
    */
   | { readonly type: 'address-moved'; readonly address: SupportedAddress }
+  | { readonly type: 'place-reviewed'; readonly place: number; readonly relevance: Relevance }
+  | { readonly type: 'places-reset' }
   /**
    * The address let go of, from the map's search box.
    *
@@ -539,12 +564,16 @@ const BACK: Readonly<Record<Screen, Screen>> = {
  * The same fields `address-cleared` resets. Used where the team asks for the
  * address to be entered again: each guide, and each visit to the full map.
  */
-function forgetAddress(session: Session): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome'> {
+function forgetAddress(
+  session: Session,
+): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome' | 'relevance'> {
   return {
     address: null,
     rejectedAddress: null,
     scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
     outcome: null,
+    // AC 5.4.2: the places are the old address's, and so are the answers.
+    relevance: {},
   };
 }
 
@@ -557,6 +586,12 @@ export function reduce(session: Session, event: SessionEvent): Session {
 
 function step(session: Session, event: SessionEvent): Session {
   switch (event.type) {
+    case 'place-reviewed':
+      return { ...session, relevance: { ...session.relevance, [event.place]: event.relevance } };
+
+    case 'places-reset':
+      return { ...session, relevance: {} };
+
     case 'address-moved':
       return {
         ...session,
@@ -566,6 +601,9 @@ function step(session: Session, event: SessionEvent): Session {
           ? {
               scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
               outcome: null,
+              // A new address renumbers the places, so answers about the old
+              // ones are answers about different places (AC 5.4.2).
+              relevance: {},
             }
           : {}),
       };
