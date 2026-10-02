@@ -25,6 +25,18 @@ export interface IndexedAddress {
   /** Local metres, the frame the map works in. */
   readonly e: number;
   readonly n: number;
+  /**
+   * Where this address sits in its street's published group, counted before
+   * anything was left out.
+   *
+   * The drainage-area lookup is keyed by street and position
+   * (`address-catchments.json`), and on the Kensington fallback this index
+   * drops the addresses outside the smaller map — so counting positions in
+   * what survives would hand every address after the first gap somebody
+   * else's drainage area. This is the position in the published group, which
+   * both files agree on.
+   */
+  readonly at: number;
 }
 
 export interface AddressIndex {
@@ -220,11 +232,11 @@ export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
   const addresses: IndexedAddress[] = [];
   raw.on.forEach((key, group) => {
     const [street, suburb = ''] = key.split('|');
-    for (const [number, rawE, rawN] of raw.at[group] ?? []) {
+    (raw.at[group] ?? []).forEach(([number, rawE, rawN], at) => {
       const e = rawE + east;
       const n = rawN + north;
       // Clipped, an address off the map is left out rather than drawn past its edge.
-      if (clipped && (e < 0 || n < 0 || e > into.width_m || n > into.height_m)) continue;
+      if (clipped && (e < 0 || n < 0 || e > into.width_m || n > into.height_m)) return;
       const label = labelOf(number, street ?? '', suburb);
       addresses.push({
         // The same id the pipeline used to write, rebuilt from the same parts.
@@ -235,8 +247,9 @@ export function unpack(raw: PackedIndex, into: Frame): AddressIndex {
         suburb,
         e,
         n,
+        at,
       });
-    }
+    });
   });
 
   // Normalised now, on load, rather than on the first keystroke: over the
