@@ -46,6 +46,8 @@ import {
   reviewedLine,
   statusOf,
 } from '../prepare/places.js';
+import { PRINT_PLAN, planHtml, printedPlan } from '../prepare/printable.js';
+import { printDocument } from '../prepare/printing.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /** One numbered place, as the map's card shows it (Figma G2). */
@@ -122,11 +124,14 @@ export function PlaceCard({
 
 /** The plan: the places, their reminders, and what every home can do (Figma G3). */
 export function PreparePlan({
+  address,
   places,
   relevance,
   onShowOnMap,
   onReset,
 }: {
+  /** As the reader chose it. It is on the printed page and nowhere else. */
+  readonly address: string;
   readonly places: readonly Place[];
   readonly relevance: Readonly<Record<number, Relevance>>;
   readonly onShowOnMap?: ((place: Place) => void) | undefined;
@@ -235,6 +240,31 @@ export function PreparePlan({
           ))}
         </ul>
       </section>
+
+      {/*
+        Print or save (AC 5.4.3), outside the places section because an
+        address with none still has a page worth keeping: the general actions
+        and the numbers at the foot of it.
+      */}
+      <p style={{ margin: `${String(space(3))}px 0 0` }}>
+        <button
+          type="button"
+          onClick={() => {
+            printDocument(planHtml(printedPlan(address, places, relevance, new Date())));
+          }}
+          style={{
+            padding: `${String(space(1))}px ${String(space(3))}px`,
+            borderRadius: radius.pill,
+            border: `1px solid ${brand.tint}`,
+            background: brand.wash,
+            color: brand.ink,
+            font: type(text.small, { weight: weight.semibold }),
+            cursor: 'pointer',
+          }}
+        >
+          {PRINT_PLAN}
+        </button>
+      </p>
 
       {/*
         The boundary, in full and at the foot of the plan (AC 5.3.3).

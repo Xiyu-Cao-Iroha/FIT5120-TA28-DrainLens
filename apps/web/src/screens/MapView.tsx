@@ -1007,6 +1007,7 @@ export function MapView({
       {panel && viewport !== null && planOpen && openPlace === null && (
         <MapNote title={PREPARE_HEADING}>
           <PreparePlan
+            address={address?.label ?? ''}
             places={places}
             relevance={relevance}
             onShowOnMap={(place) => {
