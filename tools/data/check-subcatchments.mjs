@@ -100,6 +100,58 @@ for (const area of areas.areas ?? []) {
   }
 }
 
+/*
+ * The summary, and the one number in it that is about this project rather than
+ * about the drainage area.
+ *
+ * `coverage` is the share of an area's own recorded square kilometres that
+ * falls inside the build extent, and it is what makes the pit count honest: a
+ * subcatchment does not stop at the council boundary, so a count inside one is
+ * a count of the part we hold data for. A share above 1 would be the artefact
+ * claiming more of an area than the area has, and a missing summary would be a
+ * card with blanks where AC 6.1.3's numbers go.
+ */
+let pits = 0;
+let pipeLengthM = 0;
+for (const area of areas.areas ?? []) {
+  const label = `subcatchment ${String(area.number)}`;
+  const summary = area.summary;
+  if (summary === undefined) {
+    note(`${label} has no summary, and AC 6.1.3 reads its pits, pipe length and low areas off one`);
+    continue;
+  }
+  for (const field of ['pits', 'pipeLengthM', 'lowAreas']) {
+    if (!Number.isFinite(summary[field]) || summary[field] < 0) {
+      note(`${label} has ${String(summary[field])} for ${field}`);
+    }
+  }
+  if (summary.coverage !== undefined && !(summary.coverage >= 0 && summary.coverage <= 1)) {
+    note(
+      `${label} reports coverage ${String(summary.coverage)}; it is a share of the area's own recorded ` +
+        `size and cannot be negative or more than all of it`,
+    );
+  } else if (summary.coverage === 0 && (summary.pits > 0 || summary.pipeLengthM > 0 || summary.lowAreas > 0)) {
+    // Four areas only graze the extent, and a share that rounds to zero is
+    // honest for them — they hold nothing. A zero share beside something found
+    // inside is the two halves of the summary disagreeing.
+    note(
+      `${label} reports no coverage and ${String(summary.pits)} pit(s), ${String(summary.pipeLengthM)} m of ` +
+        `pipe and ${String(summary.lowAreas)} low area(s) inside it`,
+    );
+  }
+  pits += summary.pits ?? 0;
+  pipeLengthM += summary.pipeLengthM ?? 0;
+}
+
+const totals = areas.counts ?? {};
+if (totals.pits !== pits) note(`counts.pits says ${String(totals.pits)}; the areas carry ${String(pits)}`);
+if (Math.abs((totals.pipeLengthM ?? 0) - pipeLengthM) > 1) {
+  note(`counts.pipeLengthM says ${String(totals.pipeLengthM)}; the areas carry ${String(Math.round(pipeLengthM))}`);
+}
+if (typeof areas.coverage !== 'string' || !areas.coverage.includes('City of Melbourne')) {
+  note(`subcatchments.json does not say its counts cover City of Melbourne data only (AC 6.1.3)`);
+}
+
 /* Every area carries what the card and More information read off it. */
 for (const area of areas.areas ?? []) {
   const label = `subcatchment ${String(area.number)}`;
