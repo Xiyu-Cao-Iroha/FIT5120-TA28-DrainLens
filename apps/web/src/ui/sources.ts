@@ -28,6 +28,7 @@ export type SourceSectionId =
   | 'drains'
   | 'ground'
   | 'flood-history'
+  | 'drainage-areas'
   | 'rate'
   | 'events'
   | 'limits'
@@ -142,6 +143,24 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
     ac: ['4.2.1', '4.2.2', '4.2.3', '4.3.4'],
   },
   {
+    id: 'drainage-areas',
+    title: 'Drainage areas',
+    summary:
+      'The drainage area your address is in is an official Melbourne Water record. What receives its water is not confirmed yet.',
+    points: [
+      'Melbourne Water divides its region into subcatchments. We show the one that contains your address, drawn whole, so most run past the edge of this map.',
+      'Which area an address is in is worked out from Melbourne Water’s own boundary, not from the simplified outline drawn on the map.',
+      'The boundary does not show a flood extent, which pipes connect to what, or who owns an asset.',
+      'Sharing a drainage area does not mean sharing the same flood risk or the same local pipes.',
+      'Recorded pits, pipe length and low areas inside an area come from City of Melbourne data, which covers only part of most areas. The card says how much.',
+      'We do not yet say what kind of drain or waterway receives an area’s water. Our team checks each area against Melbourne Water’s own description before DrainLens names one.',
+      'The record’s own last-updated date and the date the published layer was last edited are different things, and both are shown.',
+    ],
+    source:
+      'Melbourne Water Corporation: Catchments, Waterways and Drains Subcatchments, via data.vic. Licensed CC BY 4.0. Pit, pipe and low-area counts are from City of Melbourne data and DrainLens’s own calculations.',
+    ac: ['6.1.1', '6.1.2', '6.1.3', '6.1.4', '6.1.5'],
+  },
+  {
     id: 'limits',
     title: 'What DrainLens cannot tell you',
     summary: 'DrainLens helps you understand your area. It is not a warning service.',
@@ -188,6 +207,7 @@ export const SOURCE_LINKS = {
   groundLegend: { label: 'More about ground height', section: 'ground', where: 'map/MapLayers.tsx ground height legend', ac: ['1.3.1'] },
   mapNotice: { label: 'More about the map', section: 'drains', where: 'screens/LockedMap.tsx, under the two lines', ac: ['1.1.4'] },
   homeLimits: { label: 'What DrainLens can and cannot show', section: 'limits', where: 'screens/Home.tsx, under the closing "not a live flood warning" line', ac: ['1.1.1'] },
+  drainageArea: { label: 'About drainage areas', section: 'drainage-areas', where: 'screens/DrainageArea.tsx, foot of the card and of More information', ac: ['6.1.1', '6.1.3', '6.1.4'] },
   history: { label: 'About the data', section: 'flood-history', where: 'screens/Home.tsx top 5 note; screens/FloodHistory.tsx under the three notes; screens/FloodMap.tsx empty and selected area panels', ac: ['2.1.1', '2.3.1', '4.1.4'] },
   minimum: { label: 'Why “at least”?', section: 'flood-history', where: 'screens/FloodHistory.tsx under the list; screens/FloodMap.tsx foot of the key, and after an "At least" status in the area panel', ac: ['2.2.1', '4.1.5', '4.1.6'] },
   pastRecords: { label: 'Past records', section: 'flood-history', where: 'history/evidence.ts AREA_KINDS: the counts section of the screens/FloodMap.tsx area panel', ac: ['4.3.4'] },
