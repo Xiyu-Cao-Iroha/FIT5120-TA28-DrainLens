@@ -27,6 +27,7 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AddressIndex } from '../address/search.js';
+import type { AddressCatchmentsArtefact, SubcatchmentsArtefact } from '../catchment/artefact.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import { NOTHING_ON } from '../map/modes.js';
@@ -87,6 +88,17 @@ export interface GuideProps {
   readonly derived: DerivedArtefact;
   readonly trace: TraceArtefact;
   readonly index: AddressIndex;
+  /**
+   * The drainage areas, for the guide that teaches them.
+   *
+   * Null for the other four, which never ask for it, and null while the files
+   * are loading: the drainage-area guide's first chip then draws nothing and
+   * its card says a drainage area could not be identified, which is true.
+   */
+  readonly catchments?: {
+    readonly areas: SubcatchmentsArtefact;
+    readonly assignment: AddressCatchmentsArtefact;
+  } | null;
   /** Chosen before the guide starts. The guide has nothing to point at without one. */
   readonly address: SupportedAddress;
   /** Which section is being taught. Its lesson decides everything below. */
@@ -105,7 +117,18 @@ export interface GuideProps {
   readonly onBack?: () => void;
 }
 
-export function Guide({ map, derived, trace, index, address, section, onFinish, onLeave, onBack }: GuideProps) {
+export function Guide({
+  map,
+  derived,
+  trace,
+  index,
+  address,
+  section,
+  catchments = null,
+  onFinish,
+  onLeave,
+  onBack,
+}: GuideProps) {
   const [now, setNow] = useState<MapNow>(NOTHING_ON_MAP);
   /** How many `read` steps have been pressed past. See `stepIndex`. */
   const [acknowledged, setAcknowledged] = useState(0);
@@ -340,6 +363,7 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
           trace={trace}
           index={index}
           address={address}
+          catchments={catchments}
           task="follow"
           // Nothing on. Every lesson opens with an empty map and the first
           // instruction turns something on -- and the guided preset had

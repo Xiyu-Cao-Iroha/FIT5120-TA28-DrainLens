@@ -26,6 +26,10 @@ export const SECTION_ORDER: readonly SectionId[] = [
   'water-flow',
   'low-areas',
   'terrain',
+  // Iteration 3, Epic 6. Last because it is about the address rather than
+  // about the map, and the four before it are what its wording assumes the
+  // reader has seen.
+  'drainage-area',
 ];
 
 export interface Section {
@@ -70,9 +74,14 @@ export const SECTIONS: Record<SectionId, Section> = {
     locked: 'Start guide',
     guideTitle: `${LAYER.ground} guide`,
   },
+  'drainage-area': {
+    id: 'drainage-area',
+    label: 'Your drainage area',
+    locked: 'Start guide',
+  },
 };
 
-/** What has been finished. Four booleans and nothing else. */
+/** What has been finished. One boolean per section and nothing else. */
 export type Learned = Readonly<Record<SectionId, boolean>>;
 
 export const NOTHING_LEARNED: Learned = {
@@ -80,6 +89,7 @@ export const NOTHING_LEARNED: Learned = {
   'water-flow': false,
   'low-areas': false,
   terrain: false,
+  'drainage-area': false,
 };
 
 export const allLearned = (learned: Learned): boolean =>

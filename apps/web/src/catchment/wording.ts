@@ -19,6 +19,10 @@ import type { ReceivingClass, Subcatchment } from './artefact.js';
 /** The heading, and what the whole card is about. */
 export const DRAINAGE_AREA = 'My drainage area';
 
+/** The two chips Epic 6's guide asks the reader to press (Figma D1, D3). */
+export const CATCHMENT_CHIP = 'My drainage area';
+export const HELP_CHIP = 'Who can help';
+
 /** Who recorded the areas, said on the card (AC 6.1.1). */
 export const AREA_SOURCE = 'Official record · Melbourne Water';
 

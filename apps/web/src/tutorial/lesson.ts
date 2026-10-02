@@ -47,7 +47,10 @@ export type Requirement =
   */
   | 'layers-opened'
   | 'terrain-shown'
-  | 'terrain-off';
+  | 'terrain-off'
+  /* Epic 6's two chips (Figma, *Your drainage area* D1 and D3). */
+  | 'catchment-on'
+  | 'help-on';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -181,6 +184,10 @@ export interface MapNow {
   readonly layersOpened: boolean;
   /** Latched: Ground height has been on during this lesson. */
   readonly terrainShown: boolean;
+  /** The drainage area's boundary, drawn now. */
+  readonly catchment: boolean;
+  /** Who can help, drawn now. */
+  readonly help: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -196,6 +203,8 @@ export const NOTHING_ON_MAP: MapNow = {
   layersOpen: false,
   layersOpened: false,
   terrainShown: false,
+  catchment: false,
+  help: false,
 };
 
 /**
@@ -317,6 +326,10 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'lowPoint';
     case 'unmeasured-on':
       return 'unavailable';
+    case 'catchment-on':
+      return 'catchment';
+    case 'help-on':
+      return 'help';
     case 'pit-selected':
     case 'trace-following':
     case 'layers-opened':
@@ -366,6 +379,10 @@ export function satisfied(
   teachingPit: string | null,
 ): boolean {
   switch (requires) {
+    case 'catchment-on':
+      return now.catchment;
+    case 'help-on':
+      return now.help;
     case 'pits-on':
       return now.pits;
     case 'pipes-on':

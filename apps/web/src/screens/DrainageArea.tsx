@@ -41,8 +41,9 @@ import {
   updatedLine,
   widerNames,
 } from '../catchment/wording.js';
+import { DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchment/help.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { ink, line, radius, space, text, type, weight } from '../ui/theme.js';
+import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /**
  * The area for this address, or the honest absence of one.
@@ -199,3 +200,101 @@ export const openLinkStyle = {
   cursor: 'pointer',
   borderRadius: radius.small,
 } as const;
+
+/**
+ * A card in a corner of the map, for a layer that is about no single point.
+ *
+ * The map's other cards are callouts: they point at a pit, a pipe, a sign, an
+ * address. These two do not — one is about the area the boundary encloses and
+ * the other about the drainage system as a whole — so they sit in a corner
+ * rather than claiming a spot on the ground, which is how the design draws
+ * them (Figma D2 and D4).
+ */
+export function MapNote({
+  title,
+  at = 'top',
+  children,
+}: {
+  readonly title: string;
+  readonly at?: 'top' | 'bottom';
+  readonly children: ReactNode;
+}) {
+  return (
+    <section
+      aria-label={title}
+      style={{
+        position: 'absolute',
+        left: space(3),
+        ...(at === 'top' ? { top: 64 } : { bottom: space(3) }),
+        width: 300,
+        maxHeight: 'calc(100% - 96px)',
+        overflowY: 'auto',
+        padding: space(3),
+        background: surface.raised,
+        border: `1px solid ${line.base}`,
+        borderRadius: radius.base,
+        boxShadow: '0 6px 20px rgba(16, 32, 40, 0.10)',
+        zIndex: 3,
+      }}
+    >
+      <h2
+        style={{
+          margin: `0 0 ${String(space(2))}px`,
+          font: type(text.label, { weight: weight.semibold }),
+          color: ink.strong,
+        }}
+      >
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * The three levels, numbered, as the design's card draws them (Figma D4).
+ *
+ * Each is a level of the system, an example a reader would recognise, and who
+ * to tell. The hedged role sentences and the "these are general roles" line
+ * are under *More information* on the drainage-area card: this card is the one
+ * somebody reads while deciding who to call, and AC 6.2.1's caution belongs
+ * where it can be read without hunting, which is why it is repeated here in
+ * one line rather than left to the other card.
+ */
+export function WhoCanHelpLevels() {
+  return (
+    <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
+      <ol style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+        {DRAINAGE_LEVELS.map((level, index) => (
+          <li key={level.id} style={{ display: 'flex', gap: space(2), marginBottom: space(2) }}>
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                width: 20,
+                height: 20,
+                borderRadius: radius.pill,
+                background: brand.base,
+                color: ink.inverse,
+                font: type(text.micro, { weight: weight.semibold }),
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {index + 1}
+            </span>
+            <span>
+              <span style={{ display: 'block', font: type(text.small, { weight: weight.semibold }), color: ink.strong }}>
+                {level.title}
+              </span>
+              <span style={{ display: 'block', font: type(text.micro), color: ink.subtle }}>{level.example}</span>
+              <span style={{ display: 'block', color: brand.ink }}>{level.who}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p style={{ margin: 0, font: type(text.micro, { leading: 1.5 }), color: ink.muted }}>{GENERAL_ROLES_ONLY}</p>
+    </div>
+  );
+}

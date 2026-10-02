@@ -628,6 +628,7 @@ export function App() {
               index={loaded.index}
               address={session.address}
               section={session.guideSection}
+              catchments={catchments}
               onFinish={() => {
                 dispatch({ type: 'guide-finished' });
               }}
