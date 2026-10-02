@@ -55,6 +55,11 @@ import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
 import { waterNearby } from '../map/nearby.js';
 import { AddressInsight } from '../map/AddressInsight.js';
+import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
+import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
+import { DRAINAGE_AREA } from '../catchment/wording.js';
+import { DrainageArea, OPEN_DRAINAGE_AREA, openLinkStyle } from './DrainageArea.js';
+import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
@@ -110,6 +115,13 @@ export interface MapViewProps {
   readonly mode?: MapMode | null;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
+  /**
+   * The drainage areas and which one each address is in, or null.
+   *
+   * Null is the honest state when the files have not loaded: the address card
+   * then offers no drainage area rather than an empty one.
+   */
+  readonly catchments?: { readonly areas: SubcatchmentsArtefact; readonly assignment: AddressCatchmentsArtefact } | null;
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
@@ -232,6 +244,7 @@ export function MapView({
   task,
   mode = null,
   panel = true,
+  catchments = null,
   index,
   onAddress,
   onClearAddress,
@@ -257,6 +270,29 @@ export function MapView({
   const guided = task !== 'full-map';
   const [layers, setLayers] = useState<LayerState>(() => openWith ?? openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
+  /**
+   * Whether the drainage-area card is open.
+   *
+   * Not session state: it is a thing being read on this map, like a pit's
+   * card, and reopening the map should not reopen it. Closing it takes the
+   * boundary off the map with it — the drawing explains the card, not the
+   * other way round.
+   */
+  const [areaOpen, setAreaOpen] = useState(false);
+  /*
+    The address's own drainage area, read from the published answer.
+
+    `indexed` is the index's record for this address: the lookup is by street
+    and published position, and the session carries a label and a coordinate.
+    Matching on the label is matching on what the person searched for.
+  */
+  const indexed =
+    address === null ? null : (index?.addresses.find((entry) => entry.label === address.label) ?? null);
+  const area: Subcatchment | null = areaFor(catchments?.areas ?? null, catchments?.assignment ?? null, indexed);
+  const catchmentRings =
+    catchments === null || area === null
+      ? null
+      : boundaryInMapFrame(area.rings, catchments.areas.extent, map.extent);
   /**
    * The pit's card is folded away, and the pit is still selected.
    *
@@ -493,6 +529,7 @@ export function MapView({
         showPipes={layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
+        catchment={areaOpen && catchmentRings !== null ? catchmentRings : null}
         warnings={layers.lowPoint ? warningPoints : null}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
@@ -761,11 +798,35 @@ export function MapView({
         one card too many, and the one somebody just pressed is the one they
         are reading.
       */}
+      {/*
+        The drainage-area card. Anchored on the address, like the address's
+        own card, because the area it describes is the one the address is in
+        and the boundary is drawn around them both.
+      */}
+      {panel && viewport !== null && address !== null && areaOpen && (
+        <MapCallout
+          at={toScreen(viewport, [address.eastingM, address.northingM])}
+          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          title={DRAINAGE_AREA}
+          onClose={() => {
+            setAreaOpen(false);
+          }}
+        >
+          <DrainageArea area={area} />
+          {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
+            <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
+              The boundary is outside this view. Zoom out to see it.
+            </span>
+          )}
+        </MapCallout>
+      )}
+
       {panel &&
         viewport !== null &&
         address !== null &&
         hit === null &&
         warning === null &&
+        !areaOpen &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
@@ -790,6 +851,25 @@ export function MapView({
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
               Select a drain pit or pipe to read what the council recorded about it.
+            </span>
+          )}
+          {/*
+            The way into Epic 6's first screen (AC 6.1.1), offered only where
+            there is an answer to open: no files, no link, rather than a link
+            to a card that says nothing.
+          */}
+          {catchments !== null && indexed !== null && (
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  setAreaOpen(true);
+                }}
+                style={openLinkStyle}
+              >
+                {OPEN_DRAINAGE_AREA}
+              </button>
             </span>
           )}
         </MapCallout>

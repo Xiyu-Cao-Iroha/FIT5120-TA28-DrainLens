@@ -35,6 +35,7 @@ import { type DifferenceArea, footprintCorners, intoMapFrame } from './map/diffe
 import type { Local } from './map/viewport.js';
 import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
 import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
+import { loadCatchments } from './catchment/artefact.js';
 import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
@@ -238,6 +239,17 @@ export function App() {
   const [differences, setDifferences] = useState<DifferencesArtefact | null>(null);
   useEffect(() => {
     void loadDifferences('/data/scenario-differences.json').then(setDifferences);
+  }, []);
+
+  /*
+    The drainage areas, for Epic 6. Two files, loaded together because one is
+    useless without the other, and null when either is late or malformed: the
+    map works without them and the address card then offers no drainage area
+    rather than an empty one.
+  */
+  const [catchments, setCatchments] = useState<Awaited<ReturnType<typeof loadCatchments>>>(null);
+  useEffect(() => {
+    void loadCatchments('/data/subcatchments.json', '/data/address-catchments.json').then(setCatchments);
   }, []);
   const differing = useMemo(() => differingDrains(differences), [differences]);
 
@@ -970,6 +982,7 @@ export function App() {
           loaded={loaded}
           session={session}
           dispatch={dispatch}
+          catchments={catchments}
           crumb={crumb}
         />
       );
@@ -991,9 +1004,11 @@ function MapScreen({
   session,
   dispatch,
   crumb,
+  catchments,
 }: {
   readonly credits: readonly Credit[];
   readonly loaded: Loaded;
+  readonly catchments: Awaited<ReturnType<typeof loadCatchments>>;
   readonly session: Session;
   readonly dispatch: (event: SessionEvent) => void;
   readonly crumb: (label: string, onClick?: () => void, current?: boolean) => React.ReactNode;
@@ -1075,6 +1090,7 @@ function MapScreen({
         task={session.task}
         mode={session.mapMode}
         index={loaded.index}
+        catchments={catchments}
         onAddress={(picked) =>
           dispatch({
             type: 'address-moved',

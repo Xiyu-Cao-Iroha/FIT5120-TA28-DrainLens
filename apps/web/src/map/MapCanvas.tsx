@@ -32,6 +32,7 @@ import {
 } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
+import { drawCatchmentBoundary } from './catchmentBoundary.js';
 import { ROAD_OVER_TERRAIN } from './terrain.js';
 import { drawTerrainMarks } from './terrainMarks.js';
 import { type TerrainTiles, drawTerrainColour, drawTerrainShade, marksInView } from './terrainTiles.js';
@@ -131,6 +132,14 @@ export interface MapCanvasProps {
    */
   readonly difference?: DifferenceArea | null;
   /**
+   * The drainage area's boundary, when its card is open.
+   *
+   * Under everything else and not pressable: the card is already open when
+   * this is drawn, and an area the size of the view would otherwise swallow
+   * presses meant for the pits inside it.
+   */
+  readonly catchment?: readonly Local[][] | null;
+  /**
    * The signs on especially deep low areas, or null when Low areas is off.
    *
    * Drawn only from `WARNING_MIN_SCALE` in, and the zoom is the canvas's to
@@ -183,6 +192,7 @@ export function MapCanvas({
   openAt = null,
   trace = null,
   difference = null,
+  catchment = null,
   warnings = null,
   onWarningPress,
   onSelect,
@@ -293,6 +303,8 @@ export function MapCanvas({
           }
         : {}),
     });
+    // First of the overlays: it is the area everything else sits inside.
+    if (catchment) drawCatchmentBoundary(context, catchment, viewport);
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // Over the low areas they mark and the pits beside them: a press on a sign
     // goes to the sign, so the sign has to be the thing on top.
@@ -307,7 +319,7 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
-      terrain, terrainVersion, showPipes, showPits, difference, warnings]);
+      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
