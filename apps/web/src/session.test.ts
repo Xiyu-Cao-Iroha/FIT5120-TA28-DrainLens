@@ -1307,3 +1307,49 @@ describe('the blocked-drain comparison, step by step', () => {
     expect(onMap.screen).toBe('explore');
   });
 });
+
+describe('what the reader says about a place near them', () => {
+  const addressAt = (id: string) => ({ id, label: `${id} Street, Kensington`, eastingM: 500, northingM: 500 });
+
+  it('remembers one answer per place, and lets it be changed', () => {
+    // AC 5.4.1: a selection can be changed, and both answers are selections.
+    let session = reduce(INITIAL_SESSION, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'place-reviewed', place: 2, relevance: 'does-not-apply' });
+    expect(session.relevance).toEqual({ 1: 'applies', 2: 'does-not-apply' });
+
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'does-not-apply' });
+    expect(session.relevance[1]).toBe('does-not-apply');
+  });
+
+  it('resets them all when asked', () => {
+    const reviewed = reduce(INITIAL_SESSION, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    expect(reduce(reviewed, { type: 'places-reset' }).relevance).toEqual({});
+  });
+
+  it('forgets them when the address changes', () => {
+    /*
+     * AC 5.4.2. Place 2 at one address is a different place from Place 2 at
+     * another, so an answer carried across would attach a reminder to a spot
+     * the reader has never seen — and the criterion says no reminder may come
+     * from a selection made for the previous address.
+     */
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'address-moved', address: addressAt('b') });
+    expect(session.relevance).toEqual({});
+  });
+
+  it('keeps them while the same address is re-picked', () => {
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'address-moved', address: addressAt('a') });
+    expect(session.relevance).toEqual({ 1: 'applies' });
+  });
+
+  it('forgets them when a guide or the full map asks for the address again', () => {
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    expect(reduce(session, { type: 'guide-chosen', section: 'low-areas' }).relevance).toEqual({});
+    expect(reduce(session, { type: 'map-opened' }).relevance).toEqual({});
+  });
+});
