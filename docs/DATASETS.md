@@ -126,10 +126,16 @@ Two files from 1270.0.55.001, both the **2011 edition**, which is the edition th
 
 The pages are cited and linked, not copied: summaries are the team's own sentences, and say only what those pages state. An event appears only after a team member fills in `checkedBy` and `checkedOn`. **On 16 September none of the four is checked**: all four were rewritten from these sources that day, so the Maribyrnong check of 14 September was cleared with them. `tools/data/check-events.mjs` holds the file to that rule in CI, refuses a source on a news outlet's site (`NEWS_HOSTS`), and ties every event to an area the map has.
 
+### Official guidance the product quotes
+
+Epic 5 and Epic 6 cite pages rather than datasets: what to do before heavy rain, and who to contact about a drainage problem. Every one is recorded in [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) with the sentence it came from, the publisher, the page and the day it was read — Victoria State Emergency Service, City of Melbourne, Melbourne Water and the Building and Plumbing Commission, read on 2 and 3 October 2026.
+
+They are quoted, not copied: one sentence each, shortened into the product's own words, with the original kept in the register for a reviewer to check. **Two things those pages say are deliberately left out**: their response times, which AC 6.3.2 forbids repeating, and anything about what will be done, for the same reason. The register also records the one action the design asks for that no official page was found to carry.
+
 ### Not data at all
 
 - **The homepage photograph** (`apps/web/public/hero-street.webp`) is illustrative. Nothing is measured from it and it is not of the pilot area. Its origin and licence are not recorded in the repository — **fill this in before submission**.
-- **The guide chooser's landscape** (`apps/web/public/choose-landscape.webp`) is an illustration behind the four cards, added on 14 September. The same applies: nothing is measured from it, and its origin and licence are not recorded — **fill this in too**.
+- **The guide chooser's landscape** (`apps/web/public/choose-landscape.webp`) is an illustration behind the guide cards, added on 14 September. The same applies: nothing is measured from it, and its origin and licence are not recorded — **fill this in too**.
 - **The typeface** is self-hosted with its licence file beside it; the site makes no request to a font or map service.
 
 ---

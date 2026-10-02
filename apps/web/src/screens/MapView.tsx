@@ -1029,6 +1029,14 @@ export function MapView({
               setOpenPlace(place.number);
             }}
             {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
+            {...(guided
+              ? {}
+              : {
+                  onReport: () => {
+                    setPlanOpen(false);
+                    openReport(null);
+                  },
+                })}
           />
         </MapNote>
       )}
@@ -1039,18 +1047,25 @@ export function MapView({
           {/*
             Reporting is its own pathway, reached from the card about who
             holds what rather than from the preparation plan (AC 6.2.3).
+
+            Not inside a guide. A guide teaches one thing at a time -- it is
+            why the address card is suppressed there too -- and this opens a
+            card taller than the guide's map frame, over a step that was
+            asking about something else.
           */}
-          <span style={{ display: 'block', marginTop: space(3) }}>
-            <button
-              type="button"
-              onClick={() => {
-                openReport(hit?.kind === 'pit' ? String(hit.feature.asset_number) : null);
-              }}
-              style={planLinkStyle}
-            >
-              {REPORT_HEADING}
-            </button>
-          </span>
+          {!guided && (
+            <span style={{ display: 'block', marginTop: space(3) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  openReport(hit?.kind === 'pit' ? String(hit.feature.asset_number) : null);
+                }}
+                style={planLinkStyle}
+              >
+                {REPORT_HEADING}
+              </button>
+            </span>
+          )}
         </MapNote>
       )}
 

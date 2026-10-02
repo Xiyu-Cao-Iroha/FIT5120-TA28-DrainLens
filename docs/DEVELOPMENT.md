@@ -200,7 +200,7 @@ CI runs on every pull request and all three jobs must pass: `check` (Node), `pip
 | Suite runtime | not automated — watch it | under 5 s. **On the CI runner: Node 5 s in all three samples, which is at the limit, and Python 51–67 s, which breaches it.** Locally 3.6 s and 105 s — different hardware, so quote the one you mean. See the root README |
 | Lockfile integrity | `npm ci` in CI | fails on drift |
 | Markdown structure | `node tools/docs/check.mjs` | stray table rows, ragged rows, unclosed fences, broken relative links, and a raw NUL byte in any tracked text file |
-| Published artefacts | `node tools/data/check-*.mjs`, six scripts | a recorded inlet with a path onward within 200 m of every address the guide can be given, the area files against each other, both copies of the derived layers, the scenario and terrain tile packs against their indexes, and the verified flood events against the map's areas |
+| Published artefacts | `node tools/data/check-*.mjs`, nine scripts | a recorded inlet with a path onward within 200 m of every address the guide can be given, the area files against each other, both copies of the derived layers, the low-area warnings against the low areas they mark, the scenario and terrain tile packs against their indexes, the verified flood events against the map's areas, every pipe operator value against the mapping that explains it, and every address against the drainage area it was published in |
 
 > **`apps/web/dist` locally is not what ships.** `npm run typecheck` is `tsc --build --force`, which emits a `.js`, `.d.ts` and `.map` for every source file into the same `dist` Vite writes to — 130 files locally against the 14 the site serves. The container never sees them: the Dockerfile runs only `npm run build`. Confirmed against the live site, where `/map/draw.js` returns the single-page fallback as `text/html` rather than a script. Do not read a local `dist` listing as the deployed file list.
 
@@ -212,7 +212,7 @@ If a test would push the suite past five seconds, it belongs behind a separate s
 
 Cloud Run: https://drainlens-205559161217.australia-southeast1.run.app. The runbook, the two mistakes made getting there, and the verification that asserts the absence of stored IPs are in [deploy/README.md](../deploy/README.md).
 
-**During Iteration 2 the only service that is redeployed is `drainlens-dev`**, built from `develop`. The root service serves `iteration-1-frozen` until Iteration 2 is finished, and `drainlens-iteration1` is never touched. Firebase Hosting is not an option: it was rejected by the teacher before anything was deployed.
+**During Iteration 3 the only service that is redeployed is `drainlens-dev`**, built from `develop`. The root service serves Iteration 2 until Iteration 3 is finished, and `drainlens-iteration1` and `drainlens-iteration2` are never touched: each is a finished iteration at its own address. Firebase Hosting is not an option: it was rejected by the teacher before anything was deployed.
 
 A deployment is run by hand, from a terminal on the project, by the team member holding its credentials — never from CI, and never by a script or an automated session acting on its own:
 

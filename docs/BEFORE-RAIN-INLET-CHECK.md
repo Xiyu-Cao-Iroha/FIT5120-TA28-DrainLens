@@ -4,6 +4,8 @@ A design note for Epic 5, step 3. DrainLens · TA28 · **30 September 2026**.
 
 **No production code was changed for this note.** Everything below was measured against the published artefacts on `develop` at `ea1598f`.
 
+> **3 October: Epic 5 shipped with the behaviour this note recommends.** No inlet is ranked and no drain is called worth checking. The places a reader is offered are the published pooling markers, numbered by distance and said to be numbered by distance; the design register for those rules is [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md). The open part is still open: AC 5.2.3's wording asks for something the data cannot support, and §9 below says what would change that.
+
 ---
 
 ## The answer first

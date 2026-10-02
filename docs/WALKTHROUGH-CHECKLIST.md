@@ -7,6 +7,8 @@ Fill it in while doing it. An entry written afterwards from memory is worth less
 > **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
 >
 > **14 September: `develop` has moved well past those three places**, and `drainlens-dev` will show all of it once it is redeployed. The drain-blockage comparison is back, reached from a drain on the *Full map*; the ground height covers the council; the address panel shows which way the ground falls; and the site also stores `drainlens.learned` — guide progress, four `0`/`1` characters and nothing else — which row 1.1.1.e would otherwise mark as a defect. The words this sheet quotes have been brought to the names the copy review settled. **For the Iteration 2 criteria, work from [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md)**; there is no click-order sheet for them yet.
+>
+> **3 October: sections 9 and 10 below are the Iteration 3 sheet**, for Epic 5 (before-rain checks and the plan) and Epic 6 (the drainage area, who can help, and reporting). They are written against [ITERATION-3-ACCEPTANCE.md](./ITERATION-3-ACCEPTANCE.md) and against `develop`, so run them on the dev server or on `drainlens-dev` after it is redeployed. The storage check has a second expected key now: `drainlens.learned` holds **six** `0`/`1` characters, one per guide.
 
 ---
 
@@ -227,6 +229,67 @@ Reach an insufficient state — a pit the scene cannot place will do.
 | 1.1.5.a | "Choose a task" returns to the task page | | |
 | 1.1.5.b | The address survives it | | |
 | — | Browser **back** never lands on a screen with lost state | | |
+
+---
+
+## 9 · Epic 5 — before-rain checks and the plan
+
+Start on the **Full map** with `46 Gatehouse Drive` chosen. That address has one place; `11 Neale Street` has none, and both are needed.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| 5.1.1.a | *Before-rain checks* is a chip on the map, and the legend gains a line for it under **Estimated by DrainLens** | | |
+| 5.1.1.b | The markers near the address are **numbered**; markers further away are not | | |
+| 5.1.1.c | The address card offers **Check before heavy rain (1)** — the count in brackets | | |
+| 5.1.1.d | Nothing on screen calls the number risk, severity or priority | | |
+| 5.1.2.a | Pressing it opens **Place 1**, with the action before any explanation | | |
+| 5.1.2.b | The action is conditional: *If you park or leave bins here…* | | |
+| 5.3.1.a | *Why this place?* is folded, and opens to the low-area reason, *Estimated by DrainLens · Not a live warning*, and the sentence that it is the street rather than your property | | |
+| 5.2.2.a | Answering sends you on — to the next place, or to the plan on the last one | | |
+| 5.2.2.b | A reminder appears **only** for *Applies to me*, worded *When heavy rain is forecast: move your car or bins from Place 1* | | |
+| 5.2.3.a | The plan separates **Places near you** from **For every home** | | |
+| 5.2.3.b | No *Who can help* line sits against a nearby place | | |
+| 5.2.3.c | Three general actions, each one sentence, each naming its publisher | | |
+| 5.2.3.d | **Report a drainage problem** is a section of its own, not a fourth action | | |
+| 5.3.3 | The safety boundary is at the foot, unfolded: not a warning, not a forecast, monitor VicEmergency, never enter floodwater, **132 500**, **000** | | |
+| 5.4.1.a | *n of m reviewed* counts both answers, and says it is not a safety or readiness score | | |
+| 5.4.1.b | No *Done* or *Completed* anywhere | | |
+| 5.4.1.c | An answer can be changed, and *Reset my answers* clears them | | |
+| 5.4.2 | Switch to `11 Neale Street` and back. **The answers are gone**, and the plan says no places were marked and that this does not mean the area cannot flood | | |
+| 5.1.3 | At `11 Neale Street` there is no *Places near you* section at all, and the general actions are still offered | | |
+| 5.4.3.a | *Print or save my plan* opens the browser's print dialog with **one page** | | |
+| 5.4.3.b | That page holds the address, the date, only the reminders you marked as applying, the general actions, the sources and the safety boundary | | |
+| 5.4.3.c | It holds **no** reviewed count, no *Doesn't apply*, no *Not reviewed*, and no button | | |
+| 5.4.1.d | DevTools → Application: no address and no answers in `localStorage`, `sessionStorage`, cookies or the URL. Network tab: no request carries either | | |
+
+Then run the guide: **Get ready for heavy rain**, from the guide chooser.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| — | It opens with the markers already drawn — the only guide that opens with a layer on | | |
+| — | Four steps, in this order: press the button, read *Why this place?*, decide, read the plan | | |
+| — | The reporting pathway does **not** appear inside the guide | | |
+
+## 10 · Epic 6 — the drainage area, who can help, and reporting
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| 6.1.1.a | *My drainage area* draws the whole boundary, dashed, never clipped to the view | | |
+| 6.1.1.b | The name is plain English: no numeric prefix, `M.D.` written out | | |
+| 6.1.2 | The receiving drain reads **has not been confirmed** until the classification register is approved — if it claims a type, that is a defect today | | |
+| 6.1.3 | The summary gives recorded area, pit count, mapped pipe length and whether low areas are present, with the share of the area those counts cover | | |
+| 6.1.4 | Two dates under *More information*, labelled apart, neither called a survey date | | |
+| 6.2.1 | *Who can help* shows three levels with an example each, and says these are general roles that do not confirm who owns a particular asset | | |
+| 6.2.2.a | Select a pipe: **Operator: City of Melbourne**, or an unidentified code, or nothing — never guessed | | |
+| 6.2.2.b | Select a pit: it is a council stormwater pits record, with **no** operator | | |
+| 6.3.1 | *Report a drainage problem* offers exactly five problem types | | |
+| 6.3.2.a | Each names one organisation and one official channel, and nothing says when somebody will come or what will be done | | |
+| 6.3.2.b | **Private property** goes to a licensed plumber, not to the council | | |
+| 6.3.2.c | With no drain selected, the report says you can report without choosing one and that nothing is chosen for you | | |
+| 6.3.2.d | Select a pit first, then open the pathway: **Selected recorded drain: <number>** appears, and *Remove* takes it off | | |
+| 6.3.2.e | Nothing offers to submit the report | | |
+| 6.3.4 | **Flood or storm emergency** puts Triple Zero and 132 500 above everything else, and the checklist below *Once everyone is safe* | | |
+| 6.3.3 | *Copy summary* and *Print summary* produce the address, the problem, who to contact and the checklist, and say the copy is yours | | |
 
 ---
 

@@ -148,7 +148,11 @@ three more sit beside it and are part of the schema too: `002_second_extent.sql`
 `pipe`, because across the council 85 pipes carry no `ref` and one `ref` is used
 twice) and `004_scope_areas.sql` (`sa2_code` and `board_rank` on
 `flood_area_coverage`, so the flood tables hold all 281 areas and the board is
-the thirty that carry a rank).
+the thirty that carry a rank). Since 30 September a fifth,
+`005_pipe_operator.sql`, adds `operator` to `pipe`: the column was in the
+council's export from the start and the pipeline had been dropping it, so every
+pipe reached the browser with AC 6.2.2's question unanswerable. It is nullable,
+because 87 pipes record nothing and an empty string would be a claim.
 
 ### Three things the draft got wrong, found by running it
 
@@ -396,6 +400,7 @@ erDiagram
         bigint dnstr_pit "not a foreign key"
         int diameter_mm "a dimension, never a capacity"
         text material
+        text operator "nullable since 005; 853 carry an unexplained code"
         jsonb path
     }
 

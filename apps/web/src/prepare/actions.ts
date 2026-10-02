@@ -101,5 +101,15 @@ export const NOT_A_SCORE =
 /** Reporting is its own path, not a preparation action (AC 5.2.3, 5.3.2). */
 export const REPORT_PATHWAY = 'Report a drainage problem';
 
-/** Who a nearby-place reminder is for, which is never an organisation (AC 6.2.3). */
-export const WHO_FOR_A_PLACE = 'You or your household';
+/*
+  There is no *Who can help* line against a nearby place, and there is no
+  constant for one.
+
+  AC 6.2.3 says a preparation action is the reader's own and never an
+  organisation's, which read like an instruction to write *You or your
+  household* under each reminder -- and that is what the plan did for a day.
+  AC 5.2.3 and AC 5.3.2 both forbid exactly that line against a nearby place.
+  Naming nobody satisfies all three: no organisation is named because a pit
+  happens to be nearby, and the reader is not told that the thing they just
+  agreed to do is theirs to do.
+*/

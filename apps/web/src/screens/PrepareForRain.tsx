@@ -26,9 +26,9 @@ import { type ReactNode, useId, useState } from 'react';
 import {
   GENERAL_ACTIONS,
   NOT_A_SCORE,
+  REPORT_PATHWAY,
   SAFETY,
   VICEMERGENCY,
-  WHO_FOR_A_PLACE,
 } from '../prepare/actions.js';
 import {
   FOR_EVERY_HOME,
@@ -129,6 +129,7 @@ export function PreparePlan({
   relevance,
   onShowOnMap,
   onReset,
+  onReport,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -136,6 +137,8 @@ export function PreparePlan({
   readonly relevance: Readonly<Record<number, Relevance>>;
   readonly onShowOnMap?: ((place: Place) => void) | undefined;
   readonly onReset?: (() => void) | undefined;
+  /** The way into the reporting pathway, which is its own thing (AC 5.2.3). */
+  readonly onReport?: (() => void) | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -184,10 +187,13 @@ export function PreparePlan({
                         When heavy rain is forecast
                       </span>
                       {reminderFor(place)}
-                      {/* AC 5.3.2 and 6.2.3: a place is the reader's own, never an organisation's. */}
-                      <span style={{ display: 'block', font: type(text.micro), color: ink.subtle }}>
-                        Who can help: {WHO_FOR_A_PLACE}
-                      </span>
+                      {/*
+                        No *Who can help* line here. AC 5.2.3 and 5.3.2 both
+                        forbid one against a nearby place, and the reason the
+                        line was there -- AC 6.2.3, that a preparation action
+                        is the reader's own and never an organisation's -- is
+                        met by naming nobody at all.
+                      */}
                     </span>
                   )}
                   {onShowOnMap !== undefined && (
@@ -240,6 +246,23 @@ export function PreparePlan({
           ))}
         </ul>
       </section>
+
+      {/*
+        Reporting, named and kept apart (AC 5.2.3, 5.3.2).
+
+        A section of its own rather than a fourth general action: preparing
+        for rain is something the reader does, and reporting is something
+        they ask somebody else to do. Running them together is how a plan
+        starts reading as a list of chores from the council.
+      */}
+      {onReport !== undefined && (
+        <section aria-label={REPORT_PATHWAY} style={{ marginTop: space(3) }}>
+          <Heading>Something already wrong?</Heading>
+          <button type="button" onClick={onReport} style={linkStyle}>
+            {REPORT_PATHWAY}
+          </button>
+        </section>
+      )}
 
       {/*
         Print or save (AC 5.4.3), outside the places section because an

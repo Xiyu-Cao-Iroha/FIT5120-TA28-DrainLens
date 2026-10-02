@@ -6,6 +6,8 @@ What "done" means for Epic 5 and Epic 6. The work that produces it is in [ITERAT
 
 **Tick a criterion only when it has been seen working on the deployed build** — not when the code that should satisfy it has been merged. Nothing below is ticked: this file was written on **29 September 2026**, before the work.
 
+> **3 October 2026: every Must Have screen is built and none of this is ticked**, which is the distinction this paragraph exists to keep. The build work is finished — [ITERATION-3-TASKS.md](./ITERATION-3-TASKS.md) says where each block stands — and the click-order sheet for Epics 5 and 6 is sections 9 and 10 of [WALKTHROUGH-CHECKLIST.md](./WALKTHROUGH-CHECKLIST.md). Two things will still be found unmet when somebody runs it: **AC 6.1.2's four wordings** read *has not been confirmed* for every address until the classification register is approved, and **AC 6.3.2's channels** are shown on the strength of the publishers' own pages rather than a reviewer's name. Both are approvals, not code.
+
 **Source:** *Iteration 3 Requirements* and *Iteration 3 Epic, US & AC*, received **29 September 2026**. Epic 5 (US 5.1–5.4) and Epic 6 (US 6.1–6.3) are **Must Have**. Epic 7 (US 7.1–7.2) is **Could Have**, US 7.3 **Won't Have**, and neither has criteria here. Where those documents and this file disagree, the documents win and this file has a bug.
 
 **190 sub-criteria: 109 in Epic 5, 81 in Epic 6**, across 25 acceptance criteria. Iteration 1 had 96 and Iteration 2 had 134.
