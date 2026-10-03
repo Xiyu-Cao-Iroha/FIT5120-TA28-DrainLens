@@ -30,10 +30,10 @@ All of the Must Have build work is done. What is left is content the team signs 
 | **W1 · Data** | **Done.** W1.1 to W1.7. 35 subcatchments published, 62,396 of 62,397 addresses matched to exactly one, pipe length clipped at the boundary, the operator field carried through to the API, and two new checks in CI. |
 | **W2 · Epic 6 screens** | **Done.** W2.1 to W2.6 landed as the drainage-area guide; W2.7 and W2.8, the reporting pathway and its emergency branch, on 3 October. |
 | **W3 · Epic 5 screens** | **Done.** W3.1 to W3.8, including the printed plan (W3.7) and the safety boundary block (W3.8). |
-| **W4 · Content the team writes** | **Blocked on approval, not on writing.** W4.2 and W4.3 are drafted in [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md); W4.1 in [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md); W4.4 in [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md). **None is approved**, and until they are the product says *has not been confirmed* for every receiving drain. |
+| **W4 · Content the team writes** | **Done, 4 October.** All three registers approved by Xiyu Cao: W4.1 [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md), W4.2 and W4.3 [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md), W4.4 [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md) — all 35 rows in one sitting. The published artefact now carries 26 main drains, 5 waterway sections, 3 council-direct and 1 unclassified, so an address reads what receives its water instead of *has not been confirmed*. One question is left open on purpose: whether to keep looking for a source for the design's fourth preparation action. |
 | **W5 · Quality and operations** | **Partly done.** W5.1 (this checklist, extended), W5.2 (checks in CI), W5.3 (the privacy pass, re-run on 3 October) and W5.6 (both operational jobs settled on 4 October) are done. W5.4 accessibility and W5.5 the carried-over copy audit are not. |
 
-> **The three registers are the only thing between this iteration and its definition of done.** Every criterion they gate is already built and already hedged in the product's own words; approving them is what turns *has not been confirmed* into the sentence the design asks for.
+> **The three registers were the only thing between this iteration and its definition of done, and they were approved on 4 October.** What is left is W5.4 accessibility and W5.5 the carried-over copy audit — both of them work, not decisions.
 
 ---
 
@@ -103,10 +103,10 @@ The measurements behind the first three are in the acceptance file.
 
 | | Task | Serves |
 |---|---|---|
-| W4.1 | The preparation rules register: which markers qualify, the distance, the numbering, the count limit — approved and recorded in the PGP | 5.1.1, DoD |
-| W4.2 | The guidance content register: every official channel, phone number and quotation, with the source and the date checked | 5.3.2, 6.2.1, 6.3.2 |
-| W4.3 | Three to four general preparation actions, each one short sentence, each traceable to official guidance | 5.2.3 |
-| W4.4 | The subcatchment classification register, signed off name by name | 6.1.2 |
+| W4.1 | ~~The preparation rules register~~ — **approved 4 October**, [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md) | 5.1.1, DoD |
+| W4.2 | ~~The guidance content register~~ — **approved 4 October**, [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) | 5.3.2, 6.2.1, 6.3.2 |
+| W4.3 | ~~Three to four general preparation actions, each traceable~~ — **approved 4 October**; the design's fourth is still without a source, which is the one question left open | 5.2.3 |
+| W4.4 | ~~The subcatchment classification register, signed off name by name~~ — **approved 4 October**, all 35 rows in one sitting | 6.1.2 |
 | W4.5 | ~~Checking the four flood events still waiting from Iteration 2~~ — done 29 September; all four are checked and shown | carried over |
 | W4.6 | Deciding the *Check the street drains near you* branch: the measured design note is [BEFORE-RAIN-INLET-CHECK.md](./BEFORE-RAIN-INLET-CHECK.md), which recommends keeping the approved no-ranking behaviour and changing AC 5.2.3 for volume rather than for a score | 5.2.3, DoD |
 

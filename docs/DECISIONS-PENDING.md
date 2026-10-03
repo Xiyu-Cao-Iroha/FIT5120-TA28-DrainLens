@@ -242,21 +242,25 @@ Those are different statements and the map currently makes them look identical. 
 
 ---
 
-## 9 · Three registers, written and unapproved — **OPEN, 3 October 2026, and the only thing between Iteration 3 and its definition of done**
+## 9 · Three registers, written and unapproved — **DECIDED 4 October 2026: all three approved**
 
-Every Must Have screen in Epic 5 and Epic 6 is built. Three registers now sit between them and the words the design asks for, and none of them can be approved by code.
+Every Must Have screen in Epic 5 and Epic 6 is built. Three registers sat between them and the words the design asks for, and none of them could be approved by code.
 
-| Register | What it decides | What the product says until it is approved |
+**Xiyu Cao approved all three on 4 October 2026**, the classification register's thirty-five rows in one sitting, which that register's own instructions allow and ask to be recorded as exactly that. Every row carries that name and date in `subcatchment_register.py` as well as in the register itself. What each one unlocked is in the table below.
+
+| Register | What it decides | What it changed on 4 October |
 |---|---|---|
-| [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md) | Which of the four receiving-drain classes each of the 35 drainage areas is | *The type of drain or waterway that receives its water has not been confirmed* — for every address |
-| [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) | The channels, telephone numbers and quotations the reporting pathway cites | The channels are shown, sourced from the publishers' own pages, with nobody's name against the choice |
-| [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md) | Which markers qualify as places, the 200 m, the three, the nearest-first | The rules are in force, measured but not agreed |
+| [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md) | Which of the four receiving-drain classes each of the 35 drainage areas is | 26 main drains, 5 waterway sections, 3 council-direct, 1 left unclassified. An address now reads what receives its water: 46 Gatehouse Drive reads *This area drains to Maribyrnong River (Lower), a section of the waterway* |
+| [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) | The channels, telephone numbers and quotations the reporting pathway cites | Nothing on screen changed. The channels now carry a reviewer's name as well as a source |
+| [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md) | Which markers qualify as places, the 200 m, the three, the nearest-first | Nothing on screen changed. The rules are now agreed as well as measured |
 
-**The product is honest in the meantime, deliberately.** `classify()` returns `unclassified` for every unapproved row however strongly its name reads, and a data check fails the build if the artefact ever claims a class the register has not approved. That is the safe state, not the finished one: a reader is currently told nothing where the design promises a sentence.
+**The safe state held until the moment it was lifted, which is the point.** `classify()` returned `unclassified` for every unapproved row however strongly its name read, and the data check fails the build if the artefact claims a class the register has not approved.
+
+**That check had a bug, found by approving.** Its pattern could not see an approval on any area whose name carries brackets — `(LOWER)`, `(CITY)`, `(MOUTH TO MERRI)` — which is six of the thirty-five, including the two largest, 27,166 addresses between them. Approving them correctly would have been reported as not approving them at all. It reads a line at a time now.
 
 ### The fourth preparation action
 
-The design shows **Move valuable items above floor level**. No official page carrying it was found on 2 October, so it is not in the product — three actions is within what AC 5.2.3 asks for, and a mock-up is not a source. The decision is whether to keep looking for a source or to drop it from the design. Either is fine; shipping it without one is not.
+The design shows **Move valuable items above floor level**. No official page carrying it was found on 2 October, so it is not in the product — three actions is within what AC 5.2.3 asks for, and a mock-up is not a source. The decision is whether to keep looking for a source or to drop it from the design. Either is fine; shipping it without one is not. **Still open on 4 October**, and deliberately outside the approval above: it is a decision about what to do next, not about anything the product says today.
 
 ### Two operational jobs — **both settled 4 October 2026**
 
