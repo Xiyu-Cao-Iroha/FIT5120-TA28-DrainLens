@@ -407,6 +407,8 @@ export function MapView({
     it, which is the only way a drain can reach a report: nothing is attached
     because it happens to be near, and `Remove` takes it off again.
   */
+  /** A reminder's explanation has been opened, which the guide waits on. */
+  const [whyOpen, setWhyOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDrain, setReportDrain] = useState<string | null>(null);
   const openReport = (drain: string | null) => {
@@ -571,6 +573,7 @@ export function MapView({
       help: layers.help,
       planOpen,
       placesReviewed,
+      whyOpen,
     });
   }, [
     terrainOn,
@@ -589,6 +592,7 @@ export function MapView({
     // Epic 5's two, for the same reason.
     planOpen,
     placesReviewed,
+    whyOpen,
     onMapNow,
   ]);
 
@@ -1027,6 +1031,9 @@ export function MapView({
             relevance={relevance}
             onShowOnMap={(place) => {
               setOpenPlace(place.number);
+            }}
+            onWhyOpen={() => {
+              setWhyOpen(true);
             }}
             {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
             {...(guided

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { PREPARE, problemFor } from './problems.js';
+import { problemFor, whatToInclude } from './problems.js';
 import { NO_ADDRESS, YOURS_TO_KEEP, reportSummary, summaryHtml, summaryText } from './summary.js';
 
 const ON = new Date(2026, 9, 3);
@@ -26,7 +26,10 @@ describe('what the summary holds', () => {
   });
 
   it('holds the checklist, in the order the reader will use it', () => {
-    expect(summary().checklist).toEqual(PREPARE);
+    expect(summary().checklist).toEqual(
+      whatToInclude(ADDRESS, null).map((item) => `${item.title}: ${item.detail}`),
+    );
+    expect(summary().checklist[0]).toBe(`Location: ${ADDRESS}`);
   });
 
   it('says the copy is the reader’s and that nothing is kept', () => {
@@ -46,18 +49,19 @@ describe('reading the map without an address', () => {
 });
 
 describe('the drain, which is the reader’s to add', () => {
-  it('adds the line only where one was selected', () => {
-    expect(summary('PIT-9001').checklist).toContain('Selected recorded drain: PIT-9001');
+  it('names it only where one was selected', () => {
+    expect(summary('PIT-9001').checklist).toContain('Which drain: Selected recorded drain: PIT-9001');
     expect(summaryText(summary())).not.toMatch(/Selected recorded drain/);
+    expect(summaryText(summary())).toMatch(/Which drain: Not chosen/);
   });
 });
 
 describe('the two ways it leaves the screen', () => {
   it('reads as plain text for the clipboard', () => {
     const text = summaryText(summary('PIT-9001'));
-    expect(text.startsWith('Report a drainage problem\n46 Gatehouse Drive, Kensington')).toBe(true);
+    expect(text.startsWith('Report a problem\n46 Gatehouse Drive, Kensington')).toBe(true);
     expect(text).toContain('Problem: Blocked or flooded street drain');
-    expect(text).toContain('- Selected recorded drain: PIT-9001');
+    expect(text).toContain('- Which drain: Selected recorded drain: PIT-9001');
     expect(text).not.toMatch(/<[a-z]/);
   });
 
@@ -67,5 +71,8 @@ describe('the two ways it leaves the screen', () => {
     expect(page).not.toMatch(/<link|<script|src=/);
     expect(page).toContain('Flood or storm emergency');
     expect(page).toContain('000');
+    // The printed copy still carries the two numbers, because it is the thing
+    // a reader may be holding when the screen is not in front of them.
+    expect(page).toContain('132 500');
   });
 });

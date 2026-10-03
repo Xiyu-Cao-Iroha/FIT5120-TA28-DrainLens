@@ -246,6 +246,7 @@ Start on the **Full map** with `46 Gatehouse Drive` chosen. That address has one
 | 5.1.2.b | The action is conditional: *If you park or leave bins here…* | | |
 | 5.3.1.a | *Why this place?* is folded, and opens to the low-area reason, *Estimated by DrainLens · Not a live warning*, and the sentence that it is the street rather than your property | | |
 | 5.2.2.a | Answering sends you on — to the next place, or to the plan on the last one | | |
+| 5.3.1.b | *Why this place?* is **also** under the reminder in the plan, folded (Figma G3) | | |
 | 5.2.2.b | A reminder appears **only** for *Applies to me*, worded *When heavy rain is forecast: move your car or bins from Place 1* | | |
 | 5.2.3.a | The plan separates **Places near you** from **For every home** | | |
 | 5.2.3.b | No *Who can help* line sits against a nearby place | | |
@@ -267,7 +268,7 @@ Then run the guide: **Get ready for heavy rain**, from the guide chooser.
 | | What to look at | Result | Note |
 |---|---|---|---|
 | — | It opens with the markers already drawn — the only guide that opens with a layer on | | |
-| — | Four steps, in this order: press the button, read *Why this place?*, decide, read the plan | | |
+| — | Four steps, in the design's order: press the button, decide, read the reminder in the plan, open *Why this place?* on it (Figma G1 to G5) | | |
 | — | The reporting pathway does **not** appear inside the guide | | |
 
 ## 10 · Epic 6 — the drainage area, who can help, and reporting
@@ -282,14 +283,14 @@ Then run the guide: **Get ready for heavy rain**, from the guide chooser.
 | 6.2.1 | *Who can help* shows three levels with an example each, and says these are general roles that do not confirm who owns a particular asset | | |
 | 6.2.2.a | Select a pipe: **Operator: City of Melbourne**, or an unidentified code, or nothing — never guessed | | |
 | 6.2.2.b | Select a pit: it is a council stormwater pits record, with **no** operator | | |
-| 6.3.1 | *Report a drainage problem* offers exactly five problem types | | |
+| 6.3.1 | *Report a problem* offers exactly five, **the emergency first and in red** (Figma B3) | | |
 | 6.3.2.a | Each names one organisation and one official channel, and nothing says when somebody will come or what will be done | | |
-| 6.3.2.b | **Private property** goes to a licensed plumber, not to the council | | |
-| 6.3.2.c | With no drain selected, the report says you can report without choosing one and that nothing is chosen for you | | |
+| 6.3.2.b | **Drainage problem on my property** goes to a licensed plumber, not to the council | | |
+| 6.3.2.c | *What to include* lists Location (filled in from the address), When, Photos and Which drain; with none selected the last reads *Not chosen. Nothing is chosen for you* | | |
 | 6.3.2.d | Select a pit first, then open the pathway: **Selected recorded drain: <number>** appears, and *Remove* takes it off | | |
 | 6.3.2.e | Nothing offers to submit the report | | |
-| 6.3.4 | **Flood or storm emergency** puts Triple Zero and 132 500 above everything else, and the checklist below *Once everyone is safe* | | |
-| 6.3.3 | *Copy summary* and *Print summary* produce the address, the problem, who to contact and the checklist, and say the copy is yours | | |
+| 6.3.4 | **Flood or storm emergency** is two call blocks — *Call 000 · If life is in danger*, then *Call VICSES 132 500 · For flood and storm help* — with two safety lines and the VicEmergency link, and **no checklist at all** (Figma B5) | | |
+| 6.3.3 | *Copy details* and *Print* produce the address, the problem, who to contact and the checklist, and say the copy is yours | | |
 
 ---
 

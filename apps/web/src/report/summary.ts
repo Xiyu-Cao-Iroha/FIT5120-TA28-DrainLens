@@ -13,7 +13,7 @@
  * same rule the address has had since Iteration 1.
  */
 
-import { type ProblemType, PREPARE, REPORT_HEADING, selectedDrainLine } from './problems.js';
+import { type ProblemType, REPORT_HEADING, whatToInclude } from './problems.js';
 import { channelLine } from './channels.js';
 import { escapeHtml, printedDate } from '../prepare/printable.js';
 
@@ -63,7 +63,7 @@ export function reportSummary(
     preparedOn: `Prepared on ${printedDate(on)}`,
     problem: problem.label,
     contacts: problem.channels.map(channelLine),
-    checklist: drain === null ? PREPARE : [...PREPARE, selectedDrainLine(drain)],
+    checklist: whatToInclude(address, drain).map((item) => `${item.title}: ${item.detail}`),
     keepLine: YOURS_TO_KEEP,
   };
 }
