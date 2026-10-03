@@ -14,6 +14,7 @@
  */
 
 import { type ProblemType, REPORT_HEADING, whatToInclude } from './problems.js';
+import { type ReportPlace, pinnedLink } from './place.js';
 import { channelLine } from './channels.js';
 import { escapeHtml, printedDate } from '../prepare/printable.js';
 
@@ -47,14 +48,14 @@ export interface ReportSummary {
 /**
  * The summary for one address and one chosen problem.
  *
- * `drain` is the asset number of a drain the reader selected on the map, and
- * `null` where they selected none — which is allowed, and which leaves the
- * line out rather than guessing at the nearest (AC 6.3.2).
+ * `place` is a drain the reader tapped or a point they pinned, and `null`
+ * where they named neither — which is allowed, and which says so rather than
+ * guessing at the nearest (AC 6.3.2).
  */
 export function reportSummary(
   address: string | null,
   problem: ProblemType,
-  drain: string | null,
+  place: ReportPlace,
   on: Date,
 ): ReportSummary {
   return {
@@ -63,7 +64,12 @@ export function reportSummary(
     preparedOn: `Prepared on ${printedDate(on)}`,
     problem: problem.label,
     contacts: problem.channels.map(channelLine),
-    checklist: whatToInclude(address, drain).map((item) => `${item.title}: ${item.detail}`),
+    checklist: [
+      ...whatToInclude(address, place).map((item) => `${item.title}: ${item.detail}`),
+      // A pin is a point as well as a sentence, and the point is only useful
+      // as something the reader can send (Figma B4d).
+      ...(pinnedLink(place) === null ? [] : [`Map link: ${String(pinnedLink(place))}`]),
+    ],
     keepLine: YOURS_TO_KEEP,
   };
 }

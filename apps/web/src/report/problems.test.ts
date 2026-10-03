@@ -11,19 +11,24 @@
 import { describe, expect, it } from 'vitest';
 
 import { CHANNELS, COUNCIL_URGENT, TRIPLE_ZERO, VICSES, channelLine } from './channels.js';
+import { type PickedDrain, NO_PLACE, SELECTED_DRAIN, placeLine } from './place.js';
 import {
   EMERGENCY_CALLS,
   EMERGENCY_SAFETY,
   EMERGENCY_WARNINGS,
   NOT_SENT_YET,
   NOT_SUBMITTED,
-  NO_DRAIN_NEEDED,
   PROBLEM_TYPES,
-  SELECTED_DRAIN,
   problemFor,
-  selectedDrainLine,
   whatToInclude,
 } from './problems.js';
+
+const drain = (assetNumber: string): PickedDrain => ({
+  kind: 'drain',
+  assetNumber,
+  street: null,
+  distanceM: 20,
+});
 
 describe('the five problem types', () => {
   it('offers exactly the five the design labels, emergency first', () => {
@@ -56,12 +61,12 @@ describe('what the pathway refuses to say', () => {
   const everything = [
     ...PROBLEM_TYPES.flatMap((type) => [type.label, type.because]),
     ...CHANNELS.map(channelLine),
-    ...whatToInclude('46 Gatehouse Drive, Kensington', 'PIT-1').map(
+    ...whatToInclude('46 Gatehouse Drive, Kensington', drain('PIT-1')).map(
       (item) => `${item.title} ${item.detail}`,
     ),
     NOT_SUBMITTED,
     NOT_SENT_YET,
-    NO_DRAIN_NEEDED,
+    NO_PLACE,
     ...EMERGENCY_SAFETY,
     EMERGENCY_WARNINGS,
   ].join('\n');
@@ -95,13 +100,28 @@ describe('what to include', () => {
   });
 
   it('names a drain only where the reader selected one', () => {
-    expect(whatToInclude(null, 'PIT-9001')[3]?.detail).toBe('Selected recorded drain: PIT-9001');
-    expect(whatToInclude(null, null)[3]?.detail).toBe(NO_DRAIN_NEEDED);
-    expect(NO_DRAIN_NEEDED).toMatch(/Nothing is chosen for you/);
+    expect(whatToInclude(null, drain('PIT-9001'))[3]?.detail).toBe(
+      'Selected recorded drain: PIT-9001',
+    );
+    expect(whatToInclude(null, null)[3]?.detail).toBe(NO_PLACE);
+    expect(NO_PLACE).toMatch(/Nothing is chosen for you/);
   });
 
   it('labels the drain as the one they selected, with its identifier', () => {
-    expect(selectedDrainLine('PIT-12345')).toBe(`${SELECTED_DRAIN}: PIT-12345`);
+    // AC 6.3.2 asks for both words and the number.
+    expect(placeLine(drain('PIT-12345'))).toBe(`${SELECTED_DRAIN}: PIT-12345`);
+  });
+
+  it('turns a pinned point into the sentence that makes it findable', () => {
+    const pinned = placeLine({
+      kind: 'pin',
+      note: 'Outside number 50, near the corner',
+      at: { eastingM: 316500, northingM: 5814500 },
+    });
+    expect(pinned).toBe('Pinned on the map · Outside number 50, near the corner');
+    expect(whatToInclude(null, { kind: 'pin', note: 'x', at: { eastingM: 1, northingM: 2 } })[3]?.title).toBe(
+      'Drain location',
+    );
   });
 });
 

@@ -27,6 +27,7 @@
  * another organisation's behalf.
  */
 
+import { type ReportPlace, placeLine, placeTitle } from './place.js';
 import {
   COUNCIL_FORM,
   COUNCIL_URGENT,
@@ -75,7 +76,7 @@ export const WHAT_TO_INCLUDE = 'What to include';
  * the first thing every one of these organisations asks for and the product
  * already knows it.
  */
-export function whatToInclude(address: string | null, drain: string | null): readonly IncludeItem[] {
+export function whatToInclude(address: string | null, place: ReportPlace): readonly IncludeItem[] {
   return [
     {
       id: 'location',
@@ -86,22 +87,12 @@ export function whatToInclude(address: string | null, drain: string | null): rea
     { id: 'photos', title: 'Photos', detail: 'Taken from a safe place' },
     {
       id: 'drain',
-      title: 'Which drain',
       // AC 6.3.2: only where the reader selected one, and never the nearest.
-      detail: drain === null ? NO_DRAIN_NEEDED : `${SELECTED_DRAIN}: ${drain}`,
+      title: placeTitle(place),
+      detail: placeLine(place),
     },
   ];
 }
-
-/** The one thing a reader may add from the map, and only by choosing it. */
-export const SELECTED_DRAIN = 'Selected recorded drain';
-
-/** How that line reads once they have chosen one. */
-export const selectedDrainLine = (assetNumber: string): string =>
-  `${SELECTED_DRAIN}: ${assetNumber}`;
-
-/** Said where no drain is chosen, so an empty line is not a gap. */
-export const NO_DRAIN_NEEDED = 'Not chosen. Nothing is chosen for you';
 
 /** What this product does, and the part it does not do (AC 6.3.2). */
 export const NOT_SUBMITTED = 'DrainLens does not send this report. Nothing leaves your browser.';

@@ -35,22 +35,43 @@ import {
   whatToInclude,
 } from '../report/problems.js';
 import { VICEMERGENCY } from '../prepare/actions.js';
+import {
+  CHANGE_PLACE,
+  COPIED_WITH_LINK,
+  PICK_ON_MAP,
+  type ReportPlace,
+  placeNotice,
+  pinnedLink,
+} from '../report/place.js';
 import { reportSummary, summaryHtml, summaryText } from '../report/summary.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 export function ReportProblem({
   address,
-  drain,
-  onForgetDrain,
+  place,
+  chosen,
+  onChoose,
+  onPick,
+  onForgetPlace,
 }: {
+  /*
+    The chosen problem is held by the map, not here.
+
+    Handing the map over to pick a drain unmounts this card -- the map takes
+    the whole screen for it -- and a reader who came back to *What is the
+    problem?* after answering it would reasonably think the press had failed.
+  */
+  readonly chosen: ProblemId | null;
+  readonly onChoose: (problem: ProblemId | null) => void;
   /** As the reader chose it, or null where they are reading without one. */
   readonly address: string | null;
-  /** A drain the reader selected on the map, or null. Never the nearest one. */
-  readonly drain: string | null;
-  /** Take the selected drain off the report, which is always allowed. */
-  readonly onForgetDrain?: (() => void) | undefined;
+  /** A drain they tapped or a point they pinned. Never the nearest one. */
+  readonly place: ReportPlace;
+  /** Hand the map over so they can tap a drain or put a pin (Figma R1). */
+  readonly onPick?: (() => void) | undefined;
+  /** Take it off the report again, which is always allowed. */
+  readonly onForgetPlace?: (() => void) | undefined;
 }) {
-  const [chosen, setChosen] = useState<ProblemId | null>(null);
   const [copied, setCopied] = useState(false);
 
   if (chosen === null) {
@@ -63,7 +84,7 @@ export function ReportProblem({
               <button
                 type="button"
                 onClick={() => {
-                  setChosen(problem.id);
+                  onChoose(problem.id);
                 }}
                 style={{
                   display: 'flex',
@@ -101,8 +122,9 @@ export function ReportProblem({
   }
 
   const problem = problemFor(chosen);
-  const summary = reportSummary(address, problem, drain, new Date());
-  const items = whatToInclude(address, drain);
+  const summary = reportSummary(address, problem, place, new Date());
+  const items = whatToInclude(address, place);
+  const notice = placeNotice(place);
 
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
@@ -110,7 +132,7 @@ export function ReportProblem({
         <button
           type="button"
           onClick={() => {
-            setChosen(null);
+            onChoose(null);
             setCopied(false);
           }}
           style={linkStyle}
@@ -128,6 +150,22 @@ export function ReportProblem({
       >
         {problem.label}
       </p>
+
+      {/* What the reader just did on the map, said once (Figma B4c, B4d). */}
+      {!problem.urgent && notice !== null && (
+        <p
+          style={{
+            margin: `0 0 ${String(space(2))}px`,
+            padding: space(2),
+            borderRadius: radius.small,
+            background: NOTICE_WASH,
+            font: type(text.micro),
+            color: ink.base,
+          }}
+        >
+          {notice}
+        </p>
+      )}
 
       {problem.urgent ? (
         <>
@@ -184,14 +222,24 @@ export function ReportProblem({
             {items.map((item) => (
               <li key={item.id} style={{ marginBottom: space(2) }}>
                 <Include title={item.title} detail={item.detail} />
-                {item.id === 'drain' && drain !== null && onForgetDrain !== undefined && (
-                  <button
-                    type="button"
-                    onClick={onForgetDrain}
-                    style={{ ...linkStyle, marginLeft: 26, font: type(text.micro) }}
-                  >
-                    Remove
-                  </button>
+                {item.id === 'drain' && (
+                  <span style={{ display: 'block', marginLeft: 26 }}>
+                    {place === null
+                      ? onPick !== undefined && (
+                          <button type="button" onClick={onPick} style={{ ...linkStyle, font: type(text.micro) }}>
+                            {PICK_ON_MAP} ›
+                          </button>
+                        )
+                      : onForgetPlace !== undefined && (
+                          <button
+                            type="button"
+                            onClick={onForgetPlace}
+                            style={{ ...linkStyle, font: type(text.micro) }}
+                          >
+                            {CHANGE_PLACE}
+                          </button>
+                        )}
+                  </span>
                 )}
               </li>
             ))}
@@ -234,6 +282,11 @@ export function ReportProblem({
             </button>
           </p>
 
+          {pinnedLink(place) !== null && (
+            <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
+              {COPIED_WITH_LINK}
+            </p>
+          )}
           <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
             {NOT_SUBMITTED}
           </p>
@@ -322,6 +375,9 @@ function Heading({ children }: { readonly children: string }) {
     </p>
   );
 }
+
+/** The quiet tint behind *Location pinned on the map.* */
+const NOTICE_WASH = '#fdf6e8';
 
 /** The emergency's own red, which nothing else on the map uses. */
 const URGENT_INK = '#a4262c';
