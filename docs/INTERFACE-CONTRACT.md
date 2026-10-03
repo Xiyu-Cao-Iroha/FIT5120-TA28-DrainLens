@@ -22,7 +22,7 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 
 | Path | Size | Built by | Contents |
 |---|---:|---|---|
-| `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
+| `/data/map.json` | 345 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels; a pipe also carries its `operator` since 30 September |
 | `/data/derived.json` | 175 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
 | `/data/addresses.json` | 1.33 MB, 490 KB gzipped | `drainlens_pipeline.addresses` | The address index for the City of Melbourne **and the coverage boundary**; clipped in the browser to the Kensington map when that is the map served |
@@ -37,6 +37,9 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/population.json` | 28 KB | `drainlens_pipeline.population` | Residents per area, and the minimum below which no rate is given |
 | `/data/sa2-points.json` | 181 KB | `drainlens_pipeline.area_points` | Each area's simplified boundary and name point |
 | `/data/flood-events.json` | 7 KB | written by the team | Verified flood events, shown only once checked |
+| `/data/warnings/*.json` | 6 KB | `drainlens_pipeline.low_area_warnings` | The pooling markers, one file per extent; Epic 5's numbered places are chosen from these and from nothing else |
+| `/data/subcatchments.json` | 62 KB | `drainlens_pipeline.subcatchments` | The 35 Melbourne Water drainage areas that reach the extent, boundaries whole, with what is recorded inside each |
+| `/data/address-catchments.json` | 117 KB | `drainlens_pipeline.address_catchments` | Which drainage area each address is in, decided in the pipeline against the service geometry |
 
 > **14 September 2026.** `/data/scene/` (`scene.json` and six `.bin` arrays, 7.3 MB) is still in the container and no longer fetched: the comparison reads `scene-tiles/` and the *Ground height* layer reads `terrain-tiles/`. The single-extent terrain files that briefly sat in `/data/terrain/` are gone; only `address-ground.json` remains there. The last four rows are loaded only when the flood map or the board's ranking per 1,000 residents is opened, and only from the container — the API has no route for them.
 

@@ -477,11 +477,25 @@ python -m drainlens_pipeline.address_ground --terrain ../data/terrain-council --
 
 Compared with the handover's own `address-insight.sample.json`, matched by id: the same answer for 92.8% of addresses, and the same compass point for 98.4% of those both call reliable. Its measured-coverage values are reproduced exactly; its R² values are not (median difference 0.02, and 272 addresses it calls reliable fall under 0.30 here), so the difference is in how R² was taken, not in the thresholds. The browser colours the ground on a **fixed AHD ramp** (0, 1, 2, 3, 4, 5, 10, 20, 40 m — `apps/web/src/map/terrain.ts`), never fitted to the view, and multiplies the shade over the ground and the roads so it can only darken.
 
+## The drainage areas — `subcatchments`, `address_catchments`, `subcatchment_summary`
+
+Melbourne Water publishes 3,409 subcatchments for the region. `subcatchments.py` asks its feature service for the **35 that reach the council extent** rather than downloading the 23 MB file of all of them: 292 KB over the wire, a 57 KB artefact. It is the only layer here that needs no projection, because the service both takes and returns MGA Zone 55.
+
+**Boundaries are published whole, never clipped**, because AC 6.1.1 asks for the complete boundary, and simplified to 5 m for drawing. The tolerance was measured rather than assumed: deciding which area an address is in from the *drawn* rings instead of the service geometry would put 287 of 62,397 addresses in a different area, 8 in none and 43 in two.
+
+So membership is decided here, not in the browser. `address_catchments.py` runs a point-in-polygon for every address and publishes the answer as a lookup keyed by street: **62,396 addresses are inside exactly one area, none are inside two, and one — 5 Webb Dock — is inside none**, and is published as having none rather than given its neighbour's, which AC 6.1.5 requires. A rebuilt address index can reorder its groups, so the lookup carries each street's address count and a mismatch fails the build rather than quietly telling somebody about another street's drainage area.
+
+`subcatchment_summary.py` counts what is recorded inside each area: pits by position, **pipe length clipped at the boundary** so only the portion inside an area counts, and whether supported low areas are present. It also publishes **coverage** — the share of an area's own recorded square kilometres that lies inside the extent — because a subcatchment does not stop at the council boundary and a count inside one is a count of the part this project holds data for. Six areas are wholly inside; Richmond Quarry Main Drain is 28% inside, and its 318 pits are 28% of an area.
+
+`subcatchment_register.py` is the deliberately awkward one. The class of a receiving drain is a claim about where water goes, so it is a decision rather than a derivation: all 35 areas carry a **proposed** class and the evidence for it, **none is approved**, and `classify()` publishes `unclassified` for every unapproved row however strong its name reads. [docs/SUBCATCHMENT-CLASSIFICATION.md](../docs/SUBCATCHMENT-CLASSIFICATION.md) is the register the team approves, and `tools/data/check-subcatchments.mjs` fails the build if the artefact ever claims a class the register has not.
+
 ## Built since this file was first written
 
 Map geometry (`network`), the terrain-derived layers (`derived`), the browser scene pack (`scene`), the downstream trace (`trace`), an address index (`addresses`) with a fixture standing in for it, the recorded flood incidents (`flood_history`), and `reframe` — which moves an artefact from one extent's coordinate frame into another's, and is how the Kensington derived layers were placed on the council map.
 
-By 14 September also: the population denominator (`population`), the flood map's area shapes (`area_points`), the council-wide scenario tiles (`scene_tiles`), the Terrain layer in single-extent (`terrain_display`, `terrain_marks`) and council-wide tiled form (`terrain_tiles`), and the fall of the ground at each address (`address_ground`). Each is described above.
+By 14 September also: the population denominator (`population`), the flood map's area shapes (`area_points`), the council-wide scenario tiles (`scene_tiles`), the Terrain layer in single-extent (`terrain_display`, `terrain_marks`) and council-wide tiled form (`terrain_tiles`), and the fall of the ground at each address (`address_ground`).
+
+By 2 October also: the pooling warnings (`low_area_warnings`), which Epic 5's places are chosen from, and the four drainage-area modules above. `network` also keeps the pipe `operator` field, which it had been dropping since the first build — the column was in the council's export from the start, and every pipe reached the browser with AC 6.2.2's question unanswerable. Each is described above.
 
 **The address index is the real one as of 31 August** — 4,089 addresses across 132 streets.
 
