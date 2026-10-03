@@ -38,3 +38,7 @@ __pycache__/
 
 # A slide deck is a build product of a meeting, not of this repository.
 docs/*.pptx
+
+/assistant/chroma_db/
+/assistant/chroma_db_backup/
+/assistant/.env
