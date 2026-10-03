@@ -615,17 +615,23 @@ function step(session: Session, event: SessionEvent): Session {
       return {
         ...session,
         /*
-          Every guide opens on the address screen, empty (team decision,
-          16 September).
+          A guide opens on the address it was given, and asks only when there
+          is none (team decision, **4 October**, reversing 16 September).
 
-          It skipped straight to the guide once an address was known, so the
-          second guide started on the first guide's street with no moment to
-          choose another. The team's rule is that an address is entered for
-          each guide and each visit to the full map, so the one given before is
-          let go here rather than offered back. See `forgetAddress`.
+          The rule used to be the other way: every guide started on an empty
+          address screen, so that the second guide could not quietly begin on
+          the first one's street. What changed is how much there is to do.
+          With six guides, the full map, a preparation plan and a reporting
+          pathway, being asked for the same address five times reads as the
+          product having forgotten rather than as an invitation -- which is
+          what the team said on reviewing it.
+
+          **Changing it stayed possible everywhere it is shown**, which is the
+          other half of the decision: the guide and the chooser both carry the
+          address with a *Change* beside it, and `forgetAddress` still runs
+          when a different one is chosen.
         */
-        screen: 'address',
-        ...forgetAddress(session),
+        screen: session.address === null ? 'address' : 'guide',
         guideSection: event.section,
         // The map's mode follows the section, so finishing the guide and
         // opening the map shows the thing that was just taught rather than
@@ -693,6 +699,19 @@ function step(session: Session, event: SessionEvent): Session {
           ? {
               scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
               outcome: null,
+              /*
+                And the answers about places, for the reason `address-moved`
+                gives: a new address renumbers them, so answers about the old
+                ones are answers about different places (AC 5.4.2).
+
+                This branch did not clear them until 4 October. Nothing showed
+                it, because choosing a guide forgot the address outright and
+                every route to this screen went through that. Keeping the
+                address made this reachable: pick an address, answer a place,
+                go back, pick another, and the first address's answers were
+                still there under the second address's numbers.
+              */
+              relevance: {},
             }
           : {}),
       };
