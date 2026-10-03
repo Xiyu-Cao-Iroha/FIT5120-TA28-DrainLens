@@ -31,7 +31,7 @@ All of the Must Have build work is done. What is left is content the team signs 
 | **W2 · Epic 6 screens** | **Done.** W2.1 to W2.6 landed as the drainage-area guide; W2.7 and W2.8, the reporting pathway and its emergency branch, on 3 October. |
 | **W3 · Epic 5 screens** | **Done.** W3.1 to W3.8, including the printed plan (W3.7) and the safety boundary block (W3.8). |
 | **W4 · Content the team writes** | **Blocked on approval, not on writing.** W4.2 and W4.3 are drafted in [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md); W4.1 in [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md); W4.4 in [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md). **None is approved**, and until they are the product says *has not been confirmed* for every receiving drain. |
-| **W5 · Quality and operations** | **Partly done.** W5.1 (this checklist, extended), W5.2 (checks in CI) and W5.3 (the privacy pass, re-run on 3 October) are done. W5.4 accessibility, W5.5 the carried-over copy audit, and W5.6 the two operational jobs are not. |
+| **W5 · Quality and operations** | **Partly done.** W5.1 (this checklist, extended), W5.2 (checks in CI), W5.3 (the privacy pass, re-run on 3 October) and W5.6 (both operational jobs settled on 4 October) are done. W5.4 accessibility and W5.5 the carried-over copy audit are not. |
 
 > **The three registers are the only thing between this iteration and its definition of done.** Every criterion they gate is already built and already hedged in the product's own words; approving them is what turns *has not been confirmed* into the sentence the design asks for.
 
@@ -121,7 +121,7 @@ The measurements behind the first three are in the acceptance file.
 | W5.3 | The privacy pass: the relevance selections and the printed plan reach no storage and no server |
 | W5.4 | Accessibility: the numbered markers, the relevance controls and the printed page |
 | W5.5 | Carried over from Iteration 2 — the copy audit's third tier (15 items), the drain aria-label that still says *the nearest you can test*, and the two model simplifications recorded in DECISIONS-PENDING.md |
-| W5.6 | Operational: `--min-instances=1` on the API is billing continuously and should return to 0 after the demonstration; the gate password was exposed in a screenshot on 28 September and should be rotated across all four services |
+| W5.6 | ~~Operational: `--min-instances=1` on the API, and the gate password~~ — **both settled 4 October.** `drainlens-api` is back to `--min-instances=0` (revision `drainlens-api-00016-f65`), so no service pays for an idle instance; the first request after an idle period is a 0.74 s cold start, which is the trade. **The password is deliberately not being rotated** — the team's call, recorded in DECISIONS-PENDING.md §9 |
 
 ---
 

@@ -258,7 +258,7 @@ Every Must Have screen in Epic 5 and Epic 6 is built. Three registers now sit be
 
 The design shows **Move valuable items above floor level**. No official page carrying it was found on 2 October, so it is not in the product — three actions is within what AC 5.2.3 asks for, and a mock-up is not a source. The decision is whether to keep looking for a source or to drop it from the design. Either is fine; shipping it without one is not.
 
-### Two operational jobs, neither urgent and both easy to forget
+### Two operational jobs — **both settled 4 October 2026**
 
-- `--min-instances=1` on the API is billing continuously. It was set for a demonstration and should go back to 0 after the next one.
-- The gate password was exposed in a screenshot on 28 September and should be rotated across all four services.
+- **`--min-instances=1` on the API: reverted.** `drainlens-api` runs at `--min-instances=0` again (revision `drainlens-api-00016-f65`), so nothing pays for an idle instance. Measured straight after: 0.74 s on the first request, 0.19 s warm, `/health` returning the same counts as before. The cold start is the price of not paying for idle, and `deploy/API-DEPLOYMENT.md` has been saying so since September.
+- **The gate password: deliberately not rotated.** It was exposed in a screenshot on 28 September. The team's decision is to leave it, on the reasoning that the gate keeps a half-built prototype from being found by accident rather than protecting anything in it: there is no account, no personal data and no endpoint that takes an address. **It is recorded here as a decision rather than an oversight**, which is the point of this file. Rotating it is one command per service if that changes.
