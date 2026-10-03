@@ -258,6 +258,8 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, planOpen: true });
     case 'place-reviewed':
       return latch(state, { ...state, placesReviewed: state.placesReviewed + 1 });
+    case 'why-opened':
+      return latch(state, { ...state, whyOpen: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'help-on':

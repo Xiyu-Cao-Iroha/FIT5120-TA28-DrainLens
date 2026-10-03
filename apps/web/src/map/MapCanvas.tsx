@@ -27,6 +27,7 @@ import {
   scaleForAddress,
   scaleToContain,
   scaleToCover,
+  toLocal,
   toScreen,
   zoomAt,
 } from './viewport.js';
@@ -169,6 +170,14 @@ export interface MapCanvasProps {
    */
   readonly onAddressPress?: () => void;
   /**
+   * The map is being used to point at a place, not to read one.
+   *
+   * Set while a report is asking where the problem is (Figma R1 and R3): a
+   * press reports the ground it landed on and nothing else happens -- no pit
+   * is selected, no card opens, the pin is not pressed. The map is the input.
+   */
+  readonly onGround?: ((point: Local) => void) | undefined;
+  /**
    * The current viewport, whenever it changes.
    *
    * The map owns its own pan and zoom — that is view state and nothing above
@@ -206,6 +215,7 @@ export function MapCanvas({
   onWarningPress,
   onSelect,
   onAddressPress,
+  onGround,
   onViewport,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -405,6 +415,14 @@ export function MapCanvas({
       // network cannot steal a press from a pit -- and testing it after would
       // let a pipe running under the pin's head take one from the pin.
       const press = at(event);
+
+      // Pointing at a place takes every press, including one that lands on a
+      // pit or on the pin: the reader was asked where, not what.
+      if (onGround) {
+        onGround(toLocal(viewport, press));
+        return;
+      }
+
       // Only where pressing the pin does something: on the comparison map it
       // does nothing, and its head can stand over a drain a few metres north.
       if (address && onAddressPress && pressedThePin(press, toScreen(viewport, address))) {
@@ -440,7 +458,7 @@ export function MapCanvas({
         ),
       );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes, warnings, onWarningPress, pickPits],
+    [viewport, artefact, onSelect, at, address, onAddressPress, onGround, showPits, showPipes, warnings, onWarningPress, pickPits],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and

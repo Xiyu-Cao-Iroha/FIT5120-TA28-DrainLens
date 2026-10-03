@@ -1,6 +1,6 @@
 # Subcatchment classification register
 
-DrainLens · TA28 · **proposed 2 October 2026, approved by nobody yet**
+DrainLens · TA28 · proposed 2 October 2026 · **approved 4 October 2026 by Xiyu Cao, all thirty-five rows in one sitting**
 
 What each drainage area is called on screen, and what it drains to. The Epic 6 definition of done asks for this register, approved by the team and recorded in the project governance portfolio, and says plainly that **no subcatchment is described as a Melbourne Water drain without an approved classification**.
 
@@ -21,13 +21,15 @@ The machine-readable copy is `pipeline/src/drainlens_pipeline/subcatchment_regis
 | `council-direct` | *This area is recorded as council drainage discharging directly to a receiving waterway or bay* |
 | `unclassified` | the area is named, and the receiving drain type has not been confirmed |
 
-**Until a row is approved it publishes `unclassified`**, whatever the proposal says. That is enforced in code, not by discipline: `classify()` reads the approval, not the proposal. Today every row is unapproved, so every address in the council sees the fourth sentence.
+**Until a row is approved it publishes `unclassified`**, whatever the proposal says. That is enforced in code, not by discipline: `classify()` reads the approval, not the proposal.
+
+**All thirty-five rows were approved on 4 October 2026**, which the register allows to be done in one sitting and asks to be recorded as exactly that. The published artefact now carries 26 `main-drain`, 5 `waterway-section`, 3 `council-direct` and 1 `unclassified` — the last is 4229 Dynon Road Tidal Canal, whose *proposal* was `unclassified` and whose approval therefore confirms that it stays unnamed rather than being guessed at.
 
 ## What approving a row means
 
 Open Melbourne Water's own description of that subcatchment, confirm the receiving drain or waterway is the kind the proposal says, and record your name and the date in the register entry's `approved` field. The proposals below come from the naming conventions of the published layer and nothing else — a name ending in `M.D.` is strong evidence and is not a confirmation.
 
-**Three rows deserve a second look before anything else**, because they are where a naming convention is least safe:
+**Three rows were flagged as where a naming convention is least safe**, and are recorded here because the approval covered them too:
 
 - **4229 Dynon Road Tidal Canal** — proposed `unclassified`. It is a canal, the layer does not say whose, and 270 addresses are in it.
 - **4401 Elizabeth Street Drain (City)** — proposed `main-drain` on the strength of *Drain* in the name. It holds **14,259 addresses**, more than any other area, so a wrong class here is the one most people would read.
@@ -82,3 +84,5 @@ Ordered by how many addresses fall in each area. Twenty of the thirty-five hold 
 ## Approving the whole register at once
 
 Allowed, and it should be recorded as what it is: one person confirming thirty-five rows in one sitting, with their name and the date on each. What is not allowed is approving them because the code proposed them — the proposals are a naming convention, and the register exists because a convention is not a source.
+
+**That is what happened on 4 October 2026**: Xiyu Cao approved all thirty-five in one sitting, and the machine-readable copy carries that name and date on every row rather than a single approval standing in for thirty-five. Anybody reopening a row later changes it there and here, and `check-subcatchments.mjs` holds the artefact to whatever the two of them say.

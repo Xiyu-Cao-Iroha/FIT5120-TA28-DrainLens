@@ -51,9 +51,10 @@ export type Requirement =
   /* Epic 6's two chips (Figma, *Your drainage area* D1 and D3). */
   | 'catchment-on'
   | 'help-on'
-  /* Epic 5's two (Figma, *Get ready for heavy rain*, G1 and G2). */
+  /* Epic 5's three (Figma, *Get ready for heavy rain*, G1, G2 and G4). */
   | 'plan-opened'
-  | 'place-reviewed';
+  | 'place-reviewed'
+  | 'why-opened';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -195,6 +196,8 @@ export interface MapNow {
   readonly planOpen: boolean;
   /** How many numbered places the reader has answered for. */
   readonly placesReviewed: number;
+  /** *Why this place?* opened on a reminder in the plan (Figma G4). */
+  readonly whyOpen: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -214,6 +217,7 @@ export const NOTHING_ON_MAP: MapNow = {
   help: false,
   planOpen: false,
   placesReviewed: 0,
+  whyOpen: false,
 };
 
 /**
@@ -350,8 +354,9 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'help';
     case 'plan-opened':
     case 'place-reviewed':
-      // Neither is a chip: the first is the address card's button and the
-      // second is a choice on a place's own card.
+    case 'why-opened':
+      // None is a chip: the address card's button, a choice on a place's own
+      // card, and a fold under a reminder in the plan.
       return null;
     case 'pit-selected':
     case 'trace-following':
@@ -408,6 +413,8 @@ export function satisfied(
       // Any answer counts, including *doesn't apply to me*: the step asks for
       // a decision, and both are decisions (AC 5.4.1).
       return now.placesReviewed > 0;
+    case 'why-opened':
+      return now.whyOpen;
     case 'catchment-on':
       return now.catchment;
     case 'help-on':

@@ -1,20 +1,19 @@
 /**
- * Report a drainage problem: choose what it is, then who it goes to.
+ * Report a problem: choose what it is, then who it goes to.
  *
- * Epic 6's reporting pathway (AC 6.3.1 to 6.3.4). Two steps, because the
+ * Epic 6's reporting pathway, built to the team's Figma (file
+ * `atD5fleOrhvMjJ5m0pXYGt`, screens B3, B4 and B5). Two steps, because the
  * organisation depends on the problem and naming one before the reader has
  * said what happened would be guessing for them (AC 6.2.3).
  *
  * **The emergency branch is not a sixth screen.** It is the same screen with
- * the two telephone numbers above everything else and the checklist moved
- * below a line saying it is for once everyone is safe (AC 6.3.4). Keeping it
- * here rather than elsewhere means a reader who picks it by mistake, or who
- * realises halfway through that it is worse than they thought, is one press
- * from the numbers.
+ * two telephone numbers in place of the contact and the checklist, as the
+ * design draws it: somebody whose house is filling with water is not filling
+ * in a checklist, and AC 6.3.4 asks for the numbers first.
  *
  * **Nothing is submitted and nothing is kept.** The two controls at the foot
- * copy the summary or print it; both build it in the browser and neither
- * sends anything (AC 6.3.2, 6.3.3).
+ * copy the details or print them; both build the page in the browser and
+ * neither sends anything (AC 6.3.2, 6.3.3).
  */
 
 import { useState } from 'react';
@@ -22,34 +21,57 @@ import { useState } from 'react';
 import { printDocument } from '../prepare/printing.js';
 import { type Channel } from '../report/channels.js';
 import {
+  CHOOSE_ANOTHER,
   CHOOSE_PROBLEM,
-  EMERGENCY_CHECKLIST_LATER,
-  EMERGENCY_FIRST,
+  EMERGENCY_CALLS,
   EMERGENCY_SAFETY,
+  EMERGENCY_WARNINGS,
+  NOT_SENT_YET,
   NOT_SUBMITTED,
-  NO_DRAIN_NEEDED,
-  PREPARE,
   PROBLEM_TYPES,
   type ProblemId,
-  SELECTED_DRAIN,
+  WHAT_TO_INCLUDE,
   problemFor,
+  whatToInclude,
 } from '../report/problems.js';
+import { VICEMERGENCY } from '../prepare/actions.js';
+import {
+  CHANGE_PLACE,
+  COPIED_WITH_LINK,
+  PICK_ON_MAP,
+  type ReportPlace,
+  placeNotice,
+  pinnedLink,
+} from '../report/place.js';
 import { reportSummary, summaryHtml, summaryText } from '../report/summary.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 export function ReportProblem({
   address,
-  drain,
-  onForgetDrain,
+  place,
+  chosen,
+  onChoose,
+  onPick,
+  onForgetPlace,
 }: {
+  /*
+    The chosen problem is held by the map, not here.
+
+    Handing the map over to pick a drain unmounts this card -- the map takes
+    the whole screen for it -- and a reader who came back to *What is the
+    problem?* after answering it would reasonably think the press had failed.
+  */
+  readonly chosen: ProblemId | null;
+  readonly onChoose: (problem: ProblemId | null) => void;
   /** As the reader chose it, or null where they are reading without one. */
   readonly address: string | null;
-  /** A drain the reader selected on the map, or null. Never the nearest one. */
-  readonly drain: string | null;
-  /** Take the selected drain off the report, which is always allowed. */
-  readonly onForgetDrain?: (() => void) | undefined;
+  /** A drain they tapped or a point they pinned. Never the nearest one. */
+  readonly place: ReportPlace;
+  /** Hand the map over so they can tap a drain or put a pin (Figma R1). */
+  readonly onPick?: (() => void) | undefined;
+  /** Take it off the report again, which is always allowed. */
+  readonly onForgetPlace?: (() => void) | undefined;
 }) {
-  const [chosen, setChosen] = useState<ProblemId | null>(null);
   const [copied, setCopied] = useState(false);
 
   if (chosen === null) {
@@ -62,175 +84,254 @@ export function ReportProblem({
               <button
                 type="button"
                 onClick={() => {
-                  setChosen(problem.id);
+                  onChoose(problem.id);
                 }}
                 style={{
-                  display: 'block',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: space(2),
                   width: '100%',
                   textAlign: 'left',
-                  padding: space(2),
+                  padding: `${String(space(2))}px ${String(space(2))}px`,
                   borderRadius: radius.small,
-                  border: `1px solid ${line.base}`,
-                  background: surface.raised,
+                  // The emergency reads as one (Figma B3), and is first.
+                  border: `1px solid ${problem.urgent ? URGENT_EDGE : line.base}`,
+                  background: problem.urgent ? URGENT_WASH : surface.raised,
+                  color: problem.urgent ? URGENT_INK : ink.base,
+                  font: type(text.small, { weight: problem.urgent ? weight.semibold : weight.regular }),
                   cursor: 'pointer',
-                  font: type(text.small, { leading: 1.5 }),
-                  color: ink.base,
                 }}
               >
-                <span
-                  style={{
-                    display: 'block',
-                    font: type(text.small, { weight: weight.semibold }),
-                    color: ink.strong,
-                  }}
-                >
+                <span>
+                  {problem.urgent && <span aria-hidden>❗ </span>}
                   {problem.label}
                 </span>
-                <span style={{ display: 'block', color: ink.muted }}>{problem.describes}</span>
+                <span aria-hidden style={{ color: problem.urgent ? URGENT_INK : ink.subtle }}>
+                  ›
+                </span>
               </button>
             </li>
           ))}
         </ul>
-        <p style={{ margin: `${String(space(2))}px 0 0`, color: ink.muted }}>{NOT_SUBMITTED}</p>
+        <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
+          {NOT_SENT_YET}
+        </p>
       </div>
     );
   }
 
   const problem = problemFor(chosen);
-  const summary = reportSummary(address, problem, drain, new Date());
+  const summary = reportSummary(address, problem, place, new Date());
+  const items = whatToInclude(address, place);
+  const notice = placeNotice(place);
 
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
+      <p style={{ margin: `0 0 ${String(space(2))}px` }}>
+        <button
+          type="button"
+          onClick={() => {
+            onChoose(null);
+            setCopied(false);
+          }}
+          style={linkStyle}
+        >
+          ‹ {CHOOSE_ANOTHER}
+        </button>
+      </p>
+
       <p
         style={{
-          margin: `0 0 ${String(space(1))}px`,
-          font: type(text.small, { weight: weight.semibold }),
-          color: ink.strong,
+          margin: `0 0 ${String(space(2))}px`,
+          font: type(text.label, { weight: weight.semibold }),
+          color: problem.urgent ? URGENT_INK : ink.strong,
         }}
       >
         {problem.label}
       </p>
 
-      {/* AC 6.3.4: the numbers come before the problem is even described. */}
-      {problem.urgent && (
-        <div
+      {/* What the reader just did on the map, said once (Figma B4c, B4d). */}
+      {!problem.urgent && notice !== null && (
+        <p
           style={{
             margin: `0 0 ${String(space(2))}px`,
             padding: space(2),
             borderRadius: radius.small,
-            background: brand.wash,
-            border: `1px solid ${brand.tint}`,
-            color: brand.ink,
+            background: NOTICE_WASH,
+            font: type(text.micro),
+            color: ink.base,
           }}
         >
-          <p style={{ margin: 0, font: type(text.small, { weight: weight.semibold }) }}>
-            {EMERGENCY_FIRST}
-          </p>
-          <p style={{ margin: `${String(space(1))}px 0 0` }}>{EMERGENCY_SAFETY}</p>
-        </div>
-      )}
-
-      <p style={{ margin: `0 0 ${String(space(2))}px`, color: ink.muted }}>{problem.because}</p>
-
-      <Heading>Who to contact</Heading>
-      <ul style={{ margin: `0 0 ${String(space(3))}px`, padding: 0, listStyle: 'none' }}>
-        {problem.channels.map((channel) => (
-          <li key={channel.organisation + channel.action} style={{ marginBottom: space(2) }}>
-            <Contact channel={channel} />
-          </li>
-        ))}
-      </ul>
-
-      {problem.urgent && (
-        <p style={{ margin: `0 0 ${String(space(2))}px`, color: ink.muted }}>
-          {EMERGENCY_CHECKLIST_LATER}
+          {notice}
         </p>
       )}
 
-      <Heading>What to have ready</Heading>
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-        {PREPARE.map((item) => (
-          <li key={item} style={{ marginBottom: space(1) }}>
-            {item}
-          </li>
-        ))}
-        {/* AC 6.3.2: only where the reader selected one, and labelled as theirs. */}
-        {drain !== null && (
-          <li style={{ marginBottom: space(1) }}>
-            {SELECTED_DRAIN}: {drain}
-            {onForgetDrain !== undefined && (
-              <>
-                {' '}
-                <button type="button" onClick={onForgetDrain} style={linkStyle}>
-                  Remove
-                </button>
-              </>
-            )}
-          </li>
-        )}
-      </ul>
-      {drain === null && (
-        <p style={{ margin: `${String(space(1))}px 0 0`, color: ink.muted }}>{NO_DRAIN_NEEDED}</p>
+      {problem.urgent ? (
+        <>
+          {/* AC 6.3.4: the two numbers before anything else, and nothing to fill in. */}
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            {EMERGENCY_CALLS.map((call) => (
+              <li key={call.label} style={{ marginBottom: space(2) }}>
+                <span
+                  style={{
+                    display: 'block',
+                    padding: space(2),
+                    borderRadius: radius.small,
+                    background: call.first ? URGENT_INK : ink.strong,
+                    color: ink.inverse,
+                  }}
+                >
+                  <span style={{ display: 'block', font: type(text.label, { weight: weight.semibold }) }}>
+                    {call.label}
+                  </span>
+                  <span style={{ display: 'block', font: type(text.micro) }}>{call.when}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ul style={{ margin: `${String(space(2))}px 0 0`, paddingLeft: space(3) }}>
+            {EMERGENCY_SAFETY.map((sentence) => (
+              <li key={sentence} style={{ marginBottom: space(1) }}>
+                {sentence}
+              </li>
+            ))}
+          </ul>
+          <p style={{ margin: `${String(space(2))}px 0 0` }}>
+            <a href={VICEMERGENCY.href} target="_blank" rel="noreferrer" style={{ color: brand.ink }}>
+              {EMERGENCY_WARNINGS} ›
+            </a>
+          </p>
+        </>
+      ) : (
+        <>
+          <Heading>Contact</Heading>
+          <ul style={{ margin: `0 0 ${String(space(3))}px`, padding: 0, listStyle: 'none' }}>
+            {problem.channels.map((channel) => (
+              <li key={channel.organisation + channel.action} style={{ marginBottom: space(2) }}>
+                <Contact channel={channel} />
+              </li>
+            ))}
+          </ul>
+          <p style={{ margin: `0 0 ${String(space(3))}px`, font: type(text.micro), color: ink.subtle }}>
+            {problem.because}
+          </p>
+
+          <Heading>{WHAT_TO_INCLUDE}</Heading>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            {items.map((item) => (
+              <li key={item.id} style={{ marginBottom: space(2) }}>
+                <Include title={item.title} detail={item.detail} />
+                {item.id === 'drain' && (
+                  <span style={{ display: 'block', marginLeft: 26 }}>
+                    {place === null
+                      ? onPick !== undefined && (
+                          <button type="button" onClick={onPick} style={{ ...linkStyle, font: type(text.micro) }}>
+                            {PICK_ON_MAP} ›
+                          </button>
+                        )
+                      : onForgetPlace !== undefined && (
+                          <button
+                            type="button"
+                            onClick={onForgetPlace}
+                            style={{ ...linkStyle, font: type(text.micro) }}
+                          >
+                            {CHANGE_PLACE}
+                          </button>
+                        )}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              display: 'flex',
+              gap: space(2),
+              flexWrap: 'wrap',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(summaryText(summary)).then(
+                  () => {
+                    setCopied(true);
+                  },
+                  () => {
+                    // A refused clipboard is not an error worth a dialog: the
+                    // printed copy is right beside this button.
+                    setCopied(false);
+                  },
+                );
+              }}
+              style={filledStyle}
+            >
+              {copied ? 'Details copied' : 'Copy details'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                printDocument(summaryHtml(summary));
+              }}
+              style={outlineStyle}
+            >
+              Print
+            </button>
+          </p>
+
+          {pinnedLink(place) !== null && (
+            <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
+              {COPIED_WITH_LINK}
+            </p>
+          )}
+          <p style={{ margin: `${String(space(2))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
+            {NOT_SUBMITTED}
+          </p>
+        </>
       )}
-
-      <p
-        style={{
-          margin: `${String(space(3))}px 0 0`,
-          display: 'flex',
-          gap: space(2),
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(summaryText(summary)).then(
-              () => {
-                setCopied(true);
-              },
-              () => {
-                // A refused clipboard is not an error worth a dialog: the
-                // printed copy is right beside this button.
-                setCopied(false);
-              },
-            );
-          }}
-          style={pillStyle}
-        >
-          {copied ? 'Summary copied' : 'Copy summary'}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            printDocument(summaryHtml(summary));
-          }}
-          style={pillStyle}
-        >
-          Print summary
-        </button>
-      </p>
-
-      <p style={{ margin: `${String(space(2))}px 0 0`, color: ink.muted }}>{NOT_SUBMITTED}</p>
-
-      <p style={{ margin: `${String(space(2))}px 0 0` }}>
-        <button
-          type="button"
-          onClick={() => {
-            setChosen(null);
-            setCopied(false);
-          }}
-          style={linkStyle}
-        >
-          Choose a different problem
-        </button>
-      </p>
     </div>
+  );
+}
+
+/** One line of *What to include*: a box, the thing, and what to have ready. */
+function Include({ title, detail }: { readonly title: string; readonly detail: string }) {
+  return (
+    <span style={{ display: 'flex', gap: space(2), alignItems: 'flex-start' }}>
+      <span
+        aria-hidden
+        style={{
+          flexShrink: 0,
+          width: 14,
+          height: 14,
+          marginTop: 3,
+          borderRadius: 3,
+          border: `1px solid ${line.base}`,
+          background: surface.raised,
+        }}
+      />
+      <span>
+        <span style={{ display: 'block', font: type(text.small, { weight: weight.semibold }), color: ink.strong }}>
+          {title}
+        </span>
+        <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>{detail}</span>
+      </span>
+    </span>
   );
 }
 
 function Contact({ channel }: { readonly channel: Channel }) {
   return (
-    <span style={{ display: 'block' }}>
+    <span
+      style={{
+        display: 'block',
+        padding: space(2),
+        borderRadius: radius.small,
+        background: brand.wash,
+      }}
+    >
       <span
         style={{
           display: 'block',
@@ -245,7 +346,7 @@ function Contact({ channel }: { readonly channel: Channel }) {
       </span>
       {channel.href !== undefined && (
         <a href={channel.href} target="_blank" rel="noreferrer" style={{ color: brand.ink }}>
-          Open the page
+          Open the page ›
         </a>
       )}
       {/* Only where it is somebody else: the council's own page under the
@@ -275,12 +376,30 @@ function Heading({ children }: { readonly children: string }) {
   );
 }
 
-const pillStyle = {
+/** The quiet tint behind *Location pinned on the map.* */
+const NOTICE_WASH = '#fdf6e8';
+
+/** The emergency's own red, which nothing else on the map uses. */
+const URGENT_INK = '#a4262c';
+const URGENT_WASH = '#fdf1f1';
+const URGENT_EDGE = '#e8c4c6';
+
+const filledStyle = {
   padding: `${String(space(1))}px ${String(space(3))}px`,
-  borderRadius: radius.pill,
-  border: `1px solid ${brand.tint}`,
-  background: brand.wash,
-  color: brand.ink,
+  borderRadius: radius.small,
+  border: `1px solid ${brand.base}`,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const outlineStyle = {
+  padding: `${String(space(1))}px ${String(space(3))}px`,
+  borderRadius: radius.small,
+  border: `1px solid ${line.base}`,
+  background: surface.raised,
+  color: ink.base,
   font: type(text.small, { weight: weight.semibold }),
   cursor: 'pointer',
 } as const;

@@ -4,7 +4,9 @@ DrainLens · TA28 · Iteration 3 · task W4.2 · read on **3 October 2026**
 
 Every official channel, telephone number and quotation the product shows, with its source and the date the page was read. Serves AC 5.2.3, 5.3.2, 6.2.1, 6.3.2 and the Epic 5 and Epic 6 definitions of done.
 
-> **Approval status: not yet approved.** The rows below are what the code reads today, taken from the publishers' own pages. The team signs the register off; until then the product is shipping wording that has a source but not a reviewer.
+> **Approved 4 October 2026 by Xiyu Cao**, for every channel and every quotation below. The rows are what the code reads, taken from the publishers' own pages on the dates given.
+>
+> **One question in §4 is not settled by that approval**: whether to keep looking for a source for the design's fourth preparation action. It is a decision about what to do next, not about anything the product currently says.
 
 ---
 

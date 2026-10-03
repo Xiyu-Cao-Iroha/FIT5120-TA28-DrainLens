@@ -4,7 +4,7 @@ DrainLens · TA28 · Iteration 3 · task W4.1 · written **3 October 2026**
 
 Which spots become a *place to check before heavy rain*, how far from an address one counts, how many are offered and in what order. Serves AC 5.1.1 and the Epic 5 definition of done, which asks for these to be approved rather than merely implemented.
 
-> **Approval status: not yet approved.** The rules below are what the code does today. The team signs this off; until then the product is shipping a rule that was measured but not agreed.
+> **Approved 4 October 2026 by Xiyu Cao**, all four decisions in §6 together. The rules below are what the code does and what the team has agreed it should do. Re-measure before changing any of them.
 
 ---
 

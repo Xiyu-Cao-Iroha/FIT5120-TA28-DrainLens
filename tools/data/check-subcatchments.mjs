@@ -75,8 +75,24 @@ const register = await readFile(
   path.resolve(HERE, '../../pipeline/src/drainlens_pipeline/subcatchment_register.py'),
   'utf8',
 );
+/*
+  One entry per line, and the approval is the last thing on it.
+
+  This was written to scan the whole file at once, with `[^)]*?` between the
+  area number and the approval tuple. Six of the thirty-five areas are named
+  `… (LOWER)`, `… (CITY)` or `… (MOUTH TO MERRI)`, so that pattern could never
+  reach past their own brackets: the two largest areas in the council, holding
+  27,166 addresses between them, would have been reported as unapproved
+  however carefully somebody had approved them. Reading a line at a time is
+  what the file's shape actually supports.
+*/
+const APPROVED_ROW = /^\s*Entry\(\s*"(\d+)".*\(\s*"[^"]+"\s*,\s*"\d{4}-\d{2}-\d{2}"\s*\)\s*\),?\s*$/;
 const approvedInRegister = new Set(
-  [...register.matchAll(/Entry\(\s*"(\d+)"[^)]*?\(\s*"[^"]+"\s*,\s*"\d{4}-\d{2}-\d{2}"\s*\)/g)].map((m) => m[1]),
+  register
+    .split('\n')
+    .map((line) => APPROVED_ROW.exec(line))
+    .filter((match) => match !== null)
+    .map((match) => match[1]),
 );
 
 for (const area of areas.areas ?? []) {

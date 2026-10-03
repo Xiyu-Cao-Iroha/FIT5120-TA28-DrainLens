@@ -71,7 +71,15 @@ import {
 } from '../prepare/places.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
-import { REPORT_HEADING } from '../report/problems.js';
+import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
+import {
+  PICK_DRAIN,
+  PICK_RADIUS_M,
+  PIN_PLACE,
+  type ReportPlace,
+  drainTitle,
+  distanceLine,
+} from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
@@ -256,7 +264,7 @@ export function MapView({
   address,
   task,
   mode = null,
-  panel = true,
+  panel: panelAllowed = true,
   catchments = null,
   relevance = {},
   onReviewPlace,
@@ -407,11 +415,36 @@ export function MapView({
     it, which is the only way a drain can reach a report: nothing is attached
     because it happens to be near, and `Remove` takes it off again.
   */
+  /** A reminder's explanation has been opened, which the guide waits on. */
+  const [whyOpen, setWhyOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportDrain, setReportDrain] = useState<string | null>(null);
-  const openReport = (drain: string | null) => {
-    setReportDrain(drain);
+  const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
+  const openReport = (place: ReportPlace) => {
+    setReportPlace(place);
     setReportOpen(true);
+  };
+  /*
+    The map handed over to a report (Figma R1 and R3).
+
+    While this is set the map is an input rather than something to read: the
+    chrome is gone, only the drains near the address are drawn, and a press
+    answers the question on the banner. `panel` below is how everything else
+    gets out of the way -- every card on this map is already written to it.
+  */
+  const [reportProblem, setReportProblem] = useState<ProblemId | null>(null);
+  const [picking, setPicking] = useState<'drain' | 'pin' | null>(null);
+  const [candidate, setCandidate] = useState<{
+    readonly assetNumber: string;
+    readonly distanceM: number | null;
+  } | null>(null);
+  const [pinAt, setPinAt] = useState<Local | null>(null);
+  const [pinNote, setPinNote] = useState('');
+  const panel = panelAllowed && picking === null;
+  const leavePicking = () => {
+    setPicking(null);
+    setCandidate(null);
+    setPinAt(null);
+    setPinNote('');
   };
   /*
     Whether the before-rain callout on the address is showing.
@@ -526,6 +559,27 @@ export function MapView({
     rather than reading the zoom, because density is not uniform and any scale
     strict enough for the CBD hides Kensington.
   */
+  /*
+    The drains near the address, and only those (Figma R1).
+
+    The whole council's 21,113 pits on one screen is not a question anybody
+    can answer, and the banner says *only drains near this address are shown*
+    -- so it has to be true. Without an address there is nothing to be near
+    and the reader is sent to the pin instead.
+  */
+  const pickable = useMemo(() => {
+    if (address === null) return [];
+    const pits = map.layers.pit ?? [];
+    return pits.filter(
+      (pit) =>
+        Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM) <= PICK_RADIUS_M,
+    );
+  }, [map, address]);
+  const pickingMap = useMemo(
+    () => ({ ...map, layers: { ...map.layers, pit: pickable, pipe: [] } }),
+    [map, pickable],
+  );
+
   const pitPoints = useMemo(
     () => (map.layers.pit ?? []).map((pit) => pit.c),
     [map.layers.pit],
@@ -571,6 +625,7 @@ export function MapView({
       help: layers.help,
       planOpen,
       placesReviewed,
+      whyOpen,
     });
   }, [
     terrainOn,
@@ -589,15 +644,16 @@ export function MapView({
     // Epic 5's two, for the same reason.
     planOpen,
     placesReviewed,
+    whyOpen,
     onMapNow,
   ]);
 
   return (
     <>
       <MapCanvas
-        artefact={map}
+        artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
-        show={visibilityOf(layers)}
+        show={visibilityOf(picking === null ? layers : NOTHING_ON)}
         selectedPit={selected}
         // Only while the pits are drawn. A ring around a pit on a map with no
         // pits on it is a mark with nothing under it.
@@ -606,8 +662,8 @@ export function MapView({
         fit={fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
-        showPits={pitsDrawn}
-        showPipes={layers.pipe}
+        showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
+        showPipes={picking === null && layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
@@ -633,7 +689,32 @@ export function MapView({
           setWarning(null);
           setAddressCardOpen(true);
         }}
+        {...(picking === 'pin'
+          ? {
+              onGround: (point: Local) => {
+                setPinAt(point);
+              },
+            }
+          : {})}
         onSelect={(next) => {
+          if (picking === 'drain') {
+            // A press answers the banner's question and opens nothing else.
+            if (next?.kind === 'pit' && next.feature.asset_number !== undefined) {
+              setCandidate({
+                assetNumber: String(next.feature.asset_number),
+                distanceM:
+                  address === null
+                    ? null
+                    : Math.round(
+                        Math.hypot(
+                          next.feature.c[0] - address.eastingM,
+                          next.feature.c[1] - address.northingM,
+                        ),
+                      ),
+              });
+            }
+            return;
+          }
           setHit(next);
           setWarning(null);
           setMinimised(false);
@@ -646,6 +727,198 @@ export function MapView({
       />
 
       {viewport !== null && overlay !== null && <GuideMarks overlay={overlay} viewport={viewport} />}
+
+      {/*
+        The map as an input (Figma R1 and R3): a banner saying what to press,
+        a way out, and the card that confirms what was pressed.
+      */}
+      {picking !== null && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: space(4),
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 5,
+              display: 'flex',
+              gap: space(4),
+              alignItems: 'flex-start',
+              maxWidth: 420,
+              padding: `${String(space(2))}px ${String(space(3))}px`,
+              borderRadius: radius.base,
+              background: surface.raised,
+              border: `1px solid ${line.base}`,
+              boxShadow: '0 6px 20px rgba(16, 32, 40, 0.10)',
+            }}
+          >
+            <span>
+              <span
+                style={{
+                  display: 'block',
+                  font: type(text.small, { weight: weight.semibold }),
+                  color: ink.strong,
+                }}
+              >
+                {picking === 'drain' ? PICK_DRAIN.title : PIN_PLACE.title}
+              </span>
+              <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>
+                {picking === 'drain' ? PICK_DRAIN.near(address?.label ?? null) : PIN_PLACE.then}
+              </span>
+            </span>
+            <button type="button" onClick={leavePicking} style={planLinkStyle}>
+              {PICK_DRAIN.cancel}
+            </button>
+          </div>
+
+          {picking === 'drain' && candidate === null && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: space(4),
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                textAlign: 'center',
+              }}
+            >
+              <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>
+                Your answers stay in this browser.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPicking('pin');
+                }}
+                style={{
+                  marginTop: space(1),
+                  padding: `${String(space(1))}px ${String(space(3))}px`,
+                  borderRadius: radius.pill,
+                  border: `1px solid ${line.base}`,
+                  background: surface.raised,
+                  color: ink.base,
+                  font: type(text.small),
+                  cursor: 'pointer',
+                }}
+              >
+                {PICK_DRAIN.notOnMap}
+              </button>
+            </div>
+          )}
+
+          {picking === 'drain' && candidate !== null && (
+            <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })} at="bottom">
+              <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
+                {distanceLine(
+                  { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                  address?.label ?? null,
+                )}
+              </p>
+              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportPlace({
+                      kind: 'drain',
+                      assetNumber: candidate.assetNumber,
+                      street: null,
+                      distanceM: candidate.distanceM,
+                    });
+                    leavePicking();
+                  }}
+                  style={pickFilledStyle}
+                >
+                  Use this drain
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCandidate(null);
+                  }}
+                  style={pickOutlineStyle}
+                >
+                  Pick another
+                </button>
+              </span>
+            </MapNote>
+          )}
+
+          {/*
+            Where the pin went, drawn over the canvas rather than in it.
+
+            The card alone confirms the press without showing the place, and
+            a reader who tapped a few metres off has nothing to correct
+            against. The canvas draws the address pin and nothing else that
+            moves, so this is one absolutely positioned mark instead.
+          */}
+          {picking === 'pin' && pinAt !== null && viewport !== null && (
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: toScreen(viewport, pinAt)[0] - 9,
+                top: toScreen(viewport, pinAt)[1] - 22,
+                width: 18,
+                height: 18,
+                borderRadius: '50% 50% 50% 0',
+                transform: 'rotate(-45deg)',
+                background: brand.base,
+                border: `2px solid ${ink.inverse}`,
+                boxShadow: '0 2px 6px rgba(16, 32, 40, 0.35)',
+                zIndex: 5,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {picking === 'pin' && pinAt !== null && (
+            <MapNote title={PIN_PLACE.card} at="bottom">
+              <input
+                value={pinNote}
+                onChange={(event) => {
+                  setPinNote(event.target.value);
+                }}
+                placeholder={PIN_PLACE.placeholder}
+                aria-label={PIN_PLACE.then}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: space(2),
+                  borderRadius: radius.small,
+                  border: `1px solid ${line.base}`,
+                  font: type(text.small),
+                  color: ink.base,
+                }}
+              />
+              <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportPlace({
+                      kind: 'pin',
+                      note: pinNote.trim(),
+                      at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
+                    });
+                    leavePicking();
+                  }}
+                  style={pickFilledStyle}
+                >
+                  {PIN_PLACE.use}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinAt(null);
+                  }}
+                  style={pickOutlineStyle}
+                >
+                  {PIN_PLACE.back}
+                </button>
+              </span>
+            </MapNote>
+          )}
+        </>
+      )}
 
       {panel && (
         <div
@@ -1028,6 +1301,9 @@ export function MapView({
             onShowOnMap={(place) => {
               setOpenPlace(place.number);
             }}
+            onWhyOpen={() => {
+              setWhyOpen(true);
+            }}
             {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
             {...(guided
               ? {}
@@ -1058,7 +1334,27 @@ export function MapView({
               <button
                 type="button"
                 onClick={() => {
-                  openReport(hit?.kind === 'pit' ? String(hit.feature.asset_number) : null);
+                  // A drain already selected on the map is one the reader
+                  // selected, which is the only way one may reach a report
+                  // (AC 6.3.2). Anything else starts with nothing named.
+                  openReport(
+                    hit?.kind === 'pit' && hit.feature.asset_number !== undefined
+                      ? {
+                          kind: 'drain',
+                          assetNumber: String(hit.feature.asset_number),
+                          street: null,
+                          distanceM:
+                            address === null
+                              ? null
+                              : Math.round(
+                                  Math.hypot(
+                                    hit.feature.c[0] - address.eastingM,
+                                    hit.feature.c[1] - address.northingM,
+                                  ),
+                                ),
+                        }
+                      : null,
+                  );
                 }}
                 style={planLinkStyle}
               >
@@ -1074,9 +1370,23 @@ export function MapView({
         <MapNote title={REPORT_HEADING}>
           <ReportProblem
             address={address?.label ?? null}
-            drain={reportDrain}
-            onForgetDrain={() => {
-              setReportDrain(null);
+            place={reportPlace}
+            chosen={reportProblem}
+            onChoose={setReportProblem}
+            onPick={() => {
+              // The map takes over. The report card is still open behind it
+              // and comes back with whatever was picked.
+              setCandidate(null);
+              setPinAt(null);
+              setPicking(address === null ? 'pin' : 'drain');
+            }}
+            onForgetPlace={() => {
+              // *Change* is what the design calls it, so it goes back to the
+              // map rather than just emptying the row.
+              setReportPlace(null);
+              setCandidate(null);
+              setPinAt(null);
+              setPicking(address === null ? 'pin' : 'drain');
             }}
           />
           <span style={{ display: 'block', marginTop: space(3) }}>
@@ -1084,6 +1394,7 @@ export function MapView({
               type="button"
               onClick={() => {
                 setReportOpen(false);
+                setReportProblem(null);
               }}
               style={planLinkStyle}
             >
@@ -1162,6 +1473,27 @@ export function MapView({
     </>
   );
 }
+
+/** Filled and outline, for the two choices a picking card offers. */
+const pickFilledStyle = {
+  padding: `${String(space(1))}px ${String(space(3))}px`,
+  borderRadius: radius.small,
+  border: `1px solid ${brand.base}`,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const pickOutlineStyle = {
+  padding: `${String(space(1))}px ${String(space(3))}px`,
+  borderRadius: radius.small,
+  border: `1px solid ${line.base}`,
+  background: surface.raised,
+  color: ink.base,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
 
 /** The map's own underlined link, for the ways between its cards. */
 const planLinkStyle = {

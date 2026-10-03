@@ -200,8 +200,9 @@ describe('against the published files', () => {
     expect(gatehouse?.displayName).toBe('Maribyrnong River (Lower)');
     expect(market?.number).toBe('4220');
     expect(dock).toBeNull();
-    // Nothing is approved yet, so every address reads the unconfirmed sentence.
-    expect(gatehouse?.class).toBe('unclassified');
+    // 4220 was approved on 4 October as a reach of the Maribyrnong, so this
+    // address now reads the waterway sentence rather than the unconfirmed one.
+    expect(gatehouse?.class).toBe('waterway-section');
   }, 30_000);
 });
 
