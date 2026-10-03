@@ -6,12 +6,17 @@
  * into a reminder the reader has agreed to, and every step is about that
  * agreement rather than about the map.
  *
+ * **Five steps, in the design's order**: press the button, decide, read what
+ * the decision put in the plan, open *Why this place?* on it, finish. The
+ * fourth is a press rather than a sentence because the fold is the one part of
+ * the plan a reader would otherwise never see, and AC 5.3.1 is about what it
+ * says.
+ *
  * **The branch is not a branch in the steps.** The design draws two sets of
  * screens, one for *Applies to me* and one for *Doesn't apply to me*, and the
  * difference between them is what the plan shows — a reminder, or a place
- * listed with its status. The steps are the same four either way: open the
- * place, see why it is listed, decide, and read what the decision did. A guide
- * that forked would be telling the reader their answer was the wrong one.
+ * listed with its status. The steps are the same five either way. A guide that
+ * forked would be telling the reader their answer was the wrong one.
  *
  * **Step one asks for a press that opens the plan**, not for a layer: the
  * before-rain markers are already drawn when the guide opens, because the
@@ -31,23 +36,33 @@ export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
     requires: 'plan-opened',
   },
   {
-    kind: 'read',
-    id: 'why-shown',
-    prompt: 'Great! Why this place? explains what put this spot on your list.',
-    note: 'It describes the street near your address, not your property.',
-  },
-  {
     kind: 'do',
     id: 'place-reviewed',
     prompt: 'Decide whether Place 1 applies to you.',
     hint: 'If you never park or leave bins here, choose Doesn’t apply to me.',
     requires: 'place-reviewed',
+    /*
+      Its own feedback, so the step after it can be an instruction.
+
+      The guides' rule is that a read step straight after a press is praise
+      for that press -- *Great! …* -- and the design's third step is not
+      praise, it is *Review the reminder added to your plan*. The press gets
+      its sentence here instead, which is also where it happened.
+    */
+    done: 'Your answer is in the plan.',
   },
   {
     kind: 'read',
     id: 'plan-updated',
-    prompt: 'Great! Your plan now shows what you decided.',
-    note: 'Only places that apply to you create a reminder. The others keep their review status.',
+    prompt: 'Review the reminder added to your plan.',
+    note: 'Only places that apply to you create a reminder. Other places remain listed with their review status.',
+  },
+  {
+    kind: 'do',
+    id: 'why-shown',
+    prompt: 'Open Why this place?',
+    hint: 'Each reminder explains why DrainLens picked that place.',
+    requires: 'why-opened',
   },
 ];
 

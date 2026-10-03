@@ -47,9 +47,19 @@ class TestClassification:
         # The whole point. A name ending in M.D. is evidence and not an
         # approval, and the Epic 6 definition of done says no subcatchment is
         # described as a Melbourne Water drain without one.
-        assert reg.proposal("4410").proposed == "main-drain"
-        assert reg.proposal("4410").approved is None
-        assert reg.classify("4410") == "unclassified"
+        #
+        # Checked with a row swapped in rather than against the live register,
+        # which was approved on 4 October: this is a rule about the mechanism,
+        # and a test that reads the register's current state stops testing the
+        # mechanism the moment somebody approves something.
+        entry = reg.Entry("4410", "ALEXANDRA PARADE M.D.", "main-drain", "named for a main drain")
+        assert entry.approved is None
+        original = reg.BY_NUMBER["4410"]
+        reg.BY_NUMBER["4410"] = entry
+        try:
+            assert reg.classify("4410") == "unclassified"
+        finally:
+            reg.BY_NUMBER["4410"] = original
 
     def test_an_approved_row_publishes_what_it_was_approved_as(self):
         entry = reg.Entry("4410", "ALEXANDRA PARADE M.D.", "main-drain", "checked", ("A Teammate", "2026-10-02"))
@@ -73,8 +83,13 @@ class TestClassification:
         # Dynon Road Tidal Canal is a canal and the layer does not say whose.
         assert reg.proposal("4229").proposed == "unclassified"
 
-    def test_nothing_is_approved_yet_and_the_build_can_say_so(self):
-        assert len(reg.unapproved()) == len(reg.REGISTER)
+    def test_the_build_can_say_how_many_rows_are_unapproved(self):
+        # Approved in one sitting on 4 October 2026, which is a state and not
+        # a rule: what is held here is that `unapproved()` answers for the
+        # register as it stands, so the artefact's own count cannot drift from
+        # it. Reopening a row makes this one again.
+        assert reg.unapproved() == tuple(entry for entry in reg.REGISTER if entry.approved is None)
+        assert all(entry.approved is not None for entry in reg.REGISTER)
 
     def test_the_register_covers_every_published_area(self):
         from json import loads

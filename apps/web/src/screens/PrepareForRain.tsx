@@ -64,9 +64,6 @@ export function PlaceCard({
   /** Only where another numbered place is waiting (AC 5.1.2). */
   readonly onNext?: (() => void) | undefined;
 }) {
-  const whyId = useId();
-  const [whyOpen, setWhyOpen] = useState(false);
-
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
       {/*
@@ -93,23 +90,7 @@ export function PlaceCard({
         />
       </div>
 
-      <details
-        open={whyOpen}
-        onToggle={(event) => {
-          setWhyOpen((event.currentTarget as HTMLDetailsElement).open);
-        }}
-      >
-        <summary aria-controls={whyId} style={{ cursor: 'pointer', color: brand.ink }}>
-          Why this place?
-        </summary>
-        <div id={whyId} style={{ marginTop: space(1) }}>
-          <p style={{ margin: 0 }}>{WHY_THIS_PLACE}</p>
-          <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
-            {PLACE_SOURCE}
-          </p>
-          <p style={{ margin: `${String(space(1))}px 0 0`, color: ink.muted }}>{PLACE_IS_THE_STREET}</p>
-        </div>
-      </details>
+      <WhyThisPlace />
 
       {onNext !== undefined && (
         <p style={{ margin: `${String(space(2))}px 0 0` }}>
@@ -130,6 +111,7 @@ export function PreparePlan({
   onShowOnMap,
   onReset,
   onReport,
+  onWhyOpen,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -139,6 +121,8 @@ export function PreparePlan({
   readonly onReset?: (() => void) | undefined;
   /** The way into the reporting pathway, which is its own thing (AC 5.2.3). */
   readonly onReport?: (() => void) | undefined;
+  /** A reminder's *Why this place?* opened, which the guide's step 4 waits on. */
+  readonly onWhyOpen?: (() => void) | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -194,6 +178,13 @@ export function PreparePlan({
                         is the reader's own and never an organisation's -- is
                         met by naming nobody at all.
                       */}
+                      {/*
+                        Why this place?, under the reminder it is about (Figma
+                        G3 and G4). It is also on the place's own card; a
+                        reader who answered and moved on has the plan, and the
+                        design puts the explanation where the reminder is.
+                      */}
+                      <WhyThisPlace {...(onWhyOpen === undefined ? {} : { onOpen: onWhyOpen })} />
                     </span>
                   )}
                   {onShowOnMap !== undefined && (
@@ -321,6 +312,40 @@ export function PreparePlan({
 
 /** The heading over the safety boundary, as the design writes it. */
 const SAFETY_HEADING = 'Before you rely on this';
+
+/**
+ * *Why this place?*, folded, wherever a place is explained (AC 5.3.1).
+ *
+ * On the place's card and again under the reminder in the plan, because the
+ * design puts it in both and a reader who has moved on to the plan has no way
+ * back to the card. `onOpen` is how the guide's fourth step knows it happened.
+ */
+function WhyThisPlace({ onOpen }: { readonly onOpen?: (() => void) | undefined }) {
+  const whyId = useId();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <details
+      open={open}
+      onToggle={(event) => {
+        const nowOpen = (event.currentTarget as HTMLDetailsElement).open;
+        setOpen(nowOpen);
+        if (nowOpen) onOpen?.();
+      }}
+    >
+      <summary aria-controls={whyId} style={{ cursor: 'pointer', color: brand.ink }}>
+        Why this place?
+      </summary>
+      <div id={whyId} style={{ marginTop: space(1) }}>
+        <p style={{ margin: 0 }}>{WHY_THIS_PLACE}</p>
+        <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.micro), color: ink.subtle }}>
+          {PLACE_SOURCE}
+        </p>
+        <p style={{ margin: `${String(space(1))}px 0 0`, color: ink.muted }}>{PLACE_IS_THE_STREET}</p>
+      </div>
+    </details>
+  );
+}
 
 function Heading({ children }: { readonly children: ReactNode }) {
   return (
