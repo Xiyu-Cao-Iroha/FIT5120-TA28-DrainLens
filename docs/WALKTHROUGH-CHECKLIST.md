@@ -298,6 +298,27 @@ Then run the guide: **Get ready for heavy rain**, from the guide chooser.
 
 ---
 
+## 11 · The guidance page, the search box and the gaps
+
+Team requests of 4 October. Start from the homepage with no address given.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| — | The guide chooser shows **no** address line before one is given | | |
+| — | The first guide asks for an address; the chooser then shows *Current address: … Change* | | |
+| — | A second guide starts at step one **without asking again** | | |
+| — | *Change* beside the address, in the guide and on the chooser, reaches the address screen with the section still chosen | | |
+| 5.4.2 | Changing the address from that screen clears the answers about places | | |
+| — | Step one's back control says **← Guides** and returns to the chooser | | |
+| — | A finished guide offers **Next guide** with the chooser's own description, and *Explore full map* below it | | |
+| — | With guides unread, *Explore full map* asks first, names them, and holds *Continue to full map* for three seconds — then opens the map | | |
+| — | With every guide done, *Explore full map* opens the map with no dialog | | |
+| — | On the full map, typing something with no match says so. On the Kensington fallback it says the full council map is unavailable and names what can be searched | | |
+| — | **Ground data gaps** is not in the Layers panel (which holds Ground height alone), is in the legend, and is drawn on every way in | | |
+| 3.1.2.d | The drain condition carries an **ⓘ**; it opens three drawings of one grate at 100%, 50% and 0% intake, and says they are drawings and not of this drain | | |
+
+---
+
 ## Defects found
 
 | # | Where | What happened | What should happen | Raised as |

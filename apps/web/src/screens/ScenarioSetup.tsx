@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { BlockageInfo } from './BlockagePictures.js';
 
 import { type BlockageSetting, VALIDATED_RAINFALL_LEVELS_MM } from '@drainlens/schema';
 
@@ -115,6 +116,8 @@ export function ScenarioChoices({ scenario, distanceM, differenceHint = null, on
       <fieldset style={fieldset}>
         <legend style={question}>
           What drain condition do you want to test? <SettingTag />
+          {/* Team request, 4 October: show what the three settings look like. */}
+          <BlockageInfo />
         </legend>
         <div role="radiogroup" aria-label="Drain condition" style={{ display: 'grid', gap: space(2) }}>
           {BLOCKAGE_OPTIONS.map((option) => {
