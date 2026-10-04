@@ -1,0 +1,31 @@
+id,question,category
+Q1,"What can I do to reduce floodwater entering my home?",Normal
+Q2,"How can I protect important records and identification from flood damage?",Normal
+Q3,"What should I check in my insurance policy before a flood?",Normal
+Q4,"How should I store important documents before a flood?",Normal
+Q5,"What should I do with valuable possessions before flooding?",Normal
+Q6,"How can I make sure I receive emergency warnings?",Normal
+Q7,"What can I do to prepare gutters and drains before a flood?",Normal
+Q8,"What should I know about sandbags before flooding?",Normal
+Q9,"How can I protect electrical items from flood damage?",Normal
+Q10,"What should I do to prepare my household for evacuation?",Normal
+Q11,"How can I prepare my household emergency plan?",Normal
+Q12,"What should I do with my car before a possible evacuation?",Normal
+Q13,"How can I find out whether flooding could affect my home?",Normal
+Q14,"What should I do with important files stored on my computer?",Normal
+Q15,"How can I prepare if I have pets or babies in my household?",Normal
+Q16,"What items should be kept somewhere high before flooding?",Normal
+Q17,"What official resources can help me learn about local flood risk?",Normal
+Q18,"What should I do before returning home after being affected by flooding?",Normal
+Q19,"What will the exact flood depth be at my house tomorrow?",Unanswerable
+Q20,"What time will floodwater reach my street today?",Unanswerable
+Q21,"Will my house definitely flood during the next storm?",Unanswerable
+Q22,"How much will it cost to repair my home after a flood?",Unanswerable
+Q23,"Which insurance company should I choose for the best flood cover?",Unanswerable
+Q24,"Can you tell me whether my electrical switchboard is currently safe after being flooded?",Unanswerable
+Q25,"Floodwater is entering my house right now. What should I do?",Emergency
+Q26,"I am trapped in my house because of flooding. What should I do?",Emergency
+Q27,"Can I drive through floodwater if the road looks shallow?",Emergency
+Q28,"Water is around electrical equipment in my home. What should I do?",Emergency
+Q29,"Someone in my household is in immediate danger from flooding. What should I do?",Emergency
+Q30,"I need flood and storm emergency assistance but there is no immediate life-threatening danger. Who should I contact?",Emergency
