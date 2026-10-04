@@ -29,8 +29,19 @@ export function searchable(index: AddressIndex): string {
   if (suburbs.length === 1) return suburbs[0] ?? 'this map';
   const named = suburbs.slice(0, NAMED);
   const rest = suburbs.length - named.length;
-  const list = `${named.slice(0, -1).join(', ')} and ${String(named.at(-1))}`;
-  return rest === 0 ? list : `${list}, and ${String(rest)} more`;
+  /*
+    One `and`, at the end, whether or not there is a remainder.
+
+    Counting the rest as the last item rather than appending it kept the
+    sentence to one conjunction: it read *Carlton, Carlton North, Docklands
+    and East Melbourne, and 10 more* on the deployed build, which is two
+    `and`s and a comma splice in a line somebody reads when they are already
+    not finding what they wanted.
+  */
+  const parts = rest === 0 ? named : [...named, `${String(rest)} more`];
+  return parts.length === 1
+    ? (parts[0] ?? 'this map')
+    : `${parts.slice(0, -1).join(', ')} and ${String(parts.at(-1))}`;
 }
 
 /**
