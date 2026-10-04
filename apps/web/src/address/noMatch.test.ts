@@ -62,6 +62,16 @@ describe('listing what can be searched', () => {
 
   it('counts the rest once the list would stop being readable', () => {
     const many = ['Melbourne', 'Carlton', 'Docklands', 'Kensington', 'Parkville', 'Southbank'];
-    expect(searchable(index(many))).toMatch(/and 2 more$/);
+    expect(searchable(index(many))).toBe('Carlton, Docklands, Kensington, Melbourne and 2 more');
+  });
+
+  it('uses one and, wherever the list ends', () => {
+    // It read "… Docklands and East Melbourne, and 10 more" on the deployed
+    // build: two conjunctions in a line somebody reads when they are already
+    // not finding what they wanted.
+    const many = ['Melbourne', 'Carlton', 'Docklands', 'Kensington', 'Parkville', 'Southbank'];
+    for (const list of [searchable(index(many)), searchable(index(['A', 'B', 'C']))]) {
+      expect(list.split(' and ')).toHaveLength(2);
+    }
   });
 });
