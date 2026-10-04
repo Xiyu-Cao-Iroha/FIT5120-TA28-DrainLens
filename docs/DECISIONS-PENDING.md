@@ -266,3 +266,22 @@ The design shows **Move valuable items above floor level**. No official page car
 
 - **`--min-instances=1` on the API: reverted.** `drainlens-api` runs at `--min-instances=0` again (revision `drainlens-api-00016-f65`), so nothing pays for an idle instance. Measured straight after: 0.74 s on the first request, 0.19 s warm, `/health` returning the same counts as before. The cold start is the price of not paying for idle, and `deploy/API-DEPLOYMENT.md` has been saying so since September.
 - **The gate password: deliberately not rotated.** It was exposed in a screenshot on 28 September. The team's decision is to leave it, on the reasoning that the gate keeps a half-built prototype from being found by accident rather than protecting anything in it: there is no account, no personal data and no endpoint that takes an address. **It is recorded here as a decision rather than an oversight**, which is the point of this file. Rotating it is one command per service if that changes.
+
+---
+
+## 10 · The hold in front of the full map — **DECIDED 5 October 2026: it stays**
+
+Two reviews asked for opposite things in the same week, and this is the record of which one was followed.
+
+| | Asked for | On |
+|---|---|---|
+| The team, after watching somebody use it | A dialog at the end of a guide naming the guides still unread, with a countdown before *Continue to full map* can be pressed | 4 October, in *需要现在改的.docx* |
+| A front-end review | Merging the prompts in front of the map and **removing the fixed countdown**, on the reasoning that three stops in a row makes the flow drag | 4 October |
+
+**The team's version stays.** It is built, it works — the button is disabled and counts 3, 2, 1 before it enables — and it is deliberately smaller than the thing it reinstates: a five-second countdown stood in front of the Full map on *every* visit until 14 September, and this one appears only at the end of a guide, only while a guide is unread, and only on that one control.
+
+**What the review got right, and what it is owed.** Three stops in a row is a real observation, and the answer to it is not to delete this one: the other two are the chooser's own *Skip to Full map*, which shows nothing at all, and the notice in front of the map, which is about scope rather than about guides. If the flow is to be shortened, shorten it there — the open question below.
+
+### Still open: the other way in
+
+The dialog is only on a finished guide's *Explore full map*. Most readers leave for the map through the chooser's *Skip to Full map →*, which bypasses it entirely. Putting it on both would honour the request more fully and would also be the third stop the review complained about. **Not decided**; nothing should be built for it until it is.
