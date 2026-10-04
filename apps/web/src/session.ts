@@ -79,6 +79,15 @@ export type Screen =
   | 'flood-map'
   /** The guide's way in, and reachable again since 11 September. */
   | 'address'
+  /**
+   * The fork *Get started* opens: your own street, or what has happened before.
+   *
+   * Added 4 October, when *Flood history* came out of the header. The two are
+   * different questions with different records behind them, and a header that
+   * offered one of them beside the way into everything else was giving them
+   * the same weight.
+   */
+  | 'start'
   /** The task question, reached from the comparison's breadcrumb. */
   | 'task'
   | 'explore'
@@ -444,6 +453,7 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  | { readonly type: 'explore-chosen' }
   /** The board's map, which is the same records drawn rather than ranked. */
   | { readonly type: 'flood-map-opened' }
   /** The homepage's front door: the four cards, not the map. */
@@ -534,10 +544,14 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   // live, and they are what somebody leaving the map most likely wants.
   'flood-map': 'history',
   address: 'home',
+  start: 'home',
   task: 'address',
   // Out of a section is back to the address it was built around, not out of
   // the guide altogether. The way out of the guide is the Home control.
-  choose: 'home',
+  // Back from the chooser is the fork it was reached through, since
+  // 4 October. The homepage's own guide cards reach it too and `back` cannot
+  // tell them apart; the fork is one press from home either way.
+  choose: 'start',
   guide: 'address',
   locked: 'choose',
   explore: 'task',
@@ -609,6 +623,10 @@ function step(session: Session, event: SessionEvent): Session {
       };
 
     case 'get-started':
+      return { ...session, screen: 'start' };
+
+    /** One of the two on the start screen, and the homepage's guide cards. */
+    case 'explore-chosen':
       return { ...session, screen: 'choose' };
 
     case 'guide-chosen':

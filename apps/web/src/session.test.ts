@@ -970,7 +970,9 @@ describe('a task chosen before there is an address', () => {
       { type: 'go-home' },
       { type: 'get-started' },
     ]);
-    expect(end.screen).toBe('choose');
+    // Get started opens the fork since 4 October; the chooser is one press on.
+    expect(end.screen).toBe('start');
+    expect(reduce(end, { type: 'explore-chosen' }).screen).toBe('choose');
     expect(end.learned).toEqual(INITIAL_SESSION.learned);
   });
 });

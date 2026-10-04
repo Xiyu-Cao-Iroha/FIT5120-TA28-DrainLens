@@ -20,6 +20,7 @@ import { useAreas } from './history/useAreas.js';
 import { FloodMap } from './screens/FloodMap.js';
 import { Guide } from './screens/Guide.js';
 import { Choose } from './screens/Choose.js';
+import { Start } from './screens/Start.js';
 import { Home } from './screens/Home.js';
 import { LockedMap } from './screens/LockedMap.js';
 import { type SectionId, guideTitleOf } from './tutorial/sections.js';
@@ -343,9 +344,6 @@ export function App() {
               onOpenMap={() => {
                 dispatch({ type: 'get-started' });
               }}
-              onOpenHistory={() => {
-                dispatch({ type: 'history-opened' });
-              }}
             />
           }
         >
@@ -362,7 +360,10 @@ export function App() {
                 dispatch.
               */
               void mode;
-              dispatch({ type: 'get-started' });
+              // Straight to the chooser, not through the fork: these cards are
+              // already about the guides, and asking again which of the two
+              // they meant would be answering a question they just answered.
+              dispatch({ type: 'explore-chosen' });
             }}
             // The chooser's "Skip to Full map", so the link named after the
             // full map opens it -- through the same notice, which the reducer
@@ -387,6 +388,23 @@ export function App() {
             */
             onCompare={() => {
               dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
+            }}
+          />
+        </Shell>
+      );
+
+    case 'start':
+      return (
+        <Shell>
+          <Start
+            onExplore={() => {
+              dispatch({ type: 'explore-chosen' });
+            }}
+            onHistory={() => {
+              dispatch({ type: 'history-opened' });
+            }}
+            onBack={() => {
+              dispatch({ type: 'back' });
             }}
           />
         </Shell>
@@ -539,8 +557,10 @@ export function App() {
             onSkip={() => {
               dispatch({ type: 'map-opened', from: 'home' });
             }}
+            // Back to the fork it was reached through since 4 October, which
+            // is one press from the homepage either way.
             onBack={() => {
-              dispatch({ type: 'go-home' });
+              dispatch({ type: 'back' });
             }}
           />
         </Shell>
@@ -1232,28 +1252,16 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * The sections themselves keep their ids — they are named by the acceptance
  * criteria and are still there to scroll to.
  */
-function HomeNav({
-  onOpenMap,
-  onOpenHistory,
-}: {
-  readonly onOpenMap: () => void;
-  readonly onOpenHistory: () => void;
-}) {
+/**
+ * One control, since 4 October.
+ *
+ * *Flood history* used to sit here beside *Get started*, which gave a page
+ * about the past across Greater Melbourne the same weight as the way into
+ * everything else. It is one of the two choices behind this button now.
+ */
+function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
-      <button
-        type="button"
-        onClick={onOpenHistory}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          font: type(text.label, { weight: weight.medium }),
-          color: ink.muted,
-        }}
-      >
-        Flood history
-      </button>
       <button
         type="button"
         onClick={onOpenMap}

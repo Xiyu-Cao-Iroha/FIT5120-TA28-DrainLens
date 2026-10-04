@@ -316,6 +316,10 @@ Team requests of 4 October. Start from the homepage with no address given.
 | — | On the full map, typing something with no match says so. On the Kensington fallback it says the full council map is unavailable and names what can be searched | | |
 | — | **Ground data gaps** is not in the Layers panel (which holds Ground height alone), is in the legend, and is drawn on every way in | | |
 | 3.1.2.d | The drain condition carries an **ⓘ**; it opens three drawings of one grate at 100%, 50% and 0% intake, and says they are drawings and not of this drain | | |
+| — | The homepage header carries **one** control: *Flood history* is no longer beside *Get started* | | |
+| — | *Get started* opens a fork with two cards, each naming its scope — *City of Melbourne* for the drains, *Greater Melbourne* for the history | | |
+| — | Each card opens its own screen, and *← Back* from the guide chooser returns to the fork | | |
+| — | The homepage's own guide cards still go straight to the chooser, without being asked again | | |
 
 ---
 
