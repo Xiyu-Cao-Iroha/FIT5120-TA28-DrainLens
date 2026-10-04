@@ -524,6 +524,10 @@ export function App() {
           <Choose
             learned={session.learned}
             guided={GUIDED_SECTIONS}
+            address={session.address?.label ?? null}
+            onChangeAddress={() => {
+              dispatch({ type: 'change-address' });
+            }}
             onStart={(section) => {
               dispatch({ type: 'guide-chosen', section });
             }}
@@ -641,6 +645,14 @@ export function App() {
               }}
               onLeave={() => {
                 dispatch({ type: 'guide-left' });
+              }}
+              learned={session.learned}
+              guided={GUIDED_SECTIONS}
+              onStartSection={(next) => {
+                dispatch({ type: 'guide-chosen', section: next });
+              }}
+              onFullMap={() => {
+                dispatch({ type: 'map-opened', from: 'home' });
               }}
               // Back to the address screen, keeping the section chosen.
               onBack={() => {

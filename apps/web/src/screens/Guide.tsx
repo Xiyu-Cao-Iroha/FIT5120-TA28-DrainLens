@@ -56,7 +56,7 @@ import {
   stepIndex,
 } from '../tutorial/lesson.js';
 import { lessonFor } from '../tutorial/lessons.js';
-import { SECTIONS, type SectionId } from '../tutorial/sections.js';
+import { SECTIONS, type Learned, type SectionId } from '../tutorial/sections.js';
 import { marksFor } from '../tutorial/terrain.js';
 import {
   MARK_MARGIN_PX,
@@ -82,6 +82,7 @@ import {
   weight,
 } from '../ui/theme.js';
 import { LAYER } from '../ui/terms.js';
+import { ExploreFullMap, NextGuide, nextGuide } from './GuideEnding.js';
 import { MapView } from './MapView.js';
 
 export interface GuideProps {
@@ -120,6 +121,14 @@ export interface GuideProps {
    * header's small Address control.
    */
   readonly onBack?: () => void;
+  /** Which guides are done, so the end of this one can offer the next. */
+  readonly learned: Learned;
+  /** The sections with a guide written. */
+  readonly guided: readonly SectionId[];
+  /** Start another guide straight from the end of this one (Figma G5). */
+  readonly onStartSection: (section: SectionId) => void;
+  /** Open the full map from the end of a guide (team request, 4 October). */
+  readonly onFullMap: () => void;
 }
 
 export function Guide({
@@ -136,6 +145,10 @@ export function Guide({
   onFinish,
   onLeave,
   onBack,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
 }: GuideProps) {
   const [now, setNow] = useState<MapNow>(NOTHING_ON_MAP);
   /** How many `read` steps have been pressed past. See `stepIndex`. */
@@ -438,6 +451,11 @@ export function Guide({
         stepNumber={shown}
         total={steps.length}
         done={done && !lookingBack}
+        learned={learned}
+        guided={guided}
+        onStartSection={onStartSection}
+        onFullMap={onFullMap}
+        section={section}
         lookingBack={lookingBack}
         stepDone={stepDone}
         groundOff={lesson.withGround !== undefined && !now.terrain}
@@ -464,6 +482,18 @@ export function Guide({
   );
 }
 
+/** The quiet underlined control beside an address that can be changed. */
+const changeLink = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: 'inherit',
+  color: brand.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+} as const;
+
 function Coach({
   address,
   lesson,
@@ -484,7 +514,17 @@ function Coach({
   onNext,
   onPrevious,
   onFinish,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
+  section,
 }: {
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (next: SectionId) => void;
+  readonly onFullMap: () => void;
+  readonly section: SectionId;
   readonly address: SupportedAddress;
   readonly lesson: Lesson;
   /** The entry screen's copy, while it is showing. */
@@ -565,6 +605,23 @@ function Coach({
         </div>
         <div style={{ font: type(text.body, { weight: weight.medium }), color: ink.strong }}>
           {address.label}
+          {onBack !== undefined && (
+            <>
+              {'  '}
+              {/*
+                *Change*, beside the address it changes (Figma G1).
+
+                It is `onBack` because that is the one that asks for an
+                address and keeps the section: `onLeave` abandons the guide.
+                The guide used to reach the address screen through a *← Back*
+                on step one only; now that the address is kept across guides,
+                changing it is something a reader may want on any step.
+              */}
+              <button type="button" onClick={onBack} style={changeLink}>
+                Change
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -580,9 +637,23 @@ function Coach({
                 copy={lesson.finished}
                 onFinish={onFinish}
                 {...(noPipeShown ? { note: NO_PIPE_NOTE } : {})}
+                next={nextGuide(section, learned, guided)}
+                learned={learned}
+                guided={guided}
+                onStartSection={onStartSection}
+                onFullMap={onFullMap}
               />
             ) : (
-              <Complete copy={lesson.finished} onPrevious={onPrevious} onFinish={onFinish} />
+              <>
+                <Complete copy={lesson.finished} onPrevious={onPrevious} onFinish={onFinish} />
+                <GuideEnd
+                  next={nextGuide(section, learned, guided)}
+                  learned={learned}
+                  guided={guided}
+                  onStartSection={onStartSection}
+                  onFullMap={onFullMap}
+                />
+              </>
             )
           ) : (
             step !== undefined && (
@@ -725,9 +796,18 @@ function Coach({
                         </button>
                       )}
                     </div>
-                    {stepNumber === 0 && onBack !== undefined && (
-                      <button type="button" onClick={onBack} style={secondary}>
-                        ← Back
+                    {/*
+                      Back to the guides, not to the address screen.
+
+                      Until 4 October a guide was always entered from the
+                      address screen, so back meant that screen. Now it is
+                      entered from the chooser and the address is kept, so
+                      back means the chooser -- and the address has its own
+                      *Change* beside it above.
+                    */}
+                    {stepNumber === 0 && onLeave !== undefined && (
+                      <button type="button" onClick={onLeave} style={secondary}>
+                        ← Guides
                       </button>
                     )}
                     {previous && stepNumber > 0 && (
@@ -961,14 +1041,49 @@ function Progress({ done, total }: { readonly done: number; readonly total: numb
 export const NO_PIPE_NOTE =
   'The drain you chose has no connected pipe in the council records, so no pipe was drawn. The drain with the orange ring has one.';
 
+/**
+ * What every finished guide offers after its own words: the next guide, and
+ * the full map (Figma G5, and the team's request of 4 October).
+ */
+function GuideEnd({
+  next,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
+}: {
+  readonly next: SectionId | null;
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (section: SectionId) => void;
+  readonly onFullMap: () => void;
+}) {
+  return (
+    <>
+      {next !== null && <NextGuide id={next} onStart={onStartSection} />}
+      <ExploreFullMap learned={learned} guided={guided} onOpen={onFullMap} />
+    </>
+  );
+}
+
 function Done({
   copy,
   onFinish,
   note,
+  next,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
 }: {
   readonly copy: Finished;
   readonly onFinish: () => void;
   readonly note?: string;
+  readonly next: SectionId | null;
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (section: SectionId) => void;
+  readonly onFullMap: () => void;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(4) }}>
@@ -996,9 +1111,11 @@ function Done({
       >
         {copy.unlocked}
       </div>
+      {next !== null && <NextGuide id={next} onStart={onStartSection} />}
       <button type="button" onClick={onFinish} style={primary}>
         Back to guidance page →
       </button>
+      <ExploreFullMap learned={learned} guided={guided} onOpen={onFullMap} />
     </div>
   );
 }

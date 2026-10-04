@@ -52,16 +52,19 @@ export const WATER_FLOW_STEPS: Lesson['steps'] = [
     id: 'paths-and-pits',
     prompt: 'Great! Some water paths lead towards street drains.',
   },
-  {
-    kind: 'do',
-    id: 'unmeasured-on',
-    prompt: `Click ${LAYER.limited} to see where we cannot map water.`,
-    requires: 'unmeasured-on',
-  },
+  /*
+    The gaps used to be a switch, and this step used to be the press.
+
+    They are always drawn from 4 October, so there is nothing to press and
+    the sentence the press was there to earn is said on its own. It stays in
+    the guide because the striped areas are on the map in front of the reader
+    and an unexplained hatch is worse than no hatch.
+  */
   {
     kind: 'read',
     id: 'gaps-shown',
-    prompt: 'Good. Striped areas are gaps, so no water paths show there.',
+    prompt: `Striped areas are ${LAYER.limited.toLowerCase()}: no water paths show there.`,
+    note: 'The stripes are where the ground was never measured, not where water does not go.',
   },
 ];
 
@@ -74,18 +77,16 @@ export const WATER_FLOW: Lesson = {
   steps: WATER_FLOW_STEPS,
   finished: WATER_FLOW_DONE,
   /*
-    Likely water paths, then Drain pits at step 2, then Ground data gaps at
-    step 4.
+    Likely water paths, then Drain pits at step 2.
 
-    `Ground data gaps` is behind the Layers button on the unguided map, because
-    it is the switch people change least. Here it is a chip, because it is the
-    thing this section ends on and a lesson that asked somebody to go looking
-    for a control would be teaching the control rather than the point.
+    `Ground data gaps` used to be the third, offered at step 4 so that the
+    lesson could ask for the press. It is not a switch any more (4 October):
+    the stripes are always drawn, so the last step reads them instead of
+    turning them on.
   */
   chips: unlockingChips([
     { key: 'channel', at: 0, on: (now) => now.channel },
     { key: 'pit', at: 2, on: (now) => now.pits },
-    { key: 'unavailable', at: 4, on: (now) => now.unmeasured },
   ]),
   teachingPit: false,
   previous: true,

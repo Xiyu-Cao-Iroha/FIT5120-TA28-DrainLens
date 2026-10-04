@@ -31,21 +31,22 @@ import { COMPARE_ACCENT, COMPARE_CARD, CompareThumb } from './BlockedDrain.js';
 import { PATHS, PathThumb } from './Home.js';
 import { SECTIONS, type Learned, type SectionId, countLearned } from '../tutorial/sections.js';
 import { FULL_MAP } from '../ui/terms.js';
-import {
-  ink,
-  line,
-  radius,
-  shadow,
-  space,
-  surface,
-  text,
-  tracking,
-  type,
-  weight,
-} from '../ui/theme.js';
+import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 export interface ChooseProps {
   readonly learned: Learned;
+  /**
+   * The address the guides will open on, or `null` before one is given.
+   *
+   * Shown here because it is kept from now on (4 October): a reader who is
+   * about to start a third guide should be able to see which street it will
+   * be about, and change it, without starting it to find out. Before there is
+   * one there is nothing to say, so nothing is drawn -- an empty *Current
+   * address* is a field somebody forgot to fill in.
+   */
+  readonly address: string | null;
+  /** Ask for a different one. The guides reopen on whatever comes back. */
+  readonly onChangeAddress?: (() => void) | undefined;
   /** The sections with a guide written. The rest cannot be started yet. */
   readonly guided: readonly SectionId[];
   readonly onStart: (section: SectionId) => void;
@@ -55,7 +56,28 @@ export interface ChooseProps {
   readonly onBack: () => void;
 }
 
-export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: ChooseProps) {
+/** The quiet underlined control beside an address that can be changed. */
+const changeLink = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: 'inherit',
+  color: brand.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+} as const;
+
+export function Choose({
+  learned,
+  guided,
+  address,
+  onChangeAddress,
+  onStart,
+  onCompare,
+  onSkip,
+  onBack,
+}: ChooseProps) {
   const done = countLearned(learned);
 
   return (
@@ -85,6 +107,28 @@ export function Choose({ learned, guided, onStart, onCompare, onSkip, onBack }: 
             Skip to {FULL_MAP} →
           </button>
         </div>
+
+        {address !== null && (
+          <p
+            style={{
+              margin: `-${String(space(8))}px 0 ${String(space(8))}px`,
+              textAlign: 'center',
+              font: type(text.small),
+              color: ink.muted,
+            }}
+          >
+            <span style={{ color: ink.subtle }}>Current address: </span>
+            <span style={{ color: ink.strong }}>{address}</span>
+            {onChangeAddress !== undefined && (
+              <>
+                {'  '}
+                <button type="button" onClick={onChangeAddress} style={changeLink}>
+                  Change
+                </button>
+              </>
+            )}
+          </p>
+        )}
 
         <h1
           style={{

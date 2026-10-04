@@ -129,7 +129,6 @@ describe.each(written)('%s', (id, lesson) => {
       'pipes-on': 'pipe',
       'water-flow-on': 'channel',
       'low-areas-on': 'lowPoint',
-      'unmeasured-on': 'unavailable',
     };
     lesson.steps.forEach((step, at) => {
       if (step.kind !== 'do') return;
@@ -244,8 +243,6 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return { ...state, channel: true };
     case 'low-areas-on':
       return { ...state, lowPoints: true };
-    case 'unmeasured-on':
-      return { ...state, unmeasured: true };
     case 'pit-selected':
       return { ...state, selectedPit: pit };
     case 'trace-following':

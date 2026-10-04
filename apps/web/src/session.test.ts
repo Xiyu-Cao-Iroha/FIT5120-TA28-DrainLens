@@ -235,11 +235,13 @@ describe('going back', () => {
     expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
   });
 
-  it('opens every guide on the address screen and asks for the address again', () => {
+  it('asks for an address once and keeps it for the guides after it', () => {
     /*
-     * Team decision, 16 September: the second guide skipped the address
-     * screen and started on the first guide's street. The screen now comes
-     * every time, empty.
+     * Team decision, 4 October, reversing 16 September. The screen used to
+     * come every time, empty, so that a second guide could not quietly start
+     * on the first one's street. With six guides, the full map, a plan and a
+     * reporting pathway, being asked five times reads as the product having
+     * forgotten. Changing it stays possible from the guide itself.
      */
     const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(first.screen).toBe('address');
@@ -251,10 +253,11 @@ describe('going back', () => {
       reduce(withAddress, { type: 'guide-finished' }),
       { type: 'guide-chosen', section: 'water-flow' },
     );
-    expect(second.screen).toBe('address');
+    expect(second.screen).toBe('guide');
     expect(second.guideSection).toBe('water-flow');
-    expect(second.address).toBeNull();
-    expect(reduce(second, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('guide');
+    expect(second.address).toEqual(GATEHOUSE);
+    // And the way to change it is still one press from inside the guide.
+    expect(reduce(second, { type: 'change-address' }).screen).toBe('address');
   });
 
   it('goes back from a guide to the address screen with the section still chosen', () => {
@@ -1346,10 +1349,18 @@ describe('what the reader says about a place near them', () => {
     expect(session.relevance).toEqual({ 1: 'applies' });
   });
 
-  it('forgets them when a guide or the full map asks for the address again', () => {
+  it('keeps them while the address does not change, and forgets them when it does', () => {
+    // Starting another guide keeps the address now (4 October), so it keeps
+    // the answers with it: they are about places near that address, and the
+    // address has not moved. A different address still clears them (AC 5.4.2).
     let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
     session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
-    expect(reduce(session, { type: 'guide-chosen', section: 'low-areas' }).relevance).toEqual({});
+    expect(reduce(session, { type: 'guide-chosen', section: 'low-areas' }).relevance).toEqual({
+      1: 'applies',
+    });
     expect(reduce(session, { type: 'map-opened' }).relevance).toEqual({});
+    expect(
+      reduce(session, { type: 'address-accepted', address: addressAt('b') }).relevance,
+    ).toEqual({});
   });
 });
