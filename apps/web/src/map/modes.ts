@@ -71,17 +71,21 @@ export const CHIP_KEYS: readonly LayerKey[] = [
 ];
 
 /**
- * The switches behind the Layers button.
+ * The switch behind the Layers button.
  *
- * Neither is a lesser layer. The ground surface is background: drawn beneath
- * everything else, and rarely the thing somebody is changing. It was on by
- * default until 11 September and is now on under every homepage card and off
- * on the unguided way in -- see `NOTHING_ON`.
- * "Limited ground data" answers a question about the *evidence* rather
- * than about the ground, and it stays switchable in every view because it is
- * the one mark that says the map is guessing.
+ * The ground surface is background: drawn beneath everything else, and rarely
+ * the thing somebody is changing. It was on by default until 11 September and
+ * is now on under every homepage card and off on the unguided way in -- see
+ * `NOTHING_ON`.
+ *
+ * **"Limited ground data" used to be the second one and is not a switch any
+ * more** (team request, 4 October). It answers a question about the
+ * *evidence* rather than about the ground: the hatch is where this product
+ * has nothing to say, and a reader who turns it off is left with a map that
+ * looks complete where it is not. It is always drawn and lives in the legend,
+ * which is the only place it needed to be.
  */
-export const PANEL_KEYS: readonly LayerKey[] = ['terrain', 'unavailable'];
+export const PANEL_KEYS: readonly LayerKey[] = ['terrain'];
 
 /** The ways in from the homepage. Not the chip row — see the note above. */
 export type MapMode =
@@ -135,7 +139,9 @@ export const NOTHING_ON: LayerState = {
   terrain: false,
   channel: false,
   lowPoint: false,
-  unavailable: false,
+  // Not a layer any more: the hatch says where the ground was never measured,
+  // and every preset carries it for that reason (4 October).
+  unavailable: true,
   catchment: false,
   help: false,
   beforeRain: false,
@@ -161,7 +167,7 @@ export const GUIDED_ON: LayerState = {
   terrain: true,
   channel: true,
   lowPoint: false,
-  unavailable: false,
+  unavailable: true,
   catchment: false,
   help: false,
   beforeRain: false,
@@ -185,7 +191,7 @@ export function openingLayers(requested: MapMode): LayerState {
     channel: requested === 'water-flow',
     lowPoint: requested === 'low-areas',
     terrain: true,
-    unavailable: false,
+    unavailable: true,
     // Off even under its own card: the guide's first step is to press the
     // chip, and a boundary already drawn would make that step a no-op.
     catchment: false,

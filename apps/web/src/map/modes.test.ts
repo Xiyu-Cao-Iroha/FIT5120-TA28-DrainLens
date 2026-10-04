@@ -36,9 +36,16 @@ const ALL_LAYERS: readonly LayerKey[] = [
 ];
 
 describe('where each control lives', () => {
-  it('gives every layer exactly one control', () => {
+  it('gives every layer a control, except the one that is not a choice', () => {
+    // *Limited ground data* stopped being a switch on 4 October: the hatch
+    // marks where this product has nothing to say, and a reader who turned it
+    // off was left with a map that looked complete where it is not. It is
+    // always drawn and it is in the legend, so it is governed by neither row.
     const governed = [...CHIP_KEYS, ...PANEL_KEYS];
-    expect([...governed].sort()).toEqual([...ALL_LAYERS].sort());
+    expect([...governed].sort()).toEqual(
+      [...ALL_LAYERS].filter((key) => key !== 'unavailable').sort(),
+    );
+    expect(governed).not.toContain('unavailable');
   });
 
   it('puts the recorded network on the chips and the background behind Layers', () => {
@@ -54,7 +61,7 @@ describe('where each control lives', () => {
       'help',
       'beforeRain',
     ]);
-    expect(PANEL_KEYS).toEqual(['terrain', 'unavailable']);
+    expect(PANEL_KEYS).toEqual(['terrain']);
   });
 
   it('keeps pits and pipes separate, which is what both criteria protect', () => {
@@ -70,8 +77,12 @@ describe('the presets', () => {
     expect(Object.values(ALL_ON).every(Boolean)).toBe(true);
   });
 
-  it('opens the unguided map with nothing on at all', () => {
-    expect(Object.values(NOTHING_ON).some(Boolean)).toBe(false);
+  it('opens the unguided map with nothing on but the gaps', () => {
+    // The gaps are not a layer somebody turned on; they are the map saying
+    // where it was never measured, and they are drawn in every preset.
+    const { unavailable, ...chosen } = NOTHING_ON;
+    expect(unavailable).toBe(true);
+    expect(Object.values(chosen).some(Boolean)).toBe(false);
   });
 
   it('covers every layer, so a new one cannot arrive switched on', () => {
@@ -79,7 +90,7 @@ describe('the presets', () => {
     // a layer added to `LayerState` and given a value everywhere except here,
     // which would open the map with one thing on and no reason why.
     for (const key of ALL_LAYERS) {
-      expect(NOTHING_ON[key]).toBe(false);
+      expect(NOTHING_ON[key]).toBe(key === 'unavailable');
     }
     expect(Object.keys(NOTHING_ON).sort()).toEqual([...ALL_LAYERS].sort());
   });
@@ -94,9 +105,10 @@ describe('the presets', () => {
     }
   });
 
-  it('leaves low areas and the hatching out of the guided task, and nothing else', () => {
+  it('leaves low areas out of the guided task, and nothing else', () => {
     expect(GUIDED_ON.lowPoint).toBe(false);
-    expect(GUIDED_ON.unavailable).toBe(false);
+    // The hatching is in it, as it is in everything, since 4 October.
+    expect(GUIDED_ON.unavailable).toBe(true);
     expect(GUIDED_ON.pit && GUIDED_ON.pipe && GUIDED_ON.channel && GUIDED_ON.terrain).toBe(true);
   });
 
@@ -115,7 +127,9 @@ describe('openingLayers', () => {
       channel: false,
       lowPoint: false,
       terrain: true,
-      unavailable: false,
+      // Drawn under every card, like the ground: it is the map saying where
+      // it was never measured (4 October).
+      unavailable: true,
       // Off even under the drainage-area card: its guide's first step is to
       // press the chip, and a boundary already drawn makes that a no-op.
       catchment: false,
@@ -147,20 +161,20 @@ describe('openingLayers', () => {
       channel: false,
       lowPoint: false,
       terrain: true,
-      unavailable: false,
+      unavailable: true,
       catchment: false,
       help: false,
       beforeRain: false,
     });
   });
 
-  it('never opens the hatching from a card', () => {
-    // It is a statement about the evidence and it belongs to the reader, not
-    // to the way they arrived. No card turns it on, and since 10 September no
-    // preset does either — the unguided map opens empty, so it is reached
-    // from the Layers panel or not at all.
+  it('opens the hatching from every card, because it is not a choice', () => {
+    // It was the reader's switch until 4 October, on the reasoning that a
+    // statement about the evidence belongs to them. The team's answer was
+    // that a reader who turns it off is left with a map that looks complete
+    // where it is not, so it is drawn everywhere and explained in the legend.
     for (const way of WAYS_IN) {
-      expect(openingLayers(way).unavailable).toBe(false);
+      expect(openingLayers(way).unavailable).toBe(true);
     }
   });
 });

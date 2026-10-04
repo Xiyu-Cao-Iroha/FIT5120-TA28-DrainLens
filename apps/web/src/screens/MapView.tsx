@@ -31,6 +31,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
 import { MAX_SUGGESTIONS, search } from '../address/search.js';
+import { noMatch } from '../address/noMatch.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
@@ -1676,6 +1677,35 @@ function MapSearch({
         focus that fired no event -- a list that is sometimes there is worse
         than one that is always there while you are typing.
       */}
+      {/*
+        Nothing found, said out loud.
+
+        An empty box that simply shows no list is indistinguishable from a
+        broken one, which is how it was reported on 3 October.
+      */}
+      {noMatch(index, typed, matches.length) !== null && (
+        <p
+          role="status"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 'calc(100% + 4px)',
+            zIndex: 6,
+            margin: 0,
+            padding: space(2),
+            background: surface.raised,
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            boxShadow: shadow.lifted,
+            font: type(text.small, { leading: 1.45 }),
+            color: ink.muted,
+          }}
+        >
+          {noMatch(index, typed, matches.length)}
+        </p>
+      )}
+
       {matches.length > 0 && (
         <ul
           id={listId}

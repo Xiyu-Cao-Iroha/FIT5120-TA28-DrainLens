@@ -34,7 +34,6 @@ export type Requirement =
   | 'trace-following'
   | 'water-flow-on'
   | 'low-areas-on'
-  | 'unmeasured-on'
   /*
     The ground height guide's three, Figma Terrain Tutorial, 16 September.
 
@@ -346,8 +345,6 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'channel';
     case 'low-areas-on':
       return 'lowPoint';
-    case 'unmeasured-on':
-      return 'unavailable';
     case 'catchment-on':
       return 'catchment';
     case 'help-on':
@@ -430,8 +427,6 @@ export function satisfied(
       return now.channel;
     case 'low-areas-on':
       return now.lowPoints;
-    case 'unmeasured-on':
-      return now.unmeasured;
     case 'pit-selected':
       return now.selectedPit !== null;
     case 'trace-following':
