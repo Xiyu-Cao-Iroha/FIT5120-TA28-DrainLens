@@ -42,3 +42,6 @@ docs/*.pptx
 /assistant/chroma_db/
 /assistant/chroma_db_backup/
 /assistant/.env
+/.venv/
+/assistant/models/
+*.gguf
