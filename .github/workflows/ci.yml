@@ -69,6 +69,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The build configs exclude *.test.ts, because they are composite and
+      # emit declarations. That left every test file in the repository outside
+      # the type checker, and fixtures drifted from the types they claim to
+      # build for months without anything saying so.
+      - name: Typecheck the tests
+        run: npm run typecheck:tests
+
       # Stray table rows, ragged tables, unclosed fences, broken relative links
       # -- and any tracked text file carrying a raw NUL byte, which makes it
       # binary to git and invisible to every grep run against this repository.

@@ -290,7 +290,6 @@ export function DrainageArea({
             {MAY_NOT_REFLECT_DEVELOPMENT}
           </p>
           <p style={{ margin: `0 0 ${String(space(1))}px`, color: ink.muted }}>{BOUNDARY_LIMITS}</p>
-          <p style={{ margin: 0, color: ink.muted }}>{GENERAL_ROLES_ONLY}</p>
           <span style={{ display: 'block', marginTop: space(2) }}>
             <SourceLink id="drainageArea" />
           </span>

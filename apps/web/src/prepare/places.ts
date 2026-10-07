@@ -148,6 +148,17 @@ export const applying = (
 ): readonly Place[] => places.filter((place) => relevance[place.number] === 'applies');
 
 /** What the plan says where no place qualifies (AC 5.1.3). */
+/**
+ * What the before-rain layer says before there is an address.
+ *
+ * The layer draws its markers whether or not an address has been chosen, and
+ * the checks are about an address. Saying nothing is how a reader concludes
+ * the layer is broken; `NO_PLACES` below is the other absence, which is an
+ * address with nothing near it.
+ */
+export const NO_ADDRESS_FOR_CHECKS =
+  'Search for an address to see the places to check near it.';
+
 export const NO_PLACES =
   'No places were marked near this address from the available information.';
 

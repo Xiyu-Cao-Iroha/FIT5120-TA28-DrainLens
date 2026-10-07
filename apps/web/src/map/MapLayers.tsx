@@ -292,6 +292,14 @@ export interface LayerChipsProps {
    * a chip nobody can see is pointing at nothing.
    */
   readonly fold?: boolean;
+  /**
+   * Whether to offer the collapse control at all.
+   *
+   * Only the full map has eight chips and a sidebar wanting the same corner.
+   * A guide has one chip, no sidebar, and a step that names it, so a button
+   * whose whole purpose is to hide that chip is noise at best.
+   */
+  readonly collapsible?: boolean;
 }
 
 /**
@@ -331,6 +339,7 @@ export function LayerChips({
   pulsePanelKey = null,
   onPanelChange,
   fold = false,
+  collapsible = false,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
   const [folded, setFolded] = useState(false);
@@ -338,7 +347,7 @@ export function LayerChips({
     setFolded(fold);
   }, [fold]);
   // A pulse is the tour pointing at one of these. Unfold for it.
-  const showing = !folded || pulse !== null || pulseLayers || pulsePanelKey !== null;
+  const showing = !collapsible || !folded || pulse !== null || pulseLayers || pulsePanelKey !== null;
   useEffect(() => {
     onPanelChange?.(open);
   }, [open, onPanelChange]);
@@ -390,7 +399,7 @@ export function LayerChips({
         );
       })}
 
-      {showing && keys.length > 0 && (
+      {collapsible && showing && keys.length > 0 && (
         <button
           type="button"
           aria-label="Collapse the map layer buttons"

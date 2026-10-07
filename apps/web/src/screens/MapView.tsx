@@ -59,11 +59,11 @@ import { AddressInsight } from '../map/AddressInsight.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
-import { WHO_CAN_HELP } from '../catchment/help.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
+  NO_ADDRESS_FOR_CHECKS,
   NO_PLACES,
   PLACE_RADIUS_M,
   NO_PLACES_MEANS,
@@ -491,7 +491,14 @@ export function MapView({
   */
   const openedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!layers.beforeRain || address === null) {
+    /*
+      Never inside a guide. A guide drives its own sequence, and Epic 5's
+      first step is *Click Check before heavy rain* -- a button on the address
+      card, which the place card suppresses. Opening the place card for the
+      reader made the guide's own instruction point at something that was not
+      on the screen.
+    */
+    if (guided || !layers.beforeRain || address === null) {
       openedFor.current = null;
       return;
     }
@@ -503,7 +510,7 @@ export function MapView({
       return;
     }
     setOpenPlace((current) => current ?? places[0]?.number ?? null);
-  }, [layers.beforeRain, address, places]);
+  }, [guided, layers.beforeRain, address, places]);
 
   /*
     The opening view for the before-rain layer: the whole 200 m (item 5).
@@ -1097,6 +1104,7 @@ export function MapView({
               />
             )}
             <LayerChips
+              collapsible={!guided}
               fold={sidebarOpen}
               state={layers}
               onToggle={toggle}
@@ -1332,7 +1340,24 @@ export function MapView({
         and not the area card behind it. Two stacked cards on a phone-width map
         is the thing the map chrome was broken up to avoid.
       */}
-      {panel && viewport !== null && layers.catchment && (
+      {/*
+        Not while the report is open: both of these are corner cards and they
+        share the corner. The report is opened from this card, so without the
+        exclusion the report lands exactly on top of the thing it came from --
+        which is the same defect as the one the change list opened with, in
+        the other direction.
+      */}
+      {/*
+        Before-rain with no address: the layer is on, the markers are drawn,
+        and nothing says the checks are about an address nobody has given.
+        The subcatchment card says so; this is the same sentence in the same
+        situation.
+      */}
+      {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
+        <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
+      )}
+
+      {panel && viewport !== null && layers.catchment && !reportOpen && (
         <MapNote title={DRAINAGE_AREA}>
           <DrainageArea
             area={area}
@@ -1450,7 +1475,11 @@ export function MapView({
               <button
                 type="button"
                 onClick={() => {
+                  // It says the plan, so it opens the plan. It used to only
+                  // close this card, which was true while the card could only
+                  // be reached from a plan that was already open behind it.
                   setOpenPlace(null);
+                  setPlanOpen(true);
                 }}
                 style={{
                   background: 'none',

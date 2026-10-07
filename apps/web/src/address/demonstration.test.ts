@@ -19,7 +19,19 @@ import type { AddressIndex, IndexedAddress } from './search.js';
 
 const at = (id: string, label: string, e = 500, n = 500): IndexedAddress => {
   const [number = '', ...rest] = label.split(' ');
-  return { id, label, number, street: rest.join(' ').split(',')[0] ?? '', suburb: 'Kensington', e, n };
+  return {
+    id,
+    label,
+    number,
+    street: rest.join(' ').split(',')[0] ?? '',
+    suburb: 'Kensington',
+    e,
+    n,
+  // Published position in the street group. Nothing here reads it; it is
+  // set because `IndexedAddress` requires it, which is what these builders
+  // stopped saying while the tests were outside the type checker.
+  at: 0,
+  };
 };
 
 const index = (addresses: readonly IndexedAddress[]): AddressIndex => ({
@@ -102,7 +114,7 @@ describe('the comparison’s own offer', () => {
 
   it('falls back to the guide’s address, then to the first', () => {
     const guide = at('g', DEMONSTRATION_LABEL);
-    expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere').id).toBe('g');
+    expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere')?.id).toBe('g');
   });
 });
 
