@@ -124,6 +124,14 @@ export interface MapControlsProps {
   readonly onRecentre?: (() => void) | undefined;
   /** Pixels per metre, for the bar. */
   readonly scale: number;
+  /**
+   * How far in from the right edge to sit, in pixels.
+   *
+   * The sidebar is drawn over the right of the map, so without this the zoom
+   * buttons and the scale bar end up underneath it — which is where they were
+   * in the screenshot that asked for a sidebar in the first place.
+   */
+  readonly inset?: number | undefined;
 }
 
 export function MapControls({
@@ -133,6 +141,7 @@ export function MapControls({
   canZoomOut,
   onRecentre,
   scale,
+  inset = 0,
 }: MapControlsProps) {
   const bar = scaleBar(scale);
 
@@ -140,8 +149,9 @@ export function MapControls({
     <div
       style={{
         position: 'absolute',
-        right: space(4),
+        right: space(4) + inset,
         bottom: space(4),
+        transition: 'right 160ms ease',
         zIndex: 3,
         display: 'flex',
         flexDirection: 'column',

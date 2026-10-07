@@ -282,6 +282,17 @@ export interface LayerChipsProps {
   readonly pulsePanelKey?: LayerKey | null;
   /** Told whenever the panel opens or shuts. The guide's first step waits on it. */
   readonly onPanelChange?: (open: boolean) => void;
+  /**
+   * Collapse the row to one button, without taking the chips away.
+   *
+   * Set while the sidebar is open. Eight chips across the top of a map that
+   * has a panel down one side is most of the map's chrome fighting for the
+   * same corner, so the row folds to *Map layers* and unfolds on a press. A
+   * fold, not a lock: the reader opens it again whenever they want it, and
+   * the guide's own pulses still force it open, because a tour that points at
+   * a chip nobody can see is pointing at nothing.
+   */
+  readonly fold?: boolean;
 }
 
 /**
@@ -291,6 +302,25 @@ export interface LayerChipsProps {
  * panel are one decision seen at two depths, and a person looking for a layer
  * that is not a chip should find the place it lives without hunting.
  */
+/** The chevrons on the fold button, as glyphs rather than icons. */
+const CHEVRON_LEFT = '‹';
+const CHEVRON_RIGHT = '›';
+
+/** The fold button, which is a chip without a swatch. */
+const foldButton = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: space(1),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.base,
+  background: surface.raised,
+  color: ink.muted,
+  font: type(text.label, { weight: weight.medium, leading: 1.2 }),
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+} as const;
+
 export function LayerChips({
   state,
   onToggle,
@@ -301,8 +331,15 @@ export function LayerChips({
   pulseLayers = false,
   pulsePanelKey = null,
   onPanelChange,
+  fold = false,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    setFolded(fold);
+  }, [fold]);
+  // A pulse is the tour pointing at one of these. Unfold for it.
+  const showing = !folded || pulse !== null || pulseLayers || pulsePanelKey !== null;
   useEffect(() => {
     onPanelChange?.(open);
   }, [open, onPanelChange]);
@@ -320,7 +357,21 @@ export function LayerChips({
       data-tour="chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
-      {keys.map((key) => {
+      {!showing && (
+        <button
+          type="button"
+          onClick={() => {
+            setFolded(false);
+          }}
+          aria-expanded={false}
+          style={foldButton}
+        >
+          {CHEVRON_RIGHT} Map layers
+        </button>
+      )}
+
+      {showing &&
+        keys.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
         return (
@@ -340,7 +391,21 @@ export function LayerChips({
         );
       })}
 
-      {layersButton && (
+      {showing && keys.length > 0 && (
+        <button
+          type="button"
+          aria-label="Collapse the map layer buttons"
+          onClick={() => {
+            setFolded(true);
+          }}
+          aria-expanded
+          style={foldButton}
+        >
+          {CHEVRON_LEFT}
+        </button>
+      )}
+
+      {showing && layersButton && (
       <div style={{ position: 'relative' }}>
         <button
           type="button"
@@ -472,6 +537,7 @@ export function LayerChips({
 export function MapLegend({
   state,
   pulseTerrain = false,
+  fold = false,
 }: {
   readonly state: LayerState;
   /**
@@ -480,8 +546,20 @@ export function MapLegend({
    * outlined instead, since the scale is not there to outline.
    */
   readonly pulseTerrain?: boolean;
+  /**
+   * Fold the legend away, without taking it away.
+   *
+   * Set while the sidebar is open. It is a nudge rather than a lock: the
+   * legend collapses when the sidebar appears and the reader can still open
+   * it again, which is the difference between a panel tidying up after itself
+   * and a panel deciding what somebody is allowed to look at.
+   */
+  readonly fold?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (fold === true) setOpen(false);
+  }, [fold]);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
 

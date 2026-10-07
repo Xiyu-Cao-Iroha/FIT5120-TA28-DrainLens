@@ -70,12 +70,23 @@ const SETTLE_MS = 280;
 export function AskAboutGettingReady({
   onBackToPlan,
   onReviewPlaces,
+  opening,
 }: {
   readonly onBackToPlan: () => void;
   /** Back to the plan, at the step that lists the places (Figma Q4). */
   readonly onReviewPlaces?: (() => void) | undefined;
+  /**
+   * A question to arrive with, asked as though the reader had typed it.
+   *
+   * Set when the panel was opened from a plan action's *Ask a question about
+   * this*: the reader said what they wanted to know by pressing it, and
+   * showing them an empty box would be asking them to say it again.
+   */
+  readonly opening?: string | undefined;
 }) {
-  const [turns, setTurns] = useState<readonly Turn[]>([]);
+  const [turns, setTurns] = useState<readonly Turn[]>(
+    opening === undefined || opening.trim() === '' ? [] : [{ question: opening, result: null }],
+  );
   const [typed, setTyped] = useState('');
 
   const pending = turns.some((turn) => turn.result === null);

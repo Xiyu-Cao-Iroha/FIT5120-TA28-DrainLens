@@ -405,6 +405,18 @@ export const IN_YOUR_PLAN = 'In your plan:';
  */
 export const SUGGESTED: readonly string[] = ['gutters', 'kit', 'car', 'warnings'];
 
+/**
+ * The question to open with, for a plan action the reader asked about.
+ *
+ * The design's step-2 tip cards each carry *Ask a question about this*, and
+ * what makes that different from the row at the foot of the plan is that it
+ * already knows the subject. `null` where no answer is about that action,
+ * which is how the link is left off rather than opening an empty panel.
+ */
+export function questionForAction(actionId: string): string | null {
+  return ANSWERS.find((answer) => answer.planAction === actionId)?.question ?? null;
+}
+
 /** An answer by id, or `null` where nothing carries that id. */
 export function answerFor(id: string): AskAnswer | null {
   return ANSWERS.find((answer) => answer.id === id) ?? null;
