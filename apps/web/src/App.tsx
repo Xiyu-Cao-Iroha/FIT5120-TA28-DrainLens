@@ -341,8 +341,14 @@ export function App() {
           extentName={loaded.extentName}
           actions={
             <HomeNav
-              onOpenMap={() => {
-                dispatch({ type: 'get-started' });
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened' });
               }}
             />
           }
@@ -1218,7 +1224,7 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
         />
         <circle cx="8.4" cy="11.6" r="0.95" fill="currentColor" />
       </svg>
-      Tutorial
+      Map guide
     </button>
   );
 }
@@ -1259,24 +1265,61 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * about the past across Greater Melbourne the same weight as the way into
  * everything else. It is one of the two choices behind this button now.
  */
-function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
+/**
+ * The homepage's navigation bar.
+ *
+ * It used to be one *Get started* button. The team's change list of 8 October
+ * asks for the four places the site actually has, and the hero already
+ * carries the call to action a paragraph below this, so the button is not
+ * repeated here: a masthead with one button and no navigation is a masthead
+ * that cannot say what else exists.
+ *
+ * *Home page* is where the reader already is, so it is marked as the current
+ * page rather than drawn as a link to here. The *Tutorial* link goes to the
+ * guide chooser, which is where the guides are; the map's own help control is
+ * called *Map guide* and is a different thing, which is why it was renamed on
+ * the same list.
+ */
+function HomeNav({
+  onOpenGuides,
+  onOpenHistory,
+  onOpenFullMap,
+}: {
+  readonly onOpenGuides: () => void;
+  readonly onOpenHistory: () => void;
+  readonly onOpenFullMap: () => void;
+}) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
-      <button
-        type="button"
-        onClick={onOpenMap}
-        style={{
-          padding: `${String(space(2))}px ${String(space(4))}px`,
-          font: type(text.label, { weight: weight.semibold }),
-          color: ink.inverse,
-          background: ink.strong,
-          border: 'none',
-          borderRadius: radius.base,
-        }}
-      >
-        Get started →
-      </button>
-    </span>
+    <nav
+      aria-label="Site"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}
+    >
+      <span aria-current="page" style={{ ...navItem, color: ink.strong, fontWeight: weight.semibold }}>
+        Home page
+      </span>
+      <NavLink label="Tutorial" onOpen={onOpenGuides} />
+      <NavLink label="Flood history" onOpen={onOpenHistory} />
+      <NavLink label={FULL_MAP} onOpen={onOpenFullMap} />
+    </nav>
+  );
+}
+
+const navItem = {
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  borderRadius: radius.base,
+  font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+  whiteSpace: 'nowrap',
+} as const;
+
+function NavLink({ label, onOpen }: { readonly label: string; readonly onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{ ...navItem, border: 'none', background: 'none', color: ink.base, cursor: 'pointer' }}
+    >
+      {label}
+    </button>
   );
 }
 

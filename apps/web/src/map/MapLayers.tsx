@@ -62,7 +62,6 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, swatch: 'blob' },
   { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
   { key: 'catchment', chip: LAYER.catchment, label: LAYER.catchment, swatch: 'outline' },
-  { key: 'help', chip: LAYER.help, label: LAYER.help, swatch: 'levels' },
   { key: 'beforeRain', chip: LAYER.beforeRain, label: LAYER.beforeRain, swatch: 'check' },
 ];
 

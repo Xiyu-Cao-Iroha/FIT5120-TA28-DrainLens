@@ -714,7 +714,6 @@ export function MapView({
       layersOpened: layersOpen,
       terrainShown: terrainOn,
       catchment: layers.catchment,
-      help: layers.help,
       planOpen,
       placesReviewed,
       whyOpen,
@@ -729,10 +728,9 @@ export function MapView({
     unmeasuredOn,
     selectedId,
     following,
-    // Epic 6's two: the guide waits for these presses, so the report has to
-    // run when they change.
+    // Epic 6's chip: the guide waits for the press, so the report has to
+    // run when it changes.
     layers.catchment,
-    layers.help,
     // Epic 5's two, for the same reason.
     planOpen,
     placesReviewed,
@@ -1274,9 +1272,22 @@ export function MapView({
         and not the area card behind it. Two stacked cards on a phone-width map
         is the thing the map chrome was broken up to avoid.
       */}
-      {panel && viewport !== null && layers.catchment && !layers.help && (
+      {panel && viewport !== null && layers.catchment && (
         <MapNote title={DRAINAGE_AREA}>
-          <DrainageArea area={area} />
+          <DrainageArea
+            area={area}
+            hasAddress={address !== null}
+            {...(guided
+              ? {}
+              : {
+                  // Not inside a guide. A guide teaches one thing at a time,
+                  // and this opens a card taller than the guide's map frame
+                  // over a step that was asking about something else.
+                  onReport: () => {
+                    openReport(null);
+                  },
+                })}
+          />
           {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
             <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
               The boundary is outside this view. Zoom out to see it.
@@ -1430,54 +1441,6 @@ export function MapView({
         </Sidebar>
       )}
 
-      {panel && viewport !== null && layers.help && !reportOpen && (
-        <MapNote title={WHO_CAN_HELP}>
-          <WhoCanHelpLevels />
-          {/*
-            Reporting is its own pathway, reached from the card about who
-            holds what rather than from the preparation plan (AC 6.2.3).
-
-            Not inside a guide. A guide teaches one thing at a time -- it is
-            why the address card is suppressed there too -- and this opens a
-            card taller than the guide's map frame, over a step that was
-            asking about something else.
-          */}
-          {!guided && (
-            <span style={{ display: 'block', marginTop: space(3) }}>
-              <button
-                type="button"
-                onClick={() => {
-                  // A drain already selected on the map is one the reader
-                  // selected, which is the only way one may reach a report
-                  // (AC 6.3.2). Anything else starts with nothing named.
-                  openReport(
-                    hit?.kind === 'pit' && hit.feature.asset_number !== undefined
-                      ? {
-                          kind: 'drain',
-                          assetNumber: String(hit.feature.asset_number),
-                          street: null,
-                          distanceM:
-                            address === null
-                              ? null
-                              : Math.round(
-                                  Math.hypot(
-                                    hit.feature.c[0] - address.eastingM,
-                                    hit.feature.c[1] - address.northingM,
-                                  ),
-                                ),
-                        }
-                      : null,
-                  );
-                }}
-                style={planLinkStyle}
-              >
-                {REPORT_HEADING}
-              </button>
-            </span>
-          )}
-        </MapNote>
-      )}
-
       {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
       {panel && viewport !== null && reportOpen && (
         <MapNote title={REPORT_HEADING}>
@@ -1523,7 +1486,6 @@ export function MapView({
         hit === null &&
         warning === null &&
         !layers.catchment &&
-        !layers.help &&
         !planOpen &&
         openPlace === null &&
         addressCard &&

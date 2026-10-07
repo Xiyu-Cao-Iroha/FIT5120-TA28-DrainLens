@@ -155,7 +155,8 @@ export const PATHS: readonly {
     // about where the street's water goes rather than about the street.
     mode: 'drainage-area',
     title: 'Your drainage area',
-    body: 'The area your street drains with, and who looks after each part.',
+    body:
+      'See the recorded subcatchment boundary for this address and its receiving drain or waterway.',
     accent: BOUNDARY_STROKE,
   },
 ];
