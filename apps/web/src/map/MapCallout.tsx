@@ -113,6 +113,19 @@ export function MapCallout({
   const [open, setOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(150);
+  /*
+    Where the reader has dragged the card to, relative to where it was put.
+
+    The card is placed beside the thing it is about, which is right until the
+    thing it is about is behind it: a pit card in the middle of the map is the
+    map, covered, and the change list of 8 October asks for a window that can
+    be moved out of the way. Dragging is by the title, the way a window is
+    dragged by its bar, and `null` means it is still where the placement put
+    it -- which is also when the caret is drawn, because once the card has
+    been moved the caret is pointing at nothing.
+  */
+  const [moved, setMoved] = useState<{ readonly dx: number; readonly dy: number } | null>(null);
+  const dragFrom = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
 
   // Measured rather than guessed, because the card grows by a cross-section
   // when More information is opened and a placement computed against the
@@ -136,8 +149,8 @@ export function MapCallout({
       aria-label={title}
       style={{
         position: 'absolute',
-        left: placement.left,
-        top: placement.top,
+        left: placement.left + (moved?.dx ?? 0),
+        top: placement.top + (moved?.dy ?? 0),
         width: WIDTH,
         maxWidth: 'calc(100% - 32px)',
         maxHeight: `min(${String(MAX_HEIGHT)}px, calc(100% - 32px))`,
@@ -151,7 +164,7 @@ export function MapCallout({
         boxShadow: shadow.floating,
       }}
     >
-      {placement.caret !== 'none' && (
+      {placement.caret !== 'none' && moved === null && (
         <span
           aria-hidden
           style={{
@@ -170,10 +183,50 @@ export function MapCallout({
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: space(2) }}>
         <strong
+          onPointerDown={(event) => {
+            // Where the drag started, before anything that can fail. Pointer
+            // capture keeps the drag alive when the pointer leaves the title,
+            // but it throws on a pointer id the browser does not know, and a
+            // card that cannot be dragged at all is a worse outcome than one
+            // that stops when the pointer runs off its handle.
+            dragFrom.current = {
+              x: event.clientX,
+              y: event.clientY,
+              dx: moved?.dx ?? 0,
+              dy: moved?.dy ?? 0,
+            };
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // Nothing to do: the move handler works without it.
+            }
+          }}
+          onPointerMove={(event) => {
+            const from = dragFrom.current;
+            if (from === null) return;
+            setMoved({
+              dx: from.dx + (event.clientX - from.x),
+              dy: from.dy + (event.clientY - from.y),
+            });
+          }}
+          onPointerUp={(event) => {
+            dragFrom.current = null;
+            try {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            } catch {
+              // Never captured; nothing to release.
+            }
+          }}
+          onPointerCancel={() => {
+            dragFrom.current = null;
+          }}
+          title="Drag to move this card"
           style={{
             flex: 1,
             font: type(text.body, { weight: weight.semibold, leading: 1.3 }),
             color: ink.strong,
+            cursor: 'grab',
+            touchAction: 'none',
           }}
         >
           {title}

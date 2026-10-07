@@ -24,6 +24,7 @@
  * older lessons set none of them and render as they did.
  */
 
+import { AddressMark } from '../ui/AddressMark.js';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AddressIndex } from '../address/search.js';
@@ -592,37 +593,17 @@ function Coach({
         gap: space(5),
       }}
     >
-      <div>
-        <div
-          style={{
-            font: type(text.small, { weight: weight.medium }),
-            letterSpacing: tracking.caps,
-            textTransform: 'uppercase',
-            color: ink.subtle,
-          }}
-        >
-          Current address
-        </div>
-        <div style={{ font: type(text.body, { weight: weight.medium }), color: ink.strong }}>
-          {address.label}
-          {onBack !== undefined && (
-            <>
-              {'  '}
-              {/*
-                *Change*, beside the address it changes (Figma G1).
+      {/*
+        The address, marked as the design marks it (Figma G1).
 
-                It is `onBack` because that is the one that asks for an
-                address and keeps the section: `onLeave` abandons the guide.
-                The guide used to reach the address screen through a *← Back*
-                on step one only; now that the address is kept across guides,
-                changing it is something a reader may want on any step.
-              */}
-              <button type="button" onClick={onBack} style={changeLink}>
-                Change
-              </button>
-            </>
-          )}
-        </div>
+        *Change* is `onBack` because that is the one that asks for an address
+        and keeps the section: `onLeave` abandons the guide. The guide used to
+        reach the address screen through a *← Back* on step one only; now that
+        the address is kept across guides, changing it is something a reader
+        may want on any step.
+      */}
+      <div>
+        <AddressMark address={address.label} {...(onBack === undefined ? {} : { onChange: onBack })} />
       </div>
 
       {intro !== null ? (

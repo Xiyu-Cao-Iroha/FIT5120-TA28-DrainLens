@@ -37,7 +37,7 @@ import type { Local } from './map/viewport.js';
 import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
 import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
 import { loadCatchments } from './catchment/artefact.js';
-import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
+import { brand, ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import { useScenarioSupport } from './scenario/support.js';
@@ -340,9 +340,19 @@ export function App() {
           credits={credits}
           extentName={loaded.extentName}
           actions={
-            <HomeNav
-              onOpenMap={() => {
-                dispatch({ type: 'get-started' });
+            <SiteNav
+              current="home"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened' });
               }}
             />
           }
@@ -537,8 +547,28 @@ export function App() {
 
     case 'choose':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName} masthead={false}>
+        <Shell
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          actions={
+            <SiteNav
+              current="tutorial"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened' });
+              }}
+            />
+          }
+        >
           <Choose
             learned={session.learned}
             guided={GUIDED_SECTIONS}
@@ -1218,7 +1248,7 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
         />
         <circle cx="8.4" cy="11.6" r="0.95" fill="currentColor" />
       </svg>
-      Tutorial
+      Map guide
     </button>
   );
 }
@@ -1259,24 +1289,79 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * about the past across Greater Melbourne the same weight as the way into
  * everything else. It is one of the two choices behind this button now.
  */
-function HomeNav({ onOpenMap }: { readonly onOpenMap: () => void }) {
+/**
+ * The homepage's navigation bar.
+ *
+ * It used to be one *Get started* button. The team's change list of 8 October
+ * asks for the four places the site actually has, and the hero already
+ * carries the call to action a paragraph below this, so the button is not
+ * repeated here: a masthead with one button and no navigation is a masthead
+ * that cannot say what else exists.
+ *
+ * *Home page* is where the reader already is, so it is marked as the current
+ * page rather than drawn as a link to here. The *Tutorial* link goes to the
+ * guide chooser, which is where the guides are; the map's own help control is
+ * called *Map guide* and is a different thing, which is why it was renamed on
+ * the same list.
+ */
+function SiteNav({
+  current,
+  onOpenHome,
+  onOpenGuides,
+  onOpenHistory,
+  onOpenFullMap,
+}: {
+  /** Which of the four this screen is, so it is marked rather than linked. */
+  readonly current: 'home' | 'tutorial';
+  readonly onOpenHome: () => void;
+  readonly onOpenGuides: () => void;
+  readonly onOpenHistory: () => void;
+  readonly onOpenFullMap: () => void;
+}) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
-      <button
-        type="button"
-        onClick={onOpenMap}
-        style={{
-          padding: `${String(space(2))}px ${String(space(4))}px`,
-          font: type(text.label, { weight: weight.semibold }),
-          color: ink.inverse,
-          background: ink.strong,
-          border: 'none',
-          borderRadius: radius.base,
-        }}
-      >
-        Get started →
-      </button>
-    </span>
+    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+      <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
+      <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
+      <NavLink label="Flood history" current={false} onOpen={onOpenHistory} />
+      <NavLink label={FULL_MAP} current={false} onOpen={onOpenFullMap} />
+    </nav>
+  );
+}
+
+const navItem = {
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  borderRadius: radius.base,
+  font: type(text.label, { weight: weight.medium, leading: 1.4 }),
+  whiteSpace: 'nowrap',
+} as const;
+
+function NavLink({
+  label,
+  current,
+  onOpen,
+}: {
+  readonly label: string;
+  readonly current: boolean;
+  readonly onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={current ? undefined : onOpen}
+      {...(current ? { 'aria-current': 'page' as const } : {})}
+      style={{
+        ...navItem,
+        border: 'none',
+        background: 'none',
+        color: current ? ink.strong : ink.base,
+        fontWeight: current ? weight.semibold : weight.medium,
+        borderBottom: current ? `2px solid ${brand.base}` : '2px solid transparent',
+        borderRadius: 0,
+        cursor: current ? 'default' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -39,7 +39,7 @@ const INDEX: TileIndex = {
   note: 'a fixture',
 };
 
-function tile(tx: number, ty: number, over: Partial<TileArrays> & { meta?: Partial<TileArrays['meta']> } = {}): TileArrays {
+function tile(tx: number, ty: number, over: TileOverride = {}): TileArrays {
   const origin: [number, number] = [(2 - ty) * 2, tx * 2];
   return {
     elevation: Int16Array.from([100 * (tx + 1), 100 * (tx + 1), 100 * (ty + 1), 100 * (ty + 1)]),
@@ -53,7 +53,15 @@ function tile(tx: number, ty: number, over: Partial<TileArrays> & { meta?: Parti
 }
 
 const WINDOW = [0, 0] as const;
-const windowTiles = (overrides: Record<string, Partial<TileArrays> & { meta?: Partial<TileArrays['meta']> }> = {}) =>
+/*
+  `Partial<TileArrays> & { meta?: Partial<...> }` asked for two things at
+  once: the partial made `meta` optional and the intersection then demanded a
+  whole `TileMeta` for it, so no override with a partial meta could satisfy
+  it. Taking `meta` out of the first half is what the helper always meant.
+*/
+type TileOverride = Partial<Omit<TileArrays, 'meta'>> & { meta?: Partial<TileArrays['meta']> };
+
+const windowTiles = (overrides: Record<string, TileOverride> = {}) =>
   new Map(
     [
       [0, 0],
