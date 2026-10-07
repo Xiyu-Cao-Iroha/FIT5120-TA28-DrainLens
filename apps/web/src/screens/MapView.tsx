@@ -26,7 +26,7 @@ import {
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
@@ -64,6 +64,9 @@ import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
+  NO_PLACES,
+  PLACE_RADIUS_M,
+  NO_PLACES_MEANS,
   type Place,
   type Relevance,
   checkButton,
@@ -468,6 +471,63 @@ export function MapView({
     corner the panel wants is the screenshot that asked for this.
   */
   const panelWidth = viewport === null ? 0 : sidebarWidth(viewport.widthPx);
+  /*
+    The before-rain layer opens something, always (change list, item 11).
+
+    Reported from the guide: step two says *decide whether Place 1 applies to
+    you* over a map with nothing open on it, and the reader has to work out
+    that the thing to press is a small warning triangle somewhere among the
+    streets. The design opens the first place's card for them, so the step is
+    about the decision rather than about finding the control.
+
+    Where there are no places it opens the address card instead, which is
+    where the *none near this address* sentence is. An address with nothing to
+    check is a result and has to look like one; silence looks like a layer
+    that did not load.
+
+    Once per address and per switch-on: `opened` is the key it has already
+    done, so a reader who closes the card is not handed it again on the next
+    render.
+  */
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!layers.beforeRain || address === null) {
+      openedFor.current = null;
+      return;
+    }
+    const key = `${address.label}:${String(places.length)}`;
+    if (openedFor.current === key) return;
+    openedFor.current = key;
+    if (places.length === 0) {
+      setAddressCardOpen(true);
+      return;
+    }
+    setOpenPlace((current) => current ?? places[0]?.number ?? null);
+  }, [layers.beforeRain, address, places]);
+
+  /*
+    The opening view for the before-rain layer: the whole 200 m (item 5).
+
+    An address accepted with this layer on used to leave the map at whatever
+    scale it was at, so a numbered marker 180 m away was off the screen and
+    the reader was asked to decide about a place they could not see. The fit
+    is the square that definitely contains every place, because 200 m is what
+    `placesNear` means by near -- so the radius the product uses and the
+    radius it shows are the same number, read from the same constant.
+
+    Keyed on the address, so it fits once when the address arrives and leaves
+    the reader's own panning alone afterwards.
+  */
+  const placesFit = useMemo((): MapCanvasProps['fit'] => {
+    if (!layers.beforeRain || address === null) return null;
+    const r = PLACE_RADIUS_M;
+    const corners: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
+    return { key: `places:${address.label}`, points: corners, reservePanel: false };
+  }, [layers.beforeRain, address]);
+
   const planShowing = panel && viewport !== null && planOpen && openPlace === null;
   const sidebarOpen = planShowing && panelWidth > 0;
   /*
@@ -750,7 +810,7 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
-        fit={fit}
+        fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
@@ -1354,7 +1414,14 @@ export function MapView({
         if (place === undefined) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
         return (
-          <MapNote title={placeTitle(place)}>
+          <MapCallout
+            at={toScreen(viewport, place.at)}
+            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            title={placeTitle(place)}
+            onClose={() => {
+              setOpenPlace(null);
+            }}
+          >
             <PlaceCard
               place={place}
               relevance={relevance[place.number] ?? null}
@@ -1399,7 +1466,7 @@ export function MapView({
                 Back to the plan
               </button>
             </span>
-          </MapNote>
+          </MapCallout>
         );
       })()}
 
@@ -1515,6 +1582,19 @@ export function MapView({
             </span>
           )}
           {/*
+            Nothing to check, said on the card rather than by an empty map
+            (AC 5.1.3, change list item 11). An absence of marks is a result,
+            and it is not a safer address.
+          */}
+          {layers.beforeRain && places.length === 0 && (
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              {NO_PLACES}
+              <span style={{ display: 'block', marginTop: space(1), color: ink.subtle }}>
+                {NO_PLACES_MEANS}
+              </span>
+            </span>
+          )}
+          {/*
             AC 5.1.1: the count where there are places, the same words without
             it where there are none — and the plan is reachable either way,
             because the general actions are for every home.
@@ -1543,11 +1623,48 @@ export function MapView({
               </button>
             </span>
           )}
+
+          {/*
+            The way to the layer the card is already talking about.
+
+            The card says *water may pool about 20 m away* and then leaves the
+            reader to work out that there is a layer which draws exactly that.
+            The change list of 8 October asks for the button, and for it to
+            say which way it goes rather than being a switch with no state:
+            off, it offers to open the layer; on, it says the layer is already
+            open, and pressing it takes the layer off again. Both sentences
+            are the design's own.
+          */}
+          <span style={{ display: 'block', marginTop: space(2) }}>
+            <button
+              type="button"
+              aria-pressed={layers.lowPoint}
+              onClick={() => {
+                toggle('lowPoint');
+              }}
+              style={{
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                borderRadius: radius.small,
+                border: `1px solid ${layers.lowPoint ? brand.tint : line.base}`,
+                background: layers.lowPoint ? brand.wash : surface.raised,
+                color: layers.lowPoint ? brand.ink : ink.base,
+                font: type(text.small, { weight: weight.semibold }),
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+            >
+              {layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}
+            </button>
+          </span>
         </MapCallout>
       )}
     </>
   );
 }
+
+/** The two states of the address card's low-areas button (change list, item 2). */
+const OPEN_LOW_AREAS = 'Open low areas to see where water may pool';
+const LOW_AREAS_SHOWN = 'Low areas already show on map';
 
 /** Filled and outline, for the two choices a picking card offers. */
 const pickFilledStyle = {

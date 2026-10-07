@@ -37,7 +37,7 @@ import type { Local } from './map/viewport.js';
 import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
 import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
 import { loadCatchments } from './catchment/artefact.js';
-import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
+import { brand, ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import { useScenarioSupport } from './scenario/support.js';
@@ -340,7 +340,11 @@ export function App() {
           credits={credits}
           extentName={loaded.extentName}
           actions={
-            <HomeNav
+            <SiteNav
+              current="home"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
               onOpenGuides={() => {
                 dispatch({ type: 'explore-chosen' });
               }}
@@ -543,8 +547,28 @@ export function App() {
 
     case 'choose':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName} masthead={false}>
+        <Shell
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          actions={
+            <SiteNav
+              current="tutorial"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened' });
+              }}
+            />
+          }
+        >
           <Choose
             learned={session.learned}
             guided={GUIDED_SECTIONS}
@@ -1280,26 +1304,26 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * called *Map guide* and is a different thing, which is why it was renamed on
  * the same list.
  */
-function HomeNav({
+function SiteNav({
+  current,
+  onOpenHome,
   onOpenGuides,
   onOpenHistory,
   onOpenFullMap,
 }: {
+  /** Which of the four this screen is, so it is marked rather than linked. */
+  readonly current: 'home' | 'tutorial';
+  readonly onOpenHome: () => void;
   readonly onOpenGuides: () => void;
   readonly onOpenHistory: () => void;
   readonly onOpenFullMap: () => void;
 }) {
   return (
-    <nav
-      aria-label="Site"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}
-    >
-      <span aria-current="page" style={{ ...navItem, color: ink.strong, fontWeight: weight.semibold }}>
-        Home page
-      </span>
-      <NavLink label="Tutorial" onOpen={onOpenGuides} />
-      <NavLink label="Flood history" onOpen={onOpenHistory} />
-      <NavLink label={FULL_MAP} onOpen={onOpenFullMap} />
+    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+      <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
+      <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
+      <NavLink label="Flood history" current={false} onOpen={onOpenHistory} />
+      <NavLink label={FULL_MAP} current={false} onOpen={onOpenFullMap} />
     </nav>
   );
 }
@@ -1311,12 +1335,30 @@ const navItem = {
   whiteSpace: 'nowrap',
 } as const;
 
-function NavLink({ label, onOpen }: { readonly label: string; readonly onOpen: () => void }) {
+function NavLink({
+  label,
+  current,
+  onOpen,
+}: {
+  readonly label: string;
+  readonly current: boolean;
+  readonly onOpen: () => void;
+}) {
   return (
     <button
       type="button"
-      onClick={onOpen}
-      style={{ ...navItem, border: 'none', background: 'none', color: ink.base, cursor: 'pointer' }}
+      onClick={current ? undefined : onOpen}
+      {...(current ? { 'aria-current': 'page' as const } : {})}
+      style={{
+        ...navItem,
+        border: 'none',
+        background: 'none',
+        color: current ? ink.strong : ink.base,
+        fontWeight: current ? weight.semibold : weight.medium,
+        borderBottom: current ? `2px solid ${brand.base}` : '2px solid transparent',
+        borderRadius: 0,
+        cursor: current ? 'default' : 'pointer',
+      }}
     >
       {label}
     </button>

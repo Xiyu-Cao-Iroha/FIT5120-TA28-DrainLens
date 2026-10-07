@@ -283,3 +283,19 @@ The Figma file gained a page on 7 October: *Epic 5 · AI: Ask about getting read
 
 **One thing the design asks for that is not built.** The mock-up puts an *Ask a question about this* link inside each general action’s expanded tip card. The product’s general actions are three sentences with a publisher under them, not cards that open, so that second way in has nothing to live inside. The one at the foot of the plan is built and is the way in.
 
+---
+
+## 11 · The 8 October change list — **DONE: fourteen items, two of them decisions**
+
+A list of fourteen changes arrived from the team on 8 October, with a screenshot against each. Twelve were straightforward; the two worth recording here are the ones that removed something.
+
+**Who can help is gone, and that fixed the bug the list opened with.** Item 6 reported that opening *My drainage area* showed no area card. It does show one — unless *Who can help* is also on, and then the two cards were mutually exclusive and the second silently replaced the first. *Who can help* was never a layer: it drew nothing on the map, its only effect was to open a card, and everything it said is about the area the other card is about. Chip, layer key, card and guide step are all removed, and the three levels are a section of the drainage-area card now. Epic 6's two halves meet there: the card says who looks after which part (AC 6.2.1) and a button on it opens the reporting pathway (AC 6.2.3), which is where the report entry used to be reached from.
+
+**The drainage-area card lost a figure and gained a fold.** Item 12 asked for the design's shape: three tiles rather than four figures, and the qualifying sentences in *More information*. Nothing is deleted — each of those sentences is a criterion — but five caveats above the fold is four too many when what a reader wants at a glance is the area, the figures and who to tell. *Low areas* leaves the tiles because it is a sentence where the others are a number, and it is the one figure that reads as a claim about risk. It is in the fold, labelled.
+
+**Two renames are in `RETIRED_TERMS`** so they stay retired: *Likely water paths* is **Water paths**, and *My drainage area* is **Recorded subcatchment area** — the second because *my* said ownership about an area the reader does not own and a record they did not make.
+
+**What else the list changed.** The map's *Tutorial* button is *Map guide*; the masthead is a navigation bar on the homepage and the guide chooser, with the page you are on marked rather than linked; the chooser is the design's two groups (*Learn the map*, and *Use your address* for the two guides that need one); the chosen address is one marked component instead of two different grey lines; the address card offers the low-areas layer it is already describing; a card on the map can be dragged by its title out of the way of the map it is about; the place card is anchored on its place rather than in the top-left corner; and the before-rain layer fits the view to the 200 m it means by *near* — the same constant `placesNear` uses — so a marker 180 m away is not off the screen when the guide asks about it.
+
+**One thing the list asked for is not built**, and it is the mobile case: under 620 pixels there is no room for a sidebar that leaves a map, so the plan falls back to the card it used to live in. The design has a sheet for that. It is a screen, not a decision, and it is the next piece of this work.
+

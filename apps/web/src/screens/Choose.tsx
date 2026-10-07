@@ -30,8 +30,9 @@ import type { ReactNode } from 'react';
 import { COMPARE_ACCENT, COMPARE_CARD, CompareThumb } from './BlockedDrain.js';
 import { PATHS, PathThumb } from './Home.js';
 import { SECTIONS, type Learned, type SectionId, countLearned } from '../tutorial/sections.js';
+import { AddressMark } from '../ui/AddressMark.js';
 import { FULL_MAP } from '../ui/terms.js';
-import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
+import { advisory, brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 export interface ChooseProps {
   readonly learned: Learned;
@@ -108,28 +109,6 @@ export function Choose({
           </button>
         </div>
 
-        {address !== null && (
-          <p
-            style={{
-              margin: `-${String(space(8))}px 0 ${String(space(8))}px`,
-              textAlign: 'center',
-              font: type(text.small),
-              color: ink.muted,
-            }}
-          >
-            <span style={{ color: ink.subtle }}>Current address: </span>
-            <span style={{ color: ink.strong }}>{address}</span>
-            {onChangeAddress !== undefined && (
-              <>
-                {'  '}
-                <button type="button" onClick={onChangeAddress} style={changeLink}>
-                  Change
-                </button>
-              </>
-            )}
-          </p>
-        )}
-
         <h1
           style={{
             margin: `0 0 ${String(space(3))}px`,
@@ -152,20 +131,29 @@ export function Choose({
           }}
         >
           {done === 0
-            ? `Each guide takes a few minutes. Choose one, or open the ${FULL_MAP.toLowerCase()}.`
-            : `${String(done)} guide${done === 1 ? '' : 's'} completed. You can continue or open the ${FULL_MAP.toLowerCase()}.`}
+            ? `Each guide takes a few minutes. Every guide uses the same address.`
+            : `${String(done)} of ${String(SECTION_COUNT)} guides done. Every guide uses the same address.`}
         </p>
 
-        <div
-          style={{
-            display: 'grid',
-            // 200 rather than 230 so the five fit one row at the column's
-            // 1180 px; at 230 the fifth wrapped and sat alone under the first.
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: space(5),
-          }}
-        >
-          {PATHS.map((path) => {
+        {/*
+          The address, between the subtitle and the cards, because every card
+          below uses it. It was above the heading, where it read as a leftover
+          from the screen before.
+        */}
+        {address !== null && (
+          <div style={{ margin: `-${String(space(8))}px 0 ${String(space(10))}px`, textAlign: 'center' }}>
+            <AddressMark
+              address={address}
+              {...(onChangeAddress === undefined ? {} : { onChange: onChangeAddress })}
+            />
+          </div>
+        )}
+
+        <GroupHeading>Learn the map</GroupHeading>
+        <div style={{ ...grid, marginBottom: space(10) }}>
+          {LEARN_THE_MAP.map((mode) => {
+            const path = PATHS.find((candidate) => candidate.mode === mode);
+            if (path === undefined) return null;
             const ready = guided.includes(path.mode);
             return (
               <Card
@@ -185,7 +173,7 @@ export function Choose({
           })}
           {/*
             Never `done`: there is nothing to finish, and a tick on it would
-            read as a fifth guide completed.
+            read as another guide completed.
           */}
           <Card
             thumb={<CompareThumb />}
@@ -198,6 +186,155 @@ export function Choose({
             onStart={onCompare}
           />
         </div>
+
+        <GroupHeading badge="New">Use your address</GroupHeading>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+            gap: space(5),
+          }}
+        >
+          {USE_YOUR_ADDRESS.map((mode) => {
+            const path = PATHS.find((candidate) => candidate.mode === mode);
+            if (path === undefined) return null;
+            const ready = guided.includes(path.mode);
+            return (
+              <WideCard
+                key={path.mode}
+                thumb={<PathThumb mode={path.mode} />}
+                title={path.title}
+                body={path.body}
+                accent={path.accent}
+                done={learned[path.mode]}
+                ready={ready}
+                onStart={() => {
+                  onStart(path.mode);
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The two groups, in the design's order (Figma T1).
+ *
+ * The division is not decoration: the first five are about the map and can be
+ * read anywhere, and the two below do something with the reader's own
+ * address. The comparison goes in the first group, where it already was --
+ * it is not a guide, and the group is not called *guides*.
+ */
+const LEARN_THE_MAP = ['drainage', 'water-flow', 'terrain', 'low-areas'] as const;
+const USE_YOUR_ADDRESS = ['heavy-rain', 'drainage-area'] as const;
+
+/** How many guides there are to finish, for *n of seven*. */
+const SECTION_COUNT = Object.keys(SECTIONS).length;
+
+const grid = {
+  display: 'grid',
+  // 200 rather than 230 so the five fit one row at the column's 1180 px; at
+  // 230 the fifth wrapped and sat alone under the first.
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: space(5),
+} as const;
+
+function GroupHeading({ children, badge }: { readonly children: ReactNode; readonly badge?: string }) {
+  return (
+    <p
+      style={{
+        display: 'flex',
+        gap: space(2),
+        alignItems: 'center',
+        margin: `0 0 ${String(space(3))}px`,
+        font: type(text.micro, { weight: weight.semibold }),
+        letterSpacing: tracking.caps,
+        textTransform: 'uppercase',
+        color: brand.ink,
+      }}
+    >
+      {children}
+      {badge !== undefined && (
+        <span
+          style={{
+            padding: `1px ${String(space(2))}px`,
+            borderRadius: radius.pill,
+            background: advisory.fill,
+            border: `1px solid ${advisory.line}`,
+            color: advisory.ink,
+            letterSpacing: 0,
+            textTransform: 'none',
+          }}
+        >
+          {badge}
+        </span>
+      )}
+    </p>
+  );
+}
+
+/**
+ * The wider card the address group uses (Figma T1): picture beside the words.
+ *
+ * It carries a real *Start guide* button rather than a label over the
+ * picture, because these two are the ones the design is pointing at and a
+ * button is what a reader presses when they have decided.
+ */
+function WideCard({
+  thumb,
+  title,
+  body,
+  accent,
+  done,
+  ready,
+  onStart,
+}: {
+  readonly thumb: ReactNode;
+  readonly title: string;
+  readonly body: string;
+  readonly accent: string;
+  readonly done: boolean;
+  readonly ready: boolean;
+  readonly onStart: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        overflow: 'hidden',
+        border: `1px solid ${done ? accent : line.base}`,
+        borderRadius: radius.large,
+        background: surface.raised,
+        boxShadow: shadow.lifted,
+      }}
+    >
+      <div style={{ flex: '0 0 40%', minWidth: 0, position: 'relative' }} aria-hidden>
+        {thumb}
+      </div>
+      <div style={{ flex: '1 0 0', minWidth: 0, padding: space(5) }}>
+        <p style={{ margin: 0, font: type(text.lead, { weight: weight.semibold }), color: ink.strong }}>
+          {title}
+        </p>
+        <p style={{ margin: `${String(space(2))}px 0 ${String(space(4))}px`, color: ink.muted }}>{body}</p>
+        <button
+          type="button"
+          onClick={ready ? onStart : undefined}
+          disabled={!ready}
+          style={{
+            padding: `${String(space(2))}px ${String(space(4))}px`,
+            borderRadius: radius.base,
+            border: 'none',
+            background: ready ? brand.base : line.base,
+            color: ink.inverse,
+            font: type(text.label, { weight: weight.semibold }),
+            cursor: ready ? 'pointer' : 'default',
+          }}
+        >
+          {done ? 'Done ✓  Start again →' : 'Start guide →'}
+        </button>
       </div>
     </div>
   );
