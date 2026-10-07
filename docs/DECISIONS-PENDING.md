@@ -266,3 +266,20 @@ The design shows **Move valuable items above floor level**. No official page car
 
 - **`--min-instances=1` on the API: reverted.** `drainlens-api` runs at `--min-instances=0` again (revision `drainlens-api-00016-f65`), so nothing pays for an idle instance. Measured straight after: 0.74 s on the first request, 0.19 s warm, `/health` returning the same counts as before. The cold start is the price of not paying for idle, and `deploy/API-DEPLOYMENT.md` has been saying so since September.
 - **The gate password: deliberately not rotated.** It was exposed in a screenshot on 28 September. The team's decision is to leave it, on the reasoning that the gate keeps a half-built prototype from being found by accident rather than protecting anything in it: there is no account, no personal data and no endpoint that takes an address. **It is recorded here as a decision rather than an oversight**, which is the point of this file. Rotating it is one command per service if that changes.
+
+---
+
+## 10 · The assistant answers from a register, not from a model — **DECIDED 8 October 2026: register, and the team can overturn it**
+
+The Figma file gained a page on 7 October: *Epic 5 · AI: Ask about getting ready*, thirteen frames of a panel that answers questions about getting ready, with a source chip under every answer, a state for questions it cannot answer and a state for an emergency. It is built, and the decision this file exists to record is **what is behind it**.
+
+**What was built.** Ten answers in `apps/web/src/ask/answers.ts`, each written from an official page read on 8 October, each carrying the sentence it came from. A question is matched against them in the browser. Nothing is sent anywhere, nothing is generated, and no endpoint was added.
+
+**What was not built, and why.** `assistant/` holds the team's Stage 2 retrieval prototype: Streamlit, ChromaDB, `llama3.2` under Ollama, running on one person's machine. Wiring it into the product would mean an endpoint, a key, a bill, a question leaving the browser, and above all **sentences about floodwater that nobody has read before a resident does**. The project's whole vocabulary exists to separate what is recorded from what is estimated; a generated answer is neither, and it would arrive in the one part of the product a person might read with rain coming.
+
+**The evaluation is what bounds the register.** `assistant/evaluation_results.csv` is thirty questions scored by hand in three categories. An answer ships only where a *Normal* row **passed**; the eight that failed are not in the register. The six *Unanswerable* rows are refused by name **before** matching, because each one is full of words the register would otherwise recognise — *insurance*, *switchboard* — and a refusal that ran second would never run at all. The six *Emergency* rows are answered with three telephone numbers **before** anything is read or matched. `apps/web/src/ask/respond.test.ts` reads that CSV and runs all thirty, so a question added to the evaluation is a question the panel has to survive.
+
+**What the team is being asked.** Not whether to have an assistant — it is built and it works. Whether answering from ten approved sentences is enough for Iteration 3, or whether the prototype should be deployed behind it before the showcase. If it should, the question that comes with it is who reads the generated answers, and when, and what happens to the ones they do not agree with. The register has an answer to that question already, which is the argument for it.
+
+**One thing the design asks for that is not built.** The mock-up puts an *Ask a question about this* link inside each general action’s expanded tip card. The product’s general actions are three sentences with a publisher under them, not cards that open, so that second way in has nothing to live inside. The one at the foot of the plan is built and is the way in.
+

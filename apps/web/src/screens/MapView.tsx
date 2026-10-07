@@ -60,6 +60,7 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { WHO_CAN_HELP } from '../catchment/help.js';
+import { ASK_HEADING } from '../ask/answers.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
@@ -70,6 +71,7 @@ import {
   placeTitle,
   placesNear,
 } from '../prepare/places.js';
+import { AskAboutGettingReady } from './AskAboutGettingReady.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
 import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
@@ -409,6 +411,16 @@ export function MapView({
   const [openPlace, setOpenPlace] = useState<number | null>(null);
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
+  /*
+    *Ask about getting ready* (Figma AI1, Q0 to Q5).
+
+    It replaces the plan rather than sitting beside it: one card, two things
+    it can be showing, and the only way in is from the plan, so there is no
+    state where a reader has an assistant open over a map they never asked a
+    plan about. Closing it puts the plan back, which is what *Back to my
+    plan* means.
+  */
+  const [askOpen, setAskOpen] = useState(false);
   /*
     The reporting pathway, which is its own thing (AC 6.2.3).
 
@@ -1292,8 +1304,27 @@ export function MapView({
         );
       })()}
 
+      {/* The assistant, which the plan hands over to (Figma Q0 to Q5). */}
+      {panel && viewport !== null && planOpen && askOpen && openPlace === null && (
+        <MapNote title={ASK_HEADING}>
+          <AskAboutGettingReady
+            onBackToPlan={() => {
+              setAskOpen(false);
+            }}
+            {...(places.length === 0
+              ? {}
+              : {
+                  onReviewPlaces: () => {
+                    // Back to the plan, which is where the places are listed.
+                    setAskOpen(false);
+                  },
+                })}
+          />
+        </MapNote>
+      )}
+
       {/* The plan itself (Figma G3), which the place card sits in front of. */}
-      {panel && viewport !== null && planOpen && openPlace === null && (
+      {panel && viewport !== null && planOpen && !askOpen && openPlace === null && (
         <MapNote title={PREPARE_HEADING}>
           <PreparePlan
             address={address?.label ?? ''}
@@ -1312,6 +1343,12 @@ export function MapView({
                   onReport: () => {
                     setPlanOpen(false);
                     openReport(null);
+                  },
+                  // Not inside a guide, for the reason reporting is not: a
+                  // guide teaches one thing at a time, and this is a second
+                  // thing that answers back.
+                  onAsk: () => {
+                    setAskOpen(true);
                   },
                 })}
           />

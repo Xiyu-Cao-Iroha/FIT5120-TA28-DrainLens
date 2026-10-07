@@ -23,6 +23,7 @@
 
 import { type ReactNode, useId, useState } from 'react';
 
+import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import {
   GENERAL_ACTIONS,
   NOT_A_SCORE,
@@ -112,6 +113,7 @@ export function PreparePlan({
   onReset,
   onReport,
   onWhyOpen,
+  onAsk,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -123,6 +125,8 @@ export function PreparePlan({
   readonly onReport?: (() => void) | undefined;
   /** A reminder's *Why this place?* opened, which the guide's step 4 waits on. */
   readonly onWhyOpen?: (() => void) | undefined;
+  /** The way into *Ask about getting ready* (Figma AI1). */
+  readonly onAsk?: (() => void) | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -253,6 +257,45 @@ export function PreparePlan({
             {REPORT_PATHWAY}
           </button>
         </section>
+      )}
+
+      {/*
+        The way into *Ask about getting ready* (Figma AI1).
+
+        The design shows two: this row, and an *Ask a question about this*
+        link inside each general action's expanded tip. The tips are a panel
+        this product does not have -- its general actions are three sentences
+        with their publisher under them, not cards that open -- so the link
+        that would live inside one is not here. One way in that exists beats
+        two where the second needs a screen built to hold it.
+
+        It sits after reporting and before the telephone numbers, which is
+        where the design puts it: the last thing offered, and never above the
+        two things a person with rain coming actually needs.
+      */}
+      {onAsk !== undefined && (
+        <p
+          style={{
+            display: 'flex',
+            gap: space(2),
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            margin: `${String(space(3))}px 0 0`,
+            padding: space(2),
+            border: `1px solid ${brand.tint}`,
+            borderRadius: radius.base,
+            background: brand.wash,
+          }}
+        >
+          <span style={{ color: brand.ink }}>{ASK_PROMPT}</span>
+          <button
+            type="button"
+            onClick={onAsk}
+            style={{ ...linkStyle, font: type(text.small, { weight: weight.semibold }) }}
+          >
+            {ASK_LINK} ›
+          </button>
+        </p>
       )}
 
       {/*
