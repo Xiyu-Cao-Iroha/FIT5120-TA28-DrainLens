@@ -260,6 +260,28 @@ describe('going back', () => {
     expect(reduce(second, { type: 'change-address' }).screen).toBe('address');
   });
 
+  it('leaves a guide for the chooser it was picked from, not for the search box', () => {
+    /*
+     * It went to the address screen until 8 October, from when every guide
+     * asked for its own address. The address is kept across guides now and
+     * the chooser shows it with a Change beside it, so a reader who wanted
+     * out of a guide was being handed a search box instead.
+     */
+    const inGuide = play([
+      { type: 'get-started' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(inGuide.screen).toBe('guide');
+    expect(reduce(inGuide, { type: 'back' }).screen).toBe('choose');
+    // And the way out the panel offers is the same destination.
+    const left = reduce(inGuide, { type: 'guide-left' });
+    expect(left.screen).toBe('choose');
+    expect(left.guideSection).toBeNull();
+    // The address survives either way: it is what the next guide opens on.
+    expect(left.address?.label).toBe(GATEHOUSE.label);
+  });
+
   it('goes back from a guide to the address screen with the section still chosen', () => {
     const inGuide = play([
       { type: 'get-started' },

@@ -16,8 +16,9 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --build --force",
-    "check": "npm run typecheck && npm run coverage",
-    "test:db": "vitest run --config vitest.db.config.ts"
+    "check": "npm run typecheck && npm run typecheck:tests && npm run coverage",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "typecheck:tests": "tsc -p apps/web/tsconfig.tests.json --noEmit && tsc -p apps/api/tsconfig.tests.json --noEmit && tsc -p packages/schema/tsconfig.tests.json --noEmit && tsc -p packages/scenario/tsconfig.tests.json --noEmit"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

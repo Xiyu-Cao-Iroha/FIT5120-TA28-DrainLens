@@ -79,7 +79,7 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
     points: [
       'They are worked out from the City of Melbourne 3D Point Cloud 2018, a height survey made from aerial photographs. Heights are accurate to about 25 cm.',
       'Heights are in metres above sea level (Australian Height Datum). Colours show higher and lower ground, and lines join places of equal height.',
-      'Likely water paths follow the steepest way downhill. They show where rain would tend to run, not where water has been seen.',
+      'Water paths follow the steepest way downhill. They show where rain would tend to run, not where water has been seen.',
       'Building outlines are used so that water paths go around buildings.',
       'Low areas are dips in the ground. We only show dips at least 25 cm deep, because smaller changes are within the survey’s error.',
       'A warning sign marks an especially deep low area on a street. It appears when you zoom in.',

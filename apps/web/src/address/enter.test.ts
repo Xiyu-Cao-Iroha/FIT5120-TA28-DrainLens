@@ -22,6 +22,7 @@ const at = (id: string, number: string, street: string, suburb = 'Kensington'): 
   suburb,
   e: 500,
   n: 500,
+  at: 0,
 });
 
 const INDEX: AddressIndex = {

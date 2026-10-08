@@ -62,7 +62,6 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, swatch: 'blob' },
   { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
   { key: 'catchment', chip: LAYER.catchment, label: LAYER.catchment, swatch: 'outline' },
-  { key: 'help', chip: LAYER.help, label: LAYER.help, swatch: 'levels' },
   { key: 'beforeRain', chip: LAYER.beforeRain, label: LAYER.beforeRain, swatch: 'check' },
 ];
 
@@ -282,6 +281,25 @@ export interface LayerChipsProps {
   readonly pulsePanelKey?: LayerKey | null;
   /** Told whenever the panel opens or shuts. The guide's first step waits on it. */
   readonly onPanelChange?: (open: boolean) => void;
+  /**
+   * Collapse the row to one button, without taking the chips away.
+   *
+   * Set while the sidebar is open. Eight chips across the top of a map that
+   * has a panel down one side is most of the map's chrome fighting for the
+   * same corner, so the row folds to *Map layers* and unfolds on a press. A
+   * fold, not a lock: the reader opens it again whenever they want it, and
+   * the guide's own pulses still force it open, because a tour that points at
+   * a chip nobody can see is pointing at nothing.
+   */
+  readonly fold?: boolean;
+  /**
+   * Whether to offer the collapse control at all.
+   *
+   * Only the full map has eight chips and a sidebar wanting the same corner.
+   * A guide has one chip, no sidebar, and a step that names it, so a button
+   * whose whole purpose is to hide that chip is noise at best.
+   */
+  readonly collapsible?: boolean;
 }
 
 /**
@@ -291,6 +309,25 @@ export interface LayerChipsProps {
  * panel are one decision seen at two depths, and a person looking for a layer
  * that is not a chip should find the place it lives without hunting.
  */
+/** The chevrons on the fold button, as glyphs rather than icons. */
+const CHEVRON_LEFT = '‹';
+const CHEVRON_RIGHT = '›';
+
+/** The fold button, which is a chip without a swatch. */
+const foldButton = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: space(1),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.base,
+  background: surface.raised,
+  color: ink.muted,
+  font: type(text.label, { weight: weight.medium, leading: 1.2 }),
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+} as const;
+
 export function LayerChips({
   state,
   onToggle,
@@ -301,8 +338,16 @@ export function LayerChips({
   pulseLayers = false,
   pulsePanelKey = null,
   onPanelChange,
+  fold = false,
+  collapsible = false,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    setFolded(fold);
+  }, [fold]);
+  // A pulse is the tour pointing at one of these. Unfold for it.
+  const showing = !collapsible || !folded || pulse !== null || pulseLayers || pulsePanelKey !== null;
   useEffect(() => {
     onPanelChange?.(open);
   }, [open, onPanelChange]);
@@ -320,7 +365,44 @@ export function LayerChips({
       data-tour="chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
-      {keys.map((key) => {
+      {/*
+        The fold control, at the start of the row.
+
+        It was after the last chip, which put the button that collapses the
+        row and the button that opens it again in two different places: fold
+        from the right-hand end, and the thing to press to get the chips back
+        is at the left. One position for one control, and the row collapses
+        towards it.
+      */}
+      {collapsible && showing && keys.length > 0 && (
+        <button
+          type="button"
+          aria-label="Collapse the map layer buttons"
+          onClick={() => {
+            setFolded(true);
+          }}
+          aria-expanded
+          style={foldButton}
+        >
+          {CHEVRON_LEFT}
+        </button>
+      )}
+
+      {!showing && (
+        <button
+          type="button"
+          onClick={() => {
+            setFolded(false);
+          }}
+          aria-expanded={false}
+          style={foldButton}
+        >
+          {CHEVRON_RIGHT} Map layers
+        </button>
+      )}
+
+      {showing &&
+        keys.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
         return (
@@ -340,7 +422,7 @@ export function LayerChips({
         );
       })}
 
-      {layersButton && (
+      {showing && layersButton && (
       <div style={{ position: 'relative' }}>
         <button
           type="button"
@@ -472,6 +554,7 @@ export function LayerChips({
 export function MapLegend({
   state,
   pulseTerrain = false,
+  fold = false,
 }: {
   readonly state: LayerState;
   /**
@@ -480,8 +563,20 @@ export function MapLegend({
    * outlined instead, since the scale is not there to outline.
    */
   readonly pulseTerrain?: boolean;
+  /**
+   * Fold the legend away, without taking it away.
+   *
+   * Set while the sidebar is open. It is a nudge rather than a lock: the
+   * legend collapses when the sidebar appears and the reader can still open
+   * it again, which is the difference between a panel tidying up after itself
+   * and a panel deciding what somebody is allowed to look at.
+   */
+  readonly fold?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (fold === true) setOpen(false);
+  }, [fold]);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
 

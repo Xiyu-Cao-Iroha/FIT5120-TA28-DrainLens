@@ -10,10 +10,16 @@
  * press did. The facts are the same and the delivery is not, and the design
  * is the team's to decide.
  *
- * **Two chips, two presses, and the rest is reading.** Press *My drainage
- * area* and the boundary is drawn; press *Who can help* and the three levels
- * appear on the map. Both are `do` steps, so the guide waits for the press
+ * **One chip, one press, and the rest is reading.** Press the chip and the
+ * boundary is drawn. It is a `do` step, so the guide waits for the press
  * rather than describing it — the rule the other four guides are built on.
+ *
+ * There were two presses until 8 October. The second was *Who can help*, a
+ * chip that drew nothing on the map and opened a card that pushed the
+ * drainage-area card off the screen — reported as the area card not appearing
+ * at all. Who looks after which part is now a section of the card about the
+ * area, where it was always about, so the guide's last step reads it there
+ * instead of pressing a second chip to summon it.
  *
  * **What the steps may not say.** The receiving drain is named only where the
  * classification register has approved it (AC 6.1.2), so the guide's wording
@@ -25,8 +31,7 @@
  */
 
 import { type Lesson } from './lesson.js';
-import type { LayerKey } from '../map/modes.js';
-import { CATCHMENT_CHIP, HELP_CHIP } from '../catchment/wording.js';
+import { CATCHMENT_CHIP } from '../catchment/wording.js';
 
 /*
   The wording is the design's, in the design's order: a press, what it showed,
@@ -51,16 +56,10 @@ export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
     note: 'It shows drainage, not how far a flood could reach.',
   },
   {
-    kind: 'do',
-    id: 'help-on',
-    prompt: `Now click ${HELP_CHIP}.`,
-    requires: 'help-on',
-  },
-  {
     kind: 'read',
     id: 'help-shown',
-    prompt: 'Great! Each part of the drainage is looked after by someone different.',
-    note: 'Use this to report a problem to the right place.',
+    prompt: 'Each part of the drainage is looked after by someone different, and the card says which.',
+    note: 'Use it to report a problem to the right place.',
   },
 ];
 
@@ -81,13 +80,7 @@ export const DRAINAGE_AREA: Lesson = {
     second chip and the reader should still be able to take the first one off
     — which is what `now` is for.
   */
-  chips: (index, now) => {
-    const offered: LayerKey[] = index >= 2 ? ['catchment', 'help'] : ['catchment'];
-    for (const key of ['catchment', 'help'] as const) {
-      if (now[key] && !offered.includes(key)) offered.push(key);
-    }
-    return offered;
-  },
+  chips: () => ['catchment'],
   teachingPit: false,
   previous: true,
 };

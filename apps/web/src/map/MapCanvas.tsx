@@ -187,6 +187,13 @@ export interface MapCanvasProps {
    * So the viewport is reported rather than lifted.
    */
   readonly onViewport?: (viewport: Viewport | null) => void;
+  /**
+   * How far in from the right edge the zoom and scale controls should sit.
+   *
+   * Set to the sidebar's width while one is open, so the controls are beside
+   * it rather than underneath it.
+   */
+  readonly controlsInset?: number | undefined;
 }
 
 export function MapCanvas({
@@ -217,6 +224,7 @@ export function MapCanvas({
   onAddressPress,
   onGround,
   onViewport,
+  controlsInset = 0,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -546,6 +554,7 @@ export function MapCanvas({
       />
       {viewport && (
           <MapControls
+            inset={controlsInset}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}
