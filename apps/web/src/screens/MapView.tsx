@@ -847,6 +847,10 @@ export function MapView({
             setOpenPlace(numbered);
             return;
           }
+          // An unnumbered sign is a low area like any other, and it says so.
+          // It lets go of an open place for the same reason every other press
+          // here does: two cards on one map is one too many.
+          setOpenPlace(null);
           setWarning(sign);
         }}
         onViewport={setViewport}
@@ -1318,7 +1322,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
