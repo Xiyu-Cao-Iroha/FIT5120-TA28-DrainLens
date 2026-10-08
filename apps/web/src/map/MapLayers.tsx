@@ -365,6 +365,29 @@ export function LayerChips({
       data-tour="chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
+      {/*
+        The fold control, at the start of the row.
+
+        It was after the last chip, which put the button that collapses the
+        row and the button that opens it again in two different places: fold
+        from the right-hand end, and the thing to press to get the chips back
+        is at the left. One position for one control, and the row collapses
+        towards it.
+      */}
+      {collapsible && showing && keys.length > 0 && (
+        <button
+          type="button"
+          aria-label="Collapse the map layer buttons"
+          onClick={() => {
+            setFolded(true);
+          }}
+          aria-expanded
+          style={foldButton}
+        >
+          {CHEVRON_LEFT}
+        </button>
+      )}
+
       {!showing && (
         <button
           type="button"
@@ -398,20 +421,6 @@ export function LayerChips({
           />
         );
       })}
-
-      {collapsible && showing && keys.length > 0 && (
-        <button
-          type="button"
-          aria-label="Collapse the map layer buttons"
-          onClick={() => {
-            setFolded(true);
-          }}
-          aria-expanded
-          style={foldButton}
-        >
-          {CHEVRON_LEFT}
-        </button>
-      )}
 
       {showing && layersButton && (
       <div style={{ position: 'relative' }}>
