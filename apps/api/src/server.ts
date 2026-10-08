@@ -39,71 +39,80 @@ import {
 } from './queries.js';
 
 /**
+ * The Cloud Run services whose pages may read this API from a browser.
+ *
+ * `drainlens-iteration1` is deliberately **not** here. It serves the frozen
+ * Iteration 1 bundle, which asks for `/api/map/kensington` -- an extent this
+ * database no longer holds. Letting it through would give it a 404 and the
+ * same fallback it gets now, by accident instead of on purpose. An archive
+ * should not depend on a live database that has moved on; it holds its own
+ * copies and that is what makes it an archive.
+ */
+export const ALLOWED_SERVICES = ['drainlens', 'drainlens-dev', 'drainlens-iteration2'] as const;
+
+/**
+ * The hash Cloud Run puts in this project's newer URLs.
+ *
+ * One value for the whole project and region -- all five services share it --
+ * so it is a constant rather than something to look up per service.
+ */
+const RUN_HASH = '6et5y2lpgq-ts';
+
+/**
+ * One service, as both the URLs Cloud Run answers on.
+ *
+ * **A service has two origins and the list kept carrying one.** Cloud Run
+ * used to publish `<service>-<project-number>.<region>.run.app` and now
+ * publishes `<service>-<hash>.a.run.app`; both resolve, `gcloud run services
+ * describe` reports the second, and a browser's `Origin` is whichever one the
+ * reader typed. A list holding only the first allows exactly the readers who
+ * followed an old link.
+ */
+const originsFor = (service: string): string[] => [
+  `https://${service}-205559161217.australia-southeast1.run.app`,
+  `https://${service}-${RUN_HASH}.a.run.app`,
+];
+
+/**
  * The origins allowed to read this from a browser.
  *
  * The site and the API are two Cloud Run services and therefore two origins,
  * so without this the browser refuses every response before the page sees it.
  *
  * **A list rather than `*`.** Everything here is published council data and
- * no request carries a credential, so `*` would leak nothing — but an
+ * no request carries a credential, so `*` would leak nothing -- but an
  * allow-list is a statement about who this is for, and it is the kind of
  * setting that is easy to widen later and impossible to narrow once something
  * unknown depends on it. `ALLOWED_ORIGINS` overrides it for a preview
  * deployment without a code change.
+ *
+ * **This list has now been wrong three times, in the same way each time**, and
+ * it is generated rather than written out for that reason:
+ *
+ * - 11 September. Iteration 2 moved to three URLs and the list did not move
+ *   with them. The dev origin's every response was dropped and the site fell
+ *   back to the square kilometre in its own container. It said so honestly --
+ *   *the wider council map needs the database, which is not answering* -- and
+ *   the sentence was true from where the browser stood.
+ * - 28 September. The Iteration 2 archive was deployed at the freeze and the
+ *   same omission dropped its every response, with the same symptom.
+ * - 8 October. Cloud Run's URL format changed under all five services. The
+ *   list still held the old form, so **the live root, the dev service and the
+ *   archive were all serving one square kilometre** to anybody who used the
+ *   URL the console and `gcloud` report. Found by opening the dev site in a
+ *   browser and reading the footer.
+ *
+ * What each looked like was the council extent being broken. What each was is
+ * this array. **A CORS list is not a feature flag, but it behaves like one**,
+ * so the shape of it is now the fix: name a service and it gets both of its
+ * origins, because the failure every time was one of them missing.
  */
 export const DEFAULT_ORIGINS = [
-  'https://drainlens-205559161217.australia-southeast1.run.app',
-  /*
-    The dev service, and the reason this list is a thing that can be wrong
-    without anybody being told.
-
-    Iteration 2 moved to three URLs on 11 September -- root, archive, dev --
-    and this list was not one of the things that moved. The dev service is a
-    different origin, so the browser dropped every response from this API
-    before the page saw it, and `fetchTogether` did exactly what it is for:
-    fell back to the copy in the container. The footer said so in plain words
-    -- *the wider council map needs the database, which is not answering* --
-    and it was right, from where the browser was standing.
-
-    What it looked like was the council extent not working. What it was is
-    this array. **A CORS list is not a feature flag, but it behaves like one**:
-    the whole Iteration 2 URL had been serving one square kilometre for a day.
-  */
-  'https://drainlens-dev-205559161217.australia-southeast1.run.app',
-  /*
-    The Iteration 2 archive, and the same omission a second time.
-
-    It was deployed at the freeze on 28 September and its every request was
-    dropped for the same reason, with the same symptom: the archive URL served
-    one square kilometre of Kensington, two example addresses instead of
-    three, and said so honestly in the footer. Found by reading the browser's
-    network log against a curl with an `Origin` header, which is the check
-    this list needs and does not get from any test.
-
-    **Why this one is in the list when `drainlens-iteration1` is not.** The
-    Iteration 1 archive asks for an extent this database no longer holds, so
-    letting it through would buy it a 404 and the fallback it already has. The
-    Iteration 2 archive asks for the extent the database *does* hold, and the
-    choice is between an archive that shows the whole council and one that
-    shows a kilometre of it. The team took the first on 29 September, knowing
-    what it costs: this archive is frozen in its code, not in what it reads,
-    and if the database moves on it degrades to its own copies.
-  */
-  'https://drainlens-iteration2-205559161217.australia-southeast1.run.app',
+  ...ALLOWED_SERVICES.flatMap(originsFor),
   // `npm run dev`, from .claude/launch.json.
   'http://localhost:5183',
   'http://127.0.0.1:5183',
 ];
-
-/*
-  `drainlens-iteration1` is deliberately **not** here.
-
-  It serves the frozen Iteration 1 bundle, which asks for `/api/map/kensington`
-  -- an extent this database no longer holds. Letting it through would give it
-  a 404 and the same fallback it gets now, by accident instead of on purpose.
-  An archive should not depend on a live database that has moved on; it holds
-  its own copies and that is what makes it an archive.
-*/
 
 export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
   if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;
