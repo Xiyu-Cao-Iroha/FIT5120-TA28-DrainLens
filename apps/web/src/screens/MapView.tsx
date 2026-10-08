@@ -833,6 +833,24 @@ export function MapView({
           setHit(null);
           setFollowing(null);
           setMinimised(false);
+          /*
+            A numbered marker opens its place, which is what the number is
+            for. It used to set `warning` like any other sign, and the card
+            that reads `warning` is gated on the low-areas layer -- so with
+            only before-rain on, pressing a numbered triangle did nothing at
+            all. The guide tells the reader the other places are numbered on
+            the map; pressing one has to reach them.
+          */
+          const numbered = layers.beforeRain ? numberOf(places, sign) : null;
+          if (numbered !== null) {
+            setWarning(null);
+            setOpenPlace(numbered);
+            return;
+          }
+          // An unnumbered sign is a low area like any other, and it says so.
+          // It lets go of an open place for the same reason every other press
+          // here does: two cards on one map is one too many.
+          setOpenPlace(null);
           setWarning(sign);
         }}
         onViewport={setViewport}
@@ -1304,7 +1322,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
@@ -1434,9 +1452,25 @@ export function MapView({
         One place's card (Figma G2). Opened by the button above and by a press
         on a numbered marker, and closed when its answer sends the reader on.
       */}
-      {panel && viewport !== null && openPlace !== null && (() => {
+      {/*
+        The card hides with the marker it points at.
+
+        Zoomed out past `WARNING_MIN_SCALE` the canvas stops drawing the signs
+        -- a sign over a whole neighbourhood is a claim about a street nobody
+        can see -- and the card stayed, anchored to a triangle that was not
+        there. Panned away, the same. `warningsVisible(true, ...)` is the rule
+        the canvas draws by, read from the same function rather than restated,
+        so the two cannot drift. `openPlace` is left alone: zoom back in and
+        the card is where it was, which is how the pit card behaves.
+      */}
+      {panel &&
+        viewport !== null &&
+        openPlace !== null &&
+        warningsVisible(true, viewport.scale) &&
+        (() => {
         const place = places.find((candidate) => candidate.number === openPlace);
         if (place === undefined) return null;
+        if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
         return (
           <MapCallout
