@@ -1514,6 +1514,11 @@ export function MapView({
             <DrainageArea
               area={area}
               hasAddress={address !== null}
+              onBack={() => {
+                // The chip is what drew this card; taking it off is the way
+                // back, and it takes the boundary with it.
+                toggle('catchment');
+              }}
               {...(guided
                 ? {}
                 : {

@@ -39,6 +39,7 @@ import {
   PLACES_NEAR_YOU,
   PLACE_ACTION,
   PLACE_IS_THE_STREET,
+  PLACE_RADIUS_M,
   PLACE_SOURCE,
   type Place,
   type Relevance,
@@ -309,7 +310,18 @@ export function PreparePlan({
             background: brand.wash,
           }}
         >
-          <span style={{ color: brand.ink }}>{ASK_PROMPT}</span>
+          <span style={{ display: 'inline-flex', gap: space(2), alignItems: 'center', color: brand.ink }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
+              <path
+                d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6A1.5 1.5 0 0 1 12.5 11H6.8l-3 2.7A.5.5 0 0 1 3 13.3V11h-.5A.5.5 0 0 1 2 10.5Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {ASK_PROMPT}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -399,6 +411,24 @@ export function PreparePlan({
           {VICEMERGENCY.label} — current warnings ›
         </a>
       </p>
+
+      <details style={{ marginTop: space(3) }}>
+        <summary style={{ cursor: 'pointer', color: brand.ink }}>How this plan works</summary>
+        <div style={{ marginTop: space(2), color: ink.muted }}>
+          <p style={{ margin: `0 0 ${String(space(1))}px` }}>
+            The numbered places are the nearest low areas DrainLens estimates near your address,
+            within {PLACE_RADIUS_M} m. {PLACE_IS_THE_STREET}
+          </p>
+          <p style={{ margin: `0 0 ${String(space(1))}px` }}>
+            What every home can do is taken from official guidance, and each line carries the
+            publisher it came from.
+          </p>
+          <p style={{ margin: 0 }}>
+            Your answers stay in this browser. Nothing here is sent anywhere or saved, and the
+            printed page is made on your own device.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }

@@ -952,7 +952,7 @@ function Paths({
       <SectionHeading
         onPhoto
         eyebrow="What you can explore"
-        title="Four ways to understand your area"
+        title="Six ways to understand your area"
         body="Choose a topic to open the map. You can change layers at any time."
       />
       <div
