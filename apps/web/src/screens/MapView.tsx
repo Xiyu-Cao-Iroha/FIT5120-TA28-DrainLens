@@ -450,6 +450,15 @@ export function MapView({
   */
   /** A reminder's explanation has been opened, which the guide waits on. */
   const [whyOpen, setWhyOpen] = useState(false);
+  /*
+    *Why are there different organisations?* has been opened (Figma D3).
+
+    Latched here as well as in `latch`, because the area card is unmounted and
+    remounted whenever the boundary layer is switched off and on: its own
+    `rolesOpen` goes with it, and a step the reader had already done would
+    come undone under them.
+  */
+  const [rolesOpened, setRolesOpened] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
   /*
@@ -1024,6 +1033,7 @@ export function MapView({
       planOpen,
       placesReviewed,
       whyOpen,
+      rolesOpened,
     });
   }, [
     terrainOn,
@@ -1042,6 +1052,7 @@ export function MapView({
     planOpen,
     placesReviewed,
     whyOpen,
+    rolesOpened,
     onMapNow,
   ]);
 
@@ -1815,6 +1826,9 @@ export function MapView({
                 // The chip is what drew this card; taking it off is the way
                 // back, and it takes the boundary with it.
                 toggle('catchment');
+              }}
+              onRolesOpen={() => {
+                setRolesOpened(true);
               }}
               {...(guided
                 ? {}
