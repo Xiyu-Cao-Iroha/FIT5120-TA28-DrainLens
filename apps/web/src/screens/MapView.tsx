@@ -59,7 +59,6 @@ import { AddressInsight } from '../map/AddressInsight.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
-import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
@@ -74,7 +73,6 @@ import {
   placeTitle,
   placesNear,
 } from '../prepare/places.js';
-import { AskAboutGettingReady } from './AskAboutGettingReady.js';
 import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
@@ -427,18 +425,6 @@ export function MapView({
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
   /*
-    *Ask about getting ready* (Figma AI1, Q0 to Q5).
-
-    It replaces the plan rather than sitting beside it: one card, two things
-    it can be showing, and the only way in is from the plan, so there is no
-    state where a reader has an assistant open over a map they never asked a
-    plan about. Closing it puts the plan back, which is what *Back to my
-    plan* means.
-  */
-  const [askOpen, setAskOpen] = useState(false);
-  /** The question the panel opens with, where it was opened from a tip card. */
-  const [askOpening, setAskOpening] = useState<string | null>(null);
-  /*
     The reporting pathway, which is its own thing (AC 6.2.3).
 
     It carries a drain only where the reader had one selected when they opened
@@ -604,26 +590,6 @@ export function MapView({
   */
   const planInCard = planShowing && panelWidth === 0;
 
-  const askPanel = (
-    <AskAboutGettingReady
-      // A new panel per opening question, so one asked from a tip card
-      // arrives in a fresh conversation rather than under the last one.
-      key={askOpening ?? 'ask'}
-      {...(askOpening === null ? {} : { opening: askOpening })}
-      onBackToPlan={() => {
-        setAskOpen(false);
-      }}
-      {...(places.length === 0
-        ? {}
-        : {
-            onReviewPlaces: () => {
-              // Back to the plan, which is where the places are listed.
-              setAskOpen(false);
-            },
-          })}
-    />
-  );
-
   const planPanel = (
     <PreparePlan
       address={address?.label ?? ''}
@@ -642,13 +608,6 @@ export function MapView({
             onReport: () => {
               setPlanOpen(false);
               openReport(null);
-            },
-            // Not inside a guide, for the reason reporting is not: a guide
-            // teaches one thing at a time, and this is a second thing that
-            // answers back.
-            onAsk: (actionId?: string) => {
-              setAskOpening(actionId === undefined ? null : questionForAction(actionId));
-              setAskOpen(true);
             },
             onCheckDrains: () => {
               // Step 3's first button. The recorded drains are a layer, so
@@ -1504,9 +1463,7 @@ export function MapView({
         )}
 
         {planInCard && (
-          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
-            {askOpen ? askPanel : planPanel}
-          </MapNote>
+          <MapNote title={PREPARE_HEADING}>{planPanel}</MapNote>
         )}
 
         {panel && viewport !== null && layers.catchment && !reportOpen && (
@@ -1677,28 +1634,8 @@ export function MapView({
         );
       })()}
 
-      {/*
-        The plan and the assistant, each built once and put in whichever
-        container the window has room for.
-      */}
-      
-
-      {/* The assistant, which the plan hands over to (Figma Q0 to Q5). */}
-      {sidebarOpen && askOpen && (
-        <Sidebar
-          title={ASK_HEADING}
-          width={panelWidth}
-          onClose={() => {
-            setAskOpen(false);
-            setPlanOpen(false);
-          }}
-        >
-          {askPanel}
-        </Sidebar>
-      )}
-
       {/* The plan itself (Figma P1), which the place card sits in front of. */}
-      {sidebarOpen && !askOpen && (
+      {sidebarOpen && (
         <Sidebar
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
