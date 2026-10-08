@@ -55,8 +55,7 @@ import type { Highlight, MapNow } from '../tutorial/lesson.js';
 import { GuideMarks } from '../map/GuideOverlayView.js';
 import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
-import { waterNearby } from '../map/nearby.js';
-import { AddressInsight } from '../map/AddressInsight.js';
+import { cardSentence, waterNearby } from '../map/nearby.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
@@ -93,7 +92,6 @@ import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
 import {
   WARNING_BODY,
@@ -684,27 +682,16 @@ export function MapView({
     };
   }, [extentName, extentWidth, extentHeight]);
 
-  // Which way the ground falls around each address, precomputed. Loaded once;
-  // if it cannot be, the card still says what is near and says nothing about
-  // the ground rather than guessing.
-  const [groundIndex, setGroundIndex] = useState<AddressGroundArtefact | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadAddressGround()
-      .then((artefact) => {
-        if (live) setGroundIndex(artefact);
-      })
-      .catch(() => {
-        if (live) setGroundIndex(null);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const groundTrend = useMemo(
-    () => (address === null || groundIndex === null ? null : groundAt(groundIndex, address.id)),
-    [address, groundIndex],
-  );
+  /*
+    The per-address ground fall is no longer fetched here.
+
+    It was loaded once per visit for one line of one card -- the figure's
+    *Steep slope down about 8 m in 150 m* -- and that line went with the figure
+    on 8 October. `map/addressGround.ts` and the artefact behind it are left
+    alone: the pipeline still builds `address-ground.json` and the module is
+    still tested, so there is something to read from if the card or a guide
+    wants the fall again.
+  */
 
   const explanation = useMemo(
     () =>
@@ -1780,16 +1767,26 @@ export function MapView({
             </>
           ) : (
             <>
-              {explanation === null && groundTrend === null ? (
-                <>
-                  No place where water may flow or collect was found close to this address.
-                  <span style={{ display: 'block', marginTop: space(2) }}>
-                    <SourceLink id="derived" />
-                  </span>
-                </>
+              {/*
+                What was measured near this address, in two sentences
+                (Figma A9).
+
+                It was a small figure: a compass with the ground's fall, the
+                nearest water path and the nearest low area drawn around it.
+                The design replaced it with the sentences on 8 October and the
+                team confirmed the swap. What went with the figure is the
+                ground's fall -- *Steep slope down about 8 m in 150 m* -- which
+                the design does not carry and which nothing else in the product
+                said. The ground-height layer and its guide still do.
+              */}
+              {explanation === null ? (
+                <>No place where water may flow or collect was found close to this address.</>
               ) : (
-                <AddressInsight ground={groundTrend} near={explanation} />
+                <>{cardSentence(explanation)}</>
               )}
+              <span style={{ display: 'block', marginTop: space(2) }}>
+                <SourceLink id="derived" />
+              </span>
               {guided && (
                 <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
                   Select a drain pit or pipe to read what the council recorded about it.
