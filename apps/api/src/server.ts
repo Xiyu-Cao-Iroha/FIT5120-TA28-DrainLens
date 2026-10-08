@@ -83,8 +83,9 @@ const originsFor = (service: string): string[] => [
  * no request carries a credential, so `*` would leak nothing -- but an
  * allow-list is a statement about who this is for, and it is the kind of
  * setting that is easy to widen later and impossible to narrow once something
- * unknown depends on it. `ALLOWED_ORIGINS` overrides it for a preview
- * deployment without a code change.
+ * unknown depends on it. `ALLOWED_ORIGINS` adds to it for a preview
+ * deployment without a code change -- it adds rather than replaces, for the
+ * reason `allowedOrigins` gives.
  *
  * **This list has now been wrong three times, in the same way each time**, and
  * it is generated rather than written out for that reason:
@@ -114,12 +115,37 @@ export const DEFAULT_ORIGINS = [
   'http://127.0.0.1:5183',
 ];
 
+/**
+ * The default list, plus whatever `ALLOWED_ORIGINS` names.
+ *
+ * **It adds; it does not replace.** Replacing is what it used to do, and on
+ * 8 October that undid a fix without anybody being told: the code had just
+ * been changed to carry both of Cloud Run's URL forms for every service, the
+ * image was deployed at the right commit, and the API went on refusing the
+ * new ones -- because an `ALLOWED_ORIGINS` set at some earlier deploy still
+ * listed the five old ones and silently won. The image was right and the
+ * behaviour was a year-old environment variable.
+ *
+ * Adding is also what the variable is for. Its purpose is a preview
+ * deployment without a code change, and a preview wants its own origin **as
+ * well as** the services that already exist, not instead of them. Nothing is
+ * lost by widening it: the only thing replacing bought was the ability to
+ * take an origin away from a running service without a deploy, which is not
+ * something this project has ever done and is one `gcloud run deploy` away
+ * if it ever needs to.
+ *
+ * Duplicates are dropped, so naming an origin the defaults already carry is
+ * harmless rather than a repeated header.
+ */
 export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
-  if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;
-  return env
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => o !== '');
+  const extra =
+    env === undefined || env.trim() === ''
+      ? []
+      : env
+          .split(',')
+          .map((o) => o.trim())
+          .filter((o) => o !== '');
+  return [...new Set([...DEFAULT_ORIGINS, ...extra])];
 }
 
 /**
