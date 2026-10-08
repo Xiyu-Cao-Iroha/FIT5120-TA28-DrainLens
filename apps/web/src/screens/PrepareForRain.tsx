@@ -24,6 +24,7 @@
 import { type ReactNode, useId, useState } from 'react';
 
 import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
+import { quietButton } from '../ui/controls.js';
 
 import {
   GENERAL_ACTIONS,
@@ -60,6 +61,7 @@ export function PlaceCard({
   place,
   relevance,
   onReview,
+  onPrevious,
   onNext,
 }: {
   readonly place: Place;
@@ -67,6 +69,13 @@ export function PlaceCard({
   /** The reader's answer. Changing it is allowed and expected (AC 5.4.1). */
   readonly onReview: (relevance: Relevance) => void;
   /** Only where another numbered place is waiting (AC 5.1.2). */
+  /**
+   * The place before this one, where there is one.
+   *
+   * *Next place* was here on its own, so a reader who moved past a place had
+   * no way back to it but the plan. Reported on 9 October.
+   */
+  readonly onPrevious?: (() => void) | undefined;
   readonly onNext?: (() => void) | undefined;
 }) {
   return (
@@ -97,11 +106,18 @@ export function PlaceCard({
 
       <WhyThisPlace />
 
-      {onNext !== undefined && (
-        <p style={{ margin: `${String(space(2))}px 0 0` }}>
-          <button type="button" onClick={onNext} style={linkStyle}>
-            Next place ›
-          </button>
+      {(onPrevious !== undefined || onNext !== undefined) && (
+        <p style={{ display: 'flex', gap: space(2), margin: `${String(space(2))}px 0 0` }}>
+          {onPrevious !== undefined && (
+            <button type="button" onClick={onPrevious} style={quietButton}>
+              ‹ Previous place
+            </button>
+          )}
+          {onNext !== undefined && (
+            <button type="button" onClick={onNext} style={quietButton}>
+              Next place ›
+            </button>
+          )}
         </p>
       )}
     </div>
@@ -213,7 +229,7 @@ export function PreparePlan({
                         onClick={() => {
                           onShowOnMap(place);
                         }}
-                        style={linkStyle}
+                        style={quietButton}
                       >
                         Show on map
                       </button>
@@ -235,7 +251,7 @@ export function PreparePlan({
             <button
               type="button"
               onClick={onReset}
-              style={{ ...linkStyle, marginTop: space(1) }}
+              style={{ ...quietButton, marginTop: space(1) }}
             >
               Reset my answers
             </button>
@@ -324,10 +340,7 @@ export function PreparePlan({
               onClick={() => {
                 onAsk();
               }}
-              style={{
-                ...linkStyle,
-                font: type(text.small, { weight: weight.semibold }),
-              }}
+              style={quietButton}
             >
               {ASK_LINK} ›
             </button>
@@ -527,11 +540,7 @@ function GeneralActionRow({
             <button
               type="button"
               onClick={onAsk}
-              style={{
-                ...linkStyle,
-                marginTop: space(1),
-                font: type(text.small, { weight: weight.semibold }),
-              }}
+              style={{ ...quietButton, marginTop: space(1) }}
             >
               Ask a question about this ›
             </button>
@@ -747,15 +756,4 @@ const warningButton = {
   border: `1px solid ${advisory.line}`,
   background: advisory.fill,
   color: advisory.ink,
-} as const;
-
-const linkStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small),
-  color: brand.ink,
-  textDecoration: 'underline',
-  textUnderlineOffset: 3,
-  cursor: 'pointer',
 } as const;

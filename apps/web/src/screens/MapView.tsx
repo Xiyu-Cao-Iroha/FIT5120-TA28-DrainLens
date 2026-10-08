@@ -86,6 +86,7 @@ import {
   STREET_DRAINS_HEADING,
 } from '../drains/wording.js';
 import { StreetDrains } from './StreetDrains.js';
+import { plainButton, quietButton } from '../ui/controls.js';
 import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
@@ -1704,6 +1705,9 @@ export function MapView({
         if (place === undefined) return null;
         if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
+        // Reported on 9 October: *Next place* had no opposite, so a reader who
+        // moved past one had no way back to it but the plan.
+        const previous = places.find((candidate) => candidate.number === place.number - 1);
         /*
           Away from the address card, which is now open beside this one.
 
@@ -1748,6 +1752,13 @@ export function MapView({
                 setPlanOpen(true);
                 setOpenPlace(next?.number ?? null);
               }}
+              {...(previous === undefined
+                ? {}
+                : {
+                    onPrevious: () => {
+                      setOpenPlace(previous.number);
+                    },
+                  })}
               {...(next === undefined
                 ? {}
                 : {
@@ -1768,18 +1779,9 @@ export function MapView({
                   setOpenPlace(null);
                   setPlanOpen(true);
                 }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.small),
-                  color: ink.muted,
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                  cursor: 'pointer',
-                }}
+                style={quietButton}
               >
-                Back to the plan
+                ‹ Back to the plan
               </button>
             </span>
           </MapCallout>
@@ -2107,27 +2109,21 @@ const outlineCardButton = {
 } as const;
 
 const cardLinkButton = {
-  display: 'block',
+  ...plainButton,
   marginTop: space(3),
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small, { weight: weight.semibold }),
-  color: brand.ink,
+  paddingLeft: 0,
   textAlign: 'left',
-  cursor: 'pointer',
 } as const;
 
-const planLinkStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small),
-  color: brand.ink,
-  textDecoration: 'underline',
-  textUnderlineOffset: 3,
-  cursor: 'pointer',
-} as const;
+/**
+ * Was an underlined word; is a control (9 October).
+ *
+ * *Close* on the report card and *Cancel* while picking a drain are not
+ * links: one dismisses a pathway and the other abandons a selection. Both sit
+ * inside cards that already carry an outline, so they take the borderless
+ * weight rather than a box inside a box.
+ */
+const planLinkStyle = plainButton;
 
 /**
  * Is the thing the card points at still on the map?

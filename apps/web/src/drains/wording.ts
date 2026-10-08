@@ -41,8 +41,16 @@ export const REPORT_THIS_DRAIN = 'Report this drain';
  * road -- said here where somebody is looking at a particular grate.
  */
 export const SWEEP_SUMMARY = 'Leaves or litter on top of the grate? You can sweep them away…';
+
+/**
+ * The rest of the sentence, not the sentence again.
+ *
+ * It opened by repeating the summary word for word, so the fold read as the
+ * same note printed twice. The summary ends on an ellipsis and this picks it
+ * up: what is already on the screen is not said a second time.
+ */
 export const SWEEP_DETAIL =
-  'Leaves or litter on top of the grate? You can sweep them away when it is dry and you can stay on the footpath. Never lift the cover, reach inside, or stand in the road. If it still looks blocked, report it.';
+  'Sweep them when it is dry and you can stay on the footpath. Never lift the cover, reach inside, or stand in the road. If it still looks blocked, report it.';
 
 /** When no drain carries the reader's own street name (Figma S3). */
 export const noOwnStreet = (street: string): string =>

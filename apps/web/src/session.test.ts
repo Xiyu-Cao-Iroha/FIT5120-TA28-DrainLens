@@ -225,7 +225,7 @@ describe('going back', () => {
      * for the address, and having the view read that would put the rule in
      * two places.
      */
-    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const chosen = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(chosen.screen).toBe('address');
     expect(reduce(chosen, { type: 'address-abandoned' }).screen).toBe('choose');
   });
@@ -243,7 +243,7 @@ describe('going back', () => {
      * reporting pathway, being asked five times reads as the product having
      * forgotten. Changing it stays possible from the guide itself.
      */
-    const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const first = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(first.screen).toBe('address');
 
     const withAddress = reduce(first, { type: 'address-accepted', address: GATEHOUSE });
@@ -268,7 +268,7 @@ describe('going back', () => {
      * out of a guide was being handed a search box instead.
      */
     const inGuide = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'guide-chosen', section: 'drainage' },
       { type: 'address-accepted', address: GATEHOUSE },
     ]);
@@ -284,7 +284,7 @@ describe('going back', () => {
 
   it('goes back from a guide to the address screen with the section still chosen', () => {
     const inGuide = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'guide-chosen', section: 'drainage' },
       { type: 'address-accepted', address: GATEHOUSE },
     ]);
@@ -294,7 +294,7 @@ describe('going back', () => {
   });
 
   it('keeps the chosen section, because Back is not un-choosing it', () => {
-    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const chosen = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
   });
 });
@@ -954,7 +954,7 @@ describe('a task chosen before there is an address', () => {
       guide instead. The task is the more recent answer.
     */
     const end = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'guide-chosen', section: 'drainage' },
       { type: 'address-abandoned' },
       { type: 'go-home' },
@@ -970,7 +970,7 @@ describe('a task chosen before there is an address', () => {
     // The chooser offers the comparison as a fifth card. Back from the address
     // screen it sends you to should be the chooser, not the homepage behind it.
     const fromChooser = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'task-wanted', task: 'compare', from: 'choose' },
     ]);
     expect(fromChooser.screen).toBe('address');
@@ -984,17 +984,15 @@ describe('a task chosen before there is an address', () => {
     // The fifth card is not a lesson. Running the comparison from it must not
     // move the chooser's "N guides completed".
     const end = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'task-wanted', task: 'compare', from: 'choose' },
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
       { type: 'go-home' },
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
     ]);
-    // Get started opens the fork since 4 October; the chooser is one press on.
-    expect(end.screen).toBe('start');
-    expect(reduce(end, { type: 'explore-chosen' }).screen).toBe('choose');
+    expect(end.screen).toBe('choose');
     expect(end.learned).toEqual(INITIAL_SESSION.learned);
   });
 });

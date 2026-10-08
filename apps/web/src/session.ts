@@ -87,7 +87,6 @@ export type Screen =
    * offered one of them beside the way into everything else was giving them
    * the same weight.
    */
-  | 'start'
   /** The task question, reached from the comparison's breadcrumb. */
   | 'task'
   | 'explore'
@@ -468,7 +467,6 @@ export type SessionEvent =
   /** The board's map, which is the same records drawn rather than ranked. */
   | { readonly type: 'flood-map-opened' }
   /** The homepage's front door: the four cards, not the map. */
-  | { readonly type: 'get-started' }
   /**
    * Start a section of the guide.
    *
@@ -555,12 +553,17 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   // live, and they are what somebody leaving the map most likely wants.
   'flood-map': 'history',
   address: 'home',
-  start: 'home',
   task: 'address',
-  // Back from the chooser is the fork it was reached through, since
-  // 4 October. The homepage's own guide cards reach it too and `back` cannot
-  // tell them apart; the fork is one press from home either way.
-  choose: 'start',
+  /*
+    Back from the chooser is the homepage.
+
+    It was a fork screen -- *What would you like to look at?*, two cards, the
+    map on one and the flood board on the other -- which stopped being
+    reachable when the navigation bar went on every page on 8 October: both of
+    its cards are links in that bar now. Nothing dispatched its event any
+    more, and this chain was the only way anybody could still arrive at it.
+  */
+  choose: 'home',
   /*
     Out of a guide is back to the chooser it was picked from.
 
@@ -649,9 +652,6 @@ function step(session: Session, event: SessionEvent): Session {
             }
           : {}),
       };
-
-    case 'get-started':
-      return { ...session, screen: 'start' };
 
     /** One of the two on the start screen, and the homepage's guide cards. */
     case 'explore-chosen':
