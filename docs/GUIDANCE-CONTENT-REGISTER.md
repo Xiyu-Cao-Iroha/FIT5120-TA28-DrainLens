@@ -1,12 +1,12 @@
 # Guidance content register
 
-DrainLens · TA28 · Iteration 3 · task W4.2 · read on **3 October 2026**, with §4 read on **8 October 2026**
+DrainLens · TA28 · Iteration 3 · task W4.2 · read on **3 October 2026**
 
 Every official channel, telephone number and quotation the product shows, with its source and the date the page was read. Serves AC 5.2.3, 5.3.2, 6.2.1, 6.3.2 and the Epic 5 and Epic 6 definitions of done.
 
 > **Approved 4 October 2026 by Xiyu Cao**, for every channel and every quotation below. The rows are what the code reads, taken from the publishers' own pages on the dates given.
 >
-> **§4 is new and is not covered by that approval.** *Ask about getting ready* was added on 8 October 2026, after the approval above, and its ten answers are waiting for one. Until they have it the panel still ships — every answer carries the page it was written from and the test holds it there — but nobody has yet said the ten are right, and this line is how that stays visible.
+> **§4 was withdrawn the day it was written** and nothing in it reached the product, so the approval above still covers everything the product says.
 >
 > **One question in §5 is not settled by that approval**: whether to keep looking for a source for the design's fourth preparation action. It is a decision about what to do next, not about anything the product currently says.
 
@@ -57,41 +57,15 @@ The six statements are the criterion's own, in its order. The last two are the t
 
 ---
 
-## 4 · Ask about getting ready
+## 4 · Ask about getting ready — **withdrawn 8 October 2026, nothing in the product**
 
-Read by `apps/web/src/ask/answers.ts`. The panel answers from this register and from nothing else.
+This section carried ten answers, written from official pages on 8 October and read by `apps/web/src/ask/answers.ts`. **They are gone, and so is the panel.** The assistant is being built separately against the retrieval prototype in `assistant/`, and two answers to the same question — one of them a register nobody had approved — is one too many.
 
-**No model runs.** The repository carries a retrieval prototype under `assistant/` — Streamlit, ChromaDB and `llama3.2` under Ollama on one person's machine — and it is not deployed, not reachable from the product, and not what the panel reads. A language model in the browser would put the project's name on sentences nobody approved, about floodwater, for readers who are not in a position to check them. Ten answers, each written from an official page and carrying the sentence it came from, are what ships.
+What is left in the product is a row at the foot of the plan reading *Have a question about getting ready?* and, where the control will go, *Coming soon*. It has the design's wording and the design's position and nothing behind it. Whoever writes the panel inherits the slot, not a register they have to agree with.
 
-### 4.1 What each answer may say, and where it came from
+**Nothing here was approved and nothing here shipped**, so there is no approved wording to withdraw. The sentences themselves are not lost: they are in the history at `feat/ask-slot-left-for-the-chatbot`'s parent, with the page and date each was read from, if the assistant work wants a starting point.
 
-| Answer | Source quotation | Publisher | Page | Read |
-|---|---|---|---|---|
-| How do I clean gutters and drains safely? | "Clear debris from gutters and drains." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| What can I do to keep water out of my home? | "Check that you have sandbags or know where to get them." / "Block it: Block drains, toilets, and doorways" | Melbourne Water · VICSES | melbournewater.com.au · ses.vic.gov.au (Flood) | 2026-10-08 |
-| What should I do with valuable things in the house? | "Lift it: Lift your valuables up high" | VICSES | ses.vic.gov.au (Flood) | 2026-10-08 |
-| How should I keep documents and photographs safe? | "Store important documents and valuables in waterproof containers, or create digital backups." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| What should I check in my insurance? | "Check if your home insurance policy covers flood and stormwater damage, and make sure you understand any exclusions or limitations." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| What goes in an emergency kit? | "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| What should I do if I have to leave? | "Turn off gas and electricity at your home or workplace." | VICSES | ses.vic.gov.au (Flood) | 2026-10-08 |
-| How can I protect my car? | "Never drive through floodwater – just 15cm of water can float a small car" | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| Where do I find current warnings? | "Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226)." | VICSES | ses.vic.gov.au (Flood) | 2026-10-08 |
-| How do I find out about flooding in my suburb? | "Check if your suburb has a VICSES Local Flood Guide." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-
-Every quotation in the file is the full sentence as the page carries it; the table shows one per answer where an answer draws on several. `apps/web/src/ask/respond.test.ts` fails the build if an answer loses its source, its quotation or its date.
-
-### 4.2 Why these ten, and not others
-
-The Stage 2 evaluation (`assistant/evaluation_results.csv`) is thirty questions in three categories, scored by hand, each row naming the document and page a person checked. **An answer ships only where that evaluation found the question answerable from official guidance**, and each answer names the rows it covers. The eight *Normal* rows the evaluation marked **Fail** are not in the register: a question the team's own evaluation could not answer from the sources is not one the product should answer either.
-
-The same evaluation decides the two states that are not answers:
-
-- Its six **Unanswerable** rows — flood depth, arrival time, whether this house will flood, repair cost, which insurer, whether somebody's switchboard is safe — are refused **by name and before any matching**, because each is full of words the register would otherwise recognise. The test runs all six.
-- Its six **Emergency** rows are answered with three telephone numbers and nothing else, **before anything is read or matched**.
-
-### 4.3 Why the sources are pages and not the evaluation's PDFs
-
-The evaluation checked nine PDFs, and `assistant/sources.csv` records every one of them as *no open licence identified*. The answers are written from the publishers' own web pages instead. A page this project is free to quote and a reader can open in one tap is worth more than a page number out of a document neither of them is licensed to reproduce.
+The one thing worth carrying forward is what bounded them. `assistant/evaluation_results.csv` is thirty questions scored by hand, and it already says which are answerable from official guidance, which are not — flood depth, arrival time, whether this house will flood, repair cost, which insurer — and which are an emergency. A panel that answers the second group is the failure mode this product's whole vocabulary exists to prevent. That is a constraint on the assistant, not a decision this register can make for it.
 
 ---
 
@@ -101,6 +75,5 @@ The evaluation checked nine PDFs, and `assistant/sources.csv` records every one 
 2. That the five problem types in `report/problems.ts` are the five the criterion names and that none of them sends a reader somewhere they should not go, particularly **Private property**, which goes to a plumber rather than to the council.
 3. That the quotations are accurate and the pages are the ones a reader should be sent to.
 4. Whether to keep looking for a source for *Move valuable items above floor level*, or to drop it from the design.
-5. That the ten answers in §4 say what the pages behind them say, and that answering from a register rather than from a model is the right call for a product that cannot check its own sentences.
 
 Re-read the pages before the demonstration: a telephone number or a form that moved is the one kind of error in this product that could waste somebody's time in an emergency.

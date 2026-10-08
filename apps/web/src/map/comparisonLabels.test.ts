@@ -70,6 +70,15 @@ function clashes(address: Point, drain: Point, width: number, height: number): s
   return found;
 }
 
+/**
+ * A minute for the two grid sweeps below, not Vitest's default five seconds.
+ *
+ * Each takes about one second on its own. It is the ninety-odd other test
+ * files running beside them that make the difference, and a sweep that passes
+ * alone and times out in a full run is a red build that means nothing.
+ */
+const SWEEP_TIMEOUT_MS = 60_000;
+
 describe('step 1’s labels around a close address and drain', () => {
   it('puts the coach mark and the address name on opposite sides', () => {
     // The demonstration address: the drain up and to the right, sixty pixels away.
@@ -184,7 +193,7 @@ describe('across the fitted step-1 view', () => {
     }
     expect(checked).toBeGreaterThan(5_000);
     expect(failures.length, failures.slice(0, 12).join('\n')).toBe(0);
-  });
+  }, SWEEP_TIMEOUT_MS);
 });
 
 describe('on a phone, where neither side of the drain has room', () => {
@@ -292,7 +301,7 @@ describe('the Selected drain label on steps 2 and 3', () => {
     }
     expect(checked).toBeGreaterThan(5_000);
     expect(failures.length, failures.slice(0, 12).join('\n')).toBe(0);
-  });
+  }, SWEEP_TIMEOUT_MS);
 
   it('goes beside the drain when nothing is in the way, as before', () => {
     expect(placeSelectedLabel([400, 300], null, null, 960, 603)).toEqual([400 + COMPARISON_MARK_R + 1.5 + 6 + 2, 300 - H / 2]);

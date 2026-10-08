@@ -23,8 +23,9 @@
 
 import { type ReactNode, useId, useState } from 'react';
 
-import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import {
+  ASK_COMING,
+  ASK_PROMPT,
   GENERAL_ACTIONS,
   type GeneralAction,
   NOT_A_SCORE,
@@ -115,7 +116,6 @@ export function PreparePlan({
   onReset,
   onReport,
   onWhyOpen,
-  onAsk,
   onCheckDrains,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
@@ -128,15 +128,6 @@ export function PreparePlan({
   readonly onReport?: (() => void) | undefined;
   /** A reminder's *Why this place?* opened, which the guide's step 4 waits on. */
   readonly onWhyOpen?: (() => void) | undefined;
-  /**
-   * The way into *Ask about getting ready* (Figma AI1).
-   *
-   * The id is the general action it was asked from, where it was asked from
-   * one: the design's tip cards each have their own *Ask a question about
-   * this*, and a question about gutters should arrive as a question about
-   * gutters rather than as an empty box.
-   */
-  readonly onAsk?: ((actionId?: string) => void) | undefined;
   /** Step 3's first button: show the recorded drains near the address. */
   readonly onCheckDrains?: (() => void) | undefined;
 }) {
@@ -242,17 +233,7 @@ export function PreparePlan({
         <StepHeading step={2} label={FOR_EVERY_HOME} />
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {GENERAL_ACTIONS.map((action) => (
-            <GeneralActionRow
-              key={action.id}
-              action={action}
-              {...(onAsk === undefined
-                ? {}
-                : {
-                    onAsk: () => {
-                      onAsk(action.id);
-                    },
-                  })}
-            />
+            <GeneralActionRow key={action.id} action={action} />
           ))}
         </ul>
       </section>
@@ -283,56 +264,47 @@ export function PreparePlan({
       )}
 
       {/*
-        The way into *Ask about getting ready* (Figma AI1).
+        The slot *Ask about getting ready* will go in (Figma AI1).
 
-        The design shows two: this row, and an *Ask a question about this*
-        link inside each general action's expanded tip. The tips are a panel
-        this product does not have -- its general actions are three sentences
-        with their publisher under them, not cards that open -- so the link
-        that would live inside one is not here. One way in that exists beats
-        two where the second needs a screen built to hold it.
+        **Nothing is behind it yet, and that is deliberate.** The panel is the
+        chatbot work, being built separately against the retrieval prototype
+        in `assistant/`; this row is the place in the plan it hangs from, with
+        the design's wording and position settled so that whoever writes it is
+        not also deciding where it goes.
 
-        It sits after reporting and before the telephone numbers, which is
-        where the design puts it: the last thing offered, and never above the
-        two things a person with rain coming actually needs.
+        A row that says *Ask ›* and opens nothing would be worse than no row,
+        so it says what it is instead. It sits after reporting and before the
+        telephone numbers, which is where the design puts it: the last thing
+        offered, and never above the two things a person with rain coming
+        actually needs.
       */}
-      {onAsk !== undefined && (
-        <p
-          style={{
-            display: 'flex',
-            gap: space(2),
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            margin: `${String(space(3))}px 0 0`,
-            padding: space(2),
-            border: `1px solid ${brand.tint}`,
-            borderRadius: radius.base,
-            background: brand.wash,
-          }}
-        >
-          <span style={{ display: 'inline-flex', gap: space(2), alignItems: 'center', color: brand.ink }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
-              <path
-                d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6A1.5 1.5 0 0 1 12.5 11H6.8l-3 2.7A.5.5 0 0 1 3 13.3V11h-.5A.5.5 0 0 1 2 10.5Z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {ASK_PROMPT}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              onAsk();
-            }}
-            style={{ ...linkStyle, font: type(text.small, { weight: weight.semibold }) }}
-          >
-            {ASK_LINK} ›
-          </button>
-        </p>
-      )}
+      <p
+        style={{
+          display: 'flex',
+          gap: space(2),
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          margin: `${String(space(3))}px 0 0`,
+          padding: space(2),
+          border: `1px solid ${brand.tint}`,
+          borderRadius: radius.base,
+          background: brand.wash,
+        }}
+      >
+        <span style={{ display: 'inline-flex', gap: space(2), alignItems: 'center', color: brand.ink }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <path
+              d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6A1.5 1.5 0 0 1 12.5 11H6.8l-3 2.7A.5.5 0 0 1 3 13.3V11h-.5A.5.5 0 0 1 2 10.5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {ASK_PROMPT}
+        </span>
+        <span style={{ flexShrink: 0, font: type(text.small), color: ink.subtle }}>{ASK_COMING}</span>
+      </p>
 
       {/*
         The boundary, in full and above the telephone numbers (AC 5.3.3).
@@ -448,13 +420,7 @@ export function PreparePlan({
  * printed, because a plan that remembers what you said you had done is
  * making a claim about a house it has never seen.
  */
-function GeneralActionRow({
-  action,
-  onAsk,
-}: {
-  readonly action: GeneralAction;
-  readonly onAsk?: (() => void) | undefined;
-}) {
+function GeneralActionRow({ action }: { readonly action: GeneralAction }) {
   const [open, setOpen] = useState(false);
   const [ticked, setTicked] = useState(false);
   const tipId = useId();
@@ -516,15 +482,6 @@ function GeneralActionRow({
           >
             {action.publisher}, read {action.checked} ↗
           </a>
-          {onAsk !== undefined && (
-            <button
-              type="button"
-              onClick={onAsk}
-              style={{ ...linkStyle, marginTop: space(1), font: type(text.small, { weight: weight.semibold }) }}
-            >
-              Ask a question about this ›
-            </button>
-          )}
         </span>
       )}
     </li>

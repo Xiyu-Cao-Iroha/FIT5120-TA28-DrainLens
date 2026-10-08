@@ -99,6 +99,17 @@ export const NOT_A_SCORE =
   'This counts the places you have reviewed. It is not a safety or readiness score.';
 
 /** Reporting is its own path, not a preparation action (AC 5.2.3, 5.3.2). */
+/**
+ * The *Ask about getting ready* slot, at the foot of the plan (Figma AI1).
+ *
+ * The prompt is the design's. `ASK_COMING` is what stands where the control
+ * will go: the assistant is being built separately, against the retrieval
+ * prototype in `assistant/`, and until there is a panel behind it a link
+ * that opens nothing would be worse than saying so.
+ */
+export const ASK_PROMPT = 'Have a question about getting ready?';
+export const ASK_COMING = 'Coming soon';
+
 export const REPORT_PATHWAY = 'Report a drainage problem';
 
 /*
