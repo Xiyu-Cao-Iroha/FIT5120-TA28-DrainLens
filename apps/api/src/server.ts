@@ -339,6 +339,75 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
     answer(c, (client) => floodHistoryArtefact(client), ARTEFACT_CACHE, 'flood-history'),
   );
 
+  app.post('/api/chat', async (c) => {
+    const aiServiceUrl = process.env.AI_SERVICE_URL;
+
+    if (!aiServiceUrl || aiServiceUrl.trim() === '') {
+      return c.json(
+        { error: 'AI chat service is not configured.' },
+        503,
+      );
+  }
+
+  let body: { message?: unknown };
+
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(
+      { error: 'Invalid request body.' },
+      400,
+    );
+  }
+
+  if (
+    typeof body.message !== 'string' ||
+    body.message.trim() === ''
+  ) {
+    return c.json(
+      { error: 'A message is required.' },
+      400,
+    );
+  }
+
+  try {
+    const response = await fetch(
+      `${aiServiceUrl.replace(/\/$/, '')}/chat`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: body.message.trim(),
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      console.error(
+        `AI service returned ${String(response.status)}`,
+      );
+
+      return c.json(
+        { error: 'The chat assistant is temporarily unavailable.' },
+        502,
+      );
+    }
+
+    const result = await response.json();
+
+    return c.json(result);
+  } catch (error) {
+    console.error('AI chat service request failed', error);
+
+    return c.json(
+      { error: 'The chat assistant is temporarily unavailable.' },
+      502,
+    );
+  }
+});
+
   return app;
 }
 

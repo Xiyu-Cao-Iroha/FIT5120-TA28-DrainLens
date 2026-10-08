@@ -60,6 +60,8 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
+import { ASK_HEADING, questionForAction } from '../ask/answers.js';
+import { AskAboutGettingReady } from './AskAboutGettingReady.js';
 import {
   BEFORE_RAIN_CHIP,
   NO_ADDRESS_FOR_CHECKS,
@@ -424,6 +426,8 @@ export function MapView({
   const [openPlace, setOpenPlace] = useState<number | null>(null);
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askOpening, setAskOpening] = useState<string | null>(null);
   /*
     The reporting pathway, which is its own thing (AC 6.2.3).
 
@@ -589,6 +593,25 @@ export function MapView({
     than a window where the plan button does nothing.
   */
   const planInCard = planShowing && panelWidth === 0;
+  const askPanel = (
+    <AskAboutGettingReady
+      key={askOpening ?? 'ask'}
+      {...(askOpening === null ? {} : { opening: askOpening })}
+      onBackToPlan={() => {
+        setAskOpen(false);
+        setAskOpening(null);
+      }}
+      {...(places.length === 0
+        ? {}
+        : {
+            onReviewPlaces: () => {
+              setAskOpen(false);
+              setAskOpening(null);
+            },
+          })}
+    />
+  );
+
 
   const planPanel = (
     <PreparePlan
@@ -609,6 +632,14 @@ export function MapView({
               setPlanOpen(false);
               openReport(null);
             },
+            
+            onAsk: (actionId?: string) => {
+              setAskOpening(
+                actionId === undefined ? null : questionForAction(actionId),
+              );
+              setAskOpen(true);
+            },
+
             onCheckDrains: () => {
               // Step 3's first button. The recorded drains are a layer, so
               // showing them is switching it on rather than going anywhere.
@@ -1463,7 +1494,9 @@ export function MapView({
         )}
 
         {planInCard && (
-          <MapNote title={PREPARE_HEADING}>{planPanel}</MapNote>
+          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+            {askOpen ? askPanel : planPanel}
+          </MapNote>
         )}
 
         {panel && viewport !== null && layers.catchment && !reportOpen && (
@@ -1635,7 +1668,21 @@ export function MapView({
       })()}
 
       {/* The plan itself (Figma P1), which the place card sits in front of. */}
-      {sidebarOpen && (
+      {sidebarOpen && askOpen && (
+        <Sidebar
+          title={ASK_HEADING}
+          width={panelWidth}
+          onClose={() => {
+            setAskOpen(false);
+            setAskOpening(null);
+            setPlanOpen(false);
+          }}
+        >
+          {askPanel}
+        </Sidebar>
+      )}
+
+      {sidebarOpen && !askOpen && (
         <Sidebar
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
