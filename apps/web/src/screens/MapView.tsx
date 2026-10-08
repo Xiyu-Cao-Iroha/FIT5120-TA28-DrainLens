@@ -21,6 +21,7 @@
 
 import {
   COMPARE_HERE,
+  COMPARE_LOADING,
   type PitSupport,
   type ScenarioSupport,
   UNSUPPORTED_TEXT,
@@ -1328,14 +1329,27 @@ export function MapView({
           }}
         >
           {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
-          {onCompare !== undefined && scenarioSupport !== null && (
-            <CompareEntry
-              support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
-              onCompare={() => {
-                onCompare(String(hit.feature.asset_number ?? ''));
-              }}
-            />
-          )}
+          {/*
+            The comparison, or why it is not offered yet.
+
+            The index this reads is fetched the first time a drain is pressed
+            and is held by this screen, so every return to the map fetches it
+            again -- and while it is null the card used to render nothing at
+            all. Reported on 8 October as the button not coming back after a
+            comparison: it does, a moment later, and silence in between reads
+            as a button that has been taken away.
+          */}
+          {onCompare !== undefined &&
+            (scenarioSupport === null ? (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#5b6e7e' }}>{COMPARE_LOADING}</p>
+            ) : (
+              <CompareEntry
+                support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
+                onCompare={() => {
+                  onCompare(String(hit.feature.asset_number ?? ''));
+                }}
+              />
+            ))}
         </MapCallout>
       )}
 

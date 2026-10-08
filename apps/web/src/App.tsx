@@ -915,11 +915,26 @@ export function App() {
       const step = session.screen;
       const reached = (at: 'drain' | 'scenario' | 'review' | 'result') =>
         ({ drain: 1, scenario: 2, review: 3, result: 3, 'no-match': 0 })[step] >= { drain: 1, scenario: 2, review: 3, result: 3 }[at];
+      /*
+        The way out, as a control rather than as the first crumb (AC 3.1.1).
+
+        Reported on 8 October: *there is nowhere to go back a level.* There
+        was -- the leading crumb was pressable -- and that is the point. A
+        breadcrumb says where you are; somebody looking for the way out does
+        not read a location as an exit, which is the same finding that put a
+        Back button on every other screen in this file.
+
+        Nothing is pressable while a run is in progress: leaving mid-run is
+        Cancel's job, which says what happens to the answer.
+      */
+      const leave = running
+        ? undefined
+        : fromMap
+          ? { label: FULL_MAP, onBack: () => dispatch({ type: 'back' }) }
+          : { label: 'Address search', onBack: () => dispatch({ type: 'another-address-wanted' }) };
+
       const crumbs = (
         <>
-          {fromMap
-            ? crumb(FULL_MAP, running ? undefined : () => dispatch({ type: 'back' }))
-            : crumb('Address search', running ? undefined : () => dispatch({ type: 'another-address-wanted' }))}
           {step === 'no-match' && (
             <>
               {separator}
@@ -928,7 +943,6 @@ export function App() {
           )}
           {!fromMap && reached('drain') && (
             <>
-              {separator}
               {crumb('Choose a drain', running ? undefined : () => dispatch({ type: 'drains-reopened' }), step === 'drain')}
             </>
           )}
@@ -958,7 +972,13 @@ export function App() {
       );
 
       const shell = (children: React.ReactNode) => (
-        <Shell at={session.screen} credits={credits} extentName={loaded.extentName} crumbs={crumbs}>
+        <Shell
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          {...(leave === undefined ? {} : { back: leave })}
+          crumbs={crumbs}
+        >
           {children}
         </Shell>
       );

@@ -1329,6 +1329,53 @@ describe('the blocked-drain comparison, step by step', () => {
     expect(reduce(fromMap, { type: 'back' }).screen).toBe('explore');
   });
 
+  it('goes back to the full map from every step, not only from Choices', () => {
+    /*
+      Reported on 8 October: on a result, the control saying *Full map* went
+      to Choices. It was written for the `scenario` step alone and every other
+      step walked the fixed `BACK` chain instead.
+    */
+    const fromMap = play([
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    for (const screen of ['scenario', 'review', 'result'] as const) {
+      expect(reduce({ ...fromMap, screen }, { type: 'back' }).screen).toBe('explore');
+    }
+  });
+
+  it('leaves the map unguided on the way back, so no layer is switched on for the reader', () => {
+    /*
+      `scenario-from-map` sets `task: 'compare'`, and the map reads anything
+      but `full-map` as a guided visit -- which opens with the guided layer
+      set, Ground height included. Reported on 8 October as the ground
+      switching itself on when the reader pressed *Full map*.
+    */
+    const fromMap = play([
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    expect(fromMap.task).toBe('compare');
+    expect(reduce(fromMap, { type: 'back' }).task).toBe('full-map');
+  });
+
+  it('returns to the map from a comparison opened there, address or no address', () => {
+    // `drains-reopened` tested the address rather than where the comparison
+    // came from, so a reader with one went to step 1 of a journey they had
+    // never been on.
+    const fromMap = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    const back = reduce({ ...fromMap, address: GATEHOUSE, screen: 'result' }, { type: 'drains-reopened' });
+    expect(back.screen).toBe('explore');
+    expect(back.task).toBe('full-map');
+  });
+
   it('leaves a pit chosen on the full map where it was', () => {
     const onMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'pit-selected', pitId: '1', suggested: false }]);
     expect(onMap.screen).toBe('explore');

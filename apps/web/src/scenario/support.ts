@@ -32,6 +32,15 @@ export function supportOf(support: ScenarioSupport, assetNumber: string): PitSup
 }
 
 /** Why a drain cannot be compared, and what that does not mean. */
+/**
+ * While the index behind the comparison is still being fetched.
+ *
+ * It is a small file and this is usually one frame, but a return to the map
+ * fetches it again, and a card that says nothing while it does reads as a
+ * drain that cannot be compared.
+ */
+export const COMPARE_LOADING = 'Checking whether this drain can be compared...';
+
 export const UNSUPPORTED_TEXT: Readonly<Record<Exclude<PitSupport, 'supported'>, string>> = {
   'not-an-inlet':
     'This pit cannot be used in the blockage comparison because the council record does not identify it as a surface inlet. This is a data limitation; it does not show whether the pit works or whether the area may flood.',
