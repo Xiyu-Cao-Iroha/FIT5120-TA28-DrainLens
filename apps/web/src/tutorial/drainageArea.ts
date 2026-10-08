@@ -31,19 +31,26 @@
  */
 
 import { type Lesson } from './lesson.js';
-import { CATCHMENT_CHIP } from '../catchment/wording.js';
+import { CATCHMENT_CHIP, WHY_ORGANISATIONS } from '../catchment/wording.js';
 
 /*
   The wording is the design's, in the design's order: a press, what it showed,
   a press, what it showed, and a finish page. Each `read` step's prompt starts
   *Great!* as every guide's does since copy audit v2 (#43 to #51), and the
   caveat sits in `note` rather than in the heading.
+
+  **The third step was missing until 9 October.** The design has four, and
+  this had three: the reader was told that each part is looked after by
+  somebody different without ever being asked to open the fold that says who.
+  It is a `do` step there and it is one here, waiting on the opening the way
+  the first waits on the chip -- a guide that describes a press instead of
+  waiting for it is a guide somebody can finish without touching the map.
 */
 export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'catchment-on',
-    prompt: `Click ${CATCHMENT_CHIP} to see the area your street drains with.`,
+    prompt: `Click ${CATCHMENT_CHIP} to see the recorded boundary for this address.`,
     requires: 'catchment-on',
   },
   {
@@ -56,10 +63,16 @@ export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
     note: 'It shows drainage, not how far a flood could reach.',
   },
   {
+    kind: 'do',
+    id: 'roles-open',
+    prompt: `Now open ${WHY_ORGANISATIONS}`,
+    requires: 'roles-opened',
+  },
+  {
     kind: 'read',
     id: 'help-shown',
-    prompt: 'Each part of the drainage is looked after by someone different, and the card says which.',
-    note: 'Use it to report a problem to the right place.',
+    prompt: 'Great! Each part of the drainage is looked after by someone different.',
+    note: 'Use this to report a problem to the right place.',
   },
 ];
 

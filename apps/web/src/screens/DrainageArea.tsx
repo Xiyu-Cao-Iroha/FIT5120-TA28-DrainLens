@@ -43,6 +43,7 @@ import {
   widerNames,
 } from '../catchment/wording.js';
 import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchment/help.js';
+import { WHY_ORGANISATIONS } from '../catchment/wording.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
@@ -59,6 +60,7 @@ export function DrainageArea({
   hasAddress = true,
   onReport,
   onBack,
+  onRolesOpen,
 }: {
   readonly area: Subcatchment | null;
   /**
@@ -86,6 +88,14 @@ export function DrainageArea({
    * finding the chip, and a boundary with nothing explaining it.
    */
   readonly onBack?: (() => void) | undefined;
+  /**
+   * *Why are there different organisations?* was opened.
+   *
+   * Epic 6's guide waits on it (Figma D3), the way Epic 5's waits on *Why
+   * this place?*. Only the opening is reported: closing the fold again does
+   * not un-read what was read.
+   */
+  readonly onRolesOpen?: (() => void) | undefined;
 }) {
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -222,12 +232,16 @@ export function DrainageArea({
       <details
         open={rolesOpen}
         onToggle={(event) => {
-          setRolesOpen((event.currentTarget as HTMLDetailsElement).open);
+          const open = (event.currentTarget as HTMLDetailsElement).open;
+          setRolesOpen(open);
+          // The guide's third step waits on this (Figma D3). Only the opening
+          // counts: closing it again does not un-read what was read.
+          if (open) onRolesOpen?.();
         }}
         style={{ marginBottom: space(3) }}
       >
         <summary aria-controls={rolesId} style={{ cursor: 'pointer', color: brand.ink }}>
-          Why are there different organisations?
+          {WHY_ORGANISATIONS}
         </summary>
         <div id={rolesId} style={{ marginTop: space(2) }}>
           <WhoCanHelpLevels />

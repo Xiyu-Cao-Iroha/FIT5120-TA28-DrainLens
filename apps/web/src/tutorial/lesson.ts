@@ -52,7 +52,13 @@ export type Requirement =
   /* Epic 5's three (Figma, *Get ready for heavy rain*, G1, G2 and G4). */
   | 'plan-opened'
   | 'place-reviewed'
-  | 'why-opened';
+  | 'why-opened'
+  /*
+    Epic 6's own, from Figma D3: *Now open Why are there different
+    organisations?* Latched, like the ground guide's two: the fold can be
+    closed again, and closing it does not un-read what was read.
+  */
+  | 'roles-opened';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -194,6 +200,8 @@ export interface MapNow {
   readonly placesReviewed: number;
   /** *Why this place?* opened on a reminder in the plan (Figma G4). */
   readonly whyOpen: boolean;
+  /** Latched: *Why are there different organisations?* has been opened (Figma D3). */
+  readonly rolesOpened: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -213,6 +221,7 @@ export const NOTHING_ON_MAP: MapNow = {
   planOpen: false,
   placesReviewed: 0,
   whyOpen: false,
+  rolesOpened: false,
 };
 
 /**
@@ -227,6 +236,7 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   ...next,
   layersOpened: before.layersOpened || next.layersOpened || next.layersOpen,
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
+  rolesOpened: before.rolesOpened || next.rolesOpened,
 });
 
 /**
@@ -346,8 +356,10 @@ export function chipFor(requires: Requirement): LayerKey | null {
     case 'plan-opened':
     case 'place-reviewed':
     case 'why-opened':
+    case 'roles-opened':
       // None is a chip: the address card's button, a choice on a place's own
-      // card, and a fold under a reminder in the plan.
+      // card, a fold under a reminder in the plan, and a fold inside the card
+      // the boundary chip has already drawn.
       return null;
     case 'pit-selected':
     case 'trace-following':
@@ -406,6 +418,8 @@ export function satisfied(
       return now.placesReviewed > 0;
     case 'why-opened':
       return now.whyOpen;
+    case 'roles-opened':
+      return now.rolesOpened;
     case 'catchment-on':
       return now.catchment;
     case 'pits-on':

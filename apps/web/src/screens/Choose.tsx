@@ -101,6 +101,24 @@ export function Choose({
 }: ChooseProps) {
   const done = countLearned(learned);
 
+  /*
+    The first guide not yet done, marked so there is a place to begin.
+
+    Reported on 9 October: an address is given, *Tutorial* is pressed, and the
+    screen is six cards in two groups with nothing saying which one to press.
+    They are deliberately not numbered -- any of them can be read on its own,
+    and a reader who wants the low areas should go straight there -- so this
+    marks one rather than ordering them: *Start here* on the first that is
+    still unread, and nothing at all once they are all done.
+
+    The order it walks is the order they are laid out in, which is the order
+    the map's own ideas build on each other: what the drains are, where water
+    goes, what the ground does, where it collects.
+  */
+  const nextUp = [...LEARN_THE_MAP, ...USE_YOUR_ADDRESS].find(
+    (mode) => guided.includes(mode) && !learned[mode],
+  );
+
   return (
     // Full-bleed, so the landscape reaches the edges of the window rather than
     // the edges of the column. See `.choose__backdrop` for the wash over it.
@@ -208,6 +226,7 @@ export function Choose({
                 accent={path.accent}
                 done={learned[path.mode]}
                 ready={ready}
+                next={path.mode === nextUp}
                 status={ready ? SECTIONS[path.mode].locked : 'Terrain guide coming soon'}
                 onStart={() => {
                   onStart(path.mode);
@@ -252,6 +271,7 @@ export function Choose({
                 accent={path.accent}
                 done={learned[path.mode]}
                 ready={ready}
+                next={path.mode === nextUp}
                 onStart={() => {
                   onStart(path.mode);
                 }}
@@ -334,6 +354,7 @@ function WideCard({
   accent,
   done,
   ready,
+  next = false,
   onStart,
 }: {
   readonly thumb: ReactNode;
@@ -342,6 +363,8 @@ function WideCard({
   readonly accent: string;
   readonly done: boolean;
   readonly ready: boolean;
+  /** The first one still unread, which is where a new reader is pointed. */
+  readonly next?: boolean;
   readonly onStart: () => void;
 }) {
   return (
@@ -357,6 +380,22 @@ function WideCard({
     >
       <div style={{ flex: '0 0 40%', minWidth: 0, position: 'relative' }} aria-hidden>
         {thumb}
+        {!done && next && (
+          <span
+            style={{
+              position: 'absolute',
+              top: space(2),
+              left: space(2),
+              padding: `${String(space(1))}px ${String(space(2))}px`,
+              borderRadius: radius.pill,
+              background: accent,
+              font: type(text.small, { weight: weight.semibold, leading: 1.2 }),
+              color: '#ffffff',
+            }}
+          >
+            Start here
+          </span>
+        )}
       </div>
       <div style={{ flex: '1 0 0', minWidth: 0, padding: space(5) }}>
         <p style={{ margin: 0, font: type(text.lead, { weight: weight.semibold }), color: ink.strong }}>
@@ -391,6 +430,7 @@ function Card({
   accent,
   done,
   ready,
+  next = false,
   status,
   onStart,
 }: {
@@ -400,6 +440,8 @@ function Card({
   readonly accent: string;
   readonly done: boolean;
   readonly ready: boolean;
+  /** The first one still unread, which is where a new reader is pointed. */
+  readonly next?: boolean;
   /** Over the picture while the card is not done: what pressing it does. */
   readonly status: string;
   readonly onStart: () => void;
@@ -412,17 +454,17 @@ function Card({
         disabled={!ready}
         // A title that is a question keeps its question mark rather than
         // gaining a full stop after it.
-        aria-label={`${title}${/[.?!]$/.test(title) ? '' : '.'} ${done ? 'Guide completed' : status}.`}
+        aria-label={`${title}${/[.?!]$/.test(title) ? '' : '.'} ${done ? 'Guide completed' : next ? `Start here. ${status}` : status}.`}
         style={{
           position: 'relative',
           display: 'block',
           padding: 0,
           textAlign: 'left',
           overflow: 'hidden',
-          border: `1px solid ${done ? accent : line.base}`,
+          border: `1px solid ${done || next ? accent : line.base}`,
           borderRadius: radius.large,
           background: surface.raised,
-          boxShadow: done ? shadow.lifted : shadow.resting,
+          boxShadow: done || next ? shadow.lifted : shadow.resting,
           cursor: ready ? 'pointer' : 'default',
           font: 'inherit',
           color: 'inherit',
@@ -443,6 +485,27 @@ function Card({
             and readers could not tell a label from a button or another feature.
             Hidden from a screen reader, which already hears *Guide completed*.
           */}
+          {/*
+            *Start here*, in the corner *Done ✓* uses once the guide is read.
+            Hidden from a screen reader, which hears it in the card's label.
+          */}
+          {!done && next && (
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: space(2),
+                left: space(2),
+                padding: `${String(space(1))}px ${String(space(2))}px`,
+                borderRadius: radius.pill,
+                background: accent,
+                font: type(text.small, { weight: weight.semibold, leading: 1.2 }),
+                color: '#ffffff',
+              }}
+            >
+              Start here
+            </span>
+          )}
           {done && (
             <span
               aria-hidden
