@@ -136,4 +136,7 @@ export const RETIRED_TERMS: readonly string[] = [
   // area the reader does not own and a record they did not make.
   'Likely water paths',
   'My drainage area',
+  // Also 8 October: four empty squares over two buttons read as a form to
+  // fill in, and nothing on that screen is a field or is ever submitted.
+  'What to include',
 ];
