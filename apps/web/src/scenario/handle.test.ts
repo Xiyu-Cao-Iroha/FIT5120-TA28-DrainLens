@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { LEAVES_WINDOW, type Depression, d8FromElevations, depressionFieldFrom } from '@drainlens/scenario';
 
 import type { LoadedScene } from './scene.js';
-import { engineInput, handle } from './worker.js';
+import { type RunRequest, engineInput, handle } from './worker.js';
 
 const WIDTH = 9;
 const HEIGHT = 9;
@@ -78,7 +78,13 @@ function loadedScene(): LoadedScene {
   };
 }
 
-const run = (over: Partial<Parameters<typeof handle>[0]> = {}) =>
+/*
+  A run request, overridable. `Partial<Parameters<typeof handle>[0]>` was
+  wider than that: it is the whole union, so an override could widen `type`
+  to 'run' | 'load' and nothing here was a run request any more. It compiled
+  because the tests were outside the type checker.
+*/
+const run = (over: Partial<RunRequest> = {}): RunRequest =>
   ({
     type: 'run' as const,
     id: 7,

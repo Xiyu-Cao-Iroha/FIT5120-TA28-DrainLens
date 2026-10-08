@@ -47,9 +47,8 @@ export type Requirement =
   | 'layers-opened'
   | 'terrain-shown'
   | 'terrain-off'
-  /* Epic 6's two chips (Figma, *Your drainage area* D1 and D3). */
+  /* Epic 6's chip (Figma, *Your drainage area* D1). */
   | 'catchment-on'
-  | 'help-on'
   /* Epic 5's three (Figma, *Get ready for heavy rain*, G1, G2 and G4). */
   | 'plan-opened'
   | 'place-reviewed'
@@ -189,8 +188,6 @@ export interface MapNow {
   readonly terrainShown: boolean;
   /** The drainage area's boundary, drawn now. */
   readonly catchment: boolean;
-  /** Who can help, drawn now. */
-  readonly help: boolean;
   /** The preparation plan, open now. */
   readonly planOpen: boolean;
   /** How many numbered places the reader has answered for. */
@@ -213,7 +210,6 @@ export const NOTHING_ON_MAP: MapNow = {
   layersOpened: false,
   terrainShown: false,
   catchment: false,
-  help: false,
   planOpen: false,
   placesReviewed: 0,
   whyOpen: false,
@@ -347,8 +343,6 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'lowPoint';
     case 'catchment-on':
       return 'catchment';
-    case 'help-on':
-      return 'help';
     case 'plan-opened':
     case 'place-reviewed':
     case 'why-opened':
@@ -414,8 +408,6 @@ export function satisfied(
       return now.whyOpen;
     case 'catchment-on':
       return now.catchment;
-    case 'help-on':
-      return now.help;
     case 'pits-on':
       return now.pits;
     case 'pipes-on':

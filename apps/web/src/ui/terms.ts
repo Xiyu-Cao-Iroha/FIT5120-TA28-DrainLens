@@ -37,13 +37,12 @@ export const SOURCE = {
 export const LAYER = {
   pits: 'Drain pits',
   pipes: 'Drain pipes',
-  paths: 'Likely water paths',
+  paths: 'Water paths',
   lowAreas: 'Low areas',
   ground: 'Ground height',
   limited: 'Ground data gaps',
-  /* Epic 6's two, from Iteration 3's Figma (D1 and D3). */
-  catchment: 'My drainage area',
-  help: 'Who can help',
+  /* Epic 6's layer, from Iteration 3's Figma (D1). */
+  catchment: 'Recorded subcatchment area',
   beforeRain: 'Before-rain checks',
 } as const;
 
@@ -132,4 +131,9 @@ export const RETIRED_TERMS: readonly string[] = [
   'Minimum total',
   'exact count not published',
   'Waiting for you to try it',
+  // Renamed 8 October 2026 on the team's change list: the first was two words
+  // longer than it needed to be on a chip, and the second said *my* about an
+  // area the reader does not own and a record they did not make.
+  'Likely water paths',
+  'My drainage area',
 ];

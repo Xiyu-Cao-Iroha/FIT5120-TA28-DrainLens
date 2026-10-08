@@ -23,8 +23,10 @@
 
 import { type ReactNode, useId, useState } from 'react';
 
+import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import {
   GENERAL_ACTIONS,
+  type GeneralAction,
   NOT_A_SCORE,
   REPORT_PATHWAY,
   SAFETY,
@@ -48,7 +50,7 @@ import {
 } from '../prepare/places.js';
 import { PRINT_PLAN, planHtml, printedPlan } from '../prepare/printable.js';
 import { printDocument } from '../prepare/printing.js';
-import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
+import { advisory, alert, brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /** One numbered place, as the map's card shows it (Figma G2). */
 export function PlaceCard({
@@ -112,6 +114,8 @@ export function PreparePlan({
   onReset,
   onReport,
   onWhyOpen,
+  onAsk,
+  onCheckDrains,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -123,6 +127,17 @@ export function PreparePlan({
   readonly onReport?: (() => void) | undefined;
   /** A reminder's *Why this place?* opened, which the guide's step 4 waits on. */
   readonly onWhyOpen?: (() => void) | undefined;
+  /**
+   * The way into *Ask about getting ready* (Figma AI1).
+   *
+   * The id is the general action it was asked from, where it was asked from
+   * one: the design's tip cards each have their own *Ask a question about
+   * this*, and a question about gutters should arrive as a question about
+   * gutters rather than as an empty box.
+   */
+  readonly onAsk?: ((actionId?: string) => void) | undefined;
+  /** Step 3's first button: show the recorded drains near the address. */
+  readonly onCheckDrains?: (() => void) | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -141,10 +156,8 @@ export function PreparePlan({
           <p style={{ margin: `${String(space(1))}px 0 0`, color: ink.muted }}>{NO_PLACES_MEANS}</p>
         </div>
       ) : (
-        <section aria-label={PLACES_NEAR_YOU} style={{ marginBottom: space(3) }}>
-          <Heading>
-            {PLACES_NEAR_YOU} · {reviewedLine(places, relevance)}
-          </Heading>
+        <section aria-label={PLACES_NEAR_YOU} style={{ marginBottom: space(4) }}>
+          <StepHeading step={1} label={PLACES_NEAR_YOU} aside={reviewedLine(places, relevance)} />
           <ol style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {places.map((place) => {
               const answer = relevance[place.number] ?? null;
@@ -224,43 +237,147 @@ export function PreparePlan({
         </section>
       )}
 
-      <section aria-label={FOR_EVERY_HOME}>
-        <Heading>{FOR_EVERY_HOME}</Heading>
+      <section aria-label={FOR_EVERY_HOME} style={{ marginBottom: space(4) }}>
+        <StepHeading step={2} label={FOR_EVERY_HOME} />
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {GENERAL_ACTIONS.map((action) => (
-            <li key={action.id} style={{ marginBottom: space(2) }}>
-              {action.text}
-              <span style={{ display: 'block', font: type(text.micro), color: ink.subtle }}>
-                {action.publisher}
-              </span>
+            <GeneralActionRow
+              key={action.id}
+              action={action}
+              {...(onAsk === undefined
+                ? {}
+                : {
+                    onAsk: () => {
+                      onAsk(action.id);
+                    },
+                  })}
+            />
+          ))}
+        </ul>
+      </section>
+
+      {/*
+        Step 3 (Figma P1): the two things this plan hands off to, as the two
+        buttons the design gives them rather than as links in a paragraph.
+
+        Reporting is named and kept apart from the actions above it (AC 5.2.3,
+        5.3.2). Preparing for rain is something the reader does; reporting is
+        something they ask somebody else to do, and running the two together
+        is how a plan starts reading as a list of chores from the council.
+      */}
+      {(onCheckDrains !== undefined || onReport !== undefined) && (
+        <section aria-label={STREET_DRAINS_NEAR_YOU} style={{ marginBottom: space(4) }}>
+          <StepHeading step={3} label={STREET_DRAINS_NEAR_YOU} />
+          {onCheckDrains !== undefined && (
+            <button type="button" onClick={onCheckDrains} style={primaryButton}>
+              Check the street drains near you ›
+            </button>
+          )}
+          {onReport !== undefined && (
+            <button type="button" onClick={onReport} style={warningButton}>
+              ⚠ {REPORT_PATHWAY} ›
+            </button>
+          )}
+        </section>
+      )}
+
+      {/*
+        The way into *Ask about getting ready* (Figma AI1).
+
+        The design shows two: this row, and an *Ask a question about this*
+        link inside each general action's expanded tip. The tips are a panel
+        this product does not have -- its general actions are three sentences
+        with their publisher under them, not cards that open -- so the link
+        that would live inside one is not here. One way in that exists beats
+        two where the second needs a screen built to hold it.
+
+        It sits after reporting and before the telephone numbers, which is
+        where the design puts it: the last thing offered, and never above the
+        two things a person with rain coming actually needs.
+      */}
+      {onAsk !== undefined && (
+        <p
+          style={{
+            display: 'flex',
+            gap: space(2),
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            margin: `${String(space(3))}px 0 0`,
+            padding: space(2),
+            border: `1px solid ${brand.tint}`,
+            borderRadius: radius.base,
+            background: brand.wash,
+          }}
+        >
+          <span style={{ color: brand.ink }}>{ASK_PROMPT}</span>
+          <button
+            type="button"
+            onClick={() => {
+              onAsk();
+            }}
+            style={{ ...linkStyle, font: type(text.small, { weight: weight.semibold }) }}
+          >
+            {ASK_LINK} ›
+          </button>
+        </p>
+      )}
+
+      {/*
+        The boundary, in full and above the telephone numbers (AC 5.3.3).
+
+        The design shows only the pink line of numbers. The four sentences
+        above it are not optional and are not folded: the plan is the one
+        screen a person may read with rain coming, and *this does not tell you
+        whether your property will flood* is the sentence that stops it being
+        read as something it is not.
+      */}
+      <section aria-label={SAFETY_HEADING} style={{ marginBottom: space(3) }}>
+        <Heading>{SAFETY_HEADING}</Heading>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', color: ink.muted }}>
+          {SAFETY.slice(0, -2).map((sentence) => (
+            <li key={sentence} style={{ marginBottom: space(1) }}>
+              {sentence}
             </li>
           ))}
         </ul>
       </section>
 
       {/*
-        Reporting, named and kept apart (AC 5.2.3, 5.3.2).
+        The two telephone numbers, as the design's own band (Figma P1).
 
-        A section of its own rather than a fourth general action: preparing
-        for rain is something the reader does, and reporting is something
-        they ask somebody else to do. Running them together is how a plan
-        starts reading as a list of chores from the council.
+        They are the last two sentences of `SAFETY` and nothing else: lifted
+        out of the list above rather than written again here, so there is one
+        place they can be got wrong.
       */}
-      {onReport !== undefined && (
-        <section aria-label={REPORT_PATHWAY} style={{ marginTop: space(3) }}>
-          <Heading>Something already wrong?</Heading>
-          <button type="button" onClick={onReport} style={linkStyle}>
-            {REPORT_PATHWAY}
-          </button>
-        </section>
-      )}
+      <p
+        style={{
+          margin: `0 0 ${String(space(3))}px`,
+          padding: space(2),
+          borderRadius: radius.small,
+          background: alert.fill,
+          border: `1px solid ${alert.line}`,
+          color: alert.ink,
+          font: type(text.small, { leading: 1.5 }),
+        }}
+      >
+        {SAFETY.slice(-2).join(' ')}
+      </p>
 
       {/*
         Print or save (AC 5.4.3), outside the places section because an
         address with none still has a page worth keeping: the general actions
         and the numbers at the foot of it.
       */}
-      <p style={{ margin: `${String(space(3))}px 0 0` }}>
+      <p
+        style={{
+          display: 'flex',
+          gap: space(2),
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          margin: 0,
+        }}
+      >
         <button
           type="button"
           onClick={() => {
@@ -278,35 +395,141 @@ export function PreparePlan({
         >
           {PRINT_PLAN}
         </button>
+        <a href={VICEMERGENCY.href} target="_blank" rel="noreferrer" style={{ color: brand.ink }}>
+          {VICEMERGENCY.label} — current warnings ›
+        </a>
       </p>
+    </div>
+  );
+}
 
-      {/*
-        The boundary, in full and at the foot of the plan (AC 5.3.3).
+/**
+ * One general action, with its source folded under it (Figma P1, step 2).
+ *
+ * The design shows a photograph and two sentences of advice in the expanded
+ * card. The advice is already here and it is better than a paraphrase: every
+ * action carries **the sentence it was taken from**, with the publisher and
+ * the date the page was read, so the thing that opens is the evidence rather
+ * than a second helping of the same instruction. There is no photograph, for
+ * the reason the blockage pictures are drawings: an unlicensed image of
+ * somebody's gutter is one unrecorded licence more than this project has.
+ *
+ * The tick is for this visit only. It is not stored, not counted and not
+ * printed, because a plan that remembers what you said you had done is
+ * making a claim about a house it has never seen.
+ */
+function GeneralActionRow({
+  action,
+  onAsk,
+}: {
+  readonly action: GeneralAction;
+  readonly onAsk?: (() => void) | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const [ticked, setTicked] = useState(false);
+  const tipId = useId();
 
-        Not folded and not shortened: the plan is the one screen a person may
-        read with rain coming, and the last two lines are telephone numbers.
-      */}
-      <section aria-label={SAFETY_HEADING} style={{ marginTop: space(3) }}>
-        <Heading>{SAFETY_HEADING}</Heading>
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', color: ink.muted }}>
-          {SAFETY.map((sentence) => (
-            <li key={sentence} style={{ marginBottom: space(1) }}>
-              {sentence}
-            </li>
-          ))}
-        </ul>
-        <p style={{ margin: `${String(space(1))}px 0 0` }}>
+  return (
+    <li style={{ marginBottom: space(2) }}>
+      <span style={{ display: 'flex', gap: space(2), alignItems: 'flex-start' }}>
+        <input
+          type="checkbox"
+          checked={ticked}
+          onChange={(event) => {
+            setTicked(event.target.checked);
+          }}
+          aria-label={action.text}
+          style={{ marginTop: 3, flexShrink: 0, accentColor: brand.base }}
+        />
+        <span style={{ flex: '1 0 0', minWidth: 0 }}>{action.text}</span>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={tipId}
+          aria-label={open ? `Hide the source for ${action.text}` : `Show the source for ${action.text}`}
+          onClick={() => {
+            setOpen((was) => !was);
+          }}
+          style={{
+            flexShrink: 0,
+            width: 22,
+            height: 22,
+            borderRadius: radius.pill,
+            border: `1px solid ${line.base}`,
+            background: surface.raised,
+            color: ink.muted,
+            font: type(text.small),
+            cursor: 'pointer',
+          }}
+        >
+          {open ? '−' : '+'}
+        </button>
+      </span>
+
+      {open && (
+        <span
+          id={tipId}
+          style={{
+            display: 'block',
+            margin: `${String(space(1))}px 0 0 28px`,
+            padding: space(2),
+            background: surface.sunken,
+            borderRadius: radius.small,
+          }}
+        >
+          <span style={{ display: 'block', color: ink.muted }}>“{action.quote}”</span>
           <a
-            href={VICEMERGENCY.href}
+            href={action.page}
             target="_blank"
             rel="noreferrer"
-            style={{ color: brand.ink }}
+            style={{ display: 'block', marginTop: space(1), font: type(text.micro), color: brand.ink }}
           >
-            {VICEMERGENCY.label} — current warnings ›
+            {action.publisher}, read {action.checked} ↗
           </a>
-        </p>
-      </section>
-    </div>
+          {onAsk !== undefined && (
+            <button
+              type="button"
+              onClick={onAsk}
+              style={{ ...linkStyle, marginTop: space(1), font: type(text.small, { weight: weight.semibold }) }}
+            >
+              Ask a question about this ›
+            </button>
+          )}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** A numbered step heading, with its count on the right (Figma P1). */
+function StepHeading({
+  step,
+  label,
+  aside,
+}: {
+  readonly step: number;
+  readonly label: string;
+  readonly aside?: string | undefined;
+}) {
+  return (
+    <p
+      style={{
+        display: 'flex',
+        gap: space(2),
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        margin: `0 0 ${String(space(2))}px`,
+        font: type(text.micro, { weight: weight.semibold }),
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: brand.ink,
+      }}
+    >
+      <span>
+        Step {step} · {label}
+      </span>
+      {aside !== undefined && <span style={{ color: ink.subtle }}>{aside}</span>}
+    </p>
   );
 }
 
@@ -413,6 +636,42 @@ function Answer({
     </button>
   );
 }
+
+/** Step 3's heading, as the design names it. */
+const STREET_DRAINS_NEAR_YOU = 'Street drains near you';
+
+/** The two full-width buttons of step 3 (Figma P1). */
+const stepButton = {
+  display: 'block',
+  width: '100%',
+  marginBottom: space(2),
+  padding: `${String(space(3))}px ${String(space(3))}px`,
+  borderRadius: radius.base,
+  font: type(text.label, { weight: weight.semibold }),
+  textAlign: 'center',
+  cursor: 'pointer',
+} as const;
+
+const primaryButton = {
+  ...stepButton,
+  border: `1px solid ${brand.base}`,
+  background: brand.base,
+  color: ink.inverse,
+} as const;
+
+/*
+  Amber, not green, and not red.
+
+  Reporting is the one action on this plan that asks somebody else to do
+  something, and the design colours it as a caution rather than as the thing
+  to do next. Red is kept for the telephone numbers.
+*/
+const warningButton = {
+  ...stepButton,
+  border: `1px solid ${advisory.line}`,
+  background: advisory.fill,
+  color: advisory.ink,
+} as const;
 
 const linkStyle = {
   background: 'none',

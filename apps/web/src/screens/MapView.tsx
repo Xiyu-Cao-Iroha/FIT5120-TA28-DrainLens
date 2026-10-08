@@ -26,7 +26,7 @@ import {
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
 import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
@@ -59,10 +59,14 @@ import { AddressInsight } from '../map/AddressInsight.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
-import { WHO_CAN_HELP } from '../catchment/help.js';
+import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
+  NO_ADDRESS_FOR_CHECKS,
+  NO_PLACES,
+  PLACE_RADIUS_M,
+  NO_PLACES_MEANS,
   type Place,
   type Relevance,
   checkButton,
@@ -70,6 +74,8 @@ import {
   placeTitle,
   placesNear,
 } from '../prepare/places.js';
+import { AskAboutGettingReady } from './AskAboutGettingReady.js';
+import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
 import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
@@ -82,7 +88,7 @@ import {
   distanceLine,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
-import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
+import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
@@ -167,6 +173,16 @@ export interface MapViewProps {
   readonly layersButton?: boolean | undefined;
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
+  /**
+   * The map tour is running.
+   *
+   * Three of its seven steps point at a chip, and the row can be collapsed
+   * to one button -- so a reader who had folded it was shown *Drain pits are
+   * street drains* over a map with no Drain pits on it. While the tour runs
+   * the row is not collapsible, which both unfolds it and keeps it unfolded
+   * for the steps that come after.
+   */
+  readonly touring?: boolean | undefined;
   /**
    * Something else the guide's step points at: the Layers button, the Ground
    * height switch in its panel, or the legend's ground-height scale.
@@ -276,6 +292,7 @@ export function MapView({
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  touring = false,
   highlight = null,
   overlay = null,
   onViewport,
@@ -410,6 +427,18 @@ export function MapView({
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
   /*
+    *Ask about getting ready* (Figma AI1, Q0 to Q5).
+
+    It replaces the plan rather than sitting beside it: one card, two things
+    it can be showing, and the only way in is from the plan, so there is no
+    state where a reader has an assistant open over a map they never asked a
+    plan about. Closing it puts the plan back, which is what *Back to my
+    plan* means.
+  */
+  const [askOpen, setAskOpen] = useState(false);
+  /** The question the panel opens with, where it was opened from a tip card. */
+  const [askOpening, setAskOpening] = useState<string | null>(null);
+  /*
     The reporting pathway, which is its own thing (AC 6.2.3).
 
     It carries a drain only where the reader had one selected when they opened
@@ -441,6 +470,194 @@ export function MapView({
   const [pinAt, setPinAt] = useState<Local | null>(null);
   const [pinNote, setPinNote] = useState('');
   const panel = panelAllowed && picking === null;
+  /*
+    The sidebar (Figma P1 and AI1), and what the rest of the chrome does
+    about it.
+
+    Its width comes from the canvas's own width, and the canvas is pointedly
+    not resized to make room: the panel is drawn over the map's right edge, so
+    the two cannot end up as inputs to each other. Everything else moves --
+    the controls come in by `panelWidth`, the chips fold to one button and the
+    legend folds itself away -- because a map whose whole chrome is in the one
+    corner the panel wants is the screenshot that asked for this.
+  */
+  /*
+    Where the map's chrome ends, measured.
+
+    The search box and the chips share one row, and on a narrow window the
+    chips wrap under the search box -- so the row is one line tall or two,
+    and the cards below it were drawn at a fixed 64 pixels either way.
+    `ResizeObserver` is what makes this honest: it fires on a wrap, which no
+    window-resize handler would catch when the wrap is caused by the sidebar
+    opening rather than by the window changing.
+  */
+  const chromeRef = useRef<HTMLDivElement | null>(null);
+  const [chromeBottom, setChromeBottom] = useState(64);
+  useEffect(() => {
+    const row = chromeRef.current;
+    const under = row?.offsetParent;
+    if (row === null || under === null || under === undefined) return undefined;
+    /*
+      The lowest edge of anything in the chrome that is over the card column.
+
+      Not the row's own height: the legend is in this row and it is tall, but
+      it is at the right-hand end, and pushing the cards below it would give
+      up 200 pixels of map for a box the cards never touch. Not the chips'
+      height either, because on a narrow window the legend wraps onto a line
+      of its own and then it *is* above them.
+
+      So it is measured per child, against the column's own 300 pixels: only
+      what actually overlaps them counts.
+    */
+    const measure = () => {
+      const top = under.getBoundingClientRect().top;
+      const left = space(3);
+      const right = left + CARD_WIDTH;
+      let lowest = row.getBoundingClientRect().top;
+      for (const child of row.children) {
+        const box = child.getBoundingClientRect();
+        if (box.right > left && box.left < right && box.bottom > lowest) lowest = box.bottom;
+      }
+      setChromeBottom(Math.round(lowest - top + space(3)));
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(row);
+    for (const child of row.children) watch.observe(child);
+    return () => {
+      watch.disconnect();
+    };
+  }, [panel]);
+
+  const panelWidth = viewport === null ? 0 : sidebarWidth(viewport.widthPx);
+  /*
+    The before-rain layer opens something, always (change list, item 11).
+
+    Reported from the guide: step two says *decide whether Place 1 applies to
+    you* over a map with nothing open on it, and the reader has to work out
+    that the thing to press is a small warning triangle somewhere among the
+    streets. The design opens the first place's card for them, so the step is
+    about the decision rather than about finding the control.
+
+    Where there are no places it opens the address card instead, which is
+    where the *none near this address* sentence is. An address with nothing to
+    check is a result and has to look like one; silence looks like a layer
+    that did not load.
+
+    Once per address and per switch-on: `opened` is the key it has already
+    done, so a reader who closes the card is not handed it again on the next
+    render.
+  */
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    /*
+      Never inside a guide. A guide drives its own sequence, and Epic 5's
+      first step is *Click Check before heavy rain* -- a button on the address
+      card, which the place card suppresses. Opening the place card for the
+      reader made the guide's own instruction point at something that was not
+      on the screen.
+    */
+    if (guided || !layers.beforeRain || address === null) {
+      openedFor.current = null;
+      return;
+    }
+    const key = `${address.label}:${String(places.length)}`;
+    if (openedFor.current === key) return;
+    openedFor.current = key;
+    if (places.length === 0) {
+      setAddressCardOpen(true);
+      return;
+    }
+    setOpenPlace((current) => current ?? places[0]?.number ?? null);
+  }, [guided, layers.beforeRain, address, places]);
+
+  /*
+    The opening view for the before-rain layer: the whole 200 m (item 5).
+
+    An address accepted with this layer on used to leave the map at whatever
+    scale it was at, so a numbered marker 180 m away was off the screen and
+    the reader was asked to decide about a place they could not see. The fit
+    is the square that definitely contains every place, because 200 m is what
+    `placesNear` means by near -- so the radius the product uses and the
+    radius it shows are the same number, read from the same constant.
+
+    Keyed on the address, so it fits once when the address arrives and leaves
+    the reader's own panning alone afterwards.
+  */
+  const placesFit = useMemo((): MapCanvasProps['fit'] => {
+    if (!layers.beforeRain || address === null) return null;
+    const r = PLACE_RADIUS_M;
+    const corners: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
+    return { key: `places:${address.label}`, points: corners, reservePanel: false };
+  }, [layers.beforeRain, address]);
+
+  const planShowing = panel && viewport !== null && planOpen && openPlace === null;
+  const sidebarOpen = planShowing && panelWidth > 0;
+  /*
+    Too narrow for a sidebar, so the plan goes back in the card it used to
+    live in. Not a good screen -- the design has a sheet for this and the
+    sheet is not built -- but a worse screen than a sidebar is still better
+    than a window where the plan button does nothing.
+  */
+  const planInCard = planShowing && panelWidth === 0;
+
+  const askPanel = (
+    <AskAboutGettingReady
+      // A new panel per opening question, so one asked from a tip card
+      // arrives in a fresh conversation rather than under the last one.
+      key={askOpening ?? 'ask'}
+      {...(askOpening === null ? {} : { opening: askOpening })}
+      onBackToPlan={() => {
+        setAskOpen(false);
+      }}
+      {...(places.length === 0
+        ? {}
+        : {
+            onReviewPlaces: () => {
+              // Back to the plan, which is where the places are listed.
+              setAskOpen(false);
+            },
+          })}
+    />
+  );
+
+  const planPanel = (
+    <PreparePlan
+      address={address?.label ?? ''}
+      places={places}
+      relevance={relevance}
+      onShowOnMap={(place) => {
+        setOpenPlace(place.number);
+      }}
+      onWhyOpen={() => {
+        setWhyOpen(true);
+      }}
+      {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
+      {...(guided
+        ? {}
+        : {
+            onReport: () => {
+              setPlanOpen(false);
+              openReport(null);
+            },
+            // Not inside a guide, for the reason reporting is not: a guide
+            // teaches one thing at a time, and this is a second thing that
+            // answers back.
+            onAsk: (actionId?: string) => {
+              setAskOpening(actionId === undefined ? null : questionForAction(actionId));
+              setAskOpen(true);
+            },
+            onCheckDrains: () => {
+              // Step 3's first button. The recorded drains are a layer, so
+              // showing them is switching it on rather than going anywhere.
+              if (!layers.pit) toggle('pit');
+            },
+          })}
+    />
+  );
   const leavePicking = () => {
     setPicking(null);
     setCandidate(null);
@@ -623,7 +840,6 @@ export function MapView({
       layersOpened: layersOpen,
       terrainShown: terrainOn,
       catchment: layers.catchment,
-      help: layers.help,
       planOpen,
       placesReviewed,
       whyOpen,
@@ -638,10 +854,9 @@ export function MapView({
     unmeasuredOn,
     selectedId,
     following,
-    // Epic 6's two: the guide waits for these presses, so the report has to
-    // run when they change.
+    // Epic 6's chip: the guide waits for the press, so the report has to
+    // run when it changes.
     layers.catchment,
-    layers.help,
     // Epic 5's two, for the same reason.
     planOpen,
     placesReviewed,
@@ -652,6 +867,7 @@ export function MapView({
   return (
     <>
       <MapCanvas
+        controlsInset={sidebarOpen ? panelWidth : 0}
         artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
         show={visibilityOf(picking === null ? layers : NOTHING_ON)}
@@ -660,7 +876,7 @@ export function MapView({
         // pits on it is a mark with nothing under it.
         suggestedPit={pitsDrawn ? highlightPit : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
-        fit={fit}
+        fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
@@ -676,6 +892,24 @@ export function MapView({
           setHit(null);
           setFollowing(null);
           setMinimised(false);
+          /*
+            A numbered marker opens its place, which is what the number is
+            for. It used to set `warning` like any other sign, and the card
+            that reads `warning` is gated on the low-areas layer -- so with
+            only before-rain on, pressing a numbered triangle did nothing at
+            all. The guide tells the reader the other places are numbered on
+            the map; pressing one has to reach them.
+          */
+          const numbered = layers.beforeRain ? numberOf(places, sign) : null;
+          if (numbered !== null) {
+            setWarning(null);
+            setOpenPlace(numbered);
+            return;
+          }
+          // An unnumbered sign is a low area like any other, and it says so.
+          // It lets go of an open place for the same reason every other press
+          // here does: two cards on one map is one too many.
+          setOpenPlace(null);
           setWarning(sign);
         }}
         onViewport={setViewport}
@@ -808,40 +1042,42 @@ export function MapView({
           )}
 
           {picking === 'drain' && candidate !== null && (
-            <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })} at="bottom">
-              <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
-                {distanceLine(
-                  { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
-                  address?.label ?? null,
-                )}
-              </p>
-              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReportPlace({
-                      kind: 'drain',
-                      assetNumber: candidate.assetNumber,
-                      street: null,
-                      distanceM: candidate.distanceM,
-                    });
-                    leavePicking();
-                  }}
-                  style={pickFilledStyle}
-                >
-                  Use this drain
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCandidate(null);
-                  }}
-                  style={pickOutlineStyle}
-                >
-                  Pick another
-                </button>
-              </span>
-            </MapNote>
+            <MapNoteStack at="bottom">
+              <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}>
+                <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
+                  {distanceLine(
+                    { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                    address?.label ?? null,
+                  )}
+                </p>
+                <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportPlace({
+                        kind: 'drain',
+                        assetNumber: candidate.assetNumber,
+                        street: null,
+                        distanceM: candidate.distanceM,
+                      });
+                      leavePicking();
+                    }}
+                    style={pickFilledStyle}
+                  >
+                    Use this drain
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCandidate(null);
+                    }}
+                    style={pickOutlineStyle}
+                  >
+                    Pick another
+                  </button>
+                </span>
+              </MapNote>
+            </MapNoteStack>
           )}
 
           {/*
@@ -873,61 +1109,65 @@ export function MapView({
           )}
 
           {picking === 'pin' && pinAt !== null && (
-            <MapNote title={PIN_PLACE.card} at="bottom">
-              <input
-                value={pinNote}
-                onChange={(event) => {
-                  setPinNote(event.target.value);
-                }}
-                placeholder={PIN_PLACE.placeholder}
-                aria-label={PIN_PLACE.then}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: space(2),
-                  borderRadius: radius.small,
-                  border: `1px solid ${line.base}`,
-                  font: type(text.small),
-                  color: ink.base,
-                }}
-              />
-              <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReportPlace({
-                      kind: 'pin',
-                      note: pinNote.trim(),
-                      at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
-                    });
-                    leavePicking();
+            <MapNoteStack at="bottom">
+              <MapNote title={PIN_PLACE.card}>
+                <input
+                  value={pinNote}
+                  onChange={(event) => {
+                    setPinNote(event.target.value);
                   }}
-                  style={pickFilledStyle}
-                >
-                  {PIN_PLACE.use}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPinAt(null);
+                  placeholder={PIN_PLACE.placeholder}
+                  aria-label={PIN_PLACE.then}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: space(2),
+                    borderRadius: radius.small,
+                    border: `1px solid ${line.base}`,
+                    font: type(text.small),
+                    color: ink.base,
                   }}
-                  style={pickOutlineStyle}
-                >
-                  {PIN_PLACE.back}
-                </button>
-              </span>
-            </MapNote>
+                />
+                <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportPlace({
+                        kind: 'pin',
+                        note: pinNote.trim(),
+                        at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
+                      });
+                      leavePicking();
+                    }}
+                    style={pickFilledStyle}
+                  >
+                    {PIN_PLACE.use}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinAt(null);
+                    }}
+                    style={pickOutlineStyle}
+                  >
+                    {PIN_PLACE.back}
+                  </button>
+                </span>
+              </MapNote>
+            </MapNoteStack>
           )}
         </>
       )}
 
       {panel && (
         <div
+          ref={chromeRef}
           style={{
             position: 'absolute',
             left: space(4),
-            right: space(4),
+            right: space(4) + (sidebarOpen ? panelWidth : 0),
             top: space(4),
+            transition: 'right 160ms ease',
             zIndex: 4,
             display: 'flex',
             gap: space(3),
@@ -946,6 +1186,8 @@ export function MapView({
               />
             )}
             <LayerChips
+              collapsible={!guided && !touring}
+              fold={sidebarOpen}
               state={layers}
               onToggle={toggle}
               unavailableKeys={notYet}
@@ -967,7 +1209,27 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          {legend && <MapLegend state={layers} pulseTerrain={highlight === 'terrain-legend'} />}
+          {/*
+            Not while the Layers panel is open.
+
+            The panel hangs from a button at the chips' right-hand end and is
+            288 wide; the legend begins just past that end, and on a window
+            narrow enough for the legend to wrap onto its own line the panel
+            drops straight onto it -- two white boxes overlapping, which
+            reads as clipped text rather than as two cards. Folding the
+            legend only made the box it covered smaller.
+
+            Hidden rather than folded, because the panel is the same question
+            answered in more detail: it lists every layer and lets the reader
+            turn them on. It comes back, as it was, the moment they close it.
+          */}
+          {legend && !layersOpen && (
+            <MapLegend
+              state={layers}
+              fold={sidebarOpen}
+              pulseTerrain={highlight === 'terrain-legend'}
+            />
+          )}
         </div>
       )}
 
@@ -1138,7 +1400,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
@@ -1174,16 +1436,107 @@ export function MapView({
         and not the area card behind it. Two stacked cards on a phone-width map
         is the thing the map chrome was broken up to avoid.
       */}
-      {panel && viewport !== null && layers.catchment && !layers.help && (
-        <MapNote title={DRAINAGE_AREA}>
-          <DrainageArea area={area} />
-          {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
-            <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
-              The boundary is outside this view. Zoom out to see it.
+      {/*
+        Not while the report is open: both of these are corner cards and they
+        share the corner. The report is opened from this card, so without the
+        exclusion the report lands exactly on top of the thing it came from --
+        which is the same defect as the one the change list opened with, in
+        the other direction.
+      */}
+      {/*
+        Before-rain with no address: the layer is on, the markers are drawn,
+        and nothing says the checks are about an address nobody has given.
+        The subcatchment card says so; this is the same sentence in the same
+        situation.
+      */}
+      
+
+      
+
+      {/*
+        The map's corner cards, in one column rather than four pins at one
+        spot (reported 8 October, with a screenshot of two of them happening
+        at once).
+
+        `chromeBottom` is measured: the chip row wraps onto a second line on
+        any window narrow enough, and every card was drawn at a fixed 64
+        pixels whether the chrome ended there or not. The order below is the
+        order they stack in, and it is deliberate -- the report is the thing
+        the reader just asked for, so it comes first.
+      */}
+      <MapNoteStack top={chromeBottom}>
+        {panel && viewport !== null && reportOpen && (
+          <MapNote title={REPORT_HEADING}>
+            <ReportProblem
+              address={address?.label ?? null}
+              place={reportPlace}
+              chosen={reportProblem}
+              onChoose={setReportProblem}
+              onPick={() => {
+                // The map takes over. The report card is still open behind it
+                // and comes back with whatever was picked.
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+              onForgetPlace={() => {
+                // *Change* is what the design calls it, so it goes back to the
+                // map rather than just emptying the row.
+                setReportPlace(null);
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+            />
+            <span style={{ display: 'block', marginTop: space(3) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setReportOpen(false);
+                  setReportProblem(null);
+                }}
+                style={planLinkStyle}
+              >
+                Close
+              </button>
             </span>
-          )}
-        </MapNote>
-      )}
+          </MapNote>
+        )}
+
+        {planInCard && (
+          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+            {askOpen ? askPanel : planPanel}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.catchment && !reportOpen && (
+          <MapNote title={DRAINAGE_AREA}>
+            <DrainageArea
+              area={area}
+              hasAddress={address !== null}
+              {...(guided
+                ? {}
+                : {
+                    // Not inside a guide. A guide teaches one thing at a time,
+                    // and this opens a card taller than the guide's map frame
+                    // over a step that was asking about something else.
+                    onReport: () => {
+                      openReport(null);
+                    },
+                  })}
+            />
+            {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
+              <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
+                The boundary is outside this view. Zoom out to see it.
+              </span>
+            )}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
+          <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
+        )}
+      </MapNoteStack>
 
       {/*
         The address's own card for this layer, where the map suppresses the
@@ -1238,12 +1591,35 @@ export function MapView({
         One place's card (Figma G2). Opened by the button above and by a press
         on a numbered marker, and closed when its answer sends the reader on.
       */}
-      {panel && viewport !== null && openPlace !== null && (() => {
+      {/*
+        The card hides with the marker it points at.
+
+        Zoomed out past `WARNING_MIN_SCALE` the canvas stops drawing the signs
+        -- a sign over a whole neighbourhood is a claim about a street nobody
+        can see -- and the card stayed, anchored to a triangle that was not
+        there. Panned away, the same. `warningsVisible(true, ...)` is the rule
+        the canvas draws by, read from the same function rather than restated,
+        so the two cannot drift. `openPlace` is left alone: zoom back in and
+        the card is where it was, which is how the pit card behaves.
+      */}
+      {panel &&
+        viewport !== null &&
+        openPlace !== null &&
+        warningsVisible(true, viewport.scale) &&
+        (() => {
         const place = places.find((candidate) => candidate.number === openPlace);
         if (place === undefined) return null;
+        if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
         return (
-          <MapNote title={placeTitle(place)}>
+          <MapCallout
+            at={toScreen(viewport, place.at)}
+            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            title={placeTitle(place)}
+            onClose={() => {
+              setOpenPlace(null);
+            }}
+          >
             <PlaceCard
               place={place}
               relevance={relevance[place.number] ?? null}
@@ -1272,7 +1648,11 @@ export function MapView({
               <button
                 type="button"
                 onClick={() => {
+                  // It says the plan, so it opens the plan. It used to only
+                  // close this card, which was true while the card could only
+                  // be reached from a plan that was already open behind it.
                   setOpenPlace(null);
+                  setPlanOpen(true);
                 }}
                 style={{
                   background: 'none',
@@ -1288,122 +1668,46 @@ export function MapView({
                 Back to the plan
               </button>
             </span>
-          </MapNote>
+          </MapCallout>
         );
       })()}
 
-      {/* The plan itself (Figma G3), which the place card sits in front of. */}
-      {panel && viewport !== null && planOpen && openPlace === null && (
-        <MapNote title={PREPARE_HEADING}>
-          <PreparePlan
-            address={address?.label ?? ''}
-            places={places}
-            relevance={relevance}
-            onShowOnMap={(place) => {
-              setOpenPlace(place.number);
-            }}
-            onWhyOpen={() => {
-              setWhyOpen(true);
-            }}
-            {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
-            {...(guided
-              ? {}
-              : {
-                  onReport: () => {
-                    setPlanOpen(false);
-                    openReport(null);
-                  },
-                })}
-          />
-        </MapNote>
+      {/*
+        The plan and the assistant, each built once and put in whichever
+        container the window has room for.
+      */}
+      
+
+      {/* The assistant, which the plan hands over to (Figma Q0 to Q5). */}
+      {sidebarOpen && askOpen && (
+        <Sidebar
+          title={ASK_HEADING}
+          width={panelWidth}
+          onClose={() => {
+            setAskOpen(false);
+            setPlanOpen(false);
+          }}
+        >
+          {askPanel}
+        </Sidebar>
       )}
 
-      {panel && viewport !== null && layers.help && !reportOpen && (
-        <MapNote title={WHO_CAN_HELP}>
-          <WhoCanHelpLevels />
-          {/*
-            Reporting is its own pathway, reached from the card about who
-            holds what rather than from the preparation plan (AC 6.2.3).
-
-            Not inside a guide. A guide teaches one thing at a time -- it is
-            why the address card is suppressed there too -- and this opens a
-            card taller than the guide's map frame, over a step that was
-            asking about something else.
-          */}
-          {!guided && (
-            <span style={{ display: 'block', marginTop: space(3) }}>
-              <button
-                type="button"
-                onClick={() => {
-                  // A drain already selected on the map is one the reader
-                  // selected, which is the only way one may reach a report
-                  // (AC 6.3.2). Anything else starts with nothing named.
-                  openReport(
-                    hit?.kind === 'pit' && hit.feature.asset_number !== undefined
-                      ? {
-                          kind: 'drain',
-                          assetNumber: String(hit.feature.asset_number),
-                          street: null,
-                          distanceM:
-                            address === null
-                              ? null
-                              : Math.round(
-                                  Math.hypot(
-                                    hit.feature.c[0] - address.eastingM,
-                                    hit.feature.c[1] - address.northingM,
-                                  ),
-                                ),
-                        }
-                      : null,
-                  );
-                }}
-                style={planLinkStyle}
-              >
-                {REPORT_HEADING}
-              </button>
-            </span>
-          )}
-        </MapNote>
+      {/* The plan itself (Figma P1), which the place card sits in front of. */}
+      {sidebarOpen && !askOpen && (
+        <Sidebar
+          title={PREPARE_HEADING}
+          {...(address === null ? {} : { subtitle: address.label })}
+          width={panelWidth}
+          onClose={() => {
+            setPlanOpen(false);
+          }}
+        >
+          {planPanel}
+        </Sidebar>
       )}
 
       {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
-      {panel && viewport !== null && reportOpen && (
-        <MapNote title={REPORT_HEADING}>
-          <ReportProblem
-            address={address?.label ?? null}
-            place={reportPlace}
-            chosen={reportProblem}
-            onChoose={setReportProblem}
-            onPick={() => {
-              // The map takes over. The report card is still open behind it
-              // and comes back with whatever was picked.
-              setCandidate(null);
-              setPinAt(null);
-              setPicking(address === null ? 'pin' : 'drain');
-            }}
-            onForgetPlace={() => {
-              // *Change* is what the design calls it, so it goes back to the
-              // map rather than just emptying the row.
-              setReportPlace(null);
-              setCandidate(null);
-              setPinAt(null);
-              setPicking(address === null ? 'pin' : 'drain');
-            }}
-          />
-          <span style={{ display: 'block', marginTop: space(3) }}>
-            <button
-              type="button"
-              onClick={() => {
-                setReportOpen(false);
-                setReportProblem(null);
-              }}
-              style={planLinkStyle}
-            >
-              Close
-            </button>
-          </span>
-        </MapNote>
-      )}
+      
 
       {panel &&
         viewport !== null &&
@@ -1411,7 +1715,6 @@ export function MapView({
         hit === null &&
         warning === null &&
         !layers.catchment &&
-        !layers.help &&
         !planOpen &&
         openPlace === null &&
         addressCard &&
@@ -1438,6 +1741,19 @@ export function MapView({
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
               Select a drain pit or pipe to read what the council recorded about it.
+            </span>
+          )}
+          {/*
+            Nothing to check, said on the card rather than by an empty map
+            (AC 5.1.3, change list item 11). An absence of marks is a result,
+            and it is not a safer address.
+          */}
+          {layers.beforeRain && places.length === 0 && (
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              {NO_PLACES}
+              <span style={{ display: 'block', marginTop: space(1), color: ink.subtle }}>
+                {NO_PLACES_MEANS}
+              </span>
             </span>
           )}
           {/*
@@ -1469,11 +1785,48 @@ export function MapView({
               </button>
             </span>
           )}
+
+          {/*
+            The way to the layer the card is already talking about.
+
+            The card says *water may pool about 20 m away* and then leaves the
+            reader to work out that there is a layer which draws exactly that.
+            The change list of 8 October asks for the button, and for it to
+            say which way it goes rather than being a switch with no state:
+            off, it offers to open the layer; on, it says the layer is already
+            open, and pressing it takes the layer off again. Both sentences
+            are the design's own.
+          */}
+          <span style={{ display: 'block', marginTop: space(2) }}>
+            <button
+              type="button"
+              aria-pressed={layers.lowPoint}
+              onClick={() => {
+                toggle('lowPoint');
+              }}
+              style={{
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                borderRadius: radius.small,
+                border: `1px solid ${layers.lowPoint ? brand.tint : line.base}`,
+                background: layers.lowPoint ? brand.wash : surface.raised,
+                color: layers.lowPoint ? brand.ink : ink.base,
+                font: type(text.small, { weight: weight.semibold }),
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+            >
+              {layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}
+            </button>
+          </span>
         </MapCallout>
       )}
     </>
   );
 }
+
+/** The two states of the address card's low-areas button (change list, item 2). */
+const OPEN_LOW_AREAS = 'Open low areas to see where water may pool';
+const LOW_AREAS_SHOWN = 'Low areas already show on map';
 
 /** Filled and outline, for the two choices a picking card offers. */
 const pickFilledStyle = {
