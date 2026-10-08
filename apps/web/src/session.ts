@@ -263,6 +263,16 @@ export interface Session {
    */
   readonly pendingTaskFrom: 'home' | 'choose';
   /**
+   * Which screen asked for the address, where no task is waiting.
+   *
+   * `pendingTaskFrom` answers the same question for an address asked for on
+   * the way to a task. The chooser asks for one with no task at all -- its
+   * guides are the thing being chosen -- and without this an address given
+   * there handed the reader to the task question, a screen they had not asked
+   * for and which does not offer the guides they were looking at.
+   */
+  readonly addressFrom: 'task' | 'choose';
+  /**
    * Where the comparison was opened from: the task question, or a drain on the
    * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
    * has no task question behind it, and may have no address at all.
@@ -316,6 +326,7 @@ export const INITIAL_SESSION: Session = {
   guideSection: null,
   pendingTask: null,
   pendingTaskFrom: 'home',
+  addressFrom: 'task',
   scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
@@ -499,7 +510,7 @@ export type SessionEvent =
    * the rule.
    */
   | { readonly type: 'address-abandoned' }
-  | { readonly type: 'change-address' }
+  | { readonly type: 'change-address'; readonly from?: 'choose' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
@@ -720,9 +731,13 @@ function step(session: Session, event: SessionEvent): Session {
         screen:
           session.guideSection !== null
             ? 'guide'
-            : session.pendingTask === null
-              ? 'task'
-              : screenForTask(session.pendingTask),
+            : session.pendingTask !== null
+              ? screenForTask(session.pendingTask)
+              : // The chooser asked, with no task waiting: back to the guides.
+                session.addressFrom === 'choose'
+                ? 'choose'
+                : 'task',
+        addressFrom: 'task',
         ...(session.pendingTask === null ? {} : { task: session.pendingTask }),
         pendingTask: null,
         address: event.address,
@@ -1016,7 +1031,7 @@ function step(session: Session, event: SessionEvent): Session {
       return session.address === null ? session : { ...session, screen: 'task' };
 
     case 'change-address':
-      return { ...session, screen: 'address' };
+      return { ...session, screen: 'address', addressFrom: event.from ?? 'task' };
 
     case 'change-scenario':
       // AC 2.2.4 (Aug-27 set): the inputs are still there when they get back.

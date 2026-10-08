@@ -591,7 +591,9 @@ export function App() {
             guided={GUIDED_SECTIONS}
             address={session.address?.label ?? null}
             onChangeAddress={() => {
-              dispatch({ type: 'change-address' });
+              // Asked for from here, so it comes back here rather than
+              // handing the reader to the task question they did not ask.
+              dispatch({ type: 'change-address', from: 'choose' });
             }}
             onStart={(section) => {
               dispatch({ type: 'guide-chosen', section });

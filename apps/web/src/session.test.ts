@@ -1376,6 +1376,27 @@ describe('the blocked-drain comparison, step by step', () => {
     expect(back.task).toBe('full-map');
   });
 
+  it('returns an address asked for by the chooser to the chooser', () => {
+    /*
+      The chooser asks for one with no task waiting -- its guides are the
+      thing being chosen -- and an address given there used to hand the reader
+      to the task question instead, a screen they had not asked for and which
+      does not offer the guides they were looking at.
+    */
+    const asked = reduce({ ...INITIAL_SESSION, screen: 'choose' }, { type: 'change-address', from: 'choose' });
+    expect(asked.screen).toBe('address');
+    expect(asked.addressFrom).toBe('choose');
+    const given = reduce(asked, { type: 'address-accepted', address: GATEHOUSE });
+    expect(given.screen).toBe('choose');
+    expect(given.address).toEqual(GATEHOUSE);
+    expect(given.addressFrom).toBe('task');
+  });
+
+  it('still sends an address asked for on the way to a task to the task question', () => {
+    const asked = reduce({ ...INITIAL_SESSION, screen: 'task' }, { type: 'change-address' });
+    expect(reduce(asked, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('task');
+  });
+
   it('leaves a pit chosen on the full map where it was', () => {
     const onMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'pit-selected', pitId: '1', suggested: false }]);
     expect(onMap.screen).toBe('explore');
