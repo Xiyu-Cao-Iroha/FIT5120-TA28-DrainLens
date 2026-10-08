@@ -82,6 +82,18 @@ export const DRAINAGE_LEVELS: readonly DrainageLevel[] = [
  * levels are general roles and do not establish who owns or operates a
  * particular asset.
  */
+/**
+ * The two public levels, as the drainage-area card labels them (Figma D4).
+ *
+ * `title` names the level and is right in the list of three, where a reader
+ * is learning what the levels are. On the card the rows are about one area,
+ * and the question is which part of *it* each organisation holds.
+ */
+export const AREA_ROW_LABEL: Readonly<Record<string, string>> = {
+  street: 'Street drains and pipes on these streets',
+  regional: 'Main drain this area flows into',
+};
+
 export const GENERAL_ROLES_ONLY =
   'These are general roles. They do not confirm who legally owns or operates any particular drain, pit or pipe.';
 

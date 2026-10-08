@@ -42,7 +42,7 @@ import {
   updatedLine,
   widerNames,
 } from '../catchment/wording.js';
-import { DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchment/help.js';
+import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchment/help.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
@@ -58,6 +58,7 @@ export function DrainageArea({
   area,
   hasAddress = true,
   onReport,
+  onBack,
 }: {
   readonly area: Subcatchment | null;
   /**
@@ -77,15 +78,44 @@ export function DrainageArea({
    * disappear.
    */
   readonly onReport?: (() => void) | undefined;
+  /**
+   * Close the card, as the design's *Back to address* does (Figma D4).
+   *
+   * It takes the layer off, which is what put the card there: a close that
+   * left the boundary drawn would be a card you cannot get back without
+   * finding the chip, and a boundary with nothing explaining it.
+   */
+  readonly onBack?: (() => void) | undefined;
 }) {
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   const rolesId = useId();
   const [rolesOpen, setRolesOpen] = useState(false);
 
+  const back =
+    onBack === undefined ? null : (
+      <p style={{ margin: `0 0 ${String(space(2))}px` }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: type(text.small, { weight: weight.semibold }),
+            color: brand.ink,
+            cursor: 'pointer',
+          }}
+        >
+          ‹ Back to the map
+        </button>
+      </p>
+    );
+
   if (!hasAddress) {
     return (
       <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
+        {back}
         <p style={{ margin: 0 }}>{NO_ADDRESS_YET}</p>
         <span style={{ display: 'block', marginTop: space(2) }}>
           <SourceLink id="drainageArea" />
@@ -113,6 +143,7 @@ export function DrainageArea({
 
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
+      {back}
       <p style={{ margin: 0, font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
         {area.displayName}
       </p>
@@ -173,7 +204,7 @@ export function DrainageArea({
               borderBottom: `1px solid ${line.hair}`,
             }}
           >
-            <dt style={{ margin: 0, color: ink.muted }}>{level.title}</dt>
+            <dt style={{ margin: 0, color: ink.muted }}>{AREA_ROW_LABEL[level.id] ?? level.title}</dt>
             <dd
               style={{
                 margin: 0,
