@@ -96,8 +96,20 @@ export function printedPlan(
   address: string,
   places: readonly Place[],
   relevance: Readonly<Record<number, Relevance>>,
+  /**
+   * The general actions the reader ticked, by id.
+   *
+   * **Empty means all of them, and that is deliberate.** The ticks are an
+   * optional filter on what to take away, not a question the plan insists on:
+   * a reader who used them gets what they chose, and a reader who ignored them
+   * gets the advice rather than a page with its middle section missing. Until
+   * 8 October the page carried all three however the boxes were left, which
+   * the team reported as unticked items reaching the print.
+   */
+  ticked: ReadonlySet<string>,
   on: Date,
 ): PrintedPlan {
+  const chosen = ticked.size === 0 ? GENERAL_ACTIONS : GENERAL_ACTIONS.filter((a) => ticked.has(a.id));
   return {
     title: PRINTED_TITLE,
     address,
@@ -109,13 +121,14 @@ export function printedPlan(
       text: reminderFor(place),
       source: PLACE_SOURCE,
     })),
-    generalActions: GENERAL_ACTIONS.map((action) => ({
+    generalActions: chosen.map((action) => ({
       text: action.text,
       source: action.publisher,
     })),
     safety: SAFETY,
     sources: [
-      ...new Set(GENERAL_ACTIONS.map((action) => `${action.publisher}: ${action.page}`)),
+      // Every source behind something on the page, and nothing else.
+      ...new Set(chosen.map((action) => `${action.publisher}: ${action.page}`)),
       `${VICEMERGENCY.label}: ${VICEMERGENCY.href}`,
     ],
     keepLine: KEEP_LINE,
