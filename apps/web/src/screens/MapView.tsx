@@ -551,10 +551,13 @@ export function MapView({
     const key = `${address.label}:${String(places.length)}`;
     if (openedFor.current === key) return;
     openedFor.current = key;
-    if (places.length === 0) {
-      setAddressCardOpen(true);
-      return;
-    }
+    /*
+      Nothing near the address needs no card opened for it: the note in the
+      corner stack below says so, and says it whether or not the plan is open.
+      Opening the address card as well put the same two sentences on the
+      screen twice.
+    */
+    if (places.length === 0) return;
     setOpenPlace((current) => current ?? places[0]?.number ?? null);
   }, [guided, layers.beforeRain, address, places]);
 
@@ -581,7 +584,16 @@ export function MapView({
     return { key: `places:${address.label}`, points: corners, reservePanel: false };
   }, [layers.beforeRain, address]);
 
-  const planShowing = panel && viewport !== null && planOpen && openPlace === null;
+  /*
+    The plan and an open place card are no longer exclusive.
+
+    They were, and the cost was reported on 8 October: answering a place left
+    the reader on a map with the card gone and no way back to the plan except
+    the address pin. The plan is a sidebar beside the map and the card is
+    anchored on the map, so both fit -- the card is kept clear of the sidebar
+    by `calloutWithin` below.
+  */
+  const planShowing = panel && viewport !== null && planOpen;
   const sidebarOpen = planShowing && panelWidth > 0;
   /*
     Too narrow for a sidebar, so the plan goes back in the card it used to
@@ -589,7 +601,21 @@ export function MapView({
     sheet is not built -- but a worse screen than a sidebar is still better
     than a window where the plan button does nothing.
   */
-  const planInCard = planShowing && panelWidth === 0;
+  const planInCard = planShowing && panelWidth === 0 && openPlace === null;
+
+  /*
+    The box a callout may not leave.
+
+    The sidebar is drawn over the canvas rather than beside it -- the map is
+    deliberately not re-fitted when the plan opens, so that what the reader is
+    looking at does not move under them. A card placed against the canvas's
+    full width can therefore end up behind the sidebar, which is how a place
+    card and an open plan used to be impossible to have at once.
+  */
+  const calloutWithin =
+    viewport === null
+      ? { width: 0, height: 0 }
+      : { width: viewport.widthPx - (sidebarOpen ? panelWidth : 0), height: viewport.heightPx };
 
   const planPanel = (
     <PreparePlan
@@ -1246,7 +1272,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && minimised && onScreen(hit.feature.c, viewport) && (
         <MinimisedCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Drain pit ${String(hit.feature.asset_number)}`}
           onExpand={() => {
             setMinimised(false);
@@ -1261,7 +1287,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && !minimised && onScreen(hit.feature.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={publicLabelOf(hit.feature)}
           // A grey source line at the foot, not a badge (copy audit v4, #30).
           source="recorded"
@@ -1330,7 +1356,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pipe' && onScreen(midpoint(hit.feature.c), viewport) && (
         <MapCallout
           at={toScreen(viewport, midpoint(hit.feature.c))}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
           // The same source line as the pit card; the pipe card had the badge too.
           source="recorded"
@@ -1377,7 +1403,7 @@ export function MapView({
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={WARNING_TITLE}
           onClose={() => {
             setWarning(null);
@@ -1512,6 +1538,39 @@ export function MapView({
         {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
           <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
         )}
+
+        {/*
+          Nothing near this address, said as a result rather than as a footnote
+          (AC 5.1.3).
+
+          It was two lines at the bottom of the address card, and the address
+          card is hidden while the plan is open -- so a reader who opened the
+          plan was left with the same two lines in small type inside a sidebar.
+          Reported on 8 October: *the user will not go looking in the sidebar
+          for it*. An absence of marks is the answer to what they asked, so it
+          is a card of its own, in the column the other answers appear in, and
+          it stays there with the plan open.
+        */}
+        {panel && viewport !== null && layers.beforeRain && address !== null && places.length === 0 && (
+          <MapNote title={BEFORE_RAIN_CHIP}>
+            {NO_PLACES}
+            <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_MEANS}</span>
+            {!planOpen && (
+              <span style={{ display: 'block', marginTop: space(3) }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddressCardOpen(false);
+                    setPlanOpen(true);
+                  }}
+                  style={planLinkStyle}
+                >
+                  {checkButton(places)}
+                </button>
+              </span>
+            )}
+          </MapNote>
+        )}
       </MapNoteStack>
 
       {/*
@@ -1534,7 +1593,7 @@ export function MapView({
         onScreen([address.eastingM, address.northingM], viewport) && (
           <MapCallout
             at={toScreen(viewport, [address.eastingM, address.northingM])}
-            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            within={calloutWithin}
             title={address.label}
             onClose={() => {
               // Closing it leaves the layer on: the markers are the point, and
@@ -1590,7 +1649,7 @@ export function MapView({
         return (
           <MapCallout
             at={toScreen(viewport, place.at)}
-            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            within={calloutWithin}
             title={placeTitle(place)}
             onClose={() => {
               setOpenPlace(null);
@@ -1603,11 +1662,17 @@ export function MapView({
                 onReviewPlace?.(place.number, answer);
                 /*
                   The answer sends the reader on, as the design draws it: to
-                  the next numbered place, or — on the last one — to the plan,
-                  which is where the answer has just changed something. Staying
-                  on a card whose question has been answered leaves the reader
-                  looking for what their press did.
+                  the next numbered place, and to the plan, which is where the
+                  answer has just changed something. Staying on a card whose
+                  question has been answered leaves the reader looking for what
+                  their press did.
+
+                  Both, not one or the other. Until 8 October this only moved
+                  to the next card, and on the last one it closed and left a
+                  bare map: the plan was reachable again only by finding the
+                  address pin and pressing the button on its card.
                 */
+                setPlanOpen(true);
                 setOpenPlace(next?.number ?? null);
               }}
               {...(next === undefined
@@ -1678,7 +1743,7 @@ export function MapView({
         onScreen([address.eastingM, address.northingM], viewport) && (
         <MapCallout
           at={toScreen(viewport, [address.eastingM, address.northingM])}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={address.label}
           onClose={() => {
             setAddressCardOpen(false);
@@ -1697,19 +1762,6 @@ export function MapView({
           {guided && (
             <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
               Select a drain pit or pipe to read what the council recorded about it.
-            </span>
-          )}
-          {/*
-            Nothing to check, said on the card rather than by an empty map
-            (AC 5.1.3, change list item 11). An absence of marks is a result,
-            and it is not a safer address.
-          */}
-          {layers.beforeRain && places.length === 0 && (
-            <span style={{ display: 'block', marginTop: space(2) }}>
-              {NO_PLACES}
-              <span style={{ display: 'block', marginTop: space(1), color: ink.subtle }}>
-                {NO_PLACES_MEANS}
-              </span>
             </span>
           )}
           {/*
