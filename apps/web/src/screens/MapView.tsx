@@ -585,6 +585,24 @@ export function MapView({
     Keyed on the address, so it fits once when the address arrives and leaves
     the reader's own panning alone afterwards.
   */
+  /*
+    How many times the before-rain layer has been switched on.
+
+    The fit below is keyed on the address, so it ran once and never again --
+    and a reader who had since zoomed out got the layer, the markers and no
+    card, because `warningsVisible` stops drawing a sign over a neighbourhood
+    below 1.25 px/m. Reported on 9 October: pressing the before-rain chip from
+    too far out gives no warning card at all. Counting the switch-ons puts the
+    view back on the 200 m box every time the layer comes on, which is well
+    inside that threshold -- rather than adding a second rule about when to
+    zoom.
+  */
+  const [checksOpened, setChecksOpened] = useState(0);
+  const beforeRainOn = layers.beforeRain;
+  useEffect(() => {
+    if (beforeRainOn) setChecksOpened((was) => was + 1);
+  }, [beforeRainOn]);
+
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
     const r = PLACE_RADIUS_M;
@@ -592,8 +610,8 @@ export function MapView({
       [address.eastingM - r, address.northingM - r],
       [address.eastingM + r, address.northingM + r],
     ];
-    return { key: `places:${address.label}`, points: corners, reservePanel: false };
-  }, [layers.beforeRain, address]);
+    return { key: `places:${address.label}:${String(checksOpened)}`, points: corners, reservePanel: false };
+  }, [layers.beforeRain, address, checksOpened]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -606,6 +624,16 @@ export function MapView({
   */
   const planShowing = panel && viewport !== null && planOpen;
   const sidebarOpen = planShowing && panelWidth > 0;
+  /*
+    Whether *a* sidebar is open, which is what the map's own chrome cares about.
+
+    The legend, the zoom controls and the layer chips were all moved aside by
+    `sidebarOpen` -- the plan's. Opening the street-drains list closes the plan
+    (`openDrains`), so the chrome moved back under a panel that was still
+    there: the legend and the zoom buttons ended up behind it, reported on
+    9 October as *legend 失效，缩放图标被遮盖*. A second panel in the same place
+    needs the same room.
+  */
   /*
     Too narrow for a sidebar, so the plan goes back in the card it used to
     live in. Not a good screen -- the design has a sheet for this and the
@@ -647,6 +675,75 @@ export function MapView({
     setDrainPicked(null);
     setReportPlace(null);
   }, [addressId]);
+
+  /*
+    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
+
+    The button used to switch Drain pits on, which left a reader looking for
+    the drain outside their own house among a few hundred identical circles.
+    The panel names each one from the address it is nearest to and groups them
+    by street, and the layer goes on with it so the list and the map are about
+    the same things.
+  */
+  const [drainsOpen, setDrainsOpen] = useState(false);
+  /** The drain the list picked, which gets a card of its own (Figma S2). */
+  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
+
+  /**
+   * The reader's address as the index holds it, in parts.
+   *
+   * `indexed` above finds the same record by label; this is by id, which is
+   * what the address carries, and null where the map is running without an
+   * index at all -- inside a guide, where this panel is not offered.
+   *
+   * The panel names the street address rather than the postal label: *within
+   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
+   * the end of it is already in the panel's own subtitle.
+   */
+  const yourAddress = useMemo(
+    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
+    [index, address],
+  );
+  const yourStreet = yourAddress?.street ?? null;
+  const streetAddress =
+    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
+
+  const drainsNear = useMemo(
+    () =>
+      address === null || index === undefined
+        ? null
+        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
+    [map, index, address, yourStreet],
+  );
+
+  /** The street-drains list, in the same place the plan's sidebar goes. */
+  const drainsSidebarOpen =
+    panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0;
+
+  /**
+   * Either of them, which is what the map's own chrome has to move for.
+   *
+   * The legend, the zoom controls and the layer chips were all moved aside by
+   * the plan's `sidebarOpen`. Opening the street-drains list closes the plan,
+   * so the chrome moved back under a panel that was still there and the legend
+   * and zoom buttons ended up behind it (reported 9 October). A second panel in
+   * the same place needs the same room.
+   */
+  const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
+
+  /*
+    The drain the list picked, as the canvas names pits.
+
+    The panel works in asset numbers as strings, because that is what the
+    council's record and the reporting pathway both carry; the canvas keys its
+    ring on a number. A record whose number is not one is drawn as nothing
+    rather than as some other pit.
+  */
+  const pickedPitNumber = useMemo(() => {
+    if (drainPicked === null) return null;
+    const asNumber = Number(drainPicked.id);
+    return Number.isFinite(asNumber) ? asNumber : null;
+  }, [drainPicked]);
 
   const openDrains = () => {
     // The layer goes on with the list, so the map and the panel are about the
@@ -728,46 +825,6 @@ export function MapView({
     still tested, so there is something to read from if the card or a guide
     wants the fall again.
   */
-
-  /*
-    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
-
-    The button used to switch Drain pits on, which left a reader looking for
-    the drain outside their own house among a few hundred identical circles.
-    The panel names each one from the address it is nearest to and groups them
-    by street, and the layer goes on with it so the list and the map are about
-    the same things.
-  */
-  const [drainsOpen, setDrainsOpen] = useState(false);
-  /** The drain the list picked, which gets a card of its own (Figma S2). */
-  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
-
-  /**
-   * The reader's address as the index holds it, in parts.
-   *
-   * `indexed` above finds the same record by label; this is by id, which is
-   * what the address carries, and null where the map is running without an
-   * index at all -- inside a guide, where this panel is not offered.
-   *
-   * The panel names the street address rather than the postal label: *within
-   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
-   * the end of it is already in the panel's own subtitle.
-   */
-  const yourAddress = useMemo(
-    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
-    [index, address],
-  );
-  const yourStreet = yourAddress?.street ?? null;
-  const streetAddress =
-    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
-
-  const drainsNear = useMemo(
-    () =>
-      address === null || index === undefined
-        ? null
-        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
-    [map, index, address, yourStreet],
-  );
 
   const explanation = useMemo(
     () =>
@@ -920,14 +977,20 @@ export function MapView({
   return (
     <>
       <MapCanvas
-        controlsInset={sidebarOpen ? panelWidth : 0}
+        controlsInset={anySidebarOpen ? panelWidth : 0}
         artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
         show={visibilityOf(picking === null ? layers : NOTHING_ON)}
         selectedPit={selected}
-        // Only while the pits are drawn. A ring around a pit on a map with no
-        // pits on it is a mark with nothing under it.
-        suggestedPit={pitsDrawn ? highlightPit : null}
+        /*
+          Only while the pits are drawn. A ring around a pit on a map with no
+          pits on it is a mark with nothing under it.
+
+          The drain the street-drains list picked takes the same ring: it was
+          a row in a panel and a card on the map with nothing joining them, so
+          *选的 drain 在地图上没有高亮，找不到是哪个* (9 October).
+        */
+        suggestedPit={pitsDrawn ? (pickedPitNumber ?? highlightPit) : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
@@ -1218,7 +1281,7 @@ export function MapView({
           style={{
             position: 'absolute',
             left: space(4),
-            right: space(4) + (sidebarOpen ? panelWidth : 0),
+            right: space(4) + (anySidebarOpen ? panelWidth : 0),
             top: space(4),
             transition: 'right 160ms ease',
             zIndex: 4,
@@ -1240,7 +1303,7 @@ export function MapView({
             )}
             <LayerChips
               collapsible={!guided && !touring}
-              fold={sidebarOpen}
+              fold={anySidebarOpen}
               state={layers}
               onToggle={toggle}
               unavailableKeys={notYet}
@@ -1279,7 +1342,7 @@ export function MapView({
           {legend && !layersOpen && (
             <MapLegend
               state={layers}
-              fold={sidebarOpen}
+              fold={anySidebarOpen}
               pulseTerrain={highlight === 'terrain-legend'}
             />
           )}
@@ -1765,7 +1828,7 @@ export function MapView({
       })()}
 
       {/* Step 3's list of drains (Figma S1–S4), in the plan's own container. */}
-      {panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0 && (
+      {drainsSidebarOpen && drainsNear !== null && address !== null && (
         <Sidebar
           title={STREET_DRAINS_HEADING}
           subtitle={address.label}
