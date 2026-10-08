@@ -27,20 +27,34 @@ import {
   widerNames,
 } from './wording.js';
 
-const area = (over: Partial<Subcatchment> = {}): Subcatchment => ({
-  number: '4410',
-  name: 'ALEXANDRA PARADE M.D.',
-  displayName: 'Alexandra Parade Main Drain',
-  class: 'unclassified',
-  rings: [[[0, 0], [1, 0], [1, 1]]],
-  lastUpdated: '2013-11-20',
-  captured: '2002-07-24',
-  areaSqKm: 10.54,
-  majorName: 'YARRA RIVER MAIN STREAM',
-  basinName: 'Yarra',
-  summary: { pits: 1002, pipeLengthM: 19_000, lowAreas: 1578, coverage: 0.909 },
-  ...over,
-});
+/**
+ * One area, with fields overridden or removed.
+ *
+ * `undefined` in an override means *this record does not have that field*,
+ * and the key is deleted rather than set to `undefined`: under
+ * `exactOptionalPropertyTypes` those are different states, and the card's
+ * job is to say nothing where a date or an area is missing.
+ */
+const area = (over: { [K in keyof Subcatchment]?: Subcatchment[K] | undefined } = {}): Subcatchment => {
+  const base: Subcatchment = {
+    number: '4410',
+    name: 'ALEXANDRA PARADE M.D.',
+    displayName: 'Alexandra Parade Main Drain',
+    class: 'unclassified',
+    rings: [[[0, 0], [1, 0], [1, 1]]],
+    lastUpdated: '2013-11-20',
+    captured: '2002-07-24',
+    areaSqKm: 10.54,
+    majorName: 'YARRA RIVER MAIN STREAM',
+    basinName: 'Yarra',
+    summary: { pits: 1002, pipeLengthM: 19_000, lowAreas: 1578, coverage: 0.909 },
+  };
+  const made: Record<string, unknown> = { ...base, ...over };
+  for (const [key, value] of Object.entries(over)) {
+    if (value === undefined) delete made[key];
+  }
+  return made as unknown as Subcatchment;
+};
 
 describe('what receives this area’s water', () => {
   it('names the drain only where the class says so', () => {

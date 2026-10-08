@@ -25,10 +25,9 @@ const ALL_LAYERS: readonly LayerKey[] = [
   'pit',
   'pipe',
   'terrain',
-  // Epic 6's two, from Iteration 3's Figma: the drainage area's boundary and
-  // the three levels of who looks after what.
+  // Epic 6's layer, from Iteration 3's Figma: the drainage area's boundary.
+  // Who looks after what is a section of its card, not a layer of its own.
   'catchment',
-  'help',
   'beforeRain',
   'channel',
   'lowPoint',
@@ -58,7 +57,6 @@ describe('where each control lives', () => {
       'channel',
       'lowPoint',
       'catchment',
-      'help',
       'beforeRain',
     ]);
     expect(PANEL_KEYS).toEqual(['terrain']);
@@ -133,7 +131,6 @@ describe('openingLayers', () => {
       // Off even under the drainage-area card: its guide's first step is to
       // press the chip, and a boundary already drawn makes that a no-op.
       catchment: false,
-      help: false,
       beforeRain: false,
     });
     expect(openingLayers('water-flow').channel).toBe(true);
@@ -163,7 +160,6 @@ describe('openingLayers', () => {
       terrain: true,
       unavailable: true,
       catchment: false,
-      help: false,
       beforeRain: false,
     });
   });
@@ -191,12 +187,12 @@ describe('the legend against the marks on the map', () => {
     }
   });
 
-  it('leaves out the layers that draw no mark of their own', () => {
-    // `help` is a card about who to contact. `catchment` draws a boundary but
-    // is Melbourne Water's record rather than the council's, and neither of
-    // the legend's two groups says that; its own card carries the source.
+  it('leaves out the layer whose source neither group names', () => {
+    // `catchment` draws a boundary, but it is Melbourne Water's record rather
+    // than the council's, and neither of the legend's two groups says that;
+    // its own card carries the source.
     const listed = new Set(LEGEND_GROUPS.flatMap((group) => group.keys));
-    expect(listed.has('help')).toBe(false);
+    expect(listed.has('catchment')).toBe(false);
   });
 
   it('calls the before-rain markers an estimate, never a record', () => {

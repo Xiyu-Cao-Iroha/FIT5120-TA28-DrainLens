@@ -194,7 +194,6 @@ describe.each(written)('%s', (id, lesson) => {
       lowPoints: true,
       unmeasured: true,
       catchment: true,
-      help: true,
       planOpen: true,
       placesReviewed: 1,
     });
@@ -259,8 +258,6 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, whyOpen: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
-    case 'help-on':
-      return latch(state, { ...state, help: true });
     case 'terrain-off':
       return latch(state, { ...state, terrain: false });
     default:

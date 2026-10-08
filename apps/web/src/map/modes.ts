@@ -42,13 +42,18 @@ export type LayerKey =
   | 'lowPoint'
   | 'unavailable'
   /*
-    Epic 6's two, from the team's Figma for Iteration 3 (node 22:566, *Your
-    drainage area*). They are chips like the rest, and they are offered only
-    inside their own guide: the drainage area is about the address, and a chip
-    for it on a map with no address chosen would draw nothing.
+    Epic 6's layer, from the team's Figma for Iteration 3 (node 22:566, *Your
+    drainage area*). It is a chip like the rest, and it is offered only inside
+    its own guide: the drainage area is about the address, and a chip for it
+    on a map with no address chosen would draw nothing.
+
+    There were two. *Who can help* was the second, and it was removed on 8
+    October: it drew nothing on the map, it was a second card competing with
+    this one for the same corner -- turning it on made the drainage-area card
+    disappear, which is how it was reported -- and everything it said belongs
+    on the card about the area it is saying it about.
   */
   | 'catchment'
-  | 'help'
   /* Epic 5's layer: the numbered places to check before heavy rain. */
   | 'beforeRain';
 
@@ -66,7 +71,6 @@ export const CHIP_KEYS: readonly LayerKey[] = [
   'channel',
   'lowPoint',
   'catchment',
-  'help',
   'beforeRain',
 ];
 
@@ -143,7 +147,6 @@ export const NOTHING_ON: LayerState = {
   // and every preset carries it for that reason (4 October).
   unavailable: true,
   catchment: false,
-  help: false,
   beforeRain: false,
 };
 
@@ -156,7 +159,6 @@ export const ALL_ON: LayerState = {
   lowPoint: true,
   unavailable: true,
   catchment: true,
-  help: true,
   beforeRain: true,
 };
 
@@ -169,7 +171,6 @@ export const GUIDED_ON: LayerState = {
   lowPoint: false,
   unavailable: true,
   catchment: false,
-  help: false,
   beforeRain: false,
 };
 
@@ -195,7 +196,6 @@ export function openingLayers(requested: MapMode): LayerState {
     // Off even under its own card: the guide's first step is to press the
     // chip, and a boundary already drawn would make that step a no-op.
     catchment: false,
-    help: false,
     // On under its own card, and only there: AC 5.1.1 puts the numbered
     // markers on the map as soon as an address is chosen, and the guide's
     // first step is the button they come with rather than the layer itself.

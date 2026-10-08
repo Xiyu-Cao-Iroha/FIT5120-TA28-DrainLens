@@ -17,10 +17,10 @@
 import type { ReceivingClass, Subcatchment } from './artefact.js';
 
 /** The heading, and what the whole card is about. */
-export const DRAINAGE_AREA = 'My drainage area';
+export const DRAINAGE_AREA = 'Recorded subcatchment area';
 
 /** The two chips Epic 6's guide asks the reader to press (Figma D1, D3). */
-export const CATCHMENT_CHIP = 'My drainage area';
+export const CATCHMENT_CHIP = 'Recorded subcatchment area';
 export const HELP_CHIP = 'Who can help';
 
 /** Who recorded the areas, said on the card (AC 6.1.1). */
@@ -72,6 +72,17 @@ export const MAY_NOT_REFLECT_DEVELOPMENT =
 /** The address no recorded area contains (AC 6.1.5). */
 export const NO_AREA_FOUND =
   'A drainage area could not be confidently identified for this address.';
+
+/**
+ * What the card says before there is an address to answer about.
+ *
+ * Reported on 8 October: with the layer on and nothing searched, the card
+ * said *could not be confidently identified for this address*, which is a
+ * sentence about an address nobody had given. Two different absences --
+ * nothing asked, and asked but not found -- and only one of them is the
+ * product's limit.
+ */
+export const NO_ADDRESS_YET = 'Search for an address to see the area it drains with.';
 
 /**
  * Why that is not a reason to offer the nearest one.
