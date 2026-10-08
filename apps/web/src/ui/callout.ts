@@ -62,7 +62,20 @@ export interface Placement {
  * which is why the caret's own offset is computed from the final position
  * rather than assumed to be the middle.
  */
-export function placeCard(spot: Box, card: Box, view: { width: number; height: number }): Placement {
+export function placeCard(
+  spot: Box,
+  card: Box,
+  view: { width: number; height: number },
+  /**
+   * Which side to try first.
+   *
+   * Below, unless the caller has a reason: the map's two cards can now be open
+   * at once, and two cards that both chose *below* their own mark land on each
+   * other whenever the marks are close. The caller knows which mark is which
+   * and asks for the far side.
+   */
+  prefer: 'below' | 'above' = 'below',
+): Placement {
   const below = spot.y + spot.height + CARD_GAP;
   const above = spot.y - CARD_GAP - card.height;
 
@@ -71,7 +84,10 @@ export function placeCard(spot: Box, card: Box, view: { width: number; height: n
 
   let top: number;
   let caret: Placement['caret'];
-  if (fitsBelow) {
+  if (prefer === 'above' && fitsAbove) {
+    top = above;
+    caret = 'bottom';
+  } else if (fitsBelow) {
     top = below;
     caret = 'top';
   } else if (fitsAbove) {

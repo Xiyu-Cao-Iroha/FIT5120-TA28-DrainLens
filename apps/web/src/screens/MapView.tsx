@@ -63,10 +63,12 @@ import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import {
   BEFORE_RAIN_CHIP,
+  CHECK_STREET_DRAINS,
+  EVERY_HOME,
   NO_ADDRESS_FOR_CHECKS,
-  NO_PLACES,
+  NO_PLACES_IN_RING,
+  NO_PLACES_STILL,
   PLACE_RADIUS_M,
-  NO_PLACES_MEANS,
   type Place,
   type Relevance,
   checkButton,
@@ -74,6 +76,7 @@ import {
   placeTitle,
   placesNear,
 } from '../prepare/places.js';
+import { LAYER } from '../ui/terms.js';
 import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
@@ -552,12 +555,13 @@ export function MapView({
     if (openedFor.current === key) return;
     openedFor.current = key;
     /*
-      Nothing near the address needs no card opened for it: the note in the
-      corner stack below says so, and says it whether or not the plan is open.
-      Opening the address card as well put the same two sentences on the
-      screen twice.
+      Nothing near the address: the address card is the answer (Figma A8), so
+      it is opened rather than left for the reader to find the pin.
     */
-    if (places.length === 0) return;
+    if (places.length === 0) {
+      setAddressCardOpen(true);
+      return;
+    }
     setOpenPlace((current) => current ?? places[0]?.number ?? null);
   }, [guided, layers.beforeRain, address, places]);
 
@@ -1539,38 +1543,6 @@ export function MapView({
           <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
         )}
 
-        {/*
-          Nothing near this address, said as a result rather than as a footnote
-          (AC 5.1.3).
-
-          It was two lines at the bottom of the address card, and the address
-          card is hidden while the plan is open -- so a reader who opened the
-          plan was left with the same two lines in small type inside a sidebar.
-          Reported on 8 October: *the user will not go looking in the sidebar
-          for it*. An absence of marks is the answer to what they asked, so it
-          is a card of its own, in the column the other answers appear in, and
-          it stays there with the plan open.
-        */}
-        {panel && viewport !== null && layers.beforeRain && address !== null && places.length === 0 && (
-          <MapNote title={BEFORE_RAIN_CHIP}>
-            {NO_PLACES}
-            <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_MEANS}</span>
-            {!planOpen && (
-              <span style={{ display: 'block', marginTop: space(3) }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddressCardOpen(false);
-                    setPlanOpen(true);
-                  }}
-                  style={planLinkStyle}
-                >
-                  {checkButton(places)}
-                </button>
-              </span>
-            )}
-          </MapNote>
-        )}
       </MapNoteStack>
 
       {/*
@@ -1646,10 +1618,25 @@ export function MapView({
         if (place === undefined) return null;
         if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
+        /*
+          Away from the address card, which is now open beside this one.
+
+          Both cards hang below their own mark by default, so a place a few
+          metres from the address put them on top of each other. The address
+          pin's side is the near side; this one takes the other.
+        */
+        const at = toScreen(viewport, place.at);
+        const pinAt = address === null ? null : toScreen(viewport, [address.eastingM, address.northingM]);
+        const prefer = pinAt !== null && pinAt[1] > at[1] ? 'above' : 'below';
         return (
           <MapCallout
-            at={toScreen(viewport, place.at)}
+            at={at}
             within={calloutWithin}
+            prefer={prefer}
+            // In front of the address card where the two cannot both be clear:
+            // this one is asking a question and its buttons have to be
+            // reachable.
+            layer={7}
             title={placeTitle(place)}
             onClose={() => {
               setOpenPlace(null);
@@ -1737,7 +1724,6 @@ export function MapView({
         warning === null &&
         !layers.catchment &&
         !planOpen &&
-        openPlace === null &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
@@ -1749,83 +1735,139 @@ export function MapView({
             setAddressCardOpen(false);
           }}
         >
-          {explanation === null && groundTrend === null ? (
-            <>
-              No place where water may flow or collect was found close to this address.
-              <span style={{ display: 'block', marginTop: space(2) }}>
-                <SourceLink id="derived" />
-              </span>
-            </>
-          ) : (
-            <AddressInsight ground={groundTrend} near={explanation} />
-          )}
-          {guided && (
-            <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
-              Select a drain pit or pipe to read what the council recorded about it.
-            </span>
-          )}
           {/*
-            AC 5.1.1: the count where there are places, the same words without
-            it where there are none — and the plan is reachable either way,
-            because the general actions are for every home.
+            Nothing within the ring, said here rather than anywhere else
+            (Figma A8, *map message first, then the plan*).
+
+            It was two lines under the figure, and then — on 8 October — a
+            note of its own in the corner stack. The design puts it in this
+            card, with the two things still worth doing under it, and that is
+            better than either: the reader is looking at the pin, the answer
+            is about the pin, and it offers somewhere to go rather than only
+            reporting an absence.
+
+            No figure above it. A compass of water that is not there is a
+            picture of nothing.
           */}
-          {layers.beforeRain && (
-            <span style={{ display: 'block', marginTop: space(2) }}>
+          {layers.beforeRain && places.length === 0 ? (
+            <>
+              <span style={{ display: 'block', font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {NO_PLACES_IN_RING}
+              </span>
+              <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_STILL}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // The drains themselves, which is what the sentence above
+                  // just said were worth a look. A layer, so this switches it
+                  // on rather than going anywhere.
+                  if (!layers.pit) toggle('pit');
+                }}
+                style={primaryCardButton}
+              >
+                {CHECK_STREET_DRAINS} ›
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setAddressCardOpen(false);
                   setPlanOpen(true);
-                  setOpenPlace(places[0]?.number ?? null);
+                }}
+                style={cardLinkButton}
+              >
+                {EVERY_HOME} ›
+              </button>
+            </>
+          ) : (
+            <>
+              {explanation === null && groundTrend === null ? (
+                <>
+                  No place where water may flow or collect was found close to this address.
+                  <span style={{ display: 'block', marginTop: space(2) }}>
+                    <SourceLink id="derived" />
+                  </span>
+                </>
+              ) : (
+                <AddressInsight ground={groundTrend} near={explanation} />
+              )}
+              {guided && (
+                <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
+                  Select a drain pit or pipe to read what the council recorded about it.
+                </span>
+              )}
+              {/*
+                The places, counted (AC 5.1.1, Figma A9).
+
+                The design makes this the card's one filled button, because of
+                everything on the card it is the thing the reader came for. It
+                was an underlined link under the figure, which read as a
+                footnote to the picture rather than as the way on.
+              */}
+              {layers.beforeRain && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddressCardOpen(false);
+                    setPlanOpen(true);
+                    setOpenPlace(places[0]?.number ?? null);
+                  }}
+                  style={primaryCardButton}
+                >
+                  {checkButton(places)}
+                </button>
+              )}
+
+              {/*
+                The way to the layer the card is already talking about.
+
+                The card says *water may pool about 20 m away* and then leaves
+                the reader to work out that there is a layer which draws
+                exactly that. The change list of 8 October asks for the button,
+                and for it to say which way it goes rather than being a switch
+                with no state: off, it offers to open the layer; on, it says the
+                layer is already open, and pressing it takes the layer off
+                again. Both sentences are the design's own.
+
+                The mark beside it is the legend's own low-areas swatch, so the
+                button and the thing it draws are recognisably the same.
+              */}
+              <button
+                type="button"
+                aria-pressed={layers.lowPoint}
+                onClick={() => {
+                  toggle('lowPoint');
                 }}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.small, { weight: weight.semibold }),
-                  color: ink.base,
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                  cursor: 'pointer',
+                  ...outlineCardButton,
+                  borderColor: layers.lowPoint ? brand.tint : line.base,
+                  background: layers.lowPoint ? brand.wash : surface.raised,
                 }}
               >
-                {checkButton(places)}
+                <svg width="20" height="12" viewBox="0 0 20 12" aria-hidden focusable="false" style={{ flexShrink: 0 }}>
+                  <ellipse cx="10" cy="6" rx="7" ry="4.5" fill="#5aa0cd" opacity="0.45" stroke="#5aa0cd" />
+                </svg>
+                <span>{layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}</span>
               </button>
-            </span>
+
+              {/*
+                The other thing this address has, one press away (Figma A9).
+
+                A layer rather than a screen: switching it on draws the
+                boundary and opens the area's own card, which is where Epic 6
+                answers who looks after which part of it.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  if (!layers.catchment) toggle('catchment');
+                }}
+                style={cardLinkButton}
+              >
+                {LAYER.catchment} ›
+              </button>
+            </>
           )}
-
-          {/*
-            The way to the layer the card is already talking about.
-
-            The card says *water may pool about 20 m away* and then leaves the
-            reader to work out that there is a layer which draws exactly that.
-            The change list of 8 October asks for the button, and for it to
-            say which way it goes rather than being a switch with no state:
-            off, it offers to open the layer; on, it says the layer is already
-            open, and pressing it takes the layer off again. Both sentences
-            are the design's own.
-          */}
-          <span style={{ display: 'block', marginTop: space(2) }}>
-            <button
-              type="button"
-              aria-pressed={layers.lowPoint}
-              onClick={() => {
-                toggle('lowPoint');
-              }}
-              style={{
-                padding: `${String(space(1))}px ${String(space(3))}px`,
-                borderRadius: radius.small,
-                border: `1px solid ${layers.lowPoint ? brand.tint : line.base}`,
-                background: layers.lowPoint ? brand.wash : surface.raised,
-                color: layers.lowPoint ? brand.ink : ink.base,
-                font: type(text.small, { weight: weight.semibold }),
-                textAlign: 'left',
-                cursor: 'pointer',
-              }}
-            >
-              {layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}
-            </button>
-          </span>
         </MapCallout>
       )}
     </>
@@ -1858,6 +1900,55 @@ const pickOutlineStyle = {
 } as const;
 
 /** The map's own underlined link, for the ways between its cards. */
+/**
+ * The address card's buttons, as the design draws them (Figma A9, A8).
+ *
+ * Full width and stacked, because the card is 296 pixels wide and three
+ * controls in a row at that width wrap into something nobody drew. The filled
+ * one is the thing the reader came for; the outlined one is a switch; the last
+ * is a link, and looks like one.
+ */
+const primaryCardButton = {
+  display: 'block',
+  width: '100%',
+  marginTop: space(3),
+  padding: `${String(space(3))}px ${String(space(3))}px`,
+  border: 'none',
+  borderRadius: radius.small,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const outlineCardButton = {
+  display: 'flex',
+  gap: space(2),
+  alignItems: 'center',
+  width: '100%',
+  marginTop: space(2),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.small,
+  background: surface.raised,
+  color: brand.ink,
+  font: type(text.small, { weight: weight.semibold }),
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
+const cardLinkButton = {
+  display: 'block',
+  marginTop: space(3),
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: type(text.small, { weight: weight.semibold }),
+  color: brand.ink,
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
 const planLinkStyle = {
   background: 'none',
   border: 'none',

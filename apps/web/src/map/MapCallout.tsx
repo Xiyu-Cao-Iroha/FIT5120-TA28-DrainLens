@@ -96,6 +96,21 @@ export interface MapCalloutProps {
    * sentences and covers nothing anybody is following.
    */
   readonly onMinimise?: () => void;
+  /**
+   * Which side of the mark to try first, where the caller knows the other
+   * card is on the near side (`ui/callout.ts`).
+   */
+  readonly prefer?: 'below' | 'above';
+  /**
+   * Which card is in front where two are open and the marks are too close for
+   * both to be clear.
+   *
+   * The default is 6, above the map and its chrome. A card carrying a question
+   * passes 7: a card whose buttons are under another card is not a question
+   * anybody can answer, and the one underneath is still readable at its top
+   * and still draggable by its title.
+   */
+  readonly layer?: number;
   readonly onClose: () => void;
 }
 
@@ -108,6 +123,8 @@ export function MapCallout({
   action,
   more,
   onMinimise,
+  prefer,
+  layer = 6,
   onClose,
 }: MapCalloutProps) {
   const [open, setOpen] = useState(false);
@@ -140,7 +157,7 @@ export function MapCallout({
     2,
   );
   const card: Box = { x: 0, y: 0, width: WIDTH, height };
-  const placement = placeCard(spot, card, within);
+  const placement = placeCard(spot, card, within, prefer);
 
   return (
     <div
@@ -155,7 +172,7 @@ export function MapCallout({
         maxWidth: 'calc(100% - 32px)',
         maxHeight: `min(${String(MAX_HEIGHT)}px, calc(100% - 32px))`,
         overflow: 'auto',
-        zIndex: 6,
+        zIndex: layer,
         padding: space(4),
         background: 'rgba(255, 255, 255, 0.97)',
         backdropFilter: 'blur(8px)',

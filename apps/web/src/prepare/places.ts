@@ -165,6 +165,23 @@ export const NO_PLACES =
 /** And what that does not mean (AC 5.1.3). */
 export const NO_PLACES_MEANS = 'This does not mean the area cannot flood.';
 
+/**
+ * The same absence on the map, where the card can say more (Figma A8).
+ *
+ * The plan's version is one sentence because the plan goes on to give the
+ * general actions. The card is the whole answer the reader gets on the map,
+ * so it names the radius it searched -- the one `placesNear` actually used --
+ * and says what is still worth doing.
+ */
+export const NO_PLACES_IN_RING = `No places to check were found within ${String(PLACE_RADIUS_M)} m of this address.`;
+
+export const NO_PLACES_STILL =
+  'This does not mean the area cannot flood. The street drains near your home are still worth a look before heavy rain.';
+
+/** The two ways on from that card, as the design labels them (Figma A8). */
+export const CHECK_STREET_DRAINS = 'Check the street drains near you';
+export const EVERY_HOME = 'See what every home can do';
+
 /** The heading over the places in the plan (AC 5.2.1, 5.2.3). */
 export const PLACES_NEAR_YOU = 'Places near you';
 
