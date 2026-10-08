@@ -136,6 +136,17 @@ export function PreparePlan({
 }) {
   const reminders = applying(places, relevance);
 
+  /*
+    Which general actions are ticked, held here rather than in each row.
+
+    It was each row's own `useState`, which was enough while the tick did
+    nothing; the printed page needs to know, so it is one set in the one place
+    that prints. Still for this visit only -- not stored, not counted, and not
+    sent -- because a plan that remembers what you said you had done is making
+    a claim about a house it has never seen.
+  */
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set());
+
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
       {/* `PREPARE_HEADING` belongs to the card around this, for the same
@@ -239,6 +250,20 @@ export function PreparePlan({
             <GeneralActionRow
               key={action.id}
               action={action}
+              ticked={ticked.has(action.id)}
+              onTick={(on) => {
+                setTicked((was) => {
+                  const next = new Set(was);
+
+                  if (on) {
+                    next.add(action.id);
+                  } else {
+                    next.delete(action.id);
+                  }
+
+                  return next;
+                });
+              }}
               {...(onAsk === undefined
                 ? {}
                 : {
@@ -247,6 +272,7 @@ export function PreparePlan({
                     },
                   })}
             />
+            
           ))}
         </ul>
       </section>
@@ -366,7 +392,7 @@ export function PreparePlan({
         <button
           type="button"
           onClick={() => {
-            printDocument(planHtml(printedPlan(address, places, relevance, new Date())));
+            printDocument(planHtml(printedPlan(address, places, relevance, ticked, new Date())));
           }}
           style={{
             padding: `${String(space(1))}px ${String(space(3))}px`,
@@ -418,19 +444,25 @@ export function PreparePlan({
  * the reason the blockage pictures are drawings: an unlicensed image of
  * somebody's gutter is one unrecorded licence more than this project has.
  *
- * The tick is for this visit only. It is not stored, not counted and not
- * printed, because a plan that remembers what you said you had done is
- * making a claim about a house it has never seen.
+ * The tick is for this visit only -- not stored, not counted and not sent,
+ * because a plan that remembers what you said you had done is making a claim
+ * about a house it has never seen. It does reach the printed page now, which
+ * the 8 October list asked for: a page the reader takes away should carry
+ * what they chose, the way it already carries only the places they said apply
+ * to them. It is held by `PreparePlan`, which is what prints.
  */
 function GeneralActionRow({
   action,
+  ticked,
+  onTick,
   onAsk,
 }: {
   readonly action: GeneralAction;
+  readonly ticked: boolean;
+  readonly onTick: (on: boolean) => void;
   readonly onAsk?: (() => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const [ticked, setTicked] = useState(false);
   const tipId = useId();
 
   return (
@@ -440,7 +472,7 @@ function GeneralActionRow({
           type="checkbox"
           checked={ticked}
           onChange={(event) => {
-            setTicked(event.target.checked);
+            onTick(event.target.checked);
           }}
           aria-label={action.text}
           style={{ marginTop: 3, flexShrink: 0, accentColor: brand.base }}
@@ -481,6 +513,7 @@ function GeneralActionRow({
             borderRadius: radius.small,
           }}
         >
+          <ActionPicture src={action.photo} />
           <span style={{ display: 'block', color: ink.muted }}>“{action.quote}”</span>
           <a
             href={action.page}
@@ -506,6 +539,41 @@ function GeneralActionRow({
         </span>
       )}
     </li>
+  );
+}
+
+/**
+ * What the action looks like (Figma P1).
+ *
+ * **Photographs, and the team's own.** The objection recorded here until
+ * 8 October was to an *unlicensed* image of somebody's gutter -- one
+ * unrecorded licence more than this project has -- and these are not that:
+ * they are the team's, and `docs/IMAGE-CREDITS.md` says so. The line drawings
+ * that stood in for them while that was unsettled are gone.
+ *
+ * `aria-hidden` with an empty `alt`: each one repeats the sentence beside it,
+ * and a screen reader reading both would hear the instruction twice.
+ *
+ * `loading="lazy"`, because every one of these sits inside a tip that is
+ * folded until the reader opens it.
+ */
+function ActionPicture({ src }: { readonly src: string }) {
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      loading="lazy"
+      width={600}
+      height={400}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: 'auto',
+        marginBottom: space(2),
+        borderRadius: radius.small,
+      }}
+    />
   );
 }
 

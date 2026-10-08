@@ -482,6 +482,23 @@ export function App() {
             areas.data === null ? undefined : areas.data.population.source,
           ])}
           creditNotice={BOARD_CHANGES_NOTICE}
+          actions={
+            <SiteNav
+              current="history"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened', from: 'history' });
+              }}
+            />
+          }
           back={{
             label: 'Home',
             onBack: () => {
@@ -574,7 +591,9 @@ export function App() {
             guided={GUIDED_SECTIONS}
             address={session.address?.label ?? null}
             onChangeAddress={() => {
-              dispatch({ type: 'change-address' });
+              // Asked for from here, so it comes back here rather than
+              // handing the reader to the task question they did not ask.
+              dispatch({ type: 'change-address', from: 'choose' });
             }}
             onStart={(section) => {
               dispatch({ type: 'guide-chosen', section });
@@ -898,11 +917,26 @@ export function App() {
       const step = session.screen;
       const reached = (at: 'drain' | 'scenario' | 'review' | 'result') =>
         ({ drain: 1, scenario: 2, review: 3, result: 3, 'no-match': 0 })[step] >= { drain: 1, scenario: 2, review: 3, result: 3 }[at];
+      /*
+        The way out, as a control rather than as the first crumb (AC 3.1.1).
+
+        Reported on 8 October: *there is nowhere to go back a level.* There
+        was -- the leading crumb was pressable -- and that is the point. A
+        breadcrumb says where you are; somebody looking for the way out does
+        not read a location as an exit, which is the same finding that put a
+        Back button on every other screen in this file.
+
+        Nothing is pressable while a run is in progress: leaving mid-run is
+        Cancel's job, which says what happens to the answer.
+      */
+      const leave = running
+        ? undefined
+        : fromMap
+          ? { label: FULL_MAP, onBack: () => dispatch({ type: 'back' }) }
+          : { label: 'Address search', onBack: () => dispatch({ type: 'another-address-wanted' }) };
+
       const crumbs = (
         <>
-          {fromMap
-            ? crumb(FULL_MAP, running ? undefined : () => dispatch({ type: 'back' }))
-            : crumb('Address search', running ? undefined : () => dispatch({ type: 'another-address-wanted' }))}
           {step === 'no-match' && (
             <>
               {separator}
@@ -911,7 +945,6 @@ export function App() {
           )}
           {!fromMap && reached('drain') && (
             <>
-              {separator}
               {crumb('Choose a drain', running ? undefined : () => dispatch({ type: 'drains-reopened' }), step === 'drain')}
             </>
           )}
@@ -941,7 +974,13 @@ export function App() {
       );
 
       const shell = (children: React.ReactNode) => (
-        <Shell at={session.screen} credits={credits} extentName={loaded.extentName} crumbs={crumbs}>
+        <Shell
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          {...(leave === undefined ? {} : { back: leave })}
+          crumbs={crumbs}
+        >
           {children}
         </Shell>
       );
@@ -1120,27 +1159,37 @@ function MapScreen({
       // worked out by arriving. The row below carries the way back out.
       masthead={false}
       /*
-        The Back control names where it goes, because the map has two ways
-        in -- the homepage and the flood board -- and with two possible
-        origins a bare "Back" is a guess.
+        The site's four pages, on the row the breadcrumb used to have.
 
-        The trail beside it is one crumb now. It used to lead with a
-        clickable Home, which was doing two jobs badly: a breadcrumb says
-        where you *are*, and a person looking for the way out does not read
-        a location as an exit. The button is the exit; the crumb says where
-        they are.
+        There was a Back control here naming where it went -- Home, or Flood
+        history where that was the way in -- and one crumb saying *Full map*.
+        The change list of 8 October asks for the design's navigation bar on
+        this screen, and the bar is strictly more than those two were: it
+        names all four destinations rather than the one behind you, and it
+        marks where you are, which is what the crumb was for.
+
+        It is the row's whole contents, so the row is the landmark and these
+        are `SiteNavItems` rather than a second `nav` inside the first.
       */
-      back={{
-        label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
-        onBack: () => {
-          dispatch({ type: 'leave-map' });
-        },
-      }}
-      crumbs={crumb(
-        session.task === 'full-map' ? FULL_MAP : 'Explore drainage',
-        undefined,
-        true,
-      )}
+      crumbsLabel="Site"
+      crumbs={
+        <SiteNavItems
+          current="map"
+          onOpenHome={() => {
+            dispatch({ type: 'go-home' });
+          }}
+          onOpenGuides={() => {
+            dispatch({ type: 'explore-chosen' });
+          }}
+          onOpenHistory={() => {
+            dispatch({ type: 'history-opened' });
+          }}
+          onOpenFullMap={() => {
+            // Where they already are. `NavLink` draws it as the current page
+            // and gives it no handler, so this is never reached.
+          }}
+        />
+      }
       trailing={
         <TourButton
           onOpen={() => {
@@ -1309,26 +1358,43 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * called *Map guide* and is a different thing, which is why it was renamed on
  * the same list.
  */
-function SiteNav({
+export interface SiteNavProps {
+  /** Which of the four this screen is, so it is marked rather than linked. */
+  readonly current: 'home' | 'tutorial' | 'history' | 'map';
+  readonly onOpenHome: () => void;
+  readonly onOpenGuides: () => void;
+  readonly onOpenHistory: () => void;
+  readonly onOpenFullMap: () => void;
+}
+
+/**
+ * The four links, without a landmark of their own.
+ *
+ * The map has no masthead to hang them from, so there they are the
+ * breadcrumb row's contents and that row is the landmark. Everywhere else
+ * `SiteNav` wraps these in one.
+ */
+function SiteNavItems({
   current,
   onOpenHome,
   onOpenGuides,
   onOpenHistory,
   onOpenFullMap,
-}: {
-  /** Which of the four this screen is, so it is marked rather than linked. */
-  readonly current: 'home' | 'tutorial';
-  readonly onOpenHome: () => void;
-  readonly onOpenGuides: () => void;
-  readonly onOpenHistory: () => void;
-  readonly onOpenFullMap: () => void;
-}) {
+}: SiteNavProps) {
   return (
-    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+    <>
       <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
       <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
-      <NavLink label="Flood history" current={false} onOpen={onOpenHistory} />
-      <NavLink label={FULL_MAP} current={false} onOpen={onOpenFullMap} />
+      <NavLink label="Flood history" current={current === 'history'} onOpen={onOpenHistory} />
+      <NavLink label={FULL_MAP} current={current === 'map'} onOpen={onOpenFullMap} />
+    </>
+  );
+}
+
+function SiteNav(props: SiteNavProps) {
+  return (
+    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+      <SiteNavItems {...props} />
     </nav>
   );
 }

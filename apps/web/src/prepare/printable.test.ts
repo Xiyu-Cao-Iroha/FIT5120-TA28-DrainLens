@@ -21,8 +21,10 @@ const PLACES = placesNear(HOME, [marker(520, 500), marker(560, 500), marker(600,
 const ON = new Date(2026, 9, 3);
 const ADDRESS = '46 Gatehouse Drive, Kensington';
 
-const plan = (relevance: Record<number, 'applies' | 'does-not-apply' | null>) =>
-  printedPlan(ADDRESS, PLACES, relevance, ON);
+const plan = (
+  relevance: Record<number, 'applies' | 'does-not-apply' | null>,
+  ticked: readonly string[] = [],
+) => printedPlan(ADDRESS, PLACES, relevance, new Set(ticked), ON);
 
 describe('what the page says it is', () => {
   it('names the address and the day it was printed', () => {
@@ -99,8 +101,33 @@ describe('the document itself', () => {
     expect(printed).not.toMatch(/<link|<script|src=/);
   });
 
+  it('carries only the general actions that were ticked', () => {
+    // Reported on 8 October: the page listed all three however the boxes
+    // were left. The rule is the one the places already follow -- what the
+    // reader chose is what the page they take away carries.
+    // Read from the register rather than written out, so a change to the
+    // actions is a change to what this test ticks rather than a failure.
+    const [first, , third] = GENERAL_ACTIONS;
+    expect(first).toBeDefined();
+    expect(third).toBeDefined();
+    const page = plan({}, [String(first?.id), String(third?.id)]);
+    expect(page.generalActions.map((a) => a.text)).toEqual([first?.text, third?.text]);
+  });
+
+  it('carries all of them when none were ticked, rather than a section with nothing in it', () => {
+    // The ticks are an optional filter, not a question the plan insists on.
+    expect(plan({}).generalActions).toHaveLength(GENERAL_ACTIONS.length);
+  });
+
+  it('credits only the sources behind something on the page', () => {
+    const page = plan({}, [String(GENERAL_ACTIONS[0]?.id)]);
+    const action = GENERAL_ACTIONS[0];
+    expect(action).toBeDefined();
+    expect(page.sources).toContain(`${String(action?.publisher)}: ${String(action?.page)}`);
+  });
+
   it('escapes an address rather than letting it close a tag', () => {
-    const page = printedPlan('12 <b>Smith</b> & Co Lane', PLACES, {}, ON);
+    const page = printedPlan('12 <b>Smith</b> & Co Lane', PLACES, {}, new Set(), ON);
     expect(planHtml(page)).toContain('12 &lt;b&gt;Smith&lt;/b&gt; &amp; Co Lane');
   });
 });

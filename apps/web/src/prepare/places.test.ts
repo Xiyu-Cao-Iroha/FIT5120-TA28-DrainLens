@@ -13,7 +13,9 @@ import {
   PLACE_ACTION,
   PLACE_IS_THE_STREET,
   PLACE_RADIUS_M,
+  NO_PLACES_IN_RING,
   NO_PLACES_MEANS,
+  NO_PLACES_STILL,
   applying,
   checkButton,
   numberOf,
@@ -105,6 +107,18 @@ describe('what a place says', () => {
 
   it('never presents an absence as safety', () => {
     expect(NO_PLACES_MEANS).toMatch(/does not mean the area cannot flood/);
+    expect(NO_PLACES_STILL).toMatch(/does not mean the area cannot flood/);
+  });
+
+  it('names the radius it actually searched, on the card that reports the absence', () => {
+    /*
+      The card says *within 200 m*, which is a claim about what was looked at.
+      Written as a number it would go on saying 200 after somebody changed
+      `PLACE_RADIUS_M`, and the sentence would be false rather than merely
+      out of date.
+    */
+    expect(NO_PLACES_IN_RING).toContain(`${String(PLACE_RADIUS_M)} m`);
+    expect(placesNear(HOME, [marker(500 + PLACE_RADIUS_M + 20, 500)])).toEqual([]);
   });
 });
 

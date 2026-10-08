@@ -13,9 +13,11 @@ import type { Local } from './viewport.js';
 import {
   DISTANCE_ROUNDING_M,
   NEARBY_BASIS,
+  type NearbyThing,
   RELEVANT_RADIUS_M,
   VERY_NEAR_M,
   bearingFrom,
+  cardSentence,
   describeWaterNearby,
   nearestOnLines,
   nearestOnRings,
@@ -233,3 +235,45 @@ describe('describeWaterNearby', () => {
     expect(NEARBY_BASIS).toBe('Calculated by DrainLens');
   });
 });
+
+describe('the sentence the address card says', () => {
+  /*
+    Figma A9 replaced the card's figure with two sentences. `describe` is the
+    careful version and stays where it is; this is the card's register, in the
+    words the map's own labels use.
+  */
+  const direction = (distanceM: number): NearbyThing => ({
+    kind: 'direction',
+    distanceM,
+    bearing: 'north-west',
+    angleDeg: 135,
+  });
+
+  it('writes the design’s two sentences, rounded distance and all', () => {
+    expect(cardSentence({ channel: direction(90), low: { kind: 'very-near' } })).toBe(
+      'Water may flow about 90 m away. It may pool at or near this address.',
+    );
+  });
+
+  it('says what each of the three low-area answers means', () => {
+    expect(cardSentence({ channel: direction(40), low: { kind: 'inside' } })).toContain(
+      'It may pool at this address.',
+    );
+    expect(cardSentence({ channel: direction(40), low: direction(10) })).toContain(
+      'It may pool about 10 m away.',
+    );
+  });
+
+  it('gives the pool sentence a subject when there is no flow sentence before it', () => {
+    // *It may pool* with nothing in front of it has nothing to refer to.
+    expect(cardSentence({ channel: null, low: { kind: 'inside' } })).toBe(
+      'Water may pool at this address.',
+    );
+  });
+
+  it('leaves out what is not there rather than reporting the absence', () => {
+    // The card only reaches this with something near; `waterNearby` returns
+    // null otherwise, and the card has its own sentence for that.
+    expect(cardSentence({ channel: direction(60), low: null })).toBe('Water may flow about 60 m away.');
+  });
+})

@@ -58,7 +58,7 @@ export interface ProblemType {
   readonly urgent: boolean;
 }
 
-/** One line of *What to include*: what it is, and what to have ready. */
+/** One line of the recommended information: what it is, and what to have ready. */
 export interface IncludeItem {
   readonly id: string;
   readonly title: string;
@@ -66,8 +66,15 @@ export interface IncludeItem {
   readonly detail: string;
 }
 
-/** The heading over that list, as the design writes it. */
-export const WHAT_TO_INCLUDE = 'What to include';
+/**
+ * The heading over that list (renamed 8 October 2026, on the team's list).
+ *
+ * It was *What to include*, over four squares that looked like a form the
+ * reader had to fill in before the buttons below would work. Nothing here is
+ * a field and nothing is submitted: it is what these organisations ask for,
+ * said before the reader rings one. The name says which of the two it is.
+ */
+export const RECOMMENDED_INFORMATION = 'Recommended information for reporting';
 
 /**
  * What to have ready, whoever it goes to (AC 6.3.2).
@@ -84,7 +91,10 @@ export function whatToInclude(address: string | null, place: ReportPlace): reado
       detail: address === null || address === '' ? 'The street address or nearest cross street' : address,
     },
     { id: 'when', title: 'When', detail: 'Date and time you saw it' },
-    { id: 'photos', title: 'Photos', detail: 'Taken from a safe place' },
+    // The parenthetical is on the printed copy too, where it is the answer
+    // to the question a printout raises: nothing is uploaded here, so the
+    // photographs go to the organisation the same way the report does.
+    { id: 'photos', title: 'Photos', detail: 'Taken from a safe place (not included in print)' },
     {
       id: 'drain',
       // AC 6.3.2: only where the reader selected one, and never the nearest.

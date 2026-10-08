@@ -263,6 +263,16 @@ export interface Session {
    */
   readonly pendingTaskFrom: 'home' | 'choose';
   /**
+   * Which screen asked for the address, where no task is waiting.
+   *
+   * `pendingTaskFrom` answers the same question for an address asked for on
+   * the way to a task. The chooser asks for one with no task at all -- its
+   * guides are the thing being chosen -- and without this an address given
+   * there handed the reader to the task question, a screen they had not asked
+   * for and which does not offer the guides they were looking at.
+   */
+  readonly addressFrom: 'task' | 'choose';
+  /**
    * Where the comparison was opened from: the task question, or a drain on the
    * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
    * has no task question behind it, and may have no address at all.
@@ -316,6 +326,7 @@ export const INITIAL_SESSION: Session = {
   guideSection: null,
   pendingTask: null,
   pendingTaskFrom: 'home',
+  addressFrom: 'task',
   scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
@@ -499,7 +510,7 @@ export type SessionEvent =
    * the rule.
    */
   | { readonly type: 'address-abandoned' }
-  | { readonly type: 'change-address' }
+  | { readonly type: 'change-address'; readonly from?: 'choose' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
@@ -570,6 +581,15 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   'no-match': 'address',
   unsupported: 'address',
 };
+
+/**
+ * The comparison steps a reader can reach from the full map.
+ *
+ * `back` means *out to the map* on these and only these. A comparison opened
+ * from an address starts at `drain` and walks `BACK`; `no-match` is reached
+ * only from an address search.
+ */
+const FROM_MAP_COMPARISON: ReadonlySet<Screen> = new Set<Screen>(['scenario', 'review', 'result']);
 
 /**
  * One rule about arriving at the map, applied to every route into it.
@@ -711,9 +731,13 @@ function step(session: Session, event: SessionEvent): Session {
         screen:
           session.guideSection !== null
             ? 'guide'
-            : session.pendingTask === null
-              ? 'task'
-              : screenForTask(session.pendingTask),
+            : session.pendingTask !== null
+              ? screenForTask(session.pendingTask)
+              : // The chooser asked, with no task waiting: back to the guides.
+                session.addressFrom === 'choose'
+                ? 'choose'
+                : 'task',
+        addressFrom: 'task',
         ...(session.pendingTask === null ? {} : { task: session.pendingTask }),
         pendingTask: null,
         address: event.address,
@@ -858,7 +882,15 @@ function step(session: Session, event: SessionEvent): Session {
       return session.screen === 'review' && !session.running ? { ...session, screen: 'scenario' } : session;
 
     case 'drains-reopened':
-      if (session.address === null) {
+      /*
+        *Return to the map* goes to the map the drain was picked on.
+
+        It tested the address, not where the comparison came from -- so a
+        reader who had opened one from the full map and happened to have an
+        address went to step 1 of the address journey instead, a screen they
+        had never been on.
+      */
+      if (session.address === null || session.scenarioOrigin === 'map') {
         return { ...session, screen: 'explore', task: 'full-map', outcome: null, running: false, run: null };
       }
       return atStepOne(session);
@@ -893,8 +925,23 @@ function step(session: Session, event: SessionEvent): Session {
       };
 
     case 'back':
-      if (session.screen === 'scenario' && session.scenarioOrigin === 'map') {
-        return { ...session, screen: 'explore' };
+      /*
+        Out of a comparison that was opened from the map is out to the map,
+        from whichever of its steps (AC 3.1.1).
+
+        Two faults were reported on 8 October and both are here. It was
+        written for the `scenario` step alone, so on a **result** the control
+        saying *Full map* walked `BACK` instead and arrived at Choices. And it
+        left `task` on `compare`, which the map reads as a guided visit: it
+        reopened with the guided layer set, Ground height included, which the
+        reader had not asked for and had to find a panel to switch off.
+
+        `scenarioOrigin` alone is not the test. It survives the comparison it
+        was set for, and `back` is dispatched from screens that have nothing
+        to do with one.
+      */
+      if (session.scenarioOrigin === 'map' && FROM_MAP_COMPARISON.has(session.screen)) {
+        return { ...session, screen: 'explore', task: 'full-map' };
       }
       return { ...session, screen: BACK[session.screen] };
 
@@ -984,7 +1031,7 @@ function step(session: Session, event: SessionEvent): Session {
       return session.address === null ? session : { ...session, screen: 'task' };
 
     case 'change-address':
-      return { ...session, screen: 'address' };
+      return { ...session, screen: 'address', addressFrom: event.from ?? 'task' };
 
     case 'change-scenario':
       // AC 2.2.4 (Aug-27 set): the inputs are still there when they get back.

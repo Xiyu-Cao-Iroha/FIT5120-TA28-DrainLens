@@ -509,6 +509,19 @@ export function LayerChips({
                     disabled={disabled}
                     onChange={() => {
                       onToggle(key);
+                      /*
+                        And close the panel behind it.
+
+                        The legend is hidden while this is open, because on a
+                        narrow window the panel drops straight onto it. So
+                        turning Ground height on from here switched on the one
+                        layer whose legend is a colour ramp and left the ramp
+                        hidden -- reported on 8 October as *the legend
+                        disappears*. There is one switch in this panel; once it
+                        has been pressed the panel has done its job, and
+                        closing it shows the reader what they just turned on.
+                      */
+                      setOpen(false);
                     }}
                     style={{ marginTop: 3 }}
                   />

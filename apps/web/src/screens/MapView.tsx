@@ -21,6 +21,7 @@
 
 import {
   COMPARE_HERE,
+  COMPARE_LOADING,
   type PitSupport,
   type ScenarioSupport,
   UNSUPPORTED_TEXT,
@@ -54,8 +55,7 @@ import type { Highlight, MapNow } from '../tutorial/lesson.js';
 import { GuideMarks } from '../map/GuideOverlayView.js';
 import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
-import { waterNearby } from '../map/nearby.js';
-import { AddressInsight } from '../map/AddressInsight.js';
+import { cardSentence, waterNearby } from '../map/nearby.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
@@ -64,10 +64,12 @@ import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { AskAboutGettingReady } from './AskAboutGettingReady.js';
 import {
   BEFORE_RAIN_CHIP,
+  CHECK_STREET_DRAINS,
+  EVERY_HOME,
   NO_ADDRESS_FOR_CHECKS,
-  NO_PLACES,
+  NO_PLACES_IN_RING,
+  NO_PLACES_STILL,
   PLACE_RADIUS_M,
-  NO_PLACES_MEANS,
   type Place,
   type Relevance,
   checkButton,
@@ -75,6 +77,15 @@ import {
   placeTitle,
   placesNear,
 } from '../prepare/places.js';
+import { LAYER } from '../ui/terms.js';
+import { type NamedDrain, streetDrains } from '../drains/nearby.js';
+import {
+  DRAIN_BLOCKED_QUESTION,
+  DRAIN_SOURCE,
+  REPORT_THIS_DRAIN,
+  STREET_DRAINS_HEADING,
+} from '../drains/wording.js';
+import { StreetDrains } from './StreetDrains.js';
 import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
@@ -91,7 +102,6 @@ import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
 import {
   WARNING_BODY,
@@ -554,6 +564,10 @@ export function MapView({
     const key = `${address.label}:${String(places.length)}`;
     if (openedFor.current === key) return;
     openedFor.current = key;
+    /*
+      Nothing near the address: the address card is the answer (Figma A8), so
+      it is opened rather than left for the reader to find the pin.
+    */
     if (places.length === 0) {
       setAddressCardOpen(true);
       return;
@@ -584,7 +598,16 @@ export function MapView({
     return { key: `places:${address.label}`, points: corners, reservePanel: false };
   }, [layers.beforeRain, address]);
 
-  const planShowing = panel && viewport !== null && planOpen && openPlace === null;
+  /*
+    The plan and an open place card are no longer exclusive.
+
+    They were, and the cost was reported on 8 October: answering a place left
+    the reader on a map with the card gone and no way back to the plan except
+    the address pin. The plan is a sidebar beside the map and the card is
+    anchored on the map, so both fit -- the card is kept clear of the sidebar
+    by `calloutWithin` below.
+  */
+  const planShowing = panel && viewport !== null && planOpen;
   const sidebarOpen = planShowing && panelWidth > 0;
   /*
     Too narrow for a sidebar, so the plan goes back in the card it used to
@@ -592,7 +615,8 @@ export function MapView({
     sheet is not built -- but a worse screen than a sidebar is still better
     than a window where the plan button does nothing.
   */
-  const planInCard = planShowing && panelWidth === 0;
+  const planInCard = planShowing && panelWidth === 0 && openPlace === null;
+
   const askPanel = (
     <AskAboutGettingReady
       key={askOpening ?? 'ask'}
@@ -611,6 +635,38 @@ export function MapView({
           })}
     />
   );
+
+  /*
+    The box a callout may not leave.
+
+    The sidebar is drawn over the canvas rather than beside it -- the map is
+    deliberately not re-fitted when the plan opens, so that what the reader is
+    looking at does not move under them. A card placed against the canvas's
+    full width can therefore end up behind the sidebar.
+  */
+  const calloutWithin =
+    viewport === null
+      ? { width: 0, height: 0 }
+      : {
+          width: viewport.widthPx - (sidebarOpen ? panelWidth : 0),
+          height: viewport.heightPx,
+        };
+
+  const addressId = address?.id ?? null;
+
+  useEffect(() => {
+    setDrainsOpen(false);
+    setDrainPicked(null);
+    setReportPlace(null);
+  }, [addressId]);
+
+  const openDrains = () => {
+    if (!layers.pit) toggle('pit');
+    setAddressCardOpen(false);
+    setPlanOpen(false);
+    setOpenPlace(null);
+    setDrainsOpen(true);
+  };
 
 
   const planPanel = (
@@ -632,6 +688,7 @@ export function MapView({
               setPlanOpen(false);
               openReport(null);
             },
+
             
             onAsk: (actionId?: string) => {
               setAskOpening(
@@ -640,11 +697,9 @@ export function MapView({
               setAskOpen(true);
             },
 
-            onCheckDrains: () => {
-              // Step 3's first button. The recorded drains are a layer, so
-              // showing them is switching it on rather than going anywhere.
-              if (!layers.pit) toggle('pit');
-            },
+            // Step 3's first button, which opens the list (Figma S1).
+            onCheckDrains: openDrains,
+
           })}
     />
   );
@@ -684,26 +739,55 @@ export function MapView({
     };
   }, [extentName, extentWidth, extentHeight]);
 
-  // Which way the ground falls around each address, precomputed. Loaded once;
-  // if it cannot be, the card still says what is near and says nothing about
-  // the ground rather than guessing.
-  const [groundIndex, setGroundIndex] = useState<AddressGroundArtefact | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadAddressGround()
-      .then((artefact) => {
-        if (live) setGroundIndex(artefact);
-      })
-      .catch(() => {
-        if (live) setGroundIndex(null);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const groundTrend = useMemo(
-    () => (address === null || groundIndex === null ? null : groundAt(groundIndex, address.id)),
-    [address, groundIndex],
+  /*
+    The per-address ground fall is no longer fetched here.
+
+    It was loaded once per visit for one line of one card -- the figure's
+    *Steep slope down about 8 m in 150 m* -- and that line went with the figure
+    on 8 October. `map/addressGround.ts` and the artefact behind it are left
+    alone: the pipeline still builds `address-ground.json` and the module is
+    still tested, so there is something to read from if the card or a guide
+    wants the fall again.
+  */
+
+  /*
+    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
+
+    The button used to switch Drain pits on, which left a reader looking for
+    the drain outside their own house among a few hundred identical circles.
+    The panel names each one from the address it is nearest to and groups them
+    by street, and the layer goes on with it so the list and the map are about
+    the same things.
+  */
+  const [drainsOpen, setDrainsOpen] = useState(false);
+  /** The drain the list picked, which gets a card of its own (Figma S2). */
+  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
+
+  /**
+   * The reader's address as the index holds it, in parts.
+   *
+   * `indexed` above finds the same record by label; this is by id, which is
+   * what the address carries, and null where the map is running without an
+   * index at all -- inside a guide, where this panel is not offered.
+   *
+   * The panel names the street address rather than the postal label: *within
+   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
+   * the end of it is already in the panel's own subtitle.
+   */
+  const yourAddress = useMemo(
+    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
+    [index, address],
+  );
+  const yourStreet = yourAddress?.street ?? null;
+  const streetAddress =
+    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
+
+  const drainsNear = useMemo(
+    () =>
+      address === null || index === undefined
+        ? null
+        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
+    [map, index, address, yourStreet],
   );
 
   const explanation = useMemo(
@@ -1276,7 +1360,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && minimised && onScreen(hit.feature.c, viewport) && (
         <MinimisedCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Drain pit ${String(hit.feature.asset_number)}`}
           onExpand={() => {
             setMinimised(false);
@@ -1291,7 +1375,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && !minimised && onScreen(hit.feature.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={publicLabelOf(hit.feature)}
           // A grey source line at the foot, not a badge (copy audit v4, #30).
           source="recorded"
@@ -1333,21 +1417,34 @@ export function MapView({
           }}
         >
           {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
-          {onCompare !== undefined && scenarioSupport !== null && (
-            <CompareEntry
-              support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
-              onCompare={() => {
-                onCompare(String(hit.feature.asset_number ?? ''));
-              }}
-            />
-          )}
+          {/*
+            The comparison, or why it is not offered yet.
+
+            The index this reads is fetched the first time a drain is pressed
+            and is held by this screen, so every return to the map fetches it
+            again -- and while it is null the card used to render nothing at
+            all. Reported on 8 October as the button not coming back after a
+            comparison: it does, a moment later, and silence in between reads
+            as a button that has been taken away.
+          */}
+          {onCompare !== undefined &&
+            (scenarioSupport === null ? (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#5b6e7e' }}>{COMPARE_LOADING}</p>
+            ) : (
+              <CompareEntry
+                support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
+                onCompare={() => {
+                  onCompare(String(hit.feature.asset_number ?? ''));
+                }}
+              />
+            ))}
         </MapCallout>
       )}
 
       {panel && viewport !== null && hit?.kind === 'pipe' && onScreen(midpoint(hit.feature.c), viewport) && (
         <MapCallout
           at={toScreen(viewport, midpoint(hit.feature.c))}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
           // The same source line as the pit card; the pipe card had the badge too.
           source="recorded"
@@ -1394,7 +1491,7 @@ export function MapView({
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={WARNING_TITLE}
           onClose={() => {
             setWarning(null);
@@ -1531,6 +1628,7 @@ export function MapView({
         {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
           <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
         )}
+
       </MapNoteStack>
 
       {/*
@@ -1553,7 +1651,7 @@ export function MapView({
         onScreen([address.eastingM, address.northingM], viewport) && (
           <MapCallout
             at={toScreen(viewport, [address.eastingM, address.northingM])}
-            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            within={calloutWithin}
             title={address.label}
             onClose={() => {
               // Closing it leaves the layer on: the markers are the point, and
@@ -1606,10 +1704,25 @@ export function MapView({
         if (place === undefined) return null;
         if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
+        /*
+          Away from the address card, which is now open beside this one.
+
+          Both cards hang below their own mark by default, so a place a few
+          metres from the address put them on top of each other. The address
+          pin's side is the near side; this one takes the other.
+        */
+        const at = toScreen(viewport, place.at);
+        const pinAt = address === null ? null : toScreen(viewport, [address.eastingM, address.northingM]);
+        const prefer = pinAt !== null && pinAt[1] > at[1] ? 'above' : 'below';
         return (
           <MapCallout
-            at={toScreen(viewport, place.at)}
-            within={{ width: viewport.widthPx, height: viewport.heightPx }}
+            at={at}
+            within={calloutWithin}
+            prefer={prefer}
+            // In front of the address card where the two cannot both be clear:
+            // this one is asking a question and its buttons have to be
+            // reachable.
+            layer={7}
             title={placeTitle(place)}
             onClose={() => {
               setOpenPlace(null);
@@ -1622,11 +1735,17 @@ export function MapView({
                 onReviewPlace?.(place.number, answer);
                 /*
                   The answer sends the reader on, as the design draws it: to
-                  the next numbered place, or — on the last one — to the plan,
-                  which is where the answer has just changed something. Staying
-                  on a card whose question has been answered leaves the reader
-                  looking for what their press did.
+                  the next numbered place, and to the plan, which is where the
+                  answer has just changed something. Staying on a card whose
+                  question has been answered leaves the reader looking for what
+                  their press did.
+
+                  Both, not one or the other. Until 8 October this only moved
+                  to the next card, and on the last one it closed and left a
+                  bare map: the plan was reachable again only by finding the
+                  address pin and pressing the button on its card.
                 */
+                setPlanOpen(true);
                 setOpenPlace(next?.number ?? null);
               }}
               {...(next === undefined
@@ -1667,8 +1786,71 @@ export function MapView({
         );
       })()}
 
+      {/* Step 3's list of drains (Figma S1–S4), in the plan's own container. */}
+      {panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0 && (
+        <Sidebar
+          title={STREET_DRAINS_HEADING}
+          subtitle={address.label}
+          width={panelWidth}
+          onClose={() => {
+            setDrainsOpen(false);
+            setDrainPicked(null);
+          }}
+        >
+          <StreetDrains
+            address={streetAddress}
+            found={drainsNear}
+            yourStreet={yourStreet}
+            selected={drainPicked?.id ?? null}
+            onSelect={(drain) => {
+              setDrainPicked(drain);
+            }}
+            onBack={() => {
+              setDrainsOpen(false);
+              setDrainPicked(null);
+              setPlanOpen(true);
+            }}
+          />
+        </Sidebar>
+      )}
+
+      {/* The drain the list picked (Figma S2). */}
+      {panel && viewport !== null && drainsOpen && drainPicked !== null && onScreen(drainPicked.at, viewport) && (
+        <MapCallout
+          at={toScreen(viewport, drainPicked.at)}
+          within={calloutWithin}
+          title={drainPicked.label}
+          layer={7}
+          source="recorded"
+          onClose={() => {
+            setDrainPicked(null);
+          }}
+        >
+          {DRAIN_SOURCE}
+          <span style={{ display: 'block', marginTop: space(3), color: ink.strong }}>
+            {DRAIN_BLOCKED_QUESTION}
+          </span>
+          <span style={{ display: 'block', marginTop: space(2) }}>
+            <button
+              type="button"
+              onClick={() => {
+                openReport({
+                  kind: 'drain',
+                  assetNumber: drainPicked.id,
+                  street: drainPicked.street,
+                  distanceM: Math.round(drainPicked.distanceM),
+                });
+              }}
+              style={primaryCardButton}
+            >
+              {REPORT_THIS_DRAIN} ›
+            </button>
+          </span>
+        </MapCallout>
+      )}
+
       {/* The plan itself (Figma P1), which the place card sits in front of. */}
-      {sidebarOpen && askOpen && (
+      {sidebarOpen && !drainsOpen && askOpen && (
         <Sidebar
           title={ASK_HEADING}
           width={panelWidth}
@@ -1682,7 +1864,7 @@ export function MapView({
         </Sidebar>
       )}
 
-      {sidebarOpen && !askOpen && (
+      {sidebarOpen && !drainsOpen && !askOpen && (
         <Sidebar
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
@@ -1695,6 +1877,7 @@ export function MapView({
         </Sidebar>
       )}
 
+
       {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
       
 
@@ -1705,108 +1888,155 @@ export function MapView({
         warning === null &&
         !layers.catchment &&
         !planOpen &&
-        openPlace === null &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
         <MapCallout
           at={toScreen(viewport, [address.eastingM, address.northingM])}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={address.label}
           onClose={() => {
             setAddressCardOpen(false);
           }}
         >
-          {explanation === null && groundTrend === null ? (
+          {/*
+            Nothing within the ring, said here rather than anywhere else
+            (Figma A8, *map message first, then the plan*).
+
+            It was two lines under the figure, and then — on 8 October — a
+            note of its own in the corner stack. The design puts it in this
+            card, with the two things still worth doing under it, and that is
+            better than either: the reader is looking at the pin, the answer
+            is about the pin, and it offers somewhere to go rather than only
+            reporting an absence.
+
+            No figure above it. A compass of water that is not there is a
+            picture of nothing.
+          */}
+          {layers.beforeRain && places.length === 0 ? (
             <>
-              No place where water may flow or collect was found close to this address.
-              <span style={{ display: 'block', marginTop: space(2) }}>
-                <SourceLink id="derived" />
+              <span style={{ display: 'block', font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {NO_PLACES_IN_RING}
               </span>
-            </>
-          ) : (
-            <AddressInsight ground={groundTrend} near={explanation} />
-          )}
-          {guided && (
-            <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
-              Select a drain pit or pipe to read what the council recorded about it.
-            </span>
-          )}
-          {/*
-            Nothing to check, said on the card rather than by an empty map
-            (AC 5.1.3, change list item 11). An absence of marks is a result,
-            and it is not a safer address.
-          */}
-          {layers.beforeRain && places.length === 0 && (
-            <span style={{ display: 'block', marginTop: space(2) }}>
-              {NO_PLACES}
-              <span style={{ display: 'block', marginTop: space(1), color: ink.subtle }}>
-                {NO_PLACES_MEANS}
-              </span>
-            </span>
-          )}
-          {/*
-            AC 5.1.1: the count where there are places, the same words without
-            it where there are none — and the plan is reachable either way,
-            because the general actions are for every home.
-          */}
-          {layers.beforeRain && (
-            <span style={{ display: 'block', marginTop: space(2) }}>
+              <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_STILL}</span>
+              <button
+                type="button"
+                onClick={openDrains}
+                style={primaryCardButton}
+              >
+                {CHECK_STREET_DRAINS} ›
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setAddressCardOpen(false);
                   setPlanOpen(true);
-                  setOpenPlace(places[0]?.number ?? null);
+                }}
+                style={cardLinkButton}
+              >
+                {EVERY_HOME} ›
+              </button>
+            </>
+          ) : (
+            <>
+              {/*
+                What was measured near this address, in two sentences
+                (Figma A9).
+
+                It was a small figure: a compass with the ground's fall, the
+                nearest water path and the nearest low area drawn around it.
+                The design replaced it with the sentences on 8 October and the
+                team confirmed the swap. What went with the figure is the
+                ground's fall -- *Steep slope down about 8 m in 150 m* -- which
+                the design does not carry and which nothing else in the product
+                said. The ground-height layer and its guide still do.
+              */}
+              {explanation === null ? (
+                <>No place where water may flow or collect was found close to this address.</>
+              ) : (
+                <>{cardSentence(explanation)}</>
+              )}
+              <span style={{ display: 'block', marginTop: space(2) }}>
+                <SourceLink id="derived" />
+              </span>
+              {guided && (
+                <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
+                  Select a drain pit or pipe to read what the council recorded about it.
+                </span>
+              )}
+              {/*
+                The places, counted (AC 5.1.1, Figma A9).
+
+                The design makes this the card's one filled button, because of
+                everything on the card it is the thing the reader came for. It
+                was an underlined link under the figure, which read as a
+                footnote to the picture rather than as the way on.
+              */}
+              {layers.beforeRain && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddressCardOpen(false);
+                    setPlanOpen(true);
+                    setOpenPlace(places[0]?.number ?? null);
+                  }}
+                  style={primaryCardButton}
+                >
+                  {checkButton(places)}
+                </button>
+              )}
+
+              {/*
+                The way to the layer the card is already talking about.
+
+                The card says *water may pool about 20 m away* and then leaves
+                the reader to work out that there is a layer which draws
+                exactly that. The change list of 8 October asks for the button,
+                and for it to say which way it goes rather than being a switch
+                with no state: off, it offers to open the layer; on, it says the
+                layer is already open, and pressing it takes the layer off
+                again. Both sentences are the design's own.
+
+                The mark beside it is the legend's own low-areas swatch, so the
+                button and the thing it draws are recognisably the same.
+              */}
+              <button
+                type="button"
+                aria-pressed={layers.lowPoint}
+                onClick={() => {
+                  toggle('lowPoint');
                 }}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.small, { weight: weight.semibold }),
-                  color: ink.base,
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                  cursor: 'pointer',
+                  ...outlineCardButton,
+                  borderColor: layers.lowPoint ? brand.tint : line.base,
+                  background: layers.lowPoint ? brand.wash : surface.raised,
                 }}
               >
-                {checkButton(places)}
+                <svg width="20" height="12" viewBox="0 0 20 12" aria-hidden focusable="false" style={{ flexShrink: 0 }}>
+                  <ellipse cx="10" cy="6" rx="7" ry="4.5" fill="#5aa0cd" opacity="0.45" stroke="#5aa0cd" />
+                </svg>
+                <span>{layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}</span>
               </button>
-            </span>
+
+              {/*
+                The other thing this address has, one press away (Figma A9).
+
+                A layer rather than a screen: switching it on draws the
+                boundary and opens the area's own card, which is where Epic 6
+                answers who looks after which part of it.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  if (!layers.catchment) toggle('catchment');
+                }}
+                style={cardLinkButton}
+              >
+                {LAYER.catchment} ›
+              </button>
+            </>
           )}
-
-          {/*
-            The way to the layer the card is already talking about.
-
-            The card says *water may pool about 20 m away* and then leaves the
-            reader to work out that there is a layer which draws exactly that.
-            The change list of 8 October asks for the button, and for it to
-            say which way it goes rather than being a switch with no state:
-            off, it offers to open the layer; on, it says the layer is already
-            open, and pressing it takes the layer off again. Both sentences
-            are the design's own.
-          */}
-          <span style={{ display: 'block', marginTop: space(2) }}>
-            <button
-              type="button"
-              aria-pressed={layers.lowPoint}
-              onClick={() => {
-                toggle('lowPoint');
-              }}
-              style={{
-                padding: `${String(space(1))}px ${String(space(3))}px`,
-                borderRadius: radius.small,
-                border: `1px solid ${layers.lowPoint ? brand.tint : line.base}`,
-                background: layers.lowPoint ? brand.wash : surface.raised,
-                color: layers.lowPoint ? brand.ink : ink.base,
-                font: type(text.small, { weight: weight.semibold }),
-                textAlign: 'left',
-                cursor: 'pointer',
-              }}
-            >
-              {layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}
-            </button>
-          </span>
         </MapCallout>
       )}
     </>
@@ -1839,6 +2069,55 @@ const pickOutlineStyle = {
 } as const;
 
 /** The map's own underlined link, for the ways between its cards. */
+/**
+ * The address card's buttons, as the design draws them (Figma A9, A8).
+ *
+ * Full width and stacked, because the card is 296 pixels wide and three
+ * controls in a row at that width wrap into something nobody drew. The filled
+ * one is the thing the reader came for; the outlined one is a switch; the last
+ * is a link, and looks like one.
+ */
+const primaryCardButton = {
+  display: 'block',
+  width: '100%',
+  marginTop: space(3),
+  padding: `${String(space(3))}px ${String(space(3))}px`,
+  border: 'none',
+  borderRadius: radius.small,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const outlineCardButton = {
+  display: 'flex',
+  gap: space(2),
+  alignItems: 'center',
+  width: '100%',
+  marginTop: space(2),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.small,
+  background: surface.raised,
+  color: brand.ink,
+  font: type(text.small, { weight: weight.semibold }),
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
+const cardLinkButton = {
+  display: 'block',
+  marginTop: space(3),
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: type(text.small, { weight: weight.semibold }),
+  color: brand.ink,
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
 const planLinkStyle = {
   background: 'none',
   border: 'none',
