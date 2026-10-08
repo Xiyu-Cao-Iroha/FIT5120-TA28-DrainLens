@@ -41,6 +41,13 @@ describe('the count sentence', () => {
 });
 
 describe('what the sweep note is allowed to say', () => {
+  it('carries on from the summary rather than repeating it', () => {
+    // It opened with the summary's own sentence, so the fold read as the same
+    // note printed twice.
+    expect(SWEEP_DETAIL).not.toContain(SWEEP_SUMMARY.replace('…', ''));
+    expect(SWEEP_DETAIL.startsWith('Sweep them')).toBe(true);
+  });
+
   it('offers only what is safe, and then says what is not', () => {
     expect(SWEEP_SUMMARY).toMatch(/sweep them away/);
     for (const boundary of [/when it is dry/, /stay on the footpath/, /Never lift the cover/, /reach inside/, /stand in the road/]) {
