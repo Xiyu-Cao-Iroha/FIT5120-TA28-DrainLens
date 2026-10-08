@@ -48,6 +48,7 @@
 
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from 'react';
 
+import { quietBrandButton, quietButton } from '../ui/controls.js';
 import { type FloodHistoryArtefact, barScale, hasMore, yearLabel } from '../history/artefact.js';
 import {
   type Figure,
@@ -122,6 +123,20 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
   return (
     <div style={{ maxWidth: 880, margin: '0 auto', padding: `${String(space(8))}px ${String(space(6))}px ${String(space(16))}px` }}>
       <Heading />
+      {/*
+        The same records drawn, offered at the top as well as at the foot
+        (reported 9 October).
+
+        There was one way to the area map and it was below a ranked list of
+        thirty areas and six paragraphs about what a count means. A reader who
+        arrived wanting the map had to read past all of it to find out there
+        was one.
+      */}
+      <p style={{ margin: `${String(space(4))}px 0 0` }}>
+        <button type="button" onClick={onOpenAreas} style={quietBrandButton}>
+          Open the area map →
+        </button>
+      </p>
       <WhenChart artefact={artefact} />
 
       <RankingToggle
@@ -224,20 +239,11 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
         end of the page, and after six screens of explanation the crumb is a
         long way up.
       */}
-      <button
-        type="button"
-        onClick={onBack}
-        style={{
-          marginTop: space(6),
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          font: type(text.label, { weight: weight.medium }),
-          color: brand.ink,
-        }}
-      >
-        ← Back to the homepage
-      </button>
+      <p style={{ margin: `${String(space(6))}px 0 0` }}>
+        <button type="button" onClick={onBack} style={quietButton}>
+          ← Back to the homepage
+        </button>
+      </p>
     </div>
   );
 }

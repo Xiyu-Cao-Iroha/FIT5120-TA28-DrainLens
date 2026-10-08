@@ -20,7 +20,6 @@ import { useAreas } from './history/useAreas.js';
 import { FloodMap } from './screens/FloodMap.js';
 import { Guide } from './screens/Guide.js';
 import { Choose } from './screens/Choose.js';
-import { Start } from './screens/Start.js';
 import { Home } from './screens/Home.js';
 import { LockedMap } from './screens/LockedMap.js';
 import { type SectionId, guideTitleOf } from './tutorial/sections.js';
@@ -398,23 +397,6 @@ export function App() {
             */
             onCompare={() => {
               dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
-            }}
-          />
-        </Shell>
-      );
-
-    case 'start':
-      return (
-        <Shell>
-          <Start
-            onExplore={() => {
-              dispatch({ type: 'explore-chosen' });
-            }}
-            onHistory={() => {
-              dispatch({ type: 'history-opened' });
-            }}
-            onBack={() => {
-              dispatch({ type: 'back' });
             }}
           />
         </Shell>

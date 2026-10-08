@@ -194,6 +194,15 @@ function titleCase(name: string): string {
     .join(' ');
 }
 
+/**
+ * The fold on the area card that says who looks after which part.
+ *
+ * Here rather than in the component because Epic 6's guide names it: its
+ * third step is *Now open Why are there different organisations?* (Figma D3),
+ * and a step that quotes a control has to quote the control.
+ */
+export const WHY_ORGANISATIONS = 'Why are there different organisations?';
+
 /** What a class is called where the register's state is shown, not the sentence. */
 export const CLASS_NAME: Readonly<Record<ReceivingClass, string>> = {
   'main-drain': 'Melbourne Water main drain',

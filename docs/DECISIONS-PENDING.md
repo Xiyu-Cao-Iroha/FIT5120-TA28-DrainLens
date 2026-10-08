@@ -269,15 +269,37 @@ The design shows **Move valuable items above floor level**. No official page car
 
 ---
 
-## 10 · The assistant — **DECIDED 8 October 2026: the slot stays, the panel is somebody else's**
+## 10 · The assistant — **DECIDED 9 October 2026: it ships, and the questions leave the browser**
 
-The Figma file gained a page on 7 October: *Epic 5 · AI: Ask about getting ready*, thirteen frames of a panel that answers questions about getting ready. I built it the same day, answering from a register of ten sentences written from official pages rather than from a model. **It was removed on 8 October, before anyone outside the team had seen it.**
+### What was settled, and by whom
 
-**Why it was removed.** The assistant is already being built, by somebody else, against the retrieval prototype in `assistant/`. Two implementations of the same Figma page is not a design decision, it is wasted work and a merge nobody wants to do — and of the two, mine was the one with no owner. What is in the product now is the slot: a row at the foot of the plan reading *Have a question about getting ready?* with *Coming soon* where the control goes. The design's wording and the design's position are settled, which is the part that was worth keeping.
+**Xiyu Cao, 9 October 2026**, on the one question this entry was holding open: a resident's typed question is sent from their browser to the DrainLens API, and from there to the retrieval service in `assistant/`. It is no longer a thing the product does only inside the browser, and the team has said that is acceptable.
 
-**What the register was, for the record.** Ten answers, each written from a publisher's own page read on 8 October and carrying the sentence it came from, matched in the browser, nothing sent anywhere. It is in git history, not in the build. `GUIDANCE-CONTENT-REGISTER.md` §4 records what it held and where to find it.
+That is the whole decision. What follows is the record of how it got here, because the reasoning is worth keeping even though the answer is now yes.
 
-**The constraint it was built around, which outlives it.** `assistant/evaluation_results.csv` is thirty questions scored by hand in three categories, and it is the most useful thing either implementation has. It says which questions are answerable from official guidance and which are **not** — flood depth, arrival time, whether this house will flood, repair cost, which insurer, whether a switchboard is safe — and which are an emergency. A panel that answers the middle group would put the project's name on sentences about floodwater that nobody read before a resident did, in the one part of the product a person might open with rain coming. The register refused those six by name, before matching, because each is full of words a matcher would otherwise recognise. **Whatever ships behind that slot needs an answer to the same problem.** That is for the person building it; this entry is so the question is not rediscovered from scratch.
+### How it got here
+
+The Figma file gained a page on 7 October: *Epic 5 · AI: Ask about getting ready*, thirteen frames of a panel that answers questions about getting ready. Two implementations followed.
+
+**The first was mine and it was removed the next day.** It answered from a register of ten sentences written from official pages rather than from a model — nothing sent anywhere, nothing generated. It went because the assistant was already being built by somebody else against the prototype in `assistant/`, and two implementations of one Figma page is wasted work and a merge nobody wants to do. What stayed was the slot: the row at the foot of the plan, with the design's wording and position settled.
+
+**The second is the one that shipped**, merged on 8 October as #215: a `POST /api/chat` route on the Hono API that forwards to a FastAPI service, with the panel behind the slot. `ASK_COMING` — the *Coming soon* that stood in the slot for one day — went with it.
+
+### What the decision costs, stated plainly
+
+**Sentences about floodwater that nobody read before a resident did.** That is the thing the register was built to avoid, and it is the thing this decision accepts. The rest of this product is built the other way round: every quotation carries a publisher and the date its page was read, every figure says whether it is a council record or a DrainLens estimate, and `GUIDANCE-CONTENT-REGISTER.md` exists so a reviewer can check the lot without reading React. A generated answer is outside that register by construction.
+
+**A question leaves the browser.** Until 8 October the product's privacy line was absolute: nothing a reader typed or chose went anywhere. The plan still says *DrainLens does not send this report. Nothing leaves your browser* about a **report**, and that stays true. It is not true of the assistant, and the two sit on the same screen.
+
+### The constraint that still has to hold
+
+`assistant/evaluation_results.csv` is thirty questions scored by hand in three categories, and it is the most useful thing either implementation produced. It says which questions are answerable from official guidance and which are **not** — flood depth, arrival time, whether this house will flood, repair cost, which insurer, whether a switchboard is safe — and which are an emergency.
+
+**Answering the middle group is the failure mode**, and it is not covered by the decision above. The shipped panel carries a `prediction` refusal for forecast-shaped questions; whether it holds for all six is a question for whoever owns `assistant/`, not for this file.
+
+### Still open, and not a decision
+
+**The service is not deployed and `AI_SERVICE_URL` is not set.** The route answers 503 with *AI chat service is not configured*, so the panel on the dev site is a panel that cannot answer. It fails closed, which is the right way round, but a reader meeting it before the showcase meets a dead control.
 
 ---
 

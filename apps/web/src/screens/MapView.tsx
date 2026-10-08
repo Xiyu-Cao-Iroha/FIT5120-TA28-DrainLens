@@ -86,7 +86,8 @@ import {
   STREET_DRAINS_HEADING,
 } from '../drains/wording.js';
 import { StreetDrains } from './StreetDrains.js';
-import { Sidebar, sidebarWidth } from './Sidebar.js';
+import { plainButton, quietButton } from '../ui/controls.js';
+import { SIDEBAR_RAIL, Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
 import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
@@ -94,9 +95,11 @@ import {
   PICK_DRAIN,
   PICK_RADIUS_M,
   PIN_PLACE,
+  type PickedDrain,
   type ReportPlace,
   drainTitle,
   distanceLine,
+  useDrains,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
@@ -447,10 +450,30 @@ export function MapView({
   */
   /** A reminder's explanation has been opened, which the guide waits on. */
   const [whyOpen, setWhyOpen] = useState(false);
+  /*
+    *Why are there different organisations?* has been opened (Figma D3).
+
+    Latched here as well as in `latch`, because the area card is unmounted and
+    remounted whenever the boundary layer is switched off and on: its own
+    `rolesOpen` goes with it, and a step the reader had already done would
+    come undone under them.
+  */
+  const [rolesOpened, setRolesOpened] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
-  const openReport = (place: ReportPlace) => {
+  /*
+    Where a report was opened from, so it has somewhere to go back to (bug 4).
+
+    Reported on 9 October: the only way back to the plan after a report was
+    report → Close → press a warning sign → *Applies to me*, which is four
+    presses and two of them accidental. `Close` dismisses the pathway and
+    leaves the map; a report opened from the plan now also offers the plan.
+  */
+  const [reportFromPlan, setReportFromPlan] = useState(false);
+
+  const openReport = (place: ReportPlace, fromPlan = false) => {
     setReportPlace(place);
+    setReportFromPlan(fromPlan);
     setReportOpen(true);
   };
   /*
@@ -467,6 +490,15 @@ export function MapView({
     readonly assetNumber: string;
     readonly distanceM: number | null;
   } | null>(null);
+  /*
+    The drains already kept, while another is being tapped (bug 12).
+
+    *Pick another* used to throw the tapped drain away and start again, so a
+    problem at two inlets could only be reported as one of them. It adds to
+    this instead; the card lists what is held, each row with a way to take it
+    off again, and the confirm sends the lot.
+  */
+  const [kept, setKept] = useState<readonly PickedDrain[]>([]);
   const [pinAt, setPinAt] = useState<Local | null>(null);
   const [pinNote, setPinNote] = useState('');
   const panel = panelAllowed && picking === null;
@@ -588,6 +620,24 @@ export function MapView({
     Keyed on the address, so it fits once when the address arrives and leaves
     the reader's own panning alone afterwards.
   */
+  /*
+    How many times the before-rain layer has been switched on.
+
+    The fit below is keyed on the address, so it ran once and never again --
+    and a reader who had since zoomed out got the layer, the markers and no
+    card, because `warningsVisible` stops drawing a sign over a neighbourhood
+    below 1.25 px/m. Reported on 9 October: pressing the before-rain chip from
+    too far out gives no warning card at all. Counting the switch-ons puts the
+    view back on the 200 m box every time the layer comes on, which is well
+    inside that threshold -- rather than adding a second rule about when to
+    zoom.
+  */
+  const [checksOpened, setChecksOpened] = useState(0);
+  const beforeRainOn = layers.beforeRain;
+  useEffect(() => {
+    if (beforeRainOn) setChecksOpened((was) => was + 1);
+  }, [beforeRainOn]);
+
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
     const r = PLACE_RADIUS_M;
@@ -595,8 +645,8 @@ export function MapView({
       [address.eastingM - r, address.northingM - r],
       [address.eastingM + r, address.northingM + r],
     ];
-    return { key: `places:${address.label}`, points: corners, reservePanel: false };
-  }, [layers.beforeRain, address]);
+    return { key: `places:${address.label}:${String(checksOpened)}`, points: corners, reservePanel: false };
+  }, [layers.beforeRain, address, checksOpened]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -607,8 +657,28 @@ export function MapView({
     anchored on the map, so both fit -- the card is kept clear of the sidebar
     by `calloutWithin` below.
   */
+  /*
+    Folded to the rail rather than dismissed (bug 11, 9 October).
+
+    One flag for both panels: only one of them is ever up, and a reader who
+    folded the plan to reach the map does not mean *and keep the drains list
+    open at full width* either. It is cleared when a panel is opened, because
+    opening a panel is asking to see it.
+  */
+  const [panelFolded, setPanelFolded] = useState(false);
+
   const planShowing = panel && viewport !== null && planOpen;
   const sidebarOpen = planShowing && panelWidth > 0;
+  /*
+    Whether *a* sidebar is open, which is what the map's own chrome cares about.
+
+    The legend, the zoom controls and the layer chips were all moved aside by
+    `sidebarOpen` -- the plan's. Opening the street-drains list closes the plan
+    (`openDrains`), so the chrome moved back under a panel that was still
+    there: the legend and the zoom buttons ended up behind it, reported on
+    9 October as *legend 失效，缩放图标被遮盖*. A second panel in the same place
+    needs the same room.
+  */
   /*
     Too narrow for a sidebar, so the plan goes back in the card it used to
     live in. Not a good screen -- the design has a sheet for this and the
@@ -636,21 +706,6 @@ export function MapView({
     />
   );
 
-  /*
-    The box a callout may not leave.
-
-    The sidebar is drawn over the canvas rather than beside it -- the map is
-    deliberately not re-fitted when the plan opens, so that what the reader is
-    looking at does not move under them. A card placed against the canvas's
-    full width can therefore end up behind the sidebar.
-  */
-  const calloutWithin =
-    viewport === null
-      ? { width: 0, height: 0 }
-      : {
-          width: viewport.widthPx - (sidebarOpen ? panelWidth : 0),
-          height: viewport.heightPx,
-        };
 
   const addressId = address?.id ?? null;
 
@@ -660,7 +715,101 @@ export function MapView({
     setReportPlace(null);
   }, [addressId]);
 
+  /*
+    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
+
+    The button used to switch Drain pits on, which left a reader looking for
+    the drain outside their own house among a few hundred identical circles.
+    The panel names each one from the address it is nearest to and groups them
+    by street, and the layer goes on with it so the list and the map are about
+    the same things.
+  */
+  const [drainsOpen, setDrainsOpen] = useState(false);
+  /** The drain the list picked, which gets a card of its own (Figma S2). */
+  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
+
+  /**
+   * The reader's address as the index holds it, in parts.
+   *
+   * `indexed` above finds the same record by label; this is by id, which is
+   * what the address carries, and null where the map is running without an
+   * index at all -- inside a guide, where this panel is not offered.
+   *
+   * The panel names the street address rather than the postal label: *within
+   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
+   * the end of it is already in the panel's own subtitle.
+   */
+  const yourAddress = useMemo(
+    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
+    [index, address],
+  );
+  const yourStreet = yourAddress?.street ?? null;
+  const streetAddress =
+    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
+
+  const drainsNear = useMemo(
+    () =>
+      address === null || index === undefined
+        ? null
+        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
+    [map, index, address, yourStreet],
+  );
+
+  /** The street-drains list, in the same place the plan's sidebar goes. */
+  const drainsSidebarOpen =
+    panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0;
+
+  /**
+   * What a panel actually takes from the map.
+   *
+   * Folded it is the rail, which is why the chrome moves by this rather than
+   * by `panelWidth`: the point of folding is that the map gets the rest back.
+   */
+  const panelTakes = panelFolded ? SIDEBAR_RAIL : panelWidth;
+
+  /**
+   * Either of them, which is what the map's own chrome has to move for.
+   *
+   * The legend, the zoom controls and the layer chips were all moved aside by
+   * the plan's `sidebarOpen`. Opening the street-drains list closes the plan,
+   * so the chrome moved back under a panel that was still there and the legend
+   * and zoom buttons ended up behind it (reported 9 October). A second panel in
+   * the same place needs the same room.
+   */
+  const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
+
+  /*
+    The box a callout may not leave.
+
+    The sidebar is drawn over the canvas rather than beside it -- the map is
+    deliberately not re-fitted when the plan opens, so that what the reader is
+    looking at does not move under them. A card placed against the canvas's
+    full width can therefore end up behind the sidebar, which is how a place
+    card and an open plan used to be impossible to have at once.
+  */
+  const calloutWithin =
+    viewport === null
+      ? { width: 0, height: 0 }
+      : { width: viewport.widthPx - (anySidebarOpen ? panelTakes : 0), height: viewport.heightPx };
+
+  /*
+    The drain the list picked, as the canvas names pits.
+
+    The panel works in asset numbers as strings, because that is what the
+    council's record and the reporting pathway both carry; the canvas keys its
+    ring on a number. A record whose number is not one is drawn as nothing
+    rather than as some other pit.
+  */
+  const pickedPitNumber = useMemo(() => {
+    if (drainPicked === null) return null;
+    const asNumber = Number(drainPicked.id);
+    return Number.isFinite(asNumber) ? asNumber : null;
+  }, [drainPicked]);
+
   const openDrains = () => {
+    // The layer goes on with the list, so the map and the panel are about the
+    // same drains.
+    setPanelFolded(false);
     if (!layers.pit) toggle('pit');
     setAddressCardOpen(false);
     setPlanOpen(false);
@@ -686,7 +835,7 @@ export function MapView({
         : {
             onReport: () => {
               setPlanOpen(false);
-              openReport(null);
+              openReport(null, true);
             },
 
             
@@ -703,7 +852,14 @@ export function MapView({
           })}
     />
   );
+  /** Everything the confirm would send: what is held, and what was just tapped. */
+  const pickedSoFar: readonly PickedDrain[] =
+    candidate === null
+      ? kept
+      : [...kept, { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM }];
+
   const leavePicking = () => {
+    setKept([]);
     setPicking(null);
     setCandidate(null);
     setPinAt(null);
@@ -749,46 +905,6 @@ export function MapView({
     still tested, so there is something to read from if the card or a guide
     wants the fall again.
   */
-
-  /*
-    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
-
-    The button used to switch Drain pits on, which left a reader looking for
-    the drain outside their own house among a few hundred identical circles.
-    The panel names each one from the address it is nearest to and groups them
-    by street, and the layer goes on with it so the list and the map are about
-    the same things.
-  */
-  const [drainsOpen, setDrainsOpen] = useState(false);
-  /** The drain the list picked, which gets a card of its own (Figma S2). */
-  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
-
-  /**
-   * The reader's address as the index holds it, in parts.
-   *
-   * `indexed` above finds the same record by label; this is by id, which is
-   * what the address carries, and null where the map is running without an
-   * index at all -- inside a guide, where this panel is not offered.
-   *
-   * The panel names the street address rather than the postal label: *within
-   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
-   * the end of it is already in the panel's own subtitle.
-   */
-  const yourAddress = useMemo(
-    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
-    [index, address],
-  );
-  const yourStreet = yourAddress?.street ?? null;
-  const streetAddress =
-    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
-
-  const drainsNear = useMemo(
-    () =>
-      address === null || index === undefined
-        ? null
-        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
-    [map, index, address, yourStreet],
-  );
 
   const explanation = useMemo(
     () =>
@@ -917,6 +1033,7 @@ export function MapView({
       planOpen,
       placesReviewed,
       whyOpen,
+      rolesOpened,
     });
   }, [
     terrainOn,
@@ -935,20 +1052,34 @@ export function MapView({
     planOpen,
     placesReviewed,
     whyOpen,
+    rolesOpened,
     onMapNow,
   ]);
 
   return (
     <>
       <MapCanvas
-        controlsInset={sidebarOpen ? panelWidth : 0}
+        controlsInset={anySidebarOpen ? panelTakes : 0}
         artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
         show={visibilityOf(picking === null ? layers : NOTHING_ON)}
-        selectedPit={selected}
-        // Only while the pits are drawn. A ring around a pit on a map with no
-        // pits on it is a mark with nothing under it.
-        suggestedPit={pitsDrawn ? highlightPit : null}
+        /*
+          While picking, the drain under the question (bug 12).
+
+          `hit` is not set during picking -- a press answers the banner rather
+          than opening a card -- so nothing was marked and the reader had a
+          card naming a drain they could not find again on the map.
+        */
+        selectedPit={picking === 'drain' && candidate !== null ? Number(candidate.assetNumber) : selected}
+        /*
+          Only while the pits are drawn. A ring around a pit on a map with no
+          pits on it is a mark with nothing under it.
+
+          The drain the street-drains list picked takes the same ring: it was
+          a row in a panel and a card on the map with nothing joining them, so
+          *选的 drain 在地图上没有高亮，找不到是哪个* (9 October).
+        */
+        suggestedPit={pitsDrawn ? (pickedPitNumber ?? highlightPit) : null}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
@@ -1116,42 +1247,118 @@ export function MapView({
           )}
 
           {picking === 'drain' && candidate !== null && (
-            <MapNoteStack at="bottom">
-              <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}>
-                <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
-                  {distanceLine(
-                    { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
-                    address?.label ?? null,
-                  )}
-                </p>
-                <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportPlace({
-                        kind: 'drain',
-                        assetNumber: candidate.assetNumber,
-                        street: null,
-                        distanceM: candidate.distanceM,
-                      });
-                      leavePicking();
+            <div
+              style={{
+                position: 'absolute',
+                bottom: space(4),
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 6,
+                width: 320,
+                maxWidth: 'calc(100% - 32px)',
+                padding: space(4),
+                borderRadius: radius.large,
+                background: surface.raised,
+                border: `1px solid ${line.base}`,
+                boxShadow: shadow.floating,
+              }}
+            >
+              <p style={{ margin: 0, font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {drainTitle({ assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}
+              </p>
+              <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.small), color: ink.muted }}>
+                {distanceLine(
+                  { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                  address?.label ?? null,
+                )}
+              </p>
+
+              {/*
+                What is already held, each with a way off again.
+
+                Only once there is something in it: a heading reading
+                SELECTED (0) over nothing is a list that has not started.
+              */}
+              {kept.length > 0 && (
+                <>
+                  <p
+                    style={{
+                      margin: `${String(space(3))}px 0 ${String(space(1))}px`,
+                      font: type(text.micro, { weight: weight.semibold }),
+                      letterSpacing: tracking.caps,
+                      textTransform: 'uppercase',
+                      color: ink.subtle,
                     }}
-                    style={pickFilledStyle}
                   >
-                    Use this drain
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCandidate(null);
-                    }}
-                    style={pickOutlineStyle}
-                  >
-                    Pick another
-                  </button>
-                </span>
-              </MapNote>
-            </MapNoteStack>
+                    Selected ({kept.length})
+                  </p>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                    {kept.map((drain) => (
+                      <li
+                        key={drain.assetNumber}
+                        style={{
+                          display: 'flex',
+                          gap: space(2),
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          font: type(text.small),
+                          color: ink.base,
+                        }}
+                      >
+                        <span>
+                          {drainTitle(drain)}
+                          {drain.distanceM !== null && ` \u00b7 ${String(drain.distanceM)} m`}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${drainTitle(drain)}`}
+                          onClick={() => {
+                            setKept((held) => held.filter((one) => one.assetNumber !== drain.assetNumber));
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            width: 24,
+                            height: 24,
+                            border: `1px solid ${line.base}`,
+                            borderRadius: radius.pill,
+                            background: surface.raised,
+                            color: ink.muted,
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          −
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap', marginTop: space(3) }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportPlace({ kind: 'drain', drains: pickedSoFar });
+                    leavePicking();
+                  }}
+                  style={pickFilledStyle}
+                >
+                  {useDrains(pickedSoFar.length)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Kept, not discarded: this is how a second drain is added.
+                    setKept(pickedSoFar);
+                    setCandidate(null);
+                  }}
+                  style={pickOutlineStyle}
+                >
+                  Pick another
+                </button>
+              </span>
+            </div>
           )}
 
           {/*
@@ -1239,7 +1446,7 @@ export function MapView({
           style={{
             position: 'absolute',
             left: space(4),
-            right: space(4) + (sidebarOpen ? panelWidth : 0),
+            right: space(4) + (anySidebarOpen ? panelTakes : 0),
             top: space(4),
             transition: 'right 160ms ease',
             zIndex: 4,
@@ -1261,7 +1468,7 @@ export function MapView({
             )}
             <LayerChips
               collapsible={!guided && !touring}
-              fold={sidebarOpen}
+              fold={anySidebarOpen}
               state={layers}
               onToggle={toggle}
               unavailableKeys={notYet}
@@ -1300,7 +1507,7 @@ export function MapView({
           {legend && !layersOpen && (
             <MapLegend
               state={layers}
-              fold={sidebarOpen}
+              fold={anySidebarOpen}
               pulseTerrain={highlight === 'terrain-legend'}
             />
           )}
@@ -1575,7 +1782,21 @@ export function MapView({
                 setPicking(address === null ? 'pin' : 'drain');
               }}
             />
-            <span style={{ display: 'block', marginTop: space(3) }}>
+            <span style={{ display: 'flex', gap: space(2), marginTop: space(3) }}>
+              {reportFromPlan && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportOpen(false);
+                    setReportProblem(null);
+                    setPanelFolded(false);
+                    setPlanOpen(true);
+                  }}
+                  style={quietButton}
+                >
+                  ‹ Back to my plan
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1605,6 +1826,9 @@ export function MapView({
                 // The chip is what drew this card; taking it off is the way
                 // back, and it takes the boundary with it.
                 toggle('catchment');
+              }}
+              onRolesOpen={() => {
+                setRolesOpened(true);
               }}
               {...(guided
                 ? {}
@@ -1704,6 +1928,9 @@ export function MapView({
         if (place === undefined) return null;
         if (!onScreen(place.at, viewport)) return null;
         const next = places.find((candidate) => candidate.number === place.number + 1);
+        // Reported on 9 October: *Next place* had no opposite, so a reader who
+        // moved past one had no way back to it but the plan.
+        const previous = places.find((candidate) => candidate.number === place.number - 1);
         /*
           Away from the address card, which is now open beside this one.
 
@@ -1748,6 +1975,13 @@ export function MapView({
                 setPlanOpen(true);
                 setOpenPlace(next?.number ?? null);
               }}
+              {...(previous === undefined
+                ? {}
+                : {
+                    onPrevious: () => {
+                      setOpenPlace(previous.number);
+                    },
+                  })}
               {...(next === undefined
                 ? {}
                 : {
@@ -1768,18 +2002,9 @@ export function MapView({
                   setOpenPlace(null);
                   setPlanOpen(true);
                 }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: type(text.small),
-                  color: ink.muted,
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                  cursor: 'pointer',
-                }}
+                style={quietButton}
               >
-                Back to the plan
+                ‹ Back to the plan
               </button>
             </span>
           </MapCallout>
@@ -1787,11 +2012,13 @@ export function MapView({
       })()}
 
       {/* Step 3's list of drains (Figma S1–S4), in the plan's own container. */}
-      {panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0 && (
+      {drainsSidebarOpen && drainsNear !== null && address !== null && (
         <Sidebar
           title={STREET_DRAINS_HEADING}
           subtitle={address.label}
           width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
           onClose={() => {
             setDrainsOpen(false);
             setDrainPicked(null);
@@ -1836,9 +2063,13 @@ export function MapView({
               onClick={() => {
                 openReport({
                   kind: 'drain',
-                  assetNumber: drainPicked.id,
-                  street: drainPicked.street,
-                  distanceM: Math.round(drainPicked.distanceM),
+                  drains: [
+                    {
+                      assetNumber: drainPicked.id,
+                      street: drainPicked.street,
+                      distanceM: Math.round(drainPicked.distanceM),
+                    },
+                  ],
                 });
               }}
               style={primaryCardButton}
@@ -1869,6 +2100,8 @@ export function MapView({
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
           width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
           onClose={() => {
             setPlanOpen(false);
           }}
@@ -2107,27 +2340,21 @@ const outlineCardButton = {
 } as const;
 
 const cardLinkButton = {
-  display: 'block',
+  ...plainButton,
   marginTop: space(3),
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small, { weight: weight.semibold }),
-  color: brand.ink,
+  paddingLeft: 0,
   textAlign: 'left',
-  cursor: 'pointer',
 } as const;
 
-const planLinkStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small),
-  color: brand.ink,
-  textDecoration: 'underline',
-  textUnderlineOffset: 3,
-  cursor: 'pointer',
-} as const;
+/**
+ * Was an underlined word; is a control (9 October).
+ *
+ * *Close* on the report card and *Cancel* while picking a drain are not
+ * links: one dismisses a pathway and the other abandons a selection. Both sit
+ * inside cards that already carry an outline, so they take the borderless
+ * weight rather than a box inside a box.
+ */
+const planLinkStyle = plainButton;
 
 /**
  * Is the thing the card points at still on the map?

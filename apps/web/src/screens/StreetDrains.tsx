@@ -16,6 +16,8 @@
 
 import { useId, useState } from 'react';
 
+import { quietButton } from '../ui/controls.js';
+
 import {
   type DrainGroup,
   NAMED_GROUPS,
@@ -76,7 +78,7 @@ export function StreetDrains({
   return (
     <div style={{ font: type(text.small, { leading: 1.55 }), color: ink.base }}>
       <p style={{ margin: 0 }}>
-        <button type="button" onClick={onBack} style={backStyle}>
+        <button type="button" onClick={onBack} style={quietButton}>
           ‹ {BACK_TO_PLAN}
         </button>
       </p>
@@ -350,11 +352,4 @@ function Roll({ label, children }: { readonly label: string; readonly children: 
   );
 }
 
-const backStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small, { weight: weight.semibold }),
-  color: brand.ink,
-  cursor: 'pointer',
-} as const;
+

@@ -14,11 +14,9 @@ import { NO_ADDRESS, YOURS_TO_KEEP, reportSummary, summaryHtml, summaryText } fr
 
 const ON = new Date(2026, 9, 3);
 const ADDRESS = '46 Gatehouse Drive, Kensington';
-const drain = (assetNumber: string): ReportPlace => ({
+const drain = (...assetNumbers: readonly string[]): ReportPlace => ({
   kind: 'drain',
-  assetNumber,
-  street: null,
-  distanceM: 20,
+  drains: assetNumbers.map((assetNumber) => ({ assetNumber, street: null, distanceM: 20 })),
 });
 const summary = (place: ReportPlace = null, id: 'blocked-drain' | 'emergency' = 'blocked-drain') =>
   reportSummary(ADDRESS, problemFor(id), place, ON);

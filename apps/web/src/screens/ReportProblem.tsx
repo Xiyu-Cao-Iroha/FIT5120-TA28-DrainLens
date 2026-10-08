@@ -18,6 +18,7 @@
 
 import { useState } from 'react';
 
+import { plainButton } from '../ui/controls.js';
 import { printDocument } from '../prepare/printing.js';
 import { type Channel } from '../report/channels.js';
 import {
@@ -412,13 +413,5 @@ const outlineStyle = {
   cursor: 'pointer',
 } as const;
 
-const linkStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  font: type(text.small),
-  color: brand.ink,
-  textDecoration: 'underline',
-  textUnderlineOffset: 3,
-  cursor: 'pointer',
-} as const;
+/** Was an underline; is a control (9 October). */
+const linkStyle = plainButton;
