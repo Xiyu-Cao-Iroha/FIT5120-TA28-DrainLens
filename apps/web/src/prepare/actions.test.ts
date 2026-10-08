@@ -8,6 +8,9 @@
  * likely to grow by accident.
  */
 
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { GENERAL_ACTIONS, NOT_A_SCORE, SAFETY } from './actions.js';
@@ -35,12 +38,34 @@ describe('the general actions', () => {
     }
   });
 
-  it('has nothing the design showed and no page carried', () => {
-    // The mock-up's fourth action, *Move valuable items above floor level*, is
-    // not here: no official page was found carrying it on 2 October, and a
-    // mock-up is not a source.
-    const all = GENERAL_ACTIONS.map((action) => action.text).join(' ');
-    expect(all).not.toMatch(/valuable items/i);
+  it('takes the design’s fourth action only now that a page carries it', () => {
+    /*
+      It was left out on 2 October because no official page was found carrying
+      *Move valuable items above floor level*, and a mock-up is not a source.
+      VICSES's flood page carries *Lift it: Lift your valuables up high*, read
+      on 8 October, so the action is in under the publisher's words rather
+      than the mock-up's.
+    */
+    const lift = GENERAL_ACTIONS.find((action) => action.id === 'raise-items');
+    expect(lift?.quote).toBe('Lift it: Lift your valuables up high');
+    expect(lift?.text).not.toMatch(/valuable items/i);
+  });
+
+  it('gives each action a photograph the repository actually ships', () => {
+    // The file has to be there: a broken image on the plan is a gap in the
+    // one screen somebody may read with rain coming.
+    for (const action of GENERAL_ACTIONS) {
+      expect(action.photo).toMatch(/^\/actions\/[a-z-]+\.webp$/);
+      expect(existsSync(path.resolve(__dirname, '../../public', action.photo.slice(1)))).toBe(true);
+    }
+  });
+
+  it('never lets a photograph stand in for evidence', () => {
+    // Every action still carries the sentence it came from; the picture is
+    // about which part of a house the sentence is about and nothing more.
+    for (const action of GENERAL_ACTIONS) {
+      expect(action.quote.length).toBeGreaterThan(20);
+    }
   });
 });
 

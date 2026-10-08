@@ -105,11 +105,13 @@ describe('the document itself', () => {
     // Reported on 8 October: the page listed all three however the boxes
     // were left. The rule is the one the places already follow -- what the
     // reader chose is what the page they take away carries.
-    const page = plan({}, ['gutters', 'parking']);
-    expect(page.generalActions.map((a) => a.text)).toEqual([
-      GENERAL_ACTIONS[0]?.text,
-      GENERAL_ACTIONS[2]?.text,
-    ]);
+    // Read from the register rather than written out, so a change to the
+    // actions is a change to what this test ticks rather than a failure.
+    const [first, , third] = GENERAL_ACTIONS;
+    expect(first).toBeDefined();
+    expect(third).toBeDefined();
+    const page = plan({}, [String(first?.id), String(third?.id)]);
+    expect(page.generalActions.map((a) => a.text)).toEqual([first?.text, third?.text]);
   });
 
   it('carries all of them when none were ticked, rather than a section with nothing in it', () => {
@@ -118,7 +120,7 @@ describe('the document itself', () => {
   });
 
   it('credits only the sources behind something on the page', () => {
-    const page = plan({}, ['gutters']);
+    const page = plan({}, [String(GENERAL_ACTIONS[0]?.id)]);
     const action = GENERAL_ACTIONS[0];
     expect(action).toBeDefined();
     expect(page.sources).toContain(`${String(action?.publisher)}: ${String(action?.page)}`);

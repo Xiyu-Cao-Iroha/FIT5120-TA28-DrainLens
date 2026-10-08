@@ -31,10 +31,35 @@ export interface GeneralAction {
   readonly page: string;
   /** When the page was read, `YYYY-MM-DD`. */
   readonly checked: string;
+  /**
+   * The photograph in the expanded tip, under `public/actions/`.
+   *
+   * The team's own, which is why there is one at all: the objection recorded
+   * here until 8 October was to an **unlicensed** image of somebody's gutter,
+   * and these are not that. `docs/IMAGE-CREDITS.md` is the record.
+   */
+  readonly photo: string;
 }
 
 const VICSES_STORM = 'https://www.ses.vic.gov.au/plan-and-stay-safe/emergencies/storm';
+const VICSES_FLOOD = 'https://www.ses.vic.gov.au/plan-and-stay-safe/emergencies/flood';
+const MELBOURNE_WATER_FLOODING =
+  'https://www.melbournewater.com.au/water-and-environment/flooding-and-drainage/prepare-flooding';
 
+/**
+ * The four the design draws, each with the sentence it was taken from.
+ *
+ * **These were three until 8 October, and two of those three are gone.**
+ * *Secure loose outdoor items* and *Park under cover or away from trees* are
+ * storm advice, taken from the VICSES storm page when the design's own four
+ * could not all be sourced; the design's set is about water in the house, and
+ * the team chose it. Each of the three new ones carries an official sentence
+ * now, so the reason the fourth was dropped on 2 October -- *no official page
+ * was found carrying it* -- no longer holds.
+ *
+ * `GUIDANCE-CONTENT-REGISTER.md` §2 records the swap, and says plainly that
+ * the three new ones are not covered by the 4 October approval.
+ */
 export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   {
     id: 'gutters',
@@ -43,23 +68,36 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
     publisher: 'Victoria State Emergency Service',
     page: VICSES_STORM,
     checked: '2026-10-02',
+    photo: '/actions/gutter.webp',
   },
   {
-    id: 'loose-items',
-    text: 'Secure loose outdoor items, such as furniture and umbrellas.',
+    id: 'raise-items',
+    text: 'Lift valuables up high.',
+    quote: 'Lift it: Lift your valuables up high',
+    publisher: 'Victoria State Emergency Service',
+    page: VICSES_FLOOD,
+    checked: '2026-10-08',
+    photo: '/actions/raise-items.webp',
+  },
+  {
+    id: 'emergency-kit',
+    text: 'Pack an emergency kit with enough essentials for three days.',
     quote:
-      'Check that loose items such as outdoor furniture, umbrellas and trampolines are safely secured.',
-    publisher: 'Victoria State Emergency Service',
-    page: VICSES_STORM,
-    checked: '2026-10-02',
+      "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate.",
+    publisher: 'Melbourne Water',
+    page: MELBOURNE_WATER_FLOODING,
+    checked: '2026-10-08',
+    photo: '/actions/emergency-kit.webp',
   },
   {
-    id: 'parking',
-    text: 'Park under cover or away from trees.',
-    quote: 'Park your car under cover or away from trees.',
+    id: 'warnings',
+    text: 'Monitor weather warnings and official forecasts.',
+    quote:
+      'Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226).',
     publisher: 'Victoria State Emergency Service',
-    page: VICSES_STORM,
-    checked: '2026-10-02',
+    page: VICSES_FLOOD,
+    checked: '2026-10-08',
+    photo: '/actions/warnings.webp',
   },
 ];
 
