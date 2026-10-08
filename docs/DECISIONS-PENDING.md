@@ -299,3 +299,22 @@ A list of fourteen changes arrived from the team on 8 October, with a screenshot
 
 **One thing the list asked for is not built**, and it is the mobile case: under 620 pixels there is no room for a sidebar that leaves a map, so the plan falls back to the card it used to live in. The design has a sheet for that. It is a screen, not a decision, and it is the next piece of this work.
 
+
+---
+
+## 12 · The hold in front of the full map — **DECIDED 5 October 2026: it stays**
+
+Two reviews asked for opposite things in the same week, and this is the record of which one was followed.
+
+| | Asked for | On |
+|---|---|---|
+| The team, after watching somebody use it | A dialog at the end of a guide naming the guides still unread, with a countdown before *Continue to full map* can be pressed | 4 October, in *需要现在改的.docx* |
+| A front-end review | Merging the prompts in front of the map and **removing the fixed countdown**, on the reasoning that three stops in a row makes the flow drag | 4 October |
+
+**The team's version stays.** It is built, it works — the button is disabled and counts 3, 2, 1 before it enables — and it is deliberately smaller than the thing it reinstates: a five-second countdown stood in front of the Full map on *every* visit until 14 September, and this one appears only at the end of a guide, only while a guide is unread, and only on that one control.
+
+**What the review got right, and what it is owed.** Three stops in a row is a real observation, and the answer to it is not to delete this one: the other two are the chooser's own *Skip to Full map*, which shows nothing at all, and the notice in front of the map, which is about scope rather than about guides. If the flow is to be shortened, shorten it there — the open question below.
+
+### Still open: the other way in
+
+The dialog is only on a finished guide's *Explore full map*. Most readers leave for the map through the chooser's *Skip to Full map →*, which bypasses it entirely. Putting it on both would honour the request more fully and would also be the third stop the review complained about. **Not decided**; nothing should be built for it until it is.
