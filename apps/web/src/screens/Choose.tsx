@@ -57,6 +57,26 @@ export interface ChooseProps {
   readonly onBack: () => void;
 }
 
+/**
+ * The offer where there is no address yet.
+ *
+ * Shaped like `AddressMark`, which stands in the same place once there is
+ * one, so that giving an address replaces the control rather than moving the
+ * page about. Outlined rather than filled: the guides above it can be started
+ * without an address, and this is an offer, not the next step.
+ */
+const setAddress = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: `${String(space(2))}px ${String(space(4))}px`,
+  border: `1px solid ${brand.base}`,
+  borderRadius: radius.pill,
+  background: surface.raised,
+  font: type(text.small, { weight: weight.semibold }),
+  color: brand.ink,
+  cursor: 'pointer',
+} as const;
+
 /** The quiet underlined control beside an address that can be changed. */
 const changeLink = {
   background: 'none',
@@ -131,23 +151,47 @@ export function Choose({
           }}
         >
           {done === 0
-            ? `Each guide takes a few minutes. Every guide uses the same address.`
-            : `${String(done)} of ${String(SECTION_COUNT)} guides done. Every guide uses the same address.`}
+            ? 'Each guide takes a few minutes. '
+            : `${String(done)} of ${String(SECTION_COUNT)} guides done. `}
+          {/*
+            Only where there is one.
+
+            *Every guide uses the same address* was printed whether or not
+            there was an address, and arriving at the full map clears it -- so
+            the sentence named a thing that was not on the screen, which the
+            8 October list reported as the address bar having disappeared. The
+            two guides that need one ask for it; this says so instead of
+            promising something already chosen.
+          */}
+          {address === null
+            ? 'The two guides that use an address will ask for one.'
+            : 'Every guide uses the same address.'}
         </p>
 
         {/*
           The address, between the subtitle and the cards, because every card
           below uses it. It was above the heading, where it read as a leftover
           from the screen before.
+
+          With no address the slot is not empty: *Change* used to live inside
+          the mark, so a reader without one had no way to set an address from
+          the screen that tells them two of the guides need it. They had to
+          start one of those guides to be asked.
         */}
-        {address !== null && (
-          <div style={{ margin: `-${String(space(8))}px 0 ${String(space(10))}px`, textAlign: 'center' }}>
+        <div style={{ margin: `-${String(space(8))}px 0 ${String(space(10))}px`, textAlign: 'center' }}>
+          {address === null ? (
+            onChangeAddress !== undefined && (
+              <button type="button" onClick={onChangeAddress} style={setAddress}>
+                Set your address
+              </button>
+            )
+          ) : (
             <AddressMark
               address={address}
               {...(onChangeAddress === undefined ? {} : { onChange: onChangeAddress })}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         <GroupHeading>Learn the map</GroupHeading>
         <div style={{ ...grid, marginBottom: space(10) }}>
