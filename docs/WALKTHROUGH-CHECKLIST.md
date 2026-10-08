@@ -286,7 +286,7 @@ Then run the guide: **Get ready for heavy rain**, from the guide chooser.
 | 6.3.1 | *Report a problem* offers exactly five, **the emergency first and in red** (Figma B3) | | |
 | 6.3.2.a | Each names one organisation and one official channel, and nothing says when somebody will come or what will be done | | |
 | 6.3.2.b | **Drainage problem on my property** goes to a licensed plumber, not to the council | | |
-| 6.3.2.c | *What to include* lists Location (filled in from the address), When, Photos and Which drain; with none selected the last reads *Not chosen. Nothing is chosen for you* | | |
+| 6.3.2.c | *Recommended information for reporting* lists Location (filled in from the address), When, Photos and Which drain, each on a bullet rather than in a box; with none selected the last reads *Not chosen. Nothing is chosen for you* | | |
 | 6.3.2.d | Select a pit first, then open the pathway: **Selected recorded drain: <number>** appears, and *Change* goes back to the map | | |
 | 6.3.2.f | *Pick the drain on the map ›* hands the map over: chrome gone, a banner saying *Tap the drain that is blocked*, only the drains within 150 m drawn, **Cancel** (Figma R1) | | |
 | 6.3.2.g | Tapping one offers *Use this drain* / *Pick another* with its distance from the address (R2) | | |

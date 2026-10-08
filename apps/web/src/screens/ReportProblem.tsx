@@ -30,7 +30,7 @@ import {
   NOT_SUBMITTED,
   PROBLEM_TYPES,
   type ProblemId,
-  WHAT_TO_INCLUDE,
+  RECOMMENDED_INFORMATION,
   problemFor,
   whatToInclude,
 } from '../report/problems.js';
@@ -217,7 +217,7 @@ export function ReportProblem({
             {problem.because}
           </p>
 
-          <Heading>{WHAT_TO_INCLUDE}</Heading>
+          <Heading>{RECOMMENDED_INFORMATION}</Heading>
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {items.map((item) => (
               <li key={item.id} style={{ marginBottom: space(2) }}>
@@ -296,7 +296,16 @@ export function ReportProblem({
   );
 }
 
-/** One line of *What to include*: a box, the thing, and what to have ready. */
+/**
+ * One line of the recommended information: a dot, the thing, and what to
+ * have ready.
+ *
+ * **A dot rather than a box.** An empty square is a control, and four of them
+ * over two buttons read as a form to complete before the buttons would work.
+ * Nothing here is ticked, nothing is submitted, and the list is the same four
+ * things whatever the reader does. A bullet says *read this*, which is what
+ * it is for.
+ */
 function Include({ title, detail }: { readonly title: string; readonly detail: string }) {
   return (
     <span style={{ display: 'flex', gap: space(2), alignItems: 'flex-start' }}>
@@ -304,12 +313,11 @@ function Include({ title, detail }: { readonly title: string; readonly detail: s
         aria-hidden
         style={{
           flexShrink: 0,
-          width: 14,
-          height: 14,
-          marginTop: 3,
-          borderRadius: 3,
-          border: `1px solid ${line.base}`,
-          background: surface.raised,
+          width: 6,
+          height: 6,
+          margin: '7px 4px 0',
+          borderRadius: '50%',
+          background: ink.muted,
         }}
       />
       <span>
