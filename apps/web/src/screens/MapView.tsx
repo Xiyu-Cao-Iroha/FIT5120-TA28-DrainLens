@@ -76,6 +76,14 @@ import {
   placesNear,
 } from '../prepare/places.js';
 import { LAYER } from '../ui/terms.js';
+import { type NamedDrain, streetDrains } from '../drains/nearby.js';
+import {
+  DRAIN_BLOCKED_QUESTION,
+  DRAIN_SOURCE,
+  REPORT_THIS_DRAIN,
+  STREET_DRAINS_HEADING,
+} from '../drains/wording.js';
+import { StreetDrains } from './StreetDrains.js';
 import { Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
@@ -619,6 +627,36 @@ export function MapView({
       ? { width: 0, height: 0 }
       : { width: viewport.widthPx - (sidebarOpen ? panelWidth : 0), height: viewport.heightPx };
 
+  /*
+    A new address forgets the drain the last one chose.
+
+    Found while driving the list: picking a drain on Gatehouse Drive, then
+    searching a Bayswater Road address, left the report saying *Location: 1
+    Bayswater Road* over *Selected recorded drain: 1145039 - Drain on Gatehouse
+    Drive*. Nothing in the pathway would have caught it, and the reader would
+    have sent a council to the wrong street.
+
+    The report itself stays open where it was open: what is wrong with it is
+    the drain, and the row says *Not chosen. Nothing is chosen for you* until
+    they pick another.
+  */
+  const addressId = address?.id ?? null;
+  useEffect(() => {
+    setDrainsOpen(false);
+    setDrainPicked(null);
+    setReportPlace(null);
+  }, [addressId]);
+
+  const openDrains = () => {
+    // The layer goes on with the list, so the map and the panel are about the
+    // same drains.
+    if (!layers.pit) toggle('pit');
+    setAddressCardOpen(false);
+    setPlanOpen(false);
+    setOpenPlace(null);
+    setDrainsOpen(true);
+  };
+
   const planPanel = (
     <PreparePlan
       address={address?.label ?? ''}
@@ -638,11 +676,8 @@ export function MapView({
               setPlanOpen(false);
               openReport(null);
             },
-            onCheckDrains: () => {
-              // Step 3's first button. The recorded drains are a layer, so
-              // showing them is switching it on rather than going anywhere.
-              if (!layers.pit) toggle('pit');
-            },
+            // Step 3's first button, which opens the list (Figma S1).
+            onCheckDrains: openDrains,
           })}
     />
   );
@@ -692,6 +727,46 @@ export function MapView({
     still tested, so there is something to read from if the card or a guide
     wants the fall again.
   */
+
+  /*
+    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
+
+    The button used to switch Drain pits on, which left a reader looking for
+    the drain outside their own house among a few hundred identical circles.
+    The panel names each one from the address it is nearest to and groups them
+    by street, and the layer goes on with it so the list and the map are about
+    the same things.
+  */
+  const [drainsOpen, setDrainsOpen] = useState(false);
+  /** The drain the list picked, which gets a card of its own (Figma S2). */
+  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
+
+  /**
+   * The reader's address as the index holds it, in parts.
+   *
+   * `indexed` above finds the same record by label; this is by id, which is
+   * what the address carries, and null where the map is running without an
+   * index at all -- inside a guide, where this panel is not offered.
+   *
+   * The panel names the street address rather than the postal label: *within
+   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
+   * the end of it is already in the panel's own subtitle.
+   */
+  const yourAddress = useMemo(
+    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
+    [index, address],
+  );
+  const yourStreet = yourAddress?.street ?? null;
+  const streetAddress =
+    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
+
+  const drainsNear = useMemo(
+    () =>
+      address === null || index === undefined
+        ? null
+        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
+    [map, index, address, yourStreet],
+  );
 
   const explanation = useMemo(
     () =>
@@ -1687,8 +1762,71 @@ export function MapView({
         );
       })()}
 
+      {/* Step 3's list of drains (Figma S1–S4), in the plan's own container. */}
+      {panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0 && (
+        <Sidebar
+          title={STREET_DRAINS_HEADING}
+          subtitle={address.label}
+          width={panelWidth}
+          onClose={() => {
+            setDrainsOpen(false);
+            setDrainPicked(null);
+          }}
+        >
+          <StreetDrains
+            address={streetAddress}
+            found={drainsNear}
+            yourStreet={yourStreet}
+            selected={drainPicked?.id ?? null}
+            onSelect={(drain) => {
+              setDrainPicked(drain);
+            }}
+            onBack={() => {
+              setDrainsOpen(false);
+              setDrainPicked(null);
+              setPlanOpen(true);
+            }}
+          />
+        </Sidebar>
+      )}
+
+      {/* The drain the list picked (Figma S2). */}
+      {panel && viewport !== null && drainsOpen && drainPicked !== null && onScreen(drainPicked.at, viewport) && (
+        <MapCallout
+          at={toScreen(viewport, drainPicked.at)}
+          within={calloutWithin}
+          title={drainPicked.label}
+          layer={7}
+          source="recorded"
+          onClose={() => {
+            setDrainPicked(null);
+          }}
+        >
+          {DRAIN_SOURCE}
+          <span style={{ display: 'block', marginTop: space(3), color: ink.strong }}>
+            {DRAIN_BLOCKED_QUESTION}
+          </span>
+          <span style={{ display: 'block', marginTop: space(2) }}>
+            <button
+              type="button"
+              onClick={() => {
+                openReport({
+                  kind: 'drain',
+                  assetNumber: drainPicked.id,
+                  street: drainPicked.street,
+                  distanceM: Math.round(drainPicked.distanceM),
+                });
+              }}
+              style={primaryCardButton}
+            >
+              {REPORT_THIS_DRAIN} ›
+            </button>
+          </span>
+        </MapCallout>
+      )}
+
       {/* The plan itself (Figma P1), which the place card sits in front of. */}
-      {sidebarOpen && (
+      {sidebarOpen && !drainsOpen && (
         <Sidebar
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
@@ -1744,12 +1882,7 @@ export function MapView({
               <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_STILL}</span>
               <button
                 type="button"
-                onClick={() => {
-                  // The drains themselves, which is what the sentence above
-                  // just said were worth a look. A layer, so this switches it
-                  // on rather than going anywhere.
-                  if (!layers.pit) toggle('pit');
-                }}
+                onClick={openDrains}
                 style={primaryCardButton}
               >
                 {CHECK_STREET_DRAINS} ›
