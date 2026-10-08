@@ -133,6 +133,17 @@ export function PreparePlan({
 }) {
   const reminders = applying(places, relevance);
 
+  /*
+    Which general actions are ticked, held here rather than in each row.
+
+    It was each row's own `useState`, which was enough while the tick did
+    nothing; the printed page needs to know, so it is one set in the one place
+    that prints. Still for this visit only -- not stored, not counted, and not
+    sent -- because a plan that remembers what you said you had done is making
+    a claim about a house it has never seen.
+  */
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set());
+
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
       {/* `PREPARE_HEADING` belongs to the card around this, for the same
@@ -233,7 +244,19 @@ export function PreparePlan({
         <StepHeading step={2} label={FOR_EVERY_HOME} />
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {GENERAL_ACTIONS.map((action) => (
-            <GeneralActionRow key={action.id} action={action} />
+            <GeneralActionRow
+              key={action.id}
+              action={action}
+              ticked={ticked.has(action.id)}
+              onTick={(on) => {
+                setTicked((was) => {
+                  const next = new Set(was);
+                  if (on) next.add(action.id);
+                  else next.delete(action.id);
+                  return next;
+                });
+              }}
+            />
           ))}
         </ul>
       </section>
@@ -365,7 +388,7 @@ export function PreparePlan({
         <button
           type="button"
           onClick={() => {
-            printDocument(planHtml(printedPlan(address, places, relevance, new Date())));
+            printDocument(planHtml(printedPlan(address, places, relevance, ticked, new Date())));
           }}
           style={{
             padding: `${String(space(1))}px ${String(space(3))}px`,
@@ -416,13 +439,23 @@ export function PreparePlan({
  * the reason the blockage pictures are drawings: an unlicensed image of
  * somebody's gutter is one unrecorded licence more than this project has.
  *
- * The tick is for this visit only. It is not stored, not counted and not
- * printed, because a plan that remembers what you said you had done is
- * making a claim about a house it has never seen.
+ * The tick is for this visit only -- not stored, not counted and not sent,
+ * because a plan that remembers what you said you had done is making a claim
+ * about a house it has never seen. It does reach the printed page now, which
+ * the 8 October list asked for: a page the reader takes away should carry
+ * what they chose, the way it already carries only the places they said apply
+ * to them. It is held by `PreparePlan`, which is what prints.
  */
-function GeneralActionRow({ action }: { readonly action: GeneralAction }) {
+function GeneralActionRow({
+  action,
+  ticked,
+  onTick,
+}: {
+  readonly action: GeneralAction;
+  readonly ticked: boolean;
+  readonly onTick: (on: boolean) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [ticked, setTicked] = useState(false);
   const tipId = useId();
 
   return (
@@ -432,7 +465,7 @@ function GeneralActionRow({ action }: { readonly action: GeneralAction }) {
           type="checkbox"
           checked={ticked}
           onChange={(event) => {
-            setTicked(event.target.checked);
+            onTick(event.target.checked);
           }}
           aria-label={action.text}
           style={{ marginTop: 3, flexShrink: 0, accentColor: brand.base }}
@@ -473,6 +506,7 @@ function GeneralActionRow({ action }: { readonly action: GeneralAction }) {
             borderRadius: radius.small,
           }}
         >
+          <ActionPicture id={action.id} />
           <span style={{ display: 'block', color: ink.muted }}>“{action.quote}”</span>
           <a
             href={action.page}
@@ -487,6 +521,94 @@ function GeneralActionRow({ action }: { readonly action: GeneralAction }) {
     </li>
   );
 }
+
+/**
+ * What the action looks like, drawn rather than photographed (Figma P1).
+ *
+ * The design shows a photograph. These are line drawings for the reason the
+ * blockage pictures are: an unlicensed image of somebody's gutter is one
+ * unrecorded licence more than this project has, and a stock photograph of a
+ * tidy Australian roof is not evidence of anything. They say the shape of the
+ * thing -- which part of the house, which object -- and leave the sentence
+ * under them to say what to do about it.
+ *
+ * `aria-hidden`: each one repeats the sentence beside it, and a screen reader
+ * reading both would hear the instruction twice.
+ */
+function ActionPicture({ id }: { readonly id: string }) {
+  const drawing = PICTURES[id];
+  if (drawing === undefined) return null;
+  return (
+    <span
+      style={{
+        display: 'block',
+        marginBottom: space(2),
+        padding: space(2),
+        background: surface.raised,
+        borderRadius: radius.small,
+        textAlign: 'center',
+      }}
+    >
+      <svg
+        viewBox="0 0 160 84"
+        width="100%"
+        height="84"
+        aria-hidden
+        focusable="false"
+        style={{ display: 'block', maxWidth: 200, margin: '0 auto' }}
+        fill="none"
+        stroke={ink.muted}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {drawing}
+      </svg>
+    </span>
+  );
+}
+
+const PICTURES: Readonly<Record<string, ReactNode>> = {
+  // A roof edge, the gutter along it, the downpipe off its end, and the
+  // leaves that are the reason the sentence exists.
+  gutters: (
+    <>
+      <path d="M22 30 80 10l58 20" />
+      <path d="M22 30h116" />
+      <path d="M26 34h108v10a4 4 0 0 1-4 4H30a4 4 0 0 1-4-4z" stroke={brand.base} />
+      <path d="M120 48v22a6 6 0 0 0 6 6h8" stroke={brand.base} />
+      <path d="M46 40c3-3 7-3 10 0M64 41c3-3 7-3 10 0M84 40c3-3 7-3 10 0" />
+      <path d="M134 76c4 2 7 5 8 8" stroke={brand.base} />
+    </>
+  ),
+  // A chair and a folded umbrella, with the strap that is what *secured*
+  // means on a balcony nobody can bolt anything to.
+  'loose-items': (
+    <>
+      <path d="M30 70V40a6 6 0 0 1 6-6h10a6 6 0 0 1 6 6v30" />
+      <path d="M26 54h34M34 70v6M56 70v6" />
+      <path d="M104 74V26" />
+      <path d="M86 32c0-10 8-18 18-18s18 8 18 18z" stroke={brand.base} />
+      <path d="M104 74c-5 0-8-3-8-7" />
+      <path d="M78 48h52" stroke={brand.base} strokeDasharray="5 4" />
+      <path d="M98 44h12v8H98z" stroke={brand.base} />
+    </>
+  ),
+  // A car under a roof, and the tree it is not under.
+  parking: (
+    <>
+      <path d="M14 36 56 18l42 18" stroke={brand.base} />
+      <path d="M20 36v34M92 36v34" stroke={brand.base} />
+      <path d="M28 66v-8l6-10h32l8 10h6v8" />
+      <path d="M28 66h58" />
+      <path d="M40 48v10M62 48v10" />
+      <circle cx="40" cy="68" r="5" />
+      <circle cx="74" cy="68" r="5" />
+      <path d="M134 74V52" />
+      <path d="M134 52a16 16 0 1 1 0-32 16 16 0 0 1 0 32z" strokeDasharray="4 4" />
+    </>
+  ),
+};
 
 /** A numbered step heading, with its count on the right (Figma P1). */
 function StepHeading({

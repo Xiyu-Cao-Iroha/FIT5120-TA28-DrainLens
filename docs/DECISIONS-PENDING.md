@@ -298,6 +298,24 @@ A list of fourteen changes arrived from the team on 8 October, with a screenshot
 
 ---
 
+## 13 · The 8 October change list, second half — **DONE: nine items, two of them reversals**
+
+The same document carried a second list under a dividing line, marked *下一次 pair programming*. It was done on the same day. Seven were straightforward; the four worth recording are below.
+
+**Two of them reversed decisions written in this repository.**
+
+*The printed plan now carries only the general actions the reader ticked.* `PrepareForRain.tsx` recorded the opposite as deliberate — "not stored, not counted and not printed". The first two still hold: nothing is kept between visits, nothing is counted, nothing is sent. The third was wrong, because the page already follows exactly that rule for places, carrying only the ones the reader said apply to them. With no ticks at all it carries all three, because the boxes are an optional filter rather than a question the plan insists on.
+
+*Each tip opens with a drawing.* The same file recorded that there would be no picture. The objection it recorded was to a **photograph** — "an unlicensed image of somebody's gutter is one unrecorded licence more than this project has" — and that objection is untouched: these are line drawings, like the blockage pictures, and the quotation under each one is still the evidence.
+
+**The navigation bar replaced the map's Back control and crumb.** The map had a Back naming Home or Flood history, and one crumb saying *Full map*. The bar names all four destinations and marks the one you are on, which is both of those and more, and it is what the design draws. `Shell` takes a `crumbsLabel` so a landmark carrying the site does not call itself a breadcrumb.
+
+**Three reports turned out to be about something other than what they named.** *The legend disappears when Ground height is on* was the Layers panel not closing when its one switch was pressed, and the legend is hidden while that panel is open. *The comparison button stops appearing* was the scenario index being re-fetched on every return to the map, with the card rendering nothing while it was null. *The address bar disappeared on the chooser* was the address being null — every route into the full map clears it — while the sentence *Every guide uses the same address* was printed regardless, and there was no way to set one from that screen.
+
+**One fault was two faults.** *Full map* from a comparison result went to Choices, because the reducer's map-origin case was written for one step and every other step walked the fixed `BACK` chain; and it returned the reader to a map with Ground height switched on, because `scenario-from-map` leaves `task` on `compare` and the map reads anything but `full-map` as a guided visit.
+
+---
+
 ## 12 · The hold in front of the full map — **DECIDED 5 October 2026: it stays**
 
 Two reviews asked for opposite things in the same week, and this is the record of which one was followed.
