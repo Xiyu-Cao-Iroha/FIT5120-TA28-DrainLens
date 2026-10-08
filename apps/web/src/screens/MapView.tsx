@@ -88,7 +88,7 @@ import {
   distanceLine,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
-import { DrainageArea, MapNote, WhoCanHelpLevels } from './DrainageArea.js';
+import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
@@ -173,6 +173,16 @@ export interface MapViewProps {
   readonly layersButton?: boolean | undefined;
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
+  /**
+   * The map tour is running.
+   *
+   * Three of its seven steps point at a chip, and the row can be collapsed
+   * to one button -- so a reader who had folded it was shown *Drain pits are
+   * street drains* over a map with no Drain pits on it. While the tour runs
+   * the row is not collapsible, which both unfolds it and keeps it unfolded
+   * for the steps that come after.
+   */
+  readonly touring?: boolean | undefined;
   /**
    * Something else the guide's step points at: the Layers button, the Ground
    * height switch in its panel, or the legend's ground-height scale.
@@ -282,6 +292,7 @@ export function MapView({
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  touring = false,
   highlight = null,
   overlay = null,
   onViewport,
@@ -470,6 +481,54 @@ export function MapView({
     legend folds itself away -- because a map whose whole chrome is in the one
     corner the panel wants is the screenshot that asked for this.
   */
+  /*
+    Where the map's chrome ends, measured.
+
+    The search box and the chips share one row, and on a narrow window the
+    chips wrap under the search box -- so the row is one line tall or two,
+    and the cards below it were drawn at a fixed 64 pixels either way.
+    `ResizeObserver` is what makes this honest: it fires on a wrap, which no
+    window-resize handler would catch when the wrap is caused by the sidebar
+    opening rather than by the window changing.
+  */
+  const chromeRef = useRef<HTMLDivElement | null>(null);
+  const [chromeBottom, setChromeBottom] = useState(64);
+  useEffect(() => {
+    const row = chromeRef.current;
+    const under = row?.offsetParent;
+    if (row === null || under === null || under === undefined) return undefined;
+    /*
+      The lowest edge of anything in the chrome that is over the card column.
+
+      Not the row's own height: the legend is in this row and it is tall, but
+      it is at the right-hand end, and pushing the cards below it would give
+      up 200 pixels of map for a box the cards never touch. Not the chips'
+      height either, because on a narrow window the legend wraps onto a line
+      of its own and then it *is* above them.
+
+      So it is measured per child, against the column's own 300 pixels: only
+      what actually overlaps them counts.
+    */
+    const measure = () => {
+      const top = under.getBoundingClientRect().top;
+      const left = space(3);
+      const right = left + CARD_WIDTH;
+      let lowest = row.getBoundingClientRect().top;
+      for (const child of row.children) {
+        const box = child.getBoundingClientRect();
+        if (box.right > left && box.left < right && box.bottom > lowest) lowest = box.bottom;
+      }
+      setChromeBottom(Math.round(lowest - top + space(3)));
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(row);
+    for (const child of row.children) watch.observe(child);
+    return () => {
+      watch.disconnect();
+    };
+  }, [panel]);
+
   const panelWidth = viewport === null ? 0 : sidebarWidth(viewport.widthPx);
   /*
     The before-rain layer opens something, always (change list, item 11).
@@ -983,40 +1042,42 @@ export function MapView({
           )}
 
           {picking === 'drain' && candidate !== null && (
-            <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })} at="bottom">
-              <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
-                {distanceLine(
-                  { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
-                  address?.label ?? null,
-                )}
-              </p>
-              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReportPlace({
-                      kind: 'drain',
-                      assetNumber: candidate.assetNumber,
-                      street: null,
-                      distanceM: candidate.distanceM,
-                    });
-                    leavePicking();
-                  }}
-                  style={pickFilledStyle}
-                >
-                  Use this drain
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCandidate(null);
-                  }}
-                  style={pickOutlineStyle}
-                >
-                  Pick another
-                </button>
-              </span>
-            </MapNote>
+            <MapNoteStack at="bottom">
+              <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}>
+                <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
+                  {distanceLine(
+                    { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                    address?.label ?? null,
+                  )}
+                </p>
+                <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportPlace({
+                        kind: 'drain',
+                        assetNumber: candidate.assetNumber,
+                        street: null,
+                        distanceM: candidate.distanceM,
+                      });
+                      leavePicking();
+                    }}
+                    style={pickFilledStyle}
+                  >
+                    Use this drain
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCandidate(null);
+                    }}
+                    style={pickOutlineStyle}
+                  >
+                    Pick another
+                  </button>
+                </span>
+              </MapNote>
+            </MapNoteStack>
           )}
 
           {/*
@@ -1048,56 +1109,59 @@ export function MapView({
           )}
 
           {picking === 'pin' && pinAt !== null && (
-            <MapNote title={PIN_PLACE.card} at="bottom">
-              <input
-                value={pinNote}
-                onChange={(event) => {
-                  setPinNote(event.target.value);
-                }}
-                placeholder={PIN_PLACE.placeholder}
-                aria-label={PIN_PLACE.then}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: space(2),
-                  borderRadius: radius.small,
-                  border: `1px solid ${line.base}`,
-                  font: type(text.small),
-                  color: ink.base,
-                }}
-              />
-              <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReportPlace({
-                      kind: 'pin',
-                      note: pinNote.trim(),
-                      at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
-                    });
-                    leavePicking();
+            <MapNoteStack at="bottom">
+              <MapNote title={PIN_PLACE.card}>
+                <input
+                  value={pinNote}
+                  onChange={(event) => {
+                    setPinNote(event.target.value);
                   }}
-                  style={pickFilledStyle}
-                >
-                  {PIN_PLACE.use}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPinAt(null);
+                  placeholder={PIN_PLACE.placeholder}
+                  aria-label={PIN_PLACE.then}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: space(2),
+                    borderRadius: radius.small,
+                    border: `1px solid ${line.base}`,
+                    font: type(text.small),
+                    color: ink.base,
                   }}
-                  style={pickOutlineStyle}
-                >
-                  {PIN_PLACE.back}
-                </button>
-              </span>
-            </MapNote>
+                />
+                <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportPlace({
+                        kind: 'pin',
+                        note: pinNote.trim(),
+                        at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
+                      });
+                      leavePicking();
+                    }}
+                    style={pickFilledStyle}
+                  >
+                    {PIN_PLACE.use}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinAt(null);
+                    }}
+                    style={pickOutlineStyle}
+                  >
+                    {PIN_PLACE.back}
+                  </button>
+                </span>
+              </MapNote>
+            </MapNoteStack>
           )}
         </>
       )}
 
       {panel && (
         <div
+          ref={chromeRef}
           style={{
             position: 'absolute',
             left: space(4),
@@ -1122,7 +1186,7 @@ export function MapView({
               />
             )}
             <LayerChips
-              collapsible={!guided}
+              collapsible={!guided && !touring}
               fold={sidebarOpen}
               state={layers}
               onToggle={toggle}
@@ -1145,7 +1209,21 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          {legend && (
+          {/*
+            Not while the Layers panel is open.
+
+            The panel hangs from a button at the chips' right-hand end and is
+            288 wide; the legend begins just past that end, and on a window
+            narrow enough for the legend to wrap onto its own line the panel
+            drops straight onto it -- two white boxes overlapping, which
+            reads as clipped text rather than as two cards. Folding the
+            legend only made the box it covered smaller.
+
+            Hidden rather than folded, because the panel is the same question
+            answered in more detail: it lists every layer and lets the reader
+            turn them on. It comes back, as it was, the moment they close it.
+          */}
+          {legend && !layersOpen && (
             <MapLegend
               state={layers}
               fold={sidebarOpen}
@@ -1371,33 +1449,94 @@ export function MapView({
         The subcatchment card says so; this is the same sentence in the same
         situation.
       */}
-      {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
-        <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
-      )}
+      
 
-      {panel && viewport !== null && layers.catchment && !reportOpen && (
-        <MapNote title={DRAINAGE_AREA}>
-          <DrainageArea
-            area={area}
-            hasAddress={address !== null}
-            {...(guided
-              ? {}
-              : {
-                  // Not inside a guide. A guide teaches one thing at a time,
-                  // and this opens a card taller than the guide's map frame
-                  // over a step that was asking about something else.
-                  onReport: () => {
-                    openReport(null);
-                  },
-                })}
-          />
-          {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
-            <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
-              The boundary is outside this view. Zoom out to see it.
+      
+
+      {/*
+        The map's corner cards, in one column rather than four pins at one
+        spot (reported 8 October, with a screenshot of two of them happening
+        at once).
+
+        `chromeBottom` is measured: the chip row wraps onto a second line on
+        any window narrow enough, and every card was drawn at a fixed 64
+        pixels whether the chrome ended there or not. The order below is the
+        order they stack in, and it is deliberate -- the report is the thing
+        the reader just asked for, so it comes first.
+      */}
+      <MapNoteStack top={chromeBottom}>
+        {panel && viewport !== null && reportOpen && (
+          <MapNote title={REPORT_HEADING}>
+            <ReportProblem
+              address={address?.label ?? null}
+              place={reportPlace}
+              chosen={reportProblem}
+              onChoose={setReportProblem}
+              onPick={() => {
+                // The map takes over. The report card is still open behind it
+                // and comes back with whatever was picked.
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+              onForgetPlace={() => {
+                // *Change* is what the design calls it, so it goes back to the
+                // map rather than just emptying the row.
+                setReportPlace(null);
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+            />
+            <span style={{ display: 'block', marginTop: space(3) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setReportOpen(false);
+                  setReportProblem(null);
+                }}
+                style={planLinkStyle}
+              >
+                Close
+              </button>
             </span>
-          )}
-        </MapNote>
-      )}
+          </MapNote>
+        )}
+
+        {planInCard && (
+          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+            {askOpen ? askPanel : planPanel}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.catchment && !reportOpen && (
+          <MapNote title={DRAINAGE_AREA}>
+            <DrainageArea
+              area={area}
+              hasAddress={address !== null}
+              {...(guided
+                ? {}
+                : {
+                    // Not inside a guide. A guide teaches one thing at a time,
+                    // and this opens a card taller than the guide's map frame
+                    // over a step that was asking about something else.
+                    onReport: () => {
+                      openReport(null);
+                    },
+                  })}
+            />
+            {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
+              <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
+                The boundary is outside this view. Zoom out to see it.
+              </span>
+            )}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
+          <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
+        )}
+      </MapNoteStack>
 
       {/*
         The address's own card for this layer, where the map suppresses the
@@ -1537,11 +1676,7 @@ export function MapView({
         The plan and the assistant, each built once and put in whichever
         container the window has room for.
       */}
-      {planInCard && (
-        <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
-          {askOpen ? askPanel : planPanel}
-        </MapNote>
-      )}
+      
 
       {/* The assistant, which the plan hands over to (Figma Q0 to Q5). */}
       {sidebarOpen && askOpen && (
@@ -1572,43 +1707,7 @@ export function MapView({
       )}
 
       {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
-      {panel && viewport !== null && reportOpen && (
-        <MapNote title={REPORT_HEADING}>
-          <ReportProblem
-            address={address?.label ?? null}
-            place={reportPlace}
-            chosen={reportProblem}
-            onChoose={setReportProblem}
-            onPick={() => {
-              // The map takes over. The report card is still open behind it
-              // and comes back with whatever was picked.
-              setCandidate(null);
-              setPinAt(null);
-              setPicking(address === null ? 'pin' : 'drain');
-            }}
-            onForgetPlace={() => {
-              // *Change* is what the design calls it, so it goes back to the
-              // map rather than just emptying the row.
-              setReportPlace(null);
-              setCandidate(null);
-              setPinAt(null);
-              setPicking(address === null ? 'pin' : 'drain');
-            }}
-          />
-          <span style={{ display: 'block', marginTop: space(3) }}>
-            <button
-              type="button"
-              onClick={() => {
-                setReportOpen(false);
-                setReportProblem(null);
-              }}
-              style={planLinkStyle}
-            >
-              Close
-            </button>
-          </span>
-        </MapNote>
-      )}
+      
 
       {panel &&
         viewport !== null &&

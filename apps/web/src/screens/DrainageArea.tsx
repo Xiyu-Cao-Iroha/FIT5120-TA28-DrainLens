@@ -353,31 +353,22 @@ export const openLinkStyle = {
  * rather than claiming a spot on the ground, which is how the design draws
  * them (Figma D2 and D4).
  */
-export function MapNote({
-  title,
-  at = 'top',
-  children,
-}: {
-  readonly title: string;
-  readonly at?: 'top' | 'bottom';
-  readonly children: ReactNode;
-}) {
+/** How wide a corner card is. The map reads it to know what they cover. */
+export const CARD_WIDTH = 300;
+
+export function MapNote({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return (
     <section
       aria-label={title}
       style={{
-        position: 'absolute',
-        left: space(3),
-        ...(at === 'top' ? { top: 64 } : { bottom: space(3) }),
-        width: 300,
-        maxHeight: 'calc(100% - 96px)',
-        overflowY: 'auto',
+        pointerEvents: 'auto',
+        width: CARD_WIDTH,
+        maxWidth: '100%',
         padding: space(3),
         background: surface.raised,
         border: `1px solid ${line.base}`,
         borderRadius: radius.base,
         boxShadow: '0 6px 20px rgba(16, 32, 40, 0.10)',
-        zIndex: 3,
       }}
     >
       <h2
@@ -391,6 +382,54 @@ export function MapNote({
       </h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * Where the corner cards go, and the reason they are a column.
+ *
+ * Each card used to pin itself to the same corner at the same offset -- `top:
+ * 64`, a guess at how tall the map's chrome is. Two of them were therefore
+ * exactly on top of each other whenever two could be open, and all of them
+ * were underneath the chip row as soon as the row wrapped onto a second line,
+ * which it does on any window narrow enough to make the chips wrap. Reported
+ * on 8 October with a screenshot of both happening at once.
+ *
+ * So the offset is measured rather than guessed -- `top` is the bottom edge
+ * of the chrome, handed down by whoever drew it -- and the cards are laid out
+ * in a column, so a second card goes *under* the first instead of over it.
+ * The column scrolls rather than running off the bottom of the map.
+ */
+export function MapNoteStack({
+  at = 'top',
+  top = 64,
+  children,
+}: {
+  readonly at?: 'top' | 'bottom';
+  /** The bottom edge of the map's own chrome, in pixels. Ignored at the bottom. */
+  readonly top?: number;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: space(3),
+        ...(at === 'top'
+          ? { top, maxHeight: `calc(100% - ${String(top + 32)}px)` }
+          : { bottom: space(3), maxHeight: 'calc(100% - 96px)' }),
+        display: 'flex',
+        flexDirection: 'column',
+        gap: space(2),
+        overflowY: 'auto',
+        // The column is only as wide as its cards, so the map beside it still
+        // takes a drag. Each card turns pointer events back on for itself.
+        pointerEvents: 'none',
+        zIndex: 3,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 

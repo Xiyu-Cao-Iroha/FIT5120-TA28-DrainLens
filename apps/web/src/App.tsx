@@ -1150,6 +1150,7 @@ function MapScreen({
       }
     >
       <MapView
+        touring={touring}
         /*
           Remounted on every arrival, so the map cannot open carrying a pit
           card, a traced path or a set of chips from the last visit. It was
