@@ -60,6 +60,8 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
+import { ASK_HEADING, questionForAction } from '../ask/answers.js';
+import { AskAboutGettingReady } from './AskAboutGettingReady.js';
 import {
   BEFORE_RAIN_CHIP,
   CHECK_STREET_DRAINS,
@@ -434,6 +436,8 @@ export function MapView({
   const [openPlace, setOpenPlace] = useState<number | null>(null);
   /** Whether the plan is open. The guide's first step waits on it. */
   const [planOpen, setPlanOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askOpening, setAskOpening] = useState<string | null>(null);
   /*
     The reporting pathway, which is its own thing (AC 6.2.3).
 
@@ -613,34 +617,43 @@ export function MapView({
   */
   const planInCard = planShowing && panelWidth === 0 && openPlace === null;
 
+  const askPanel = (
+    <AskAboutGettingReady
+      key={askOpening ?? 'ask'}
+      {...(askOpening === null ? {} : { opening: askOpening })}
+      onBackToPlan={() => {
+        setAskOpen(false);
+        setAskOpening(null);
+      }}
+      {...(places.length === 0
+        ? {}
+        : {
+            onReviewPlaces: () => {
+              setAskOpen(false);
+              setAskOpening(null);
+            },
+          })}
+    />
+  );
+
   /*
     The box a callout may not leave.
 
     The sidebar is drawn over the canvas rather than beside it -- the map is
     deliberately not re-fitted when the plan opens, so that what the reader is
     looking at does not move under them. A card placed against the canvas's
-    full width can therefore end up behind the sidebar, which is how a place
-    card and an open plan used to be impossible to have at once.
+    full width can therefore end up behind the sidebar.
   */
   const calloutWithin =
     viewport === null
       ? { width: 0, height: 0 }
-      : { width: viewport.widthPx - (sidebarOpen ? panelWidth : 0), height: viewport.heightPx };
+      : {
+          width: viewport.widthPx - (sidebarOpen ? panelWidth : 0),
+          height: viewport.heightPx,
+        };
 
-  /*
-    A new address forgets the drain the last one chose.
-
-    Found while driving the list: picking a drain on Gatehouse Drive, then
-    searching a Bayswater Road address, left the report saying *Location: 1
-    Bayswater Road* over *Selected recorded drain: 1145039 - Drain on Gatehouse
-    Drive*. Nothing in the pathway would have caught it, and the reader would
-    have sent a council to the wrong street.
-
-    The report itself stays open where it was open: what is wrong with it is
-    the drain, and the row says *Not chosen. Nothing is chosen for you* until
-    they pick another.
-  */
   const addressId = address?.id ?? null;
+
   useEffect(() => {
     setDrainsOpen(false);
     setDrainPicked(null);
@@ -648,14 +661,13 @@ export function MapView({
   }, [addressId]);
 
   const openDrains = () => {
-    // The layer goes on with the list, so the map and the panel are about the
-    // same drains.
     if (!layers.pit) toggle('pit');
     setAddressCardOpen(false);
     setPlanOpen(false);
     setOpenPlace(null);
     setDrainsOpen(true);
   };
+
 
   const planPanel = (
     <PreparePlan
@@ -676,8 +688,18 @@ export function MapView({
               setPlanOpen(false);
               openReport(null);
             },
+
+            
+            onAsk: (actionId?: string) => {
+              setAskOpening(
+                actionId === undefined ? null : questionForAction(actionId),
+              );
+              setAskOpen(true);
+            },
+
             // Step 3's first button, which opens the list (Figma S1).
             onCheckDrains: openDrains,
+
           })}
     />
   );
@@ -1569,7 +1591,9 @@ export function MapView({
         )}
 
         {planInCard && (
-          <MapNote title={PREPARE_HEADING}>{planPanel}</MapNote>
+          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+            {askOpen ? askPanel : planPanel}
+          </MapNote>
         )}
 
         {panel && viewport !== null && layers.catchment && !reportOpen && (
@@ -1826,7 +1850,21 @@ export function MapView({
       )}
 
       {/* The plan itself (Figma P1), which the place card sits in front of. */}
-      {sidebarOpen && !drainsOpen && (
+      {sidebarOpen && !drainsOpen && askOpen && (
+        <Sidebar
+          title={ASK_HEADING}
+          width={panelWidth}
+          onClose={() => {
+            setAskOpen(false);
+            setAskOpening(null);
+            setPlanOpen(false);
+          }}
+        >
+          {askPanel}
+        </Sidebar>
+      )}
+
+      {sidebarOpen && !drainsOpen && !askOpen && (
         <Sidebar
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
@@ -1838,6 +1876,7 @@ export function MapView({
           {planPanel}
         </Sidebar>
       )}
+
 
       {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
       

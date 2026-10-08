@@ -23,9 +23,9 @@
 
 import { type ReactNode, useId, useState } from 'react';
 
+import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
+
 import {
-  ASK_COMING,
-  ASK_PROMPT,
   GENERAL_ACTIONS,
   type GeneralAction,
   NOT_A_SCORE,
@@ -33,6 +33,7 @@ import {
   SAFETY,
   VICEMERGENCY,
 } from '../prepare/actions.js';
+
 import {
   FOR_EVERY_HOME,
   NO_PLACES,
@@ -116,6 +117,7 @@ export function PreparePlan({
   onReset,
   onReport,
   onWhyOpen,
+  onAsk,
   onCheckDrains,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
@@ -128,6 +130,7 @@ export function PreparePlan({
   readonly onReport?: (() => void) | undefined;
   /** A reminder's *Why this place?* opened, which the guide's step 4 waits on. */
   readonly onWhyOpen?: (() => void) | undefined;
+  readonly onAsk?: ((actionId?: string) => void) | undefined;
   /** Step 3's first button: show the recorded drains near the address. */
   readonly onCheckDrains?: (() => void) | undefined;
 }) {
@@ -251,12 +254,25 @@ export function PreparePlan({
               onTick={(on) => {
                 setTicked((was) => {
                   const next = new Set(was);
-                  if (on) next.add(action.id);
-                  else next.delete(action.id);
+
+                  if (on) {
+                    next.add(action.id);
+                  } else {
+                    next.delete(action.id);
+                  }
+
                   return next;
                 });
               }}
+              {...(onAsk === undefined
+                ? {}
+                : {
+                    onAsk: () => {
+                      onAsk(action.id);
+                    },
+                  })}
             />
+            
           ))}
         </ul>
       </section>
@@ -286,49 +302,37 @@ export function PreparePlan({
         </section>
       )}
 
-      {/*
-        The slot *Ask about getting ready* will go in (Figma AI1).
 
-        **Nothing is behind it yet, and that is deliberate.** The panel is the
-        chatbot work, being built separately against the retrieval prototype
-        in `assistant/`; this row is the place in the plan it hangs from, with
-        the design's wording and position settled so that whoever writes it is
-        not also deciding where it goes.
+        {onAsk !== undefined && (
+          <p
+            style={{
+              display: 'flex',
+              gap: space(2),
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              margin: `${String(space(3))}px 0 0`,
+              padding: space(2),
+              border: `1px solid ${brand.tint}`,
+              borderRadius: radius.base,
+              background: brand.wash,
+            }}
+          >
+            <span style={{ color: brand.ink }}>{ASK_PROMPT}</span>
 
-        A row that says *Ask ›* and opens nothing would be worse than no row,
-        so it says what it is instead. It sits after reporting and before the
-        telephone numbers, which is where the design puts it: the last thing
-        offered, and never above the two things a person with rain coming
-        actually needs.
-      */}
-      <p
-        style={{
-          display: 'flex',
-          gap: space(2),
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          margin: `${String(space(3))}px 0 0`,
-          padding: space(2),
-          border: `1px solid ${brand.tint}`,
-          borderRadius: radius.base,
-          background: brand.wash,
-        }}
-      >
-        <span style={{ display: 'inline-flex', gap: space(2), alignItems: 'center', color: brand.ink }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
-            <path
-              d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6A1.5 1.5 0 0 1 12.5 11H6.8l-3 2.7A.5.5 0 0 1 3 13.3V11h-.5A.5.5 0 0 1 2 10.5Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {ASK_PROMPT}
-        </span>
-        <span style={{ flexShrink: 0, font: type(text.small), color: ink.subtle }}>{ASK_COMING}</span>
-      </p>
-
+            <button
+              type="button"
+              onClick={() => {
+                onAsk();
+              }}
+              style={{
+                ...linkStyle,
+                font: type(text.small, { weight: weight.semibold }),
+              }}
+            >
+              {ASK_LINK} ›
+            </button>
+          </p>
+      )}
       {/*
         The boundary, in full and above the telephone numbers (AC 5.3.3).
 
@@ -419,8 +423,9 @@ export function PreparePlan({
             publisher it came from.
           </p>
           <p style={{ margin: 0 }}>
-            Your answers stay in this browser. Nothing here is sent anywhere or saved, and the
-            printed page is made on your own device.
+            Your preparation answers stay in this browser. Chat questions are sent to the
+          DrainLens assistant so it can answer them. Nothing here is saved as part of
+          your preparation plan, and the printed page is made on your own device.
           </p>
         </div>
       </details>
@@ -450,10 +455,12 @@ function GeneralActionRow({
   action,
   ticked,
   onTick,
+  onAsk,
 }: {
   readonly action: GeneralAction;
   readonly ticked: boolean;
   readonly onTick: (on: boolean) => void;
+  readonly onAsk?: (() => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const tipId = useId();
@@ -516,6 +523,19 @@ function GeneralActionRow({
           >
             {action.publisher}, read {action.checked} ↗
           </a>
+          {onAsk !== undefined && (
+            <button
+              type="button"
+              onClick={onAsk}
+              style={{
+                ...linkStyle,
+                marginTop: space(1),
+                font: type(text.small, { weight: weight.semibold }),
+              }}
+            >
+              Ask a question about this ›
+            </button>
+          )}
         </span>
       )}
     </li>
