@@ -95,9 +95,11 @@ import {
   PICK_DRAIN,
   PICK_RADIUS_M,
   PIN_PLACE,
+  type PickedDrain,
   type ReportPlace,
   drainTitle,
   distanceLine,
+  useDrains,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
 import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
@@ -479,6 +481,15 @@ export function MapView({
     readonly assetNumber: string;
     readonly distanceM: number | null;
   } | null>(null);
+  /*
+    The drains already kept, while another is being tapped (bug 12).
+
+    *Pick another* used to throw the tapped drain away and start again, so a
+    problem at two inlets could only be reported as one of them. It adds to
+    this instead; the card lists what is held, each row with a way to take it
+    off again, and the confirm sends the lot.
+  */
+  const [kept, setKept] = useState<readonly PickedDrain[]>([]);
   const [pinAt, setPinAt] = useState<Local | null>(null);
   const [pinNote, setPinNote] = useState('');
   const panel = panelAllowed && picking === null;
@@ -832,7 +843,14 @@ export function MapView({
           })}
     />
   );
+  /** Everything the confirm would send: what is held, and what was just tapped. */
+  const pickedSoFar: readonly PickedDrain[] =
+    candidate === null
+      ? kept
+      : [...kept, { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM }];
+
   const leavePicking = () => {
+    setKept([]);
     setPicking(null);
     setCandidate(null);
     setPinAt(null);
@@ -1034,7 +1052,14 @@ export function MapView({
         artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
         show={visibilityOf(picking === null ? layers : NOTHING_ON)}
-        selectedPit={selected}
+        /*
+          While picking, the drain under the question (bug 12).
+
+          `hit` is not set during picking -- a press answers the banner rather
+          than opening a card -- so nothing was marked and the reader had a
+          card naming a drain they could not find again on the map.
+        */
+        selectedPit={picking === 'drain' && candidate !== null ? Number(candidate.assetNumber) : selected}
         /*
           Only while the pits are drawn. A ring around a pit on a map with no
           pits on it is a mark with nothing under it.
@@ -1211,42 +1236,118 @@ export function MapView({
           )}
 
           {picking === 'drain' && candidate !== null && (
-            <MapNoteStack at="bottom">
-              <MapNote title={drainTitle({ kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}>
-                <p style={{ margin: `0 0 ${String(space(2))}px`, font: type(text.small), color: ink.muted }}>
-                  {distanceLine(
-                    { kind: 'drain', assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
-                    address?.label ?? null,
-                  )}
-                </p>
-                <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportPlace({
-                        kind: 'drain',
-                        assetNumber: candidate.assetNumber,
-                        street: null,
-                        distanceM: candidate.distanceM,
-                      });
-                      leavePicking();
+            <div
+              style={{
+                position: 'absolute',
+                bottom: space(4),
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 6,
+                width: 320,
+                maxWidth: 'calc(100% - 32px)',
+                padding: space(4),
+                borderRadius: radius.large,
+                background: surface.raised,
+                border: `1px solid ${line.base}`,
+                boxShadow: shadow.floating,
+              }}
+            >
+              <p style={{ margin: 0, font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {drainTitle({ assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}
+              </p>
+              <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.small), color: ink.muted }}>
+                {distanceLine(
+                  { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                  address?.label ?? null,
+                )}
+              </p>
+
+              {/*
+                What is already held, each with a way off again.
+
+                Only once there is something in it: a heading reading
+                SELECTED (0) over nothing is a list that has not started.
+              */}
+              {kept.length > 0 && (
+                <>
+                  <p
+                    style={{
+                      margin: `${String(space(3))}px 0 ${String(space(1))}px`,
+                      font: type(text.micro, { weight: weight.semibold }),
+                      letterSpacing: tracking.caps,
+                      textTransform: 'uppercase',
+                      color: ink.subtle,
                     }}
-                    style={pickFilledStyle}
                   >
-                    Use this drain
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCandidate(null);
-                    }}
-                    style={pickOutlineStyle}
-                  >
-                    Pick another
-                  </button>
-                </span>
-              </MapNote>
-            </MapNoteStack>
+                    Selected ({kept.length})
+                  </p>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                    {kept.map((drain) => (
+                      <li
+                        key={drain.assetNumber}
+                        style={{
+                          display: 'flex',
+                          gap: space(2),
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          font: type(text.small),
+                          color: ink.base,
+                        }}
+                      >
+                        <span>
+                          {drainTitle(drain)}
+                          {drain.distanceM !== null && ` \u00b7 ${String(drain.distanceM)} m`}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${drainTitle(drain)}`}
+                          onClick={() => {
+                            setKept((held) => held.filter((one) => one.assetNumber !== drain.assetNumber));
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            width: 24,
+                            height: 24,
+                            border: `1px solid ${line.base}`,
+                            borderRadius: radius.pill,
+                            background: surface.raised,
+                            color: ink.muted,
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          −
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap', marginTop: space(3) }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportPlace({ kind: 'drain', drains: pickedSoFar });
+                    leavePicking();
+                  }}
+                  style={pickFilledStyle}
+                >
+                  {useDrains(pickedSoFar.length)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Kept, not discarded: this is how a second drain is added.
+                    setKept(pickedSoFar);
+                    setCandidate(null);
+                  }}
+                  style={pickOutlineStyle}
+                >
+                  Pick another
+                </button>
+              </span>
+            </div>
           )}
 
           {/*
@@ -1948,9 +2049,13 @@ export function MapView({
               onClick={() => {
                 openReport({
                   kind: 'drain',
-                  assetNumber: drainPicked.id,
-                  street: drainPicked.street,
-                  distanceM: Math.round(drainPicked.distanceM),
+                  drains: [
+                    {
+                      assetNumber: drainPicked.id,
+                      street: drainPicked.street,
+                      distanceM: Math.round(drainPicked.distanceM),
+                    },
+                  ],
                 });
               }}
               style={primaryCardButton}

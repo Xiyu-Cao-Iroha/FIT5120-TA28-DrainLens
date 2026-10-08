@@ -11,7 +11,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { CHANNELS, COUNCIL_URGENT, TRIPLE_ZERO, VICSES, channelLine } from './channels.js';
-import { type PickedDrain, NO_PLACE, SELECTED_DRAIN, placeLine } from './place.js';
+import {
+  type PickedDrains,
+  NO_PLACE,
+  SELECTED_DRAIN,
+  SELECTED_DRAINS,
+  placeLine,
+  placeNotice,
+  placeTitle,
+  useDrains,
+} from './place.js';
 import {
   EMERGENCY_CALLS,
   EMERGENCY_SAFETY,
@@ -23,11 +32,9 @@ import {
   whatToInclude,
 } from './problems.js';
 
-const drain = (assetNumber: string): PickedDrain => ({
+const drain = (...assetNumbers: readonly string[]): PickedDrains => ({
   kind: 'drain',
-  assetNumber,
-  street: null,
-  distanceM: 20,
+  drains: assetNumbers.map((assetNumber) => ({ assetNumber, street: null, distanceM: 20 })),
 });
 
 describe('the five problem types', () => {
@@ -110,6 +117,31 @@ describe('what to include', () => {
   it('labels the drain as the one they selected, with its identifier', () => {
     // AC 6.3.2 asks for both words and the number.
     expect(placeLine(drain('PIT-12345'))).toBe(`${SELECTED_DRAIN}: PIT-12345`);
+  });
+
+  it('carries every drain the reader tapped, not the first of them', () => {
+    /*
+      A blocked street floods at the two or three inlets that take it, and a
+      report naming one of them sends a council to a third of the problem.
+    */
+    expect(placeLine(drain('PIT-1', 'PIT-2', 'PIT-3'))).toBe(
+      `${SELECTED_DRAINS}: PIT-1; PIT-2; PIT-3`,
+    );
+  });
+
+  it('says drains in the plural only when there are several', () => {
+    expect(placeTitle(drain('PIT-1'))).toBe('Which drain');
+    expect(placeTitle(drain('PIT-1', 'PIT-2'))).toBe('Which drains');
+    expect(placeNotice(drain('PIT-1'))).toBe('Drain picked on the map.');
+    expect(placeNotice(drain('PIT-1', 'PIT-2'))).toBe('Drains picked on the map.');
+  });
+
+  it('never counts out loud on the button', () => {
+    // *Use these 2 drains* was the first draft: the rows are on the screen
+    // above it, and a count in a label can disagree with what is beside it.
+    expect(useDrains(1)).toBe('Use this drain');
+    expect(useDrains(3)).toBe('Use these drains');
+    expect(useDrains(3)).not.toMatch(/\d/);
   });
 
   it('turns a pinned point into the sentence that makes it findable', () => {
