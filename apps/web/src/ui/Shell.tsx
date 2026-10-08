@@ -67,6 +67,15 @@ export interface ShellProps {
    */
   readonly trailing?: ReactNode;
   /**
+   * What that row is, for a reader who cannot see it.
+   *
+   * It is a breadcrumb on every screen but the map, where there is no
+   * masthead to hang the site's four pages from and the row carries them
+   * instead. Naming it *Breadcrumb* there would be a landmark lying about
+   * what is inside it.
+   */
+  readonly crumbsLabel?: string;
+  /**
    * The name and mark at the top, which the map does without.
    *
    * On the homepage the masthead says what this is to somebody who has just
@@ -108,6 +117,7 @@ export function Shell({
   crumbs,
   back,
   trailing,
+  crumbsLabel = 'Breadcrumb',
   masthead = true,
   credits,
   creditNotice,
@@ -189,7 +199,7 @@ export function Shell({
 
       {(crumbs !== undefined || back !== undefined) && (
         <nav
-          aria-label="Breadcrumb"
+          aria-label={crumbsLabel}
           style={{
             display: 'flex',
             alignItems: 'center',

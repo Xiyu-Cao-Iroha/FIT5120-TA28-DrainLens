@@ -482,6 +482,23 @@ export function App() {
             areas.data === null ? undefined : areas.data.population.source,
           ])}
           creditNotice={BOARD_CHANGES_NOTICE}
+          actions={
+            <SiteNav
+              current="history"
+              onOpenHome={() => {
+                dispatch({ type: 'go-home' });
+              }}
+              onOpenGuides={() => {
+                dispatch({ type: 'explore-chosen' });
+              }}
+              onOpenHistory={() => {
+                dispatch({ type: 'history-opened' });
+              }}
+              onOpenFullMap={() => {
+                dispatch({ type: 'map-opened', from: 'history' });
+              }}
+            />
+          }
           back={{
             label: 'Home',
             onBack: () => {
@@ -1120,27 +1137,37 @@ function MapScreen({
       // worked out by arriving. The row below carries the way back out.
       masthead={false}
       /*
-        The Back control names where it goes, because the map has two ways
-        in -- the homepage and the flood board -- and with two possible
-        origins a bare "Back" is a guess.
+        The site's four pages, on the row the breadcrumb used to have.
 
-        The trail beside it is one crumb now. It used to lead with a
-        clickable Home, which was doing two jobs badly: a breadcrumb says
-        where you *are*, and a person looking for the way out does not read
-        a location as an exit. The button is the exit; the crumb says where
-        they are.
+        There was a Back control here naming where it went -- Home, or Flood
+        history where that was the way in -- and one crumb saying *Full map*.
+        The change list of 8 October asks for the design's navigation bar on
+        this screen, and the bar is strictly more than those two were: it
+        names all four destinations rather than the one behind you, and it
+        marks where you are, which is what the crumb was for.
+
+        It is the row's whole contents, so the row is the landmark and these
+        are `SiteNavItems` rather than a second `nav` inside the first.
       */
-      back={{
-        label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
-        onBack: () => {
-          dispatch({ type: 'leave-map' });
-        },
-      }}
-      crumbs={crumb(
-        session.task === 'full-map' ? FULL_MAP : 'Explore drainage',
-        undefined,
-        true,
-      )}
+      crumbsLabel="Site"
+      crumbs={
+        <SiteNavItems
+          current="map"
+          onOpenHome={() => {
+            dispatch({ type: 'go-home' });
+          }}
+          onOpenGuides={() => {
+            dispatch({ type: 'explore-chosen' });
+          }}
+          onOpenHistory={() => {
+            dispatch({ type: 'history-opened' });
+          }}
+          onOpenFullMap={() => {
+            // Where they already are. `NavLink` draws it as the current page
+            // and gives it no handler, so this is never reached.
+          }}
+        />
+      }
       trailing={
         <TourButton
           onOpen={() => {
@@ -1309,26 +1336,43 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * called *Map guide* and is a different thing, which is why it was renamed on
  * the same list.
  */
-function SiteNav({
+export interface SiteNavProps {
+  /** Which of the four this screen is, so it is marked rather than linked. */
+  readonly current: 'home' | 'tutorial' | 'history' | 'map';
+  readonly onOpenHome: () => void;
+  readonly onOpenGuides: () => void;
+  readonly onOpenHistory: () => void;
+  readonly onOpenFullMap: () => void;
+}
+
+/**
+ * The four links, without a landmark of their own.
+ *
+ * The map has no masthead to hang them from, so there they are the
+ * breadcrumb row's contents and that row is the landmark. Everywhere else
+ * `SiteNav` wraps these in one.
+ */
+function SiteNavItems({
   current,
   onOpenHome,
   onOpenGuides,
   onOpenHistory,
   onOpenFullMap,
-}: {
-  /** Which of the four this screen is, so it is marked rather than linked. */
-  readonly current: 'home' | 'tutorial';
-  readonly onOpenHome: () => void;
-  readonly onOpenGuides: () => void;
-  readonly onOpenHistory: () => void;
-  readonly onOpenFullMap: () => void;
-}) {
+}: SiteNavProps) {
   return (
-    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+    <>
       <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
       <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
-      <NavLink label="Flood history" current={false} onOpen={onOpenHistory} />
-      <NavLink label={FULL_MAP} current={false} onOpen={onOpenFullMap} />
+      <NavLink label="Flood history" current={current === 'history'} onOpen={onOpenHistory} />
+      <NavLink label={FULL_MAP} current={current === 'map'} onOpen={onOpenFullMap} />
+    </>
+  );
+}
+
+function SiteNav(props: SiteNavProps) {
+  return (
+    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+      <SiteNavItems {...props} />
     </nav>
   );
 }
