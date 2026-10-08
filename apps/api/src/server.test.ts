@@ -10,7 +10,15 @@
 import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createApp, createMemo } from './server.js';
+import {
+  ALLOWED_SERVICES,
+  ARTEFACT_CACHE,
+  DEFAULT_ORIGINS,
+  REBUILT_FOR_MS,
+  allowedOrigins,
+  createApp,
+  createMemo,
+} from './server.js';
 
 describe('who may read this from a browser', () => {
   it('allows the deployed site and the local dev server by default', () => {
@@ -54,6 +62,39 @@ describe('who may read this from a browser', () => {
     expect(DEFAULT_ORIGINS).toContain(
       'https://drainlens-iteration2-205559161217.australia-southeast1.run.app',
     );
+  });
+
+  it('carries both of the URLs Cloud Run answers on, for every service it allows', () => {
+    /*
+     * The third time, 8 October, and the one this test exists for.
+     *
+     * Cloud Run publishes a service at two origins -- the old
+     * `<service>-<project-number>.<region>.run.app` and the newer
+     * `<service>-<hash>.a.run.app`. Both resolve; `gcloud run services
+     * describe` and the console report the second; a browser's `Origin` is
+     * whichever one the reader followed. The list held only the first, so the
+     * live root, the dev service and the Iteration 2 archive were *all*
+     * serving one square kilometre of Kensington to anyone who used the URL
+     * the console gives them, and saying so honestly in the footer.
+     *
+     * Checking the count per service rather than the strings is the point: a
+     * service added with one of its two origins fails here, which is the
+     * shape all three outages had.
+     */
+    // The two forms, written out rather than generated, so this says what a
+    // complete entry looks like instead of restating the code that makes one.
+    const bothFormsOf = (service: string) => [
+      `https://${service}-205559161217.australia-southeast1.run.app`,
+      `https://${service}-6et5y2lpgq-ts.a.run.app`,
+    ];
+    for (const service of ALLOWED_SERVICES) {
+      for (const origin of bothFormsOf(service)) {
+        expect(DEFAULT_ORIGINS, service).toContain(origin);
+      }
+    }
+    // And nothing else: a service with one of its two origins would pass the
+    // loop above by having the other one somewhere, and fail here.
+    expect(DEFAULT_ORIGINS).toHaveLength(ALLOWED_SERVICES.length * 2 + 2);
   });
 
   it('is not a wildcard', () => {
