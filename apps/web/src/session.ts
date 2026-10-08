@@ -546,13 +546,21 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   address: 'home',
   start: 'home',
   task: 'address',
-  // Out of a section is back to the address it was built around, not out of
-  // the guide altogether. The way out of the guide is the Home control.
   // Back from the chooser is the fork it was reached through, since
   // 4 October. The homepage's own guide cards reach it too and `back` cannot
   // tell them apart; the fork is one press from home either way.
   choose: 'start',
-  guide: 'address',
+  /*
+    Out of a guide is back to the chooser it was picked from.
+
+    It was the address screen, from when every guide asked for its own
+    address and the one before it was the thing a reader had just left. The
+    address is kept across guides since 4 October and the chooser shows it
+    with a *Change* beside it, so sending somebody who wanted out of a guide
+    to a search box is answering a question they did not ask. Changing the
+    address is `change-address`, which is what that link dispatches.
+  */
+  guide: 'choose',
   locked: 'choose',
   explore: 'task',
   drain: 'address',

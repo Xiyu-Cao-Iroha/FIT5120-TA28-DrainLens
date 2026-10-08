@@ -643,9 +643,13 @@ export function App() {
           extentName={loaded.extentName}
           masthead={false}
           back={{
-            label: 'Address',
+            // Where the guide was picked, not where the address was typed.
+            // `guide-left` rather than `back` because it is the same thing
+            // the panel's own control does: it lets the section go, so the
+            // chooser is not still holding a guide nobody is in.
+            label: 'Guides',
             onBack: () => {
-              dispatch({ type: 'back' });
+              dispatch({ type: 'guide-left' });
             },
           }}
           // The guide's own title where it has one: *Ground height guide*
