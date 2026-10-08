@@ -105,11 +105,28 @@ describe('who may read this from a browser', () => {
     expect(allowedOrigins(undefined)).not.toContain('*');
   });
 
-  it('takes an override, for a preview deployment without a code change', () => {
-    expect(allowedOrigins('https://preview.example, https://other.example')).toEqual([
-      'https://preview.example',
-      'https://other.example',
-    ]);
+  it('adds what the variable names, keeping the services that already exist', () => {
+    /*
+     * **It replaced the list until 8 October, and that undid a fix.** The code
+     * had just been changed to carry both of Cloud Run's URL forms for every
+     * service, the image was deployed at the right commit, and the API went
+     * on refusing the new ones -- an `ALLOWED_ORIGINS` set at some earlier
+     * deploy still listed the five old ones and silently won.
+     *
+     * A preview wants its own origin as well as the services that already
+     * exist, which is what the variable was always for.
+     */
+    const widened = allowedOrigins('https://preview.example, https://other.example');
+    expect(widened).toContain('https://preview.example');
+    expect(widened).toContain('https://other.example');
+    for (const origin of DEFAULT_ORIGINS) expect(widened).toContain(origin);
+  });
+
+  it('drops a duplicate rather than sending the same origin twice', () => {
+    const named = DEFAULT_ORIGINS[0];
+    expect(named).toBeDefined();
+    const widened = allowedOrigins(`${String(named)},https://preview.example`);
+    expect(widened.filter((o) => o === named)).toHaveLength(1);
   });
 
   it('reads an empty or blank variable as "not set" rather than "nobody"', () => {
@@ -121,7 +138,7 @@ describe('who may read this from a browser', () => {
   });
 
   it('drops the empty entry a trailing comma leaves behind', () => {
-    expect(allowedOrigins('https://a.example,')).toEqual(['https://a.example']);
+    expect(allowedOrigins('https://a.example,')).toEqual([...DEFAULT_ORIGINS, 'https://a.example']);
   });
 });
 
