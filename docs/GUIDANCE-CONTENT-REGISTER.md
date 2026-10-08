@@ -37,15 +37,22 @@ Read by `apps/web/src/report/channels.ts`. Each row carries the sentence it came
 
 Read by `apps/web/src/prepare/actions.ts`. AC 5.2.3 asks for three to four, each one short specific sentence, each traceable.
 
+> **Three of these four are new on 8 October 2026 and are *not* covered by the approval at the top of this file.** The row that is unchanged is the first.
+
 | Shown as | Source quotation | Publisher | Page | Read |
 |---|---|---|---|---|
 | Clean gutters, downpipes and drains when it is safe to do so. | "Clean your gutters, downpipes and drains to ensure they are not blocked." | Victoria State Emergency Service | ses.vic.gov.au (Storm) | 2026-10-02 |
-| Secure loose outdoor items, such as furniture and umbrellas. | "Check that loose items such as outdoor furniture, umbrellas and trampolines are safely secured." | Victoria State Emergency Service | ses.vic.gov.au (Storm) | 2026-10-02 |
-| Park under cover or away from trees. | "Park your car under cover or away from trees." | Victoria State Emergency Service | ses.vic.gov.au (Storm) | 2026-10-02 |
+| Lift valuables up high. | "Lift it: Lift your valuables up high" | Victoria State Emergency Service | ses.vic.gov.au (Flood) | 2026-10-08 |
+| Pack an emergency kit with enough essentials for three days. | "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
+| Monitor weather warnings and official forecasts. | "Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226)." | Victoria State Emergency Service | ses.vic.gov.au (Flood) | 2026-10-08 |
 
-### One action waiting for a source
+### What was removed, and why the fourth is here now
 
-The design (Figma, *Get ready for heavy rain*) shows a fourth action, **Move valuable items above floor level**. No official page carrying it was found on the day it was looked for. Three is within what the criterion asks for, so it is not in the product: a mock-up is not a source. If the team finds the page, add the row here and the action goes in.
+**Two approved actions were taken out on 8 October**, at the team's direction: *Secure loose outdoor items, such as furniture and umbrellas.* and *Park under cover or away from trees.* Both were accurate, both were quoted from the VICSES storm page, and both were approved on 4 October. They are storm advice. The design's set is about water reaching the house, and the team chose the design's set.
+
+**The fourth action is no longer waiting for a source.** Until today this section recorded that the design's *Move valuable items above floor level* had no official page behind it and was therefore not in the product, because a mock-up is not a source. VICSES's flood page carries *Lift it: Lift your valuables up high*, read on 8 October, so the action is in — under the publisher's own words rather than the mock-up's.
+
+**Each action now carries a photograph**, which is a separate kind of claim and has its own record: `IMAGE-CREDITS.md`. None of them is evidence about the reader's house; the sentence is the thing with a source.
 
 ---
 
