@@ -87,7 +87,7 @@ import {
 } from '../drains/wording.js';
 import { StreetDrains } from './StreetDrains.js';
 import { plainButton, quietButton } from '../ui/controls.js';
-import { Sidebar, sidebarWidth } from './Sidebar.js';
+import { SIDEBAR_RAIL, Sidebar, sidebarWidth } from './Sidebar.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
 import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
@@ -450,8 +450,19 @@ export function MapView({
   const [whyOpen, setWhyOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
-  const openReport = (place: ReportPlace) => {
+  /*
+    Where a report was opened from, so it has somewhere to go back to (bug 4).
+
+    Reported on 9 October: the only way back to the plan after a report was
+    report → Close → press a warning sign → *Applies to me*, which is four
+    presses and two of them accidental. `Close` dismisses the pathway and
+    leaves the map; a report opened from the plan now also offers the plan.
+  */
+  const [reportFromPlan, setReportFromPlan] = useState(false);
+
+  const openReport = (place: ReportPlace, fromPlan = false) => {
     setReportPlace(place);
+    setReportFromPlan(fromPlan);
     setReportOpen(true);
   };
   /*
@@ -626,6 +637,16 @@ export function MapView({
     anchored on the map, so both fit -- the card is kept clear of the sidebar
     by `calloutWithin` below.
   */
+  /*
+    Folded to the rail rather than dismissed (bug 11, 9 October).
+
+    One flag for both panels: only one of them is ever up, and a reader who
+    folded the plan to reach the map does not mean *and keep the drains list
+    open at full width* either. It is cleared when a panel is opened, because
+    opening a panel is asking to see it.
+  */
+  const [panelFolded, setPanelFolded] = useState(false);
+
   const planShowing = panel && viewport !== null && planOpen;
   const sidebarOpen = planShowing && panelWidth > 0;
   /*
@@ -665,21 +686,6 @@ export function MapView({
     />
   );
 
-  /*
-    The box a callout may not leave.
-
-    The sidebar is drawn over the canvas rather than beside it -- the map is
-    deliberately not re-fitted when the plan opens, so that what the reader is
-    looking at does not move under them. A card placed against the canvas's
-    full width can therefore end up behind the sidebar.
-  */
-  const calloutWithin =
-    viewport === null
-      ? { width: 0, height: 0 }
-      : {
-          width: viewport.widthPx - (sidebarOpen ? panelWidth : 0),
-          height: viewport.heightPx,
-        };
 
   const addressId = address?.id ?? null;
 
@@ -734,6 +740,14 @@ export function MapView({
     panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0;
 
   /**
+   * What a panel actually takes from the map.
+   *
+   * Folded it is the rail, which is why the chrome moves by this rather than
+   * by `panelWidth`: the point of folding is that the map gets the rest back.
+   */
+  const panelTakes = panelFolded ? SIDEBAR_RAIL : panelWidth;
+
+  /**
    * Either of them, which is what the map's own chrome has to move for.
    *
    * The legend, the zoom controls and the layer chips were all moved aside by
@@ -743,6 +757,20 @@ export function MapView({
    * the same place needs the same room.
    */
   const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
+
+  /*
+    The box a callout may not leave.
+
+    The sidebar is drawn over the canvas rather than beside it -- the map is
+    deliberately not re-fitted when the plan opens, so that what the reader is
+    looking at does not move under them. A card placed against the canvas's
+    full width can therefore end up behind the sidebar, which is how a place
+    card and an open plan used to be impossible to have at once.
+  */
+  const calloutWithin =
+    viewport === null
+      ? { width: 0, height: 0 }
+      : { width: viewport.widthPx - (anySidebarOpen ? panelTakes : 0), height: viewport.heightPx };
 
   /*
     The drain the list picked, as the canvas names pits.
@@ -759,6 +787,9 @@ export function MapView({
   }, [drainPicked]);
 
   const openDrains = () => {
+    // The layer goes on with the list, so the map and the panel are about the
+    // same drains.
+    setPanelFolded(false);
     if (!layers.pit) toggle('pit');
     setAddressCardOpen(false);
     setPlanOpen(false);
@@ -784,7 +815,7 @@ export function MapView({
         : {
             onReport: () => {
               setPlanOpen(false);
-              openReport(null);
+              openReport(null, true);
             },
 
             
@@ -999,7 +1030,7 @@ export function MapView({
   return (
     <>
       <MapCanvas
-        controlsInset={anySidebarOpen ? panelWidth : 0}
+        controlsInset={anySidebarOpen ? panelTakes : 0}
         artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
         show={visibilityOf(picking === null ? layers : NOTHING_ON)}
@@ -1303,7 +1334,7 @@ export function MapView({
           style={{
             position: 'absolute',
             left: space(4),
-            right: space(4) + (anySidebarOpen ? panelWidth : 0),
+            right: space(4) + (anySidebarOpen ? panelTakes : 0),
             top: space(4),
             transition: 'right 160ms ease',
             zIndex: 4,
@@ -1639,7 +1670,21 @@ export function MapView({
                 setPicking(address === null ? 'pin' : 'drain');
               }}
             />
-            <span style={{ display: 'block', marginTop: space(3) }}>
+            <span style={{ display: 'flex', gap: space(2), marginTop: space(3) }}>
+              {reportFromPlan && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportOpen(false);
+                    setReportProblem(null);
+                    setPanelFolded(false);
+                    setPlanOpen(true);
+                  }}
+                  style={quietButton}
+                >
+                  ‹ Back to my plan
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1857,6 +1902,8 @@ export function MapView({
           title={STREET_DRAINS_HEADING}
           subtitle={address.label}
           width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
           onClose={() => {
             setDrainsOpen(false);
             setDrainPicked(null);
@@ -1934,6 +1981,8 @@ export function MapView({
           title={PREPARE_HEADING}
           {...(address === null ? {} : { subtitle: address.label })}
           width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
           onClose={() => {
             setPlanOpen(false);
           }}
