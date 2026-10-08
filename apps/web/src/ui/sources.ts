@@ -202,7 +202,7 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
 export const SOURCE_LINKS = {
   footer: { label: SOURCES_PAGE.footerLink, section: null, where: 'ui/Shell.tsx footer, every screen', ac: ['2.3.1', '4.3.1'] },
   recorded: { label: 'From council records', section: 'drains', where: 'map/MapLayers.tsx legend group; map/MapCallout.tsx foot of the pit and pipe popups (screens/MapView.tsx)', ac: ['1.1.4', '1.1.7', '1.2.1'] },
-  derived: { label: 'Estimated by DrainLens', section: 'ground', where: 'map/MapLayers.tsx legend group; map/AddressInsight.tsx foot of the address card, and screens/MapView.tsx when the card has no figure', ac: ['1.1.4', '1.1.7', '1.3.1', '1.3.2'] },
+  derived: { label: 'Estimated by DrainLens', section: 'ground', where: 'map/MapLayers.tsx legend group, and screens/MapView.tsx at the foot of the address card', ac: ['1.1.4', '1.1.7', '1.3.1', '1.3.2'] },
   pathEnds: { label: 'Why the line stops', section: 'drains', where: 'screens/PitDetail.tsx followed path', ac: ['1.2.2'] },
   groundLegend: { label: 'More about ground height', section: 'ground', where: 'map/MapLayers.tsx ground height legend', ac: ['1.3.1'] },
   mapNotice: { label: 'More about the map', section: 'drains', where: 'screens/LockedMap.tsx, under the two lines', ac: ['1.1.4'] },
