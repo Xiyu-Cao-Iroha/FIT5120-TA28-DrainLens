@@ -6,9 +6,9 @@ Every official channel, telephone number and quotation the product shows, with i
 
 > **Approved 4 October 2026 by Xiyu Cao**, for every channel and every quotation below. The rows are what the code reads, taken from the publishers' own pages on the dates given.
 >
-> **§4 was withdrawn the day it was written** and nothing in it reached the product, so the approval above still covers everything the product says.
+> **§2's three new rows were approved on 8 October 2026 by Xiyu Cao**, in the same way: the preparation actions changed to the design's four that day, and the three that were not in the 4 October approval are covered now.
 >
-> **One question in §5 is not settled by that approval**: whether to keep looking for a source for the design's fourth preparation action. It is a decision about what to do next, not about anything the product currently says.
+> **§4 was withdrawn the day it was written** and nothing in it reached the product, so the approvals above cover everything the product says.
 
 ---
 
@@ -37,7 +37,7 @@ Read by `apps/web/src/report/channels.ts`. Each row carries the sentence it came
 
 Read by `apps/web/src/prepare/actions.ts`. AC 5.2.3 asks for three to four, each one short specific sentence, each traceable.
 
-> **Three of these four are new on 8 October 2026 and are *not* covered by the approval at the top of this file.** The row that is unchanged is the first.
+> **Approved 8 October 2026 by Xiyu Cao.** Three of these four rows are new that day; the first is the one that carries over from 4 October.
 
 | Shown as | Source quotation | Publisher | Page | Read |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ Read by `apps/web/src/prepare/actions.ts`. AC 5.2.3 asks for three to four, each
 
 **Two approved actions were taken out on 8 October**, at the team's direction: *Secure loose outdoor items, such as furniture and umbrellas.* and *Park under cover or away from trees.* Both were accurate, both were quoted from the VICSES storm page, and both were approved on 4 October. They are storm advice. The design's set is about water reaching the house, and the team chose the design's set.
 
-**The fourth action is no longer waiting for a source.** Until today this section recorded that the design's *Move valuable items above floor level* had no official page behind it and was therefore not in the product, because a mock-up is not a source. VICSES's flood page carries *Lift it: Lift your valuables up high*, read on 8 October, so the action is in — under the publisher's own words rather than the mock-up's.
+**The fourth action is no longer waiting for a source.** Until 8 October this section recorded that the design's *Move valuable items above floor level* had no official page behind it and was therefore not in the product, because a mock-up is not a source. VICSES's flood page carries *Lift it: Lift your valuables up high*, read on 8 October, so the action is in — under the publisher's own words rather than the mock-up's. That settles the open question §5 used to carry.
 
 **Each action now carries a photograph**, which is a separate kind of claim and has its own record: `IMAGE-CREDITS.md`. None of them is evidence about the reader's house; the sentence is the thing with a source.
 
@@ -81,6 +81,7 @@ The one thing worth carrying forward is what bounded them. `assistant/evaluation
 1. That each channel above is the right one for the problem it is attached to.
 2. That the five problem types in `report/problems.ts` are the five the criterion names and that none of them sends a reader somewhere they should not go, particularly **Private property**, which goes to a plumber rather than to the council.
 3. That the quotations are accurate and the pages are the ones a reader should be sent to.
-4. Whether to keep looking for a source for *Move valuable items above floor level*, or to drop it from the design.
+
+Item 4 is gone: it asked whether to keep looking for a source for the design's fourth preparation action. VICSES's flood page carried one, and the action is in §2 with it.
 
 Re-read the pages before the demonstration: a telephone number or a form that moved is the one kind of error in this product that could waste somebody's time in an emergency.
