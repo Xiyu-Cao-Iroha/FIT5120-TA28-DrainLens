@@ -35,6 +35,7 @@ WORKDIR /repo
 # `npm ci`, never `npm install`: it installs exactly what the lockfile says and
 # fails when it and package.json have drifted.
 COPY package.json package-lock.json ./
+COPY packages/address/package.json packages/address/
 COPY packages/schema/package.json packages/schema/
 COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/
@@ -51,6 +52,7 @@ WORKDIR /app
 # hundreds the build needs. Resolved from the lockfile rather than re-resolved,
 # so the image cannot quietly get a different `pg` than the tests ran against.
 COPY package.json package-lock.json ./
+COPY packages/address/package.json packages/address/
 COPY packages/schema/package.json packages/schema/
 COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/
