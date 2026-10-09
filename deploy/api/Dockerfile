@@ -74,6 +74,25 @@ RUN apk upgrade --no-cache \
            /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /repo/apps/api/dist apps/api/dist
+
+# **The shared package's build output, which the manifest alone does not
+# bring.** `npm ci --omit=dev` above reads `packages/address/package.json` and
+# links `node_modules/@drainlens/address` to `packages/address`; the manifest
+# points at `dist/`, and nothing had put one there.
+#
+# Found the way these are found. The build succeeded, the image pushed, the
+# deployment failed at the health check, and the revision's log said
+# `ERR_MODULE_NOT_FOUND: /app/node_modules/@drainlens/address/dist/index.js
+# imported from /app/apps/api/dist/server.js`. Cloud Run kept the previous
+# revision serving, which is the only reason this was a failed deploy rather
+# than an outage.
+#
+# **Every workspace package `apps/api` imports needs a line here.** There is
+# one today. `tsc --build` in the build stage follows the project reference
+# and leaves the output at `/repo/packages/address/dist`, so adding a package
+# is two lines: the manifest beside the lockfile, and this.
+COPY --from=build /repo/packages/address/dist packages/address/dist
+
 COPY db/migrations db/migrations
 
 # **The layout below `/app` is load-bearing.** `load.ts` resolves the artefacts
