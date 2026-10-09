@@ -174,7 +174,9 @@ Twenty-one addresses — the product's seven example addresses plus fourteen tak
 
 **Precompute per inlet, in the pipeline.** The full sweep — 154 windows, a Kahn pass over 1,000,000 cells each, 9,239 inlets — took **72 seconds** on this laptop. Per request it is impossible: the browser holds one 1 km window at a time and would need every window within 200 m of the address.
 
-The artefact would be one row per inlet — asset number, catchment, measured flag — about **9,239 rows, under 200 KB**, published like `scenario-differences.json`. The browser then does a radius query against data it already has, and **the address never leaves the device**, which is the standing rule and is what AC 5.4.1 requires.
+The artefact would be one row per inlet — asset number, catchment, measured flag — about **9,239 rows, under 200 KB**, published like `scenario-differences.json`. The browser then does a radius query against data it already has, and **no address is sent to run it**.
+
+> **The standing rule this used to cite changed on 9 October**, after this page was written: a submitted address search is now a request to the API (DECISIONS-PENDING.md §14). It does not change the recommendation above and it does change the reason. The argument is no longer *the address may not leave the device* — it is that a radius query over a 200 KB artefact the browser already holds needs no request at all, and AC 5.4.1 still requires the reader's own selections about those places to stay in the tab. A per-inlet score fetched per address would be a second route receiving an address, which is a decision somebody would have to take rather than inherit.
 
 > If the team takes the ranking branch anyway, the score must be published as a **number per inlet**, never as a rank or a "top three" list, so that the ordering is recomputed for the reader's own address rather than baked in.
 
