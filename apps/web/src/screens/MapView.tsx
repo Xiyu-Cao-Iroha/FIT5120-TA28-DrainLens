@@ -59,6 +59,7 @@ import { cardSentence, waterNearby } from '../map/nearby.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
+import type { Press } from '../tutorial/lesson.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { AskAboutGettingReady } from './AskAboutGettingReady.js';
@@ -187,6 +188,19 @@ export interface MapViewProps {
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
   /**
+   * The control inside a card the current step waits on, outlined.
+   *
+   * `pulseChip`'s counterpart for things that are not chips. See `pressFor`.
+   */
+  readonly pulsePress?: Press | null | undefined;
+  /**
+   * Let a guide reach *Report a problem*, which guides otherwise hide.
+   *
+   * Only Epic 6's does, and only because the design's third and fourth
+   * frames are that flow. See `usesReport`.
+   */
+  readonly reportInGuide?: boolean | undefined;
+  /**
    * The map tour is running.
    *
    * Three of its seven steps point at a chip, and the row can be collapsed
@@ -305,6 +319,8 @@ export function MapView({
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  pulsePress = null,
+  reportInGuide = false,
   touring = false,
   highlight = null,
   overlay = null,
@@ -458,7 +474,14 @@ export function MapView({
     `rolesOpen` goes with it, and a step the reader had already done would
     come undone under them.
   */
-  const [rolesOpened, setRolesOpened] = useState(false);
+  /*
+    What Epic 6's last two steps wait on (Figma D3, D4).
+
+    Read off `reportOpen` and `reportProblem` rather than kept beside them,
+    because those already exist and a second copy of a fact is a second
+    thing to forget to update. `latch` in the guide does the latching; this
+    only has to say what is true now.
+  */
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
   /*
@@ -1033,7 +1056,8 @@ export function MapView({
       planOpen,
       placesReviewed,
       whyOpen,
-      rolesOpened,
+      reportOpened: reportOpen,
+      problemChosen: reportProblem !== null,
     });
   }, [
     terrainOn,
@@ -1052,7 +1076,8 @@ export function MapView({
     planOpen,
     placesReviewed,
     whyOpen,
-    rolesOpened,
+    reportOpen,
+    reportProblem,
     onMapNow,
   ]);
 
@@ -1766,6 +1791,7 @@ export function MapView({
               place={reportPlace}
               chosen={reportProblem}
               onChoose={setReportProblem}
+              pulse={pulsePress === 'problem'}
               onPick={() => {
                 // The map takes over. The report card is still open behind it
                 // and comes back with whatever was picked.
@@ -1827,19 +1853,27 @@ export function MapView({
                 // back, and it takes the boundary with it.
                 toggle('catchment');
               }}
-              onRolesOpen={() => {
-                setRolesOpened(true);
-              }}
-              {...(guided
+
+              {...(guided && !reportInGuide
                 ? {}
                 : {
-                    // Not inside a guide. A guide teaches one thing at a time,
-                    // and this opens a card taller than the guide's map frame
-                    // over a step that was asking about something else.
+                    /*
+                      A guide teaches one thing at a time, and this opens a
+                      card taller than the guide's map frame over a step that
+                      was asking about something else. That is why every
+                      guide hid it.
+
+                      **Epic 6's guide is the one whose subject this is.**
+                      Figma D3 asks the reader to press it and D4 asks them
+                      to choose a problem type, so hiding it there left two
+                      of the design's four frames unbuildable. `usesReport`
+                      says which lesson that is, from its steps.
+                    */
                     onReport: () => {
                       openReport(null);
                     },
                   })}
+              pulseReport={pulsePress === 'report'}
             />
             {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
               <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>

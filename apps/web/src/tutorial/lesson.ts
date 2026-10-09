@@ -54,11 +54,23 @@ export type Requirement =
   | 'place-reviewed'
   | 'why-opened'
   /*
-    Epic 6's own, from Figma D3: *Now open Why are there different
-    organisations?* Latched, like the ground guide's two: the fold can be
-    closed again, and closing it does not un-read what was read.
+    Epic 6's last two, from Figma D3 and D4.
+
+    **They replaced a step that was never in the design.** Until 10 October
+    this guide's third step was *Now open Why are there different
+    organisations?*, a fold inside the card, and its fourth was a sentence
+    about who looks after what. The design's third and fourth frames are
+    about reporting a problem: press *Report a problem*, then choose a
+    problem type, and the panel says who to contact and what to have ready.
+    The card still carries the fold and still names the operators inline;
+    the guide no longer sends anybody to it.
+
+    Both are latched, like the ground guide's two: the panel can be closed
+    and a chosen problem can be changed, and neither un-does the press the
+    step was waiting for.
   */
-  | 'roles-opened';
+  | 'report-opened'
+  | 'problem-chosen';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -200,8 +212,10 @@ export interface MapNow {
   readonly placesReviewed: number;
   /** *Why this place?* opened on a reminder in the plan (Figma G4). */
   readonly whyOpen: boolean;
-  /** Latched: *Why are there different organisations?* has been opened (Figma D3). */
-  readonly rolesOpened: boolean;
+  /** Latched: the report panel has been opened (Figma D3). */
+  readonly reportOpened: boolean;
+  /** Latched: a problem type has been chosen in it (Figma D4). */
+  readonly problemChosen: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -221,7 +235,8 @@ export const NOTHING_ON_MAP: MapNow = {
   planOpen: false,
   placesReviewed: 0,
   whyOpen: false,
-  rolesOpened: false,
+  reportOpened: false,
+  problemChosen: false,
 };
 
 /**
@@ -236,7 +251,8 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   ...next,
   layersOpened: before.layersOpened || next.layersOpened || next.layersOpen,
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
-  rolesOpened: before.rolesOpened || next.rolesOpened,
+  reportOpened: before.reportOpened || next.reportOpened,
+  problemChosen: before.problemChosen || next.problemChosen,
 });
 
 /**
@@ -341,6 +357,41 @@ export interface Lesson {
  * the connected-pipe button are not chips: the pit has its ring, and the
  * button is on the pit's own card.
  */
+/**
+ * The control inside a card that the current step is waiting for.
+ *
+ * `chipFor` answers the same question for the layer chips along the top of
+ * the map, which pulse while a step waits on one. This answers it for the
+ * controls that live inside a card, where there is no chip to pulse and a
+ * reader was left reading *click X* with nothing on screen looking clickable.
+ *
+ * Null for every step that waits on a chip, or on nothing a reader presses.
+ */
+export type Press = 'report' | 'problem';
+
+export function pressFor(requires: Requirement): Press | null {
+  switch (requires) {
+    case 'report-opened':
+      return 'report';
+    case 'problem-chosen':
+      return 'problem';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether a lesson sends the reader into the report flow.
+ *
+ * The map hides *Report a problem* during a guide, for a reason worth
+ * keeping: it opens a card taller than the guide's map frame, over a step
+ * that was asking about something else. Epic 6's guide is the exception the
+ * design draws (Figma D3 and D4), so the exception is derived from the steps
+ * rather than from the lesson's name.
+ */
+export const usesReport = (steps: Lesson['steps']): boolean =>
+  steps.some((step) => step.kind === 'do' && step.requires === 'report-opened');
+
 export function chipFor(requires: Requirement): LayerKey | null {
   switch (requires) {
     case 'pits-on':
@@ -356,10 +407,19 @@ export function chipFor(requires: Requirement): LayerKey | null {
     case 'plan-opened':
     case 'place-reviewed':
     case 'why-opened':
-    case 'roles-opened':
-      // None is a chip: the address card's button, a choice on a place's own
-      // card, a fold under a reminder in the plan, and a fold inside the card
-      // the boundary chip has already drawn.
+    case 'report-opened':
+    case 'problem-chosen':
+      /*
+        None is a chip: the address card's button, a choice on a place's own
+        card, a fold under a reminder in the plan, and two controls inside
+        the card the boundary chip has already drawn.
+
+        **A reader still has to be able to find them**, which is the
+        9 October report that the guide said *Now open Why are there
+        different organisations?* while the fold it meant was a small
+        triangle among three. `pressFor` answers that for the controls this
+        returns null about.
+      */
       return null;
     case 'pit-selected':
     case 'trace-following':
@@ -418,8 +478,10 @@ export function satisfied(
       return now.placesReviewed > 0;
     case 'why-opened':
       return now.whyOpen;
-    case 'roles-opened':
-      return now.rolesOpened;
+    case 'report-opened':
+      return now.reportOpened;
+    case 'problem-chosen':
+      return now.problemChosen;
     case 'catchment-on':
       return now.catchment;
     case 'pits-on':

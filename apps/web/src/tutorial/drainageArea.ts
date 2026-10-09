@@ -31,20 +31,37 @@
  */
 
 import { type Lesson } from './lesson.js';
-import { CATCHMENT_CHIP, WHY_ORGANISATIONS } from '../catchment/wording.js';
+import { CATCHMENT_CHIP } from '../catchment/wording.js';
+import { BLOCKED_DRAIN, NOT_SENT_YET_SHORT, REPORT_HEADING } from '../report/problems.js';
 
 /*
-  The wording is the design's, in the design's order: a press, what it showed,
-  a press, what it showed, and a finish page. Each `read` step's prompt starts
-  *Great!* as every guide's does since copy audit v2 (#43 to #51), and the
-  caveat sits in `note` rather than in the heading.
+  The wording is the design's, and so is the order, and from 10 October both
+  were read off the frames rather than remembered.
 
-  **The third step was missing until 9 October.** The design has four, and
-  this had three: the reader was told that each part is looked after by
-  somebody different without ever being asked to open the fold that says who.
-  It is a `do` step there and it is one here, waiting on the opening the way
-  the first waits on the chip -- a guide that describes a press instead of
-  waiting for it is a guide somebody can finish without touching the map.
+  **The previous version of this list was mine and three of its four steps
+  were not in Figma.** It asked the reader to open *Why are there different
+  organisations?*, a fold inside the card, and then told them each part of
+  the drainage is looked after by someone different. The design's third and
+  fourth frames are about reporting: press *Report a problem*, choose a
+  problem type, and read who to contact and what to have ready. The guide
+  taught the card; the design teaches what the card is for.
+
+  Two differences from the frames are deliberate and are not oversights.
+
+  **The step counter will read five, and Figma's reads four.** D4 and D4b
+  are both *4 of 4* there: choosing a problem type and seeing the contact
+  panel are one numbered step in two states. This engine counts `steps`, and
+  a `do` followed by the `read` that confirms it is how every other guide in
+  this product is built. Grouping them is an engine change, not a wording
+  one, and it is worth doing only if the number is what somebody noticed.
+
+  **Step two does not name the drain and the frame does.** D2 reads *Rain
+  inside this line is recorded as draining to the Kensington West Main
+  Drain.* Epic 6's definition of done is that no subcatchment is described
+  as a Melbourne Water drain without an approved classification, and most
+  addresses are unclassified today, so a prompt that named one for every
+  address would be wrong for most of them. The card beside the prompt names
+  it correctly for each class already, through `receivingLine`.
 */
 export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
   {
@@ -55,8 +72,11 @@ export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
   },
   {
     kind: 'read',
+    // Figma D2, which opens on the sentence rather than on *Great!*. That
+    // prefix was a house convention of mine from copy audit v2 and appears
+    // on no frame in this file.
     id: 'catchment-shown',
-    prompt: 'Great! Rain inside this line is recorded as draining to the same place.',
+    prompt: 'Rain inside this line is recorded as draining to the same place.',
     // The sentence that stops a boundary being read as a flood map. A
     // subcatchment says where water is recorded as going, and nothing about
     // how far any flood could reach (AC 6.1.4).
@@ -64,15 +84,27 @@ export const DRAINAGE_AREA_STEPS: Lesson['steps'] = [
   },
   {
     kind: 'do',
-    id: 'roles-open',
-    prompt: `Now open ${WHY_ORGANISATIONS}`,
-    requires: 'roles-opened',
+    id: 'report-open',
+    // Figma D3, in the design's words, question and all.
+    prompt: `See a blocked drain or a damaged grate? Click ${REPORT_HEADING}.`,
+    requires: 'report-opened',
+  },
+  {
+    kind: 'do',
+    id: 'problem-choose',
+    // Figma D4. It names one problem type because the frame does; any of
+    // the five satisfies the step, since each one answers what the note
+    // promises.
+    prompt: `Choose ${BLOCKED_DRAIN}.`,
+    hint: 'Each problem type shows who to contact.',
+    requires: 'problem-chosen',
   },
   {
     kind: 'read',
-    id: 'help-shown',
-    prompt: 'Great! Each part of the drainage is looked after by someone different.',
-    note: 'Use this to report a problem to the right place.',
+    // Figma D4b.
+    id: 'contact-shown',
+    prompt: 'This is who to contact and what to prepare.',
+    note: NOT_SENT_YET_SHORT,
   },
 ];
 

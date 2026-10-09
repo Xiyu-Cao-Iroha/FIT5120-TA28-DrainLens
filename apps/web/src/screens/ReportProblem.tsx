@@ -52,6 +52,7 @@ export function ReportProblem({
   place,
   chosen,
   onChoose,
+  pulse = false,
   onPick,
   onForgetPlace,
 }: {
@@ -64,6 +65,13 @@ export function ReportProblem({
   */
   readonly chosen: ProblemId | null;
   readonly onChoose: (problem: ProblemId | null) => void;
+  /**
+   * Outlined while the guide's fourth step waits on a choice (Figma D4).
+   *
+   * The whole list, not one option: the step names *Blocked or flooded
+   * street drain* because the frame does, and any of the five answers it.
+   */
+  readonly pulse?: boolean | undefined;
   /** As the reader chose it, or null where they are reading without one. */
   readonly address: string | null;
   /** A drain they tapped or a point they pinned. Never the nearest one. */
@@ -79,7 +87,18 @@ export function ReportProblem({
     return (
       <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>{CHOOSE_PROBLEM}</p>
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+        <ul
+          style={{
+            margin: 0,
+            listStyle: 'none',
+            // The outline goes round the list rather than round one option,
+            // because any of the five satisfies the step.
+            padding: pulse ? space(2) : 0,
+            borderRadius: radius.base,
+            border: pulse ? `2px solid ${brand.base}` : '2px solid transparent',
+            background: pulse ? brand.wash : 'transparent',
+          }}
+        >
           {PROBLEM_TYPES.map((problem) => (
             <li key={problem.id} style={{ marginBottom: space(2) }}>
               <button

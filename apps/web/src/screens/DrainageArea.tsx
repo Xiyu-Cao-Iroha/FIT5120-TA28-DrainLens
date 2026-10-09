@@ -44,6 +44,7 @@ import {
 } from '../catchment/wording.js';
 import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchment/help.js';
 import { WHY_ORGANISATIONS } from '../catchment/wording.js';
+import { REPORT_HEADING } from '../report/problems.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
@@ -59,8 +60,8 @@ export function DrainageArea({
   area,
   hasAddress = true,
   onReport,
+  pulseReport = false,
   onBack,
-  onRolesOpen,
 }: {
   readonly area: Subcatchment | null;
   /**
@@ -80,6 +81,8 @@ export function DrainageArea({
    * disappear.
    */
   readonly onReport?: (() => void) | undefined;
+  /** Outlined while the guide's third step waits on it (Figma D3). */
+  readonly pulseReport?: boolean | undefined;
   /**
    * Close the card, as the design's *Back to address* does (Figma D4).
    *
@@ -95,7 +98,6 @@ export function DrainageArea({
    * this place?*. Only the opening is reported: closing the fold again does
    * not un-read what was read.
    */
-  readonly onRolesOpen?: (() => void) | undefined;
 }) {
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -232,11 +234,7 @@ export function DrainageArea({
       <details
         open={rolesOpen}
         onToggle={(event) => {
-          const open = (event.currentTarget as HTMLDetailsElement).open;
-          setRolesOpen(open);
-          // The guide's third step waits on this (Figma D3). Only the opening
-          // counts: closing it again does not un-read what was read.
-          if (open) onRolesOpen?.();
+          setRolesOpen((event.currentTarget as HTMLDetailsElement).open);
         }}
         style={{ marginBottom: space(3) }}
       >
@@ -256,16 +254,24 @@ export function DrainageArea({
             display: 'block',
             width: '100%',
             marginBottom: space(3),
-            padding: space(3),
             borderRadius: radius.base,
-            border: `1px solid ${line.strong}`,
-            background: surface.raised,
+            /*
+              Two pixels of brand edge while a step is waiting on it, which
+              is what the layer chips do and what this had no equivalent of.
+              The extra pixel comes out of the padding, so the button is the
+              same size either way and the card below it does not shift.
+            */
+            border: pulseReport
+              ? `2px solid ${brand.base}`
+              : `1px solid ${line.strong}`,
+            padding: pulseReport ? `${String(space(3) - 1)}px` : space(3),
+            background: pulseReport ? brand.wash : surface.raised,
             color: ink.strong,
             font: type(text.label, { weight: weight.semibold }),
             cursor: 'pointer',
           }}
         >
-          Report a problem ›
+          {REPORT_HEADING} ›
         </button>
       )}
 

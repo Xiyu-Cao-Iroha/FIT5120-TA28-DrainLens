@@ -110,6 +110,18 @@ export const NOT_SUBMITTED = 'DrainLens does not send this report. Nothing leave
 /** The same thing, said once on the screen where the reader is still choosing. */
 export const NOT_SENT_YET = 'DrainLens helps you prepare a report. It does not send it for you.';
 
+/**
+ * The same promise in the words Figma D4b uses, for the guide's last step.
+ *
+ * Shorter because it sits under a prompt rather than over a panel, and the
+ * half it drops -- that DrainLens helps you prepare one -- is what the step
+ * the reader just finished has already shown them.
+ */
+export const NOT_SENT_YET_SHORT = 'DrainLens does not send the report for you.';
+
+/** The problem type Figma D4 names, which is the one most reports are. */
+export const BLOCKED_DRAIN = 'Blocked or flooded street drain';
+
 /** The five, emergency first (Figma B3, AC 6.3.4). */
 export const PROBLEM_TYPES: readonly ProblemType[] = [
   {
