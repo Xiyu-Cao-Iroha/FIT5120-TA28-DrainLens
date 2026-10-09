@@ -196,8 +196,10 @@ button:disabled {
  *   what stops the picture: a sticky box cannot leave its containing block.
  * - `.home__backdrop-photo` is sticky at the top of `<main>`'s scrollport, one
  *   screen tall. `100vh` is taller than `<main>` by the header and the footer,
- *   so the last ~150 px of the wrapper scroll the picture with it — the edge
- *   meets "How to use the map" rather than floating over it.
+ *   so the last ~150 px of the wrapper scroll the picture with it, and the
+ *   edge meets the section below rather than floating over it. That section
+ *   was "How to use the map" until 10 October and is now the limits note;
+ *   the measurement is of the wrapper, so nothing here depends on which.
  *
  * Nothing moves by itself. Sticky is the browser holding an element still, not
  * an animation, so there is nothing for `prefers-reduced-motion` to switch off.
