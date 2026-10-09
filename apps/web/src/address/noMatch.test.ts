@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { noMatch, searchable } from './noMatch.js';
-import type { AddressIndex, IndexedAddress } from './search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 
 const at = (suburb: string): IndexedAddress => ({
   id: `x/${suburb}`,

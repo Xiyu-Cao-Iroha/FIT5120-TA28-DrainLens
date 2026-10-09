@@ -12,7 +12,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { addressForEnter, nextActive } from './enter.js';
-import { type AddressIndex, type IndexedAddress, type PackedIndex, search, unpack } from './search.js';
+import { type AddressIndex, type IndexedAddress, type PackedIndex, search, unpack } from '@drainlens/address';
 
 const at = (id: string, number: string, street: string, suburb = 'Kensington'): IndexedAddress => ({
   id,

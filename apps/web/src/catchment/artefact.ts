@@ -21,7 +21,7 @@
  * positions in what survives would shift every address after the first gap.
  */
 
-import type { IndexedAddress } from '../address/search.js';
+import type { IndexedAddress } from '@drainlens/address';
 
 /** The four answers AC 6.1.2 allows, as the pipeline's register publishes them. */
 export type ReceivingClass = 'main-drain' | 'waterway-section' | 'council-direct' | 'unclassified';

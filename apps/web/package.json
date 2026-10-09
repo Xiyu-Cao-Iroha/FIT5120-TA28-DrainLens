@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@drainlens/address": "0.1.0",
     "@drainlens/scenario": "0.1.0",
     "@drainlens/schema": "0.1.0",
     "react": "^19.2.8",

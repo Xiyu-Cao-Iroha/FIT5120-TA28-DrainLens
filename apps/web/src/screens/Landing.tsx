@@ -35,7 +35,7 @@ import {
   MAX_SUGGESTIONS,
   resolve,
   search,
-} from '../address/search.js';
+} from '@drainlens/address';
 import {
   COMPARE_DEMONSTRATION_LABELS,
   DEMONSTRATION_LABELS,

@@ -29,6 +29,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
+import { type PackedIndex, normalise, unpack } from '@drainlens/address';
 import pg from 'pg';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -170,6 +171,22 @@ export async function load(
     await readFile(path.join(BUNDLED.dir, 'sa2-areas.json'), 'utf8'),
   ) as Artefact;
 
+  /*
+    The address index, read from the bundled directory whichever extent is
+    being loaded, because there is only one of it.
+
+    It is published for the council and nothing clips it at build time: the
+    site clips it in the browser when the Kensington fallback is the map under
+    it, which is a runtime decision about which map answered. So this is read
+    from one place, and the block that inserts it declines unless the extent
+    being loaded is the one it declares -- a clipped copy in Postgres would be
+    the same clipping written a second time, in a second language, with
+    nothing to notice when the two stop agreeing.
+  */
+  const addressIndex = JSON.parse(
+    await readFile(path.join(BUNDLED.dir, 'addresses.json'), 'utf8'),
+  ) as PackedIndex & Artefact;
+
   const counted: Record<string, number> = {};
   const count = (table: string, n: number) => {
     counted[table] = n;
@@ -255,7 +272,13 @@ export async function load(
       (s as unknown as { last_modified?: string }).last_modified ?? null,
     ]);
   }
-  for (const s of [flood.source, flood.geographySource, trace.source, population.source]) {
+  for (const s of [
+    flood.source,
+    flood.geographySource,
+    trace.source,
+    population.source,
+    addressIndex.source,
+  ]) {
     if (!s) continue;
     sources.set(s.dataset_id, [
       s.dataset_id,
@@ -685,6 +708,91 @@ export async function load(
     }
   }
   count('population', populationRows);
+
+  // --- The address index ----------------------------------------------------
+
+  /*
+    **Addresses are loaded only for the extent that publishes them.**
+
+    `addresses.json` declares `city-of-melbourne`, and a load of Kensington
+    leaves these two tables empty rather than clipping into them. The site has
+    the bundled index for that case and already clips it on the way in; see
+    where it is read, above.
+
+    A database holding one extent's addresses under another extent's id is the
+    failure this guard exists for, and it is not theoretical -- `unpack` exists
+    because an unshifted index put every pin 1.5 km west and 6 km south of the
+    house, on a real street, inside the map.
+  */
+  if (addressIndex.area === EXTENT) {
+    const index = unpack(addressIndex, need(addressIndex.extent, 'an extent on the address index'));
+    const addressDataset = need(
+      (addressIndex.source as { dataset_id?: string } | undefined)?.dataset_id,
+      'a source on the address index',
+    );
+
+    /*
+      One statement, nine arrays, and a column-at-a-time shape nothing else in
+      this loader uses.
+
+      **It is here because the obvious version was measured and was too
+      slow.** A row-at-a-time insert put the council load past the sixty
+      seconds `both.test.ts` allows for swapping the extents in both
+      directions. Batching into multi-row `VALUES` did not rescue it either:
+      62,397 rows in batches of 500 is 125 statements carrying 5,500
+      placeholders each, and Postgres parses every one of them from scratch
+      -- the cost was never the round trips.
+
+      `unnest` moves the rows out of the statement and into its parameters.
+      The text is fixed, so it is parsed once; the arrays are sent as
+      parameters, as every other value in this file is. `extent_id` and
+      `dataset_id` are scalars rather than arrays because they are the same
+      for all 62,397 rows, and repeating them 62,397 times to satisfy a
+      symmetry nobody reads is a megabyte of nothing.
+    */
+    const column = <T>(pick: (address: (typeof index.addresses)[number]) => T): T[] =>
+      index.addresses.map(pick);
+
+    await client.query(
+      `INSERT INTO address (id, extent_id, label, number, street, suburb, e_m, n_m, at_pos, label_norm, dataset_id)
+       SELECT id, $1, label, number, street, suburb, e_m, n_m, at_pos, label_norm, $2
+         FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::text[],
+                     $8::double precision[], $9::double precision[], $10::int[], $11::text[])
+           AS t(id, label, number, street, suburb, e_m, n_m, at_pos, label_norm)`,
+      [
+        EXTENT,
+        addressDataset,
+        column((a) => a.id),
+        column((a) => a.label),
+        column((a) => a.number),
+        column((a) => a.street),
+        column((a) => a.suburb),
+        column((a) => a.e),
+        column((a) => a.n),
+        column((a) => a.at),
+        column((a) => normalise(a.label)),
+      ],
+    );
+    count('address', index.addresses.length);
+
+    /*
+      The published street list, which is wider than the streets the addresses
+      mention and is the signal AC 1.1.8 turns on. `006_address.sql` says why
+      it is a table of its own rather than a DISTINCT over `address.street`.
+
+      `ON CONFLICT` because the list is published per extent and a street may
+      appear in it twice; the same shape as the addresses above, for the same
+      reason, over a much smaller list.
+    */
+    const streets = index.streets ?? [];
+    await client.query(
+      `INSERT INTO address_street (extent_id, name)
+       SELECT $1, name FROM unnest($2::text[]) AS t(name)
+       ON CONFLICT (extent_id, name) DO NOTHING`,
+      [EXTENT, [...streets]],
+    );
+    count('address_street', streets.length);
+  }
 
   return counted;
 }

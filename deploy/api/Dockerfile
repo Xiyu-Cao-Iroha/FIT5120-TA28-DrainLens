@@ -80,17 +80,24 @@ COPY db/migrations db/migrations
 # `db/migrations` the same way. Flattening this image would break both at run
 # time and neither at build time.
 #
-# Six files, not the directory: `scene/` is 8 MB of terrain the browser reads
-# and the loader never opens, and `addresses.json` is never meant to leave the
-# browser. **A file the loader reads and this list forgets is a load that fails
-# inside a Cloud Run job**, which is the slowest place in this project to find
-# anything out.
+# Seven files, not the directory: `scene/` is 8 MB of terrain the browser
+# reads and the loader never opens. **A file the loader reads and this list
+# forgets is a load that fails inside a Cloud Run job**, which is the slowest
+# place in this project to find anything out.
+#
+# > **`addresses.json` joined this list on 9 October**, and the line it used
+# > to carry here said it was *never meant to leave the browser*. That was
+# > the product's position and the team withdrew it: the address search is
+# > served from Postgres now, with the bundled copy as the fallback, and the
+# > two sentences on screen that promised otherwise were rewritten in the
+# > same change. `db/migrations/006_address.sql` carries the decision.
 COPY apps/web/public/data/map.json \
      apps/web/public/data/derived.json \
      apps/web/public/data/trace.json \
      apps/web/public/data/flood-history.json \
      apps/web/public/data/sa2-areas.json \
      apps/web/public/data/population.json \
+     apps/web/public/data/addresses.json \
      apps/web/public/data/
 
 # The council extent, which is what the migration job loads when it is given

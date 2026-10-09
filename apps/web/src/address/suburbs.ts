@@ -13,7 +13,7 @@
  * suburb and are left out of the line, not listed as a blank.
  */
 
-import type { AddressIndex } from './search.js';
+import type { AddressIndex } from '@drainlens/address';
 
 /** Held per index: the council index is 62,397 addresses, and this runs on render. */
 const SUBURBS = new WeakMap<AddressIndex, readonly string[]>();

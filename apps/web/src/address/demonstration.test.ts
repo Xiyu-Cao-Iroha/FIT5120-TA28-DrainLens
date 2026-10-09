@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEMONSTRATION_LABEL, demonstrationAddress } from './demonstration.js';
-import type { AddressIndex, IndexedAddress } from './search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 
 const at = (id: string, label: string, e = 500, n = 500): IndexedAddress => {
   const [number = '', ...rest] = label.split(' ');
@@ -90,7 +90,7 @@ describe('the comparison’s own offer', () => {
   it('names a published address the comparison can show a difference for', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { COMPARE_DEMONSTRATION_LABEL } = await import('./demonstration.js');
     const { comparableNear } = await import('../scenario/eligibility.js');
     const { differingDrains } = await import('../scenario/differences.js');
@@ -148,7 +148,7 @@ describe('the three example addresses', () => {
   it('offers three guide addresses on the bundled map, each centred and near a pit with a path', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
     const { chooseTeachingPit } = await import('../tutorial/pit.js');
     const data = (name: string): unknown =>
@@ -168,7 +168,7 @@ describe('the three example addresses', () => {
   it('offers three comparison addresses on the council map, each opening on a drain that shows a difference', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { COMPARE_DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
     const { comparableNear } = await import('../scenario/eligibility.js');
     const { differingDrains } = await import('../scenario/differences.js');

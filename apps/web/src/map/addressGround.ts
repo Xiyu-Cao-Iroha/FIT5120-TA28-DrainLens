@@ -18,7 +18,7 @@
  * descend.
  */
 
-import { idOf, labelOf } from '../address/search.js';
+import { idOf, labelOf } from '@drainlens/address';
 import { type Compass, type WaterNearby, describe as describeWater } from './nearby.js';
 
 export type GroundTrend =
