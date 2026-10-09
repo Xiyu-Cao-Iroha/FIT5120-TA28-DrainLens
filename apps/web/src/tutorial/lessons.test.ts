@@ -145,16 +145,25 @@ describe.each(written)('%s', (id, lesson) => {
   it('keeps to the audit writing rules', () => {
     /*
      * Copy audit v2, appendix A: an instruction is one sentence of at most 16
-     * words; the feedback after a correct press starts with praise and stays
-     * within 13 words; no em dashes; the finish page says well done.
+     * words; the feedback after a correct press stays within 13; no em
+     * dashes; the finish page says well done.
      *
-     * **Twelve until 2 October, when Iteration 3's design supplied a thirteenth
-     * word worth having.** The drainage-area guide's second step is the
-     * design's own sentence — *Great! Rain inside this line is recorded as
-     * draining to the same place* — and the word that takes it over twelve is
-     * *recorded*, which is the hedge: without it the guide tells a resident
-     * where their rain goes rather than what the record says about it. The cap
-     * exists to keep feedback short, not to trade accuracy for a word count.
+     * **The praise opener was a rule here until 10 October and is not one
+     * now.** It required `Great`, `Nice` or `Good`, and the comment that
+     * stood here said the drainage-area guide's second step was *the
+     * design's own sentence, Great! Rain inside this line is recorded as
+     * draining to the same place*. That was wrong twice over. Figma D2
+     * reads *Rain inside this line is recorded as draining to the
+     * Kensington West Main Drain*: no praise, and it names the drain. The
+     * opener was mine, this rule enforced it, and this comment credited it
+     * to a design that does not use it.
+     *
+     * The three older guides still open their feedback that way and nothing
+     * here stops them. Whether they should is a question for the wording
+     * audit the team has asked for, not one to settle by regular expression.
+     *
+     * What is still checked is what the cap was for: feedback is short, an
+     * instruction is one sentence, and neither carries an em dash.
      *
      * The ground height guide's finish page is its design's (Figma Terrain
      * Tutorial, frame 10): a *Guide complete* chip and a heading, not the
@@ -168,8 +177,10 @@ describe.each(written)('%s', (id, lesson) => {
         expect(words(step.prompt)).toBeLessThanOrEqual(16);
         expect(step.prompt).not.toMatch(/^Select\b/);
       } else if (isPressFeedback(lesson.steps[at - 1])) {
-        expect(step.prompt).toMatch(/^(Great|Nice|Good)\b/);
         expect(words(step.prompt)).toBeLessThanOrEqual(13);
+        // Feedback states what happened. A question here is a step still
+        // asking, which is what the `do` step before it was for.
+        expect(step.prompt).not.toMatch(/\?$/);
       }
     });
     if (lesson.finished.badge === undefined) {
@@ -256,8 +267,10 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, placesReviewed: state.placesReviewed + 1 });
     case 'why-opened':
       return latch(state, { ...state, whyOpen: true });
-    case 'roles-opened':
-      return latch(state, { ...state, rolesOpened: true });
+    case 'report-opened':
+      return latch(state, { ...state, reportOpened: true });
+    case 'problem-chosen':
+      return latch(state, { ...state, problemChosen: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'terrain-off':
