@@ -395,7 +395,8 @@ function Nothing() {
           color: ink.strong,
         }}
       >
-        Click an area to see its flood history.
+        Click on a <strong style={{ color: brand.ink }}>suburb on the map</strong> to see the
+        flood history statistics
       </h2>
       <SourceLink id="history" />
     </div>

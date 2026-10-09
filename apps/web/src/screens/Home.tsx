@@ -37,7 +37,13 @@
  * the area map, and the picture opens that map; the comparison is a feature
  * with a figure, like the hero, and its button goes straight to the address
  * search. The street photograph behind the hero now stays behind the page
- * down to *How to use the map* — see `.home__backdrop` in `ui/base.css`.
+ * down to the limits note at the foot of the page, see `.home__backdrop`
+ * in `ui/base.css`.
+ *
+ * > **The page used to end with a *How to use the map* block of three steps,
+ * > removed on 10 October**: the navigation bar says where everything is, and
+ * > a numbered list telling somebody to open the map sat below the four
+ * > sections that each open it.
  */
 
 import { useState } from 'react';
@@ -59,7 +65,7 @@ import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
 import { CoverageBadge } from '../ui/Shell.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { FLOOD, FULL_MAP, TOTAL_RAINFALL } from '../ui/terms.js';
+import { FLOOD, FULL_MAP } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -79,7 +85,6 @@ export const SECTIONS = {
   paths: 'home-paths',
   flood: 'home-flood',
   compare: 'home-compare',
-  flow: 'home-flow',
   limits: 'home-limits',
 } as const;
 
@@ -151,33 +156,25 @@ export const PATHS: readonly {
     accent: WARNING_FILL,
   },
   {
-    // Iteration 3, Epic 6 (Figma, *Your drainage area*). Last, because it is
-    // about where the street's water goes rather than about the street.
+    /*
+      Iteration 3, Epic 6 (Figma, *Your drainage area*). Last, because it is
+      about where the street's water goes rather than about the street.
+
+      **The card says what the reader gets to do, not what the layer is
+      called** (team, 10 October). *Recorded subcatchment area* is the name
+      of a boundary; it was the title of a card whose whole purpose is
+      reporting a problem to the right organisation, and a first-time reader
+      had to already know what a subcatchment was to guess that. The chip on
+      the map keeps the layer's name, because there it names a layer.
+    */
     mode: 'drainage-area',
-    title: 'Recorded subcatchment area',
+    title: 'Report a drainage problem',
     body:
-      'See the recorded subcatchment boundary for this address and its receiving drain or waterway.',
+      'Choose the issue, find the right contact, and copy or print the details to send yourself.',
     accent: BOUNDARY_STROKE,
   },
 ];
 
-/**
- * Three steps, one short action each (copy audit v2, #10).
- *
- * The third step used to say where each layer's data comes from, which is not
- * something to do; the map legend's source groups say that now.
- *
- * **The second step used to promise the address never left the device, and
- * from 9 October it does not.** The search is answered by the API, against
- * the same council addresses in Postgres; what is still true, and is what the
- * step now says, is that nothing is kept -- no account, no row, no log line.
- * `packages/address/src/lookup.ts` carries the decision and what it cost.
- */
-const STEPS: readonly { readonly title: string; readonly body?: string }[] = [
-  { title: 'Open the map' },
-  { title: 'Search your address', body: 'Your address is not saved or linked to you.' },
-  { title: 'Turn on the layers you want to see' },
-];
 
 
 export interface HomeProps {
@@ -242,7 +239,6 @@ export function Home({
         />
         <CompareSection onCompare={onCompare} />
       </div>
-      <Flow />
       <Limits />
     </div>
   );
@@ -474,7 +470,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
             className="home__title"
             style={{ margin: `0 0 ${String(space(4))}px`, color: ON_PHOTO.title }}
           >
-            Understand how water moves through your neighbourhood.
+            Explore your street. Prepare for heavy rain.
           </h1>
           <p
             style={{
@@ -484,8 +480,9 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Search your address to see nearby street drains, how the ground slopes and where rain
-            may flow.
+            See recorded drains, connected pipes and possible rainwater paths together on one
+            map. Review a before-rain plan for your address. If you spot a drainage problem,
+            gather the details and find the right contact to report it.
           </p>
 
           {/*
@@ -1209,12 +1206,27 @@ function FloodMapCard({
             At least (+)
           </span>
         </span>
+        {/*
+          Reported twice: a text link where the design has a filled button.
+
+          It is drawn as a `span` rather than a `button` on purpose, because
+          the whole card is already the button and nesting one inside another
+          is invalid HTML that browsers silently repair by moving it out. So
+          it takes the filled button's shape without being a control: the
+          card remains the one thing that is pressed, and `aria-hidden` keeps
+          a screen reader from announcing a second target that is not there.
+        */}
         <span
+          aria-hidden
           style={{
-            display: 'block',
+            display: 'inline-flex',
+            alignItems: 'center',
             marginTop: space(4),
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            borderRadius: radius.base,
+            background: brand.base,
             font: type(text.label, { weight: weight.semibold }),
-            color: brand.ink,
+            color: ink.inverse,
           }}
         >
           Open the area map →
@@ -1254,12 +1266,12 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
       <div className="home__feature">
         <BlockedDrainFigure />
         <div>
-          <Eyebrow onPhoto>What-if comparison</Eyebrow>
+          <Eyebrow onPhoto>Clear vs blocked</Eyebrow>
           <h2
             className="home__section-title"
             style={{ margin: `${String(space(3))}px 0`, color: ON_PHOTO.title }}
           >
-            Could one blocked drain change where water collects?
+            Clear or blocked: would rainwater collect in different places?
           </h2>
           <p
             style={{
@@ -1269,9 +1281,11 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Compare the same {TOTAL_RAINFALL.toLowerCase()} with a nearby drain clear and blocked.
+            Choose a nearby street drain and compare it clear and blocked with the same amount
+            of rain. See whether water builds up more, collects somewhere new, or shows no
+            visible difference.
           </p>
-          <PrimaryButton label="Check an address →" onPress={onCompare} />
+          <PrimaryButton label="Compare a nearby drain →" onPress={onCompare} />
           <p
             style={{
               margin: `${String(space(3))}px 0 0`,
@@ -1279,64 +1293,11 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.quiet,
             }}
           >
-            Most drains show no visible change nearby.
+            This is a modelled comparison, not a check of the drain's current condition or a
+            flood forecast.
           </p>
         </div>
       </div>
-    </Band>
-  );
-}
-
-function Flow() {
-  return (
-    <Band tone="tint" id={SECTIONS.flow}>
-      <SectionHeading
-        title="How to use the map"
-      />
-      <ol
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'grid',
-          gap: space(8),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        }}
-      >
-        {STEPS.map((step, index) => (
-          <li key={step.title}>
-            <span
-              aria-hidden
-              style={{
-                display: 'grid',
-                placeItems: 'center',
-                width: 30,
-                height: 30,
-                borderRadius: radius.pill,
-                background: ink.strong,
-                color: ink.inverse,
-                font: type(text.label, { weight: weight.semibold, leading: 1 }),
-              }}
-            >
-              {index + 1}
-            </span>
-            <h3
-              style={{
-                margin: `${String(space(3))}px 0 ${String(space(2))}px`,
-                font: type(text.body, { weight: weight.semibold, leading: 1.35 }),
-                color: ink.strong,
-              }}
-            >
-              {step.title}
-            </h3>
-            {step.body !== undefined && (
-              <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-                {step.body}
-              </p>
-            )}
-          </li>
-        ))}
-      </ol>
     </Band>
   );
 }
