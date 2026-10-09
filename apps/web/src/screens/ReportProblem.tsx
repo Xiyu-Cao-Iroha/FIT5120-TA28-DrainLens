@@ -33,7 +33,6 @@ import {
   type ProblemId,
   RECOMMENDED_INFORMATION,
   problemFor,
-  whatToInclude,
 } from '../report/problems.js';
 import { VICEMERGENCY } from '../prepare/actions.js';
 import {
@@ -44,11 +43,11 @@ import {
   placeNotice,
   pinnedLink,
 } from '../report/place.js';
-import { reportSummary, summaryHtml, summaryText } from '../report/summary.js';
+import { type ReportWhere, reportSummary, summaryHtml, summaryText } from '../report/summary.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 export function ReportProblem({
-  address,
+  where,
   place,
   chosen,
   onChoose,
@@ -72,8 +71,15 @@ export function ReportProblem({
    * street drain* because the frame does, and any of the five answers it.
    */
   readonly pulse?: boolean | undefined;
-  /** As the reader chose it, or null where they are reading without one. */
-  readonly address: string | null;
+  /**
+   * The street, the suburb and the drainage area. Never the house number.
+   *
+   * `whereLine` says why the number is not here: this page goes to a council
+   * officer about a drain in a public street, and the reporter's front door
+   * is the one identifying thing in the summary that nothing downstream
+   * needs.
+   */
+  readonly where: ReportWhere;
   /** A drain they tapped or a point they pinned. Never the nearest one. */
   readonly place: ReportPlace;
   /** Hand the map over so they can tap a drain or put a pin (Figma R1). */
@@ -142,8 +148,7 @@ export function ReportProblem({
   }
 
   const problem = problemFor(chosen);
-  const summary = reportSummary(address, problem, place, new Date());
-  const items = whatToInclude(address, place);
+  const summary = reportSummary(where, problem, place, new Date());
   const notice = placeNotice(place);
 
   return (
@@ -238,10 +243,17 @@ export function ReportProblem({
           </p>
 
           <Heading>{RECOMMENDED_INFORMATION}</Heading>
+          {/*
+            The same array the printed page and the clipboard are built from.
+
+            It used to be a second list, `whatToInclude`, which said the same
+            four things in the same order and could stop saying them in the
+            same order without anything noticing.
+          */}
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {items.map((item) => (
+            {summary.fields.map((item) => (
               <li key={item.id} style={{ marginBottom: space(2) }}>
-                <Include title={item.title} detail={item.detail} />
+                <Include title={item.label} detail={item.value} note={item.note} />
                 {item.id === 'drain' && (
                   <span style={{ display: 'block', marginLeft: 26 }}>
                     {place === null
@@ -326,7 +338,16 @@ export function ReportProblem({
  * things whatever the reader does. A bullet says *read this*, which is what
  * it is for.
  */
-function Include({ title, detail }: { readonly title: string; readonly detail: string }) {
+function Include({
+  title,
+  detail,
+  note,
+}: {
+  readonly title: string;
+  readonly detail: string;
+  /** A quieter second line, where a field needs one. */
+  readonly note?: string | undefined;
+}) {
   return (
     <span style={{ display: 'flex', gap: space(2), alignItems: 'flex-start' }}>
       <span
@@ -345,6 +366,9 @@ function Include({ title, detail }: { readonly title: string; readonly detail: s
           {title}
         </span>
         <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>{detail}</span>
+        {note !== undefined && (
+          <span style={{ display: 'block', font: type(text.micro), color: ink.subtle }}>{note}</span>
+        )}
       </span>
     </span>
   );

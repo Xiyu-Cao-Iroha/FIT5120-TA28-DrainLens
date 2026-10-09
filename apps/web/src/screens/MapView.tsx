@@ -1787,7 +1787,16 @@ export function MapView({
         {panel && viewport !== null && reportOpen && (
           <MapNote title={REPORT_HEADING}>
             <ReportProblem
-              address={address?.label ?? null}
+              /*
+                The street and the suburb, from the index entry rather than
+                from the label. `whereLine` says why the house number does
+                not travel with a report.
+              */
+              where={{
+                street: yourAddress?.street ?? null,
+                suburb: yourAddress?.suburb ?? null,
+                area: area?.displayName ?? null,
+              }}
               place={reportPlace}
               chosen={reportProblem}
               onChoose={setReportProblem}

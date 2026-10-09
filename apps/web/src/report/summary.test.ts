@@ -3,97 +3,171 @@
  *
  * Short enough to read out over the telephone, because three of the five
  * channels are a telephone call, and carrying only what the reader chose: a
- * drain line appears if they picked one on the map and not otherwise.
+ * drain line names one if they picked it on the map and says so otherwise.
+ *
+ * **The house number is the thing it must not hold.** That is the team's
+ * instruction of 10 October and the assertions for it are first, because a
+ * change that quietly puts it back would otherwise only be caught by
+ * somebody reading a printout.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { problemFor, whatToInclude } from './problems.js';
 import type { ReportPlace } from './place.js';
-import { NO_ADDRESS, YOURS_TO_KEEP, reportSummary, summaryHtml, summaryText } from './summary.js';
+import { problemFor } from './problems.js';
+import {
+  NO_ADDRESS,
+  PHOTOS_ATTACH,
+  type ReportWhere,
+  reportSummary,
+  summaryHtml,
+  summaryText,
+  whereLine,
+} from './summary.js';
 
 const ON = new Date(2026, 9, 3);
-const ADDRESS = '46 Gatehouse Drive, Kensington';
+const WHERE: ReportWhere = {
+  street: 'Gatehouse Drive',
+  suburb: 'Kensington',
+  area: 'Maribyrnong River (Lower)',
+};
 const drain = (...assetNumbers: readonly string[]): ReportPlace => ({
   kind: 'drain',
   drains: assetNumbers.map((assetNumber) => ({ assetNumber, street: null, distanceM: 20 })),
 });
-const summary = (place: ReportPlace = null, id: 'blocked-drain' | 'emergency' = 'blocked-drain') =>
-  reportSummary(ADDRESS, problemFor(id), place, ON);
+const summary = (
+  place: ReportPlace = null,
+  id: 'blocked-drain' | 'emergency' = 'blocked-drain',
+  where: ReportWhere = WHERE,
+) => reportSummary(where, problemFor(id), place, ON);
 
-describe('what the summary holds', () => {
-  it('holds the address, the day, the problem and who to contact', () => {
-    const made = summary();
-    expect(made.address).toBe(ADDRESS);
-    expect(made.preparedOn).toBe('Prepared on 3 October 2026');
-    expect(made.problem).toBe('Blocked or flooded street drain');
-    expect(made.contacts[0]).toMatch(/^City of Melbourne/);
+/** Every string the summary can put in front of a council officer. */
+const everything = (where: ReportWhere = WHERE, place: ReportPlace = null): string =>
+  [summaryText(summary(place, 'blocked-drain', where)), summaryHtml(summary(place, 'blocked-drain', where))].join(
+    '\n',
+  );
+
+describe('the house number never leaves', () => {
+  it('is not in the text, the page, or any field', () => {
+    // The number is not even an input: `ReportWhere` has no field for it,
+    // which is the point. This guards the two renderers against a future
+    // one being handed a full label by a caller that still has it.
+    const text = everything();
+    expect(text).not.toMatch(/\b46\b/);
+    expect(text).toContain('Gatehouse Drive, Kensington');
   });
 
-  it('holds the checklist, in the order the reader will use it', () => {
-    expect(summary().checklist).toEqual(
-      whatToInclude(ADDRESS, null).map((item) => `${item.title}: ${item.detail}`),
-    );
-    expect(summary().checklist[0]).toBe(`Location: ${ADDRESS}`);
+  it('keeps the street and the suburb together, and the suburb optional', () => {
+    expect(whereLine('Gatehouse Drive', 'Kensington')).toBe('Gatehouse Drive, Kensington');
+    expect(whereLine('Lorimer Street', null)).toBe('Lorimer Street');
+    expect(whereLine('Lorimer Street', '')).toBe('Lorimer Street');
   });
 
-  it('says the copy is the reader’s and that nothing is kept', () => {
-    expect(summary().keepLine).toBe(YOURS_TO_KEEP);
-    expect(YOURS_TO_KEEP).toMatch(/keeps nothing/);
+  it('says so rather than printing an empty line when there is no street', () => {
+    expect(whereLine(null, 'Kensington')).toBe(NO_ADDRESS);
+    expect(whereLine('  ', 'Kensington')).toBe(NO_ADDRESS);
+    expect(everything({ street: null, suburb: null, area: null })).toContain(NO_ADDRESS);
   });
 });
 
-describe('reading the map without an address', () => {
-  it('says so rather than printing an empty line', () => {
-    // The full map can be read without one, and a blank field on paper reads
-    // as something somebody forgot to fill in.
-    expect(reportSummary(null, problemFor('waterway'), null, ON).address).toBe(NO_ADDRESS);
-    expect(reportSummary('', problemFor('waterway'), null, ON).address).toBe(NO_ADDRESS);
-    expect(NO_ADDRESS).toMatch(/Give the location when you contact them/);
+describe('what the summary holds', () => {
+  it('shows the fields in the order the team listed them', () => {
+    expect(summary().fields.map((field) => field.id)).toEqual([
+      'when',
+      'where',
+      'area',
+      'drain',
+      'problem',
+      'photos',
+    ]);
+  });
+
+  it('fills in what the product already knows', () => {
+    const by = Object.fromEntries(summary(drain('PIT-1')).fields.map((f) => [f.id, f.value]));
+    expect(by.when).toMatch(/^Prepared on /);
+    expect(by.where).toBe('Gatehouse Drive, Kensington');
+    expect(by.area).toBe('Maribyrnong River (Lower)');
+    expect(by.problem).toBe('Blocked or flooded street drain');
+    expect(by.drain).toContain('PIT-1');
+  });
+
+  it('says the drainage area is not recorded rather than leaving it blank', () => {
+    // AC 6.1.5: an address no recorded area contains says so, and is never
+    // given a neighbour's.
+    const none = summary(null, 'blocked-drain', { ...WHERE, area: null });
+    expect(none.fields.find((f) => f.id === 'area')?.value).toBe('Not recorded for this street');
+  });
+
+  it('tells the reader the photographs are theirs to attach', () => {
+    const photos = summary().fields.find((field) => field.id === 'photos');
+    expect(photos?.note).toBe(PHOTOS_ATTACH);
+    expect(summaryText(summary())).toContain(PHOTOS_ATTACH);
+  });
+
+  it('no longer claims the copy is kept by nobody', () => {
+    // Removed on 10 October: the line was true and it was the last thing on
+    // the page, under a report the reader is about to send to a council.
+    expect(everything()).not.toMatch(/keeps nothing once you close this tab/);
+  });
+
+  it('holds who to contact, the first one first', () => {
+    expect(summary().contacts[0]).toContain('City of Melbourne');
+    expect(summary(null, 'emergency').contacts[0]).toContain('000');
   });
 });
 
 describe('the drain, which is the reader’s to add', () => {
   it('names it only where one was selected', () => {
-    expect(summary(drain('PIT-9001')).checklist).toContain('Which drain: Selected recorded drain: PIT-9001');
-    expect(summaryText(summary())).not.toMatch(/Selected recorded drain/);
-    expect(summaryText(summary())).toMatch(/Which drain: Not chosen/);
+    const picked = summary(drain('PIT-1')).fields.find((f) => f.id === 'drain');
+    expect(picked?.value).toContain('PIT-1');
+
+    const none = summary().fields.find((f) => f.id === 'drain');
+    expect(none?.value).not.toContain('PIT-');
+  });
+
+  it('names every one of several', () => {
+    const value = summary(drain('PIT-1', 'PIT-2')).fields.find((f) => f.id === 'drain')?.value ?? '';
+    expect(value).toContain('PIT-1');
+    expect(value).toContain('PIT-2');
   });
 });
 
 describe('the two ways it leaves the screen', () => {
   it('reads as plain text for the clipboard', () => {
-    const text = summaryText(summary(drain('PIT-9001')));
-    expect(text.startsWith('Report a problem\n46 Gatehouse Drive, Kensington')).toBe(true);
-    expect(text).toContain('Problem: Blocked or flooded street drain');
-    expect(text).toContain('- Which drain: Selected recorded drain: PIT-9001');
-    expect(text).not.toMatch(/<[a-z]/);
+    const text = summaryText(summary(drain('PIT-1')));
+    expect(text.startsWith('Report a problem')).toBe(true);
+    expect(text).toContain('Street: Gatehouse Drive, Kensington');
+    expect(text).toContain('Who to contact:');
   });
 
   it('prints as one self-contained page with no fetch to make', () => {
-    const page = summaryHtml(summary(null, 'emergency'));
-    expect(page.startsWith('<!doctype html>')).toBe(true);
-    expect(page).not.toMatch(/<link|<script|src=/);
-    expect(page).toContain('Flood or storm emergency');
-    expect(page).toContain('000');
-    // The printed copy still carries the two numbers, because it is the thing
-    // a reader may be holding when the screen is not in front of them.
-    expect(page).toContain('132 500');
+    const html = summaryHtml(summary(drain('PIT-1')));
+    expect(html.startsWith('<!doctype html>')).toBe(true);
+    expect(html).not.toMatch(/<(script|img|link)\b/);
+    expect(html).not.toMatch(/https?:\/\/(?!www\.openstreetmap)/);
+  });
+
+  it('escapes what it prints, because a street name is somebody else’s text', () => {
+    const html = summaryHtml(
+      summary(null, 'blocked-drain', { ...WHERE, street: 'O<script>alert(1)</script> Street' }),
+    );
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
   });
 });
 
 describe('a pinned place, which is a point as well as a sentence', () => {
   const pinned = (note: string) =>
-    reportSummary(ADDRESS, problemFor('blocked-drain'), {
-      kind: 'pin',
-      note,
-      at: { eastingM: 316500, northingM: 5814500 },
-    }, ON);
+    reportSummary(
+      WHERE,
+      problemFor('blocked-drain'),
+      { kind: 'pin', note, at: { eastingM: 316500, northingM: 5814500 } },
+      ON,
+    );
 
   it('carries the words that make it findable', () => {
-    expect(pinned('Outside number 50, near the corner').checklist).toContain(
-      'Drain location: Pinned on the map · Outside number 50, near the corner',
-    );
+    const value = pinned('Outside number 50, near the corner').fields.find((f) => f.id === 'drain')?.value;
+    expect(value).toBe('Pinned on the map · Outside number 50, near the corner');
   });
 
   it('carries a map link the reader can send on, built here', () => {
