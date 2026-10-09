@@ -165,13 +165,17 @@ export const PATHS: readonly {
  * Three steps, one short action each (copy audit v2, #10).
  *
  * The third step used to say where each layer's data comes from, which is not
- * something to do; the map legend's source groups say that now. The privacy promise stays
- * in the second step because the code keeps it: the address index is searched
- * on the device and the address is written nowhere.
+ * something to do; the map legend's source groups say that now.
+ *
+ * **The second step used to promise the address never left the device, and
+ * from 9 October it does not.** The search is answered by the API, against
+ * the same council addresses in Postgres; what is still true, and is what the
+ * step now says, is that nothing is kept -- no account, no row, no log line.
+ * `packages/address/src/lookup.ts` carries the decision and what it cost.
  */
 const STEPS: readonly { readonly title: string; readonly body?: string }[] = [
   { title: 'Open the map' },
-  { title: 'Search your address', body: 'Your address stays on your device.' },
+  { title: 'Search your address', body: 'Your address is not saved or linked to you.' },
   { title: 'Turn on the layers you want to see' },
 ];
 
