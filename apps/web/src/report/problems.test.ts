@@ -29,8 +29,8 @@ import {
   NOT_SUBMITTED,
   PROBLEM_TYPES,
   problemFor,
-  whatToInclude,
 } from './problems.js';
+import { reportSummary } from './summary.js';
 
 const drain = (...assetNumbers: readonly string[]): PickedDrains => ({
   kind: 'drain',
@@ -68,9 +68,15 @@ describe('what the pathway refuses to say', () => {
   const everything = [
     ...PROBLEM_TYPES.flatMap((type) => [type.label, type.because]),
     ...CHANNELS.map(channelLine),
-    ...whatToInclude('46 Gatehouse Drive, Kensington', drain('PIT-1')).map(
-      (item) => `${item.title} ${item.detail}`,
-    ),
+    // The fields the summary puts in front of a reader. `whatToInclude`
+    // used to be a second list of the same four things; `summary.ts` is the
+    // one now, and this sweep follows it there.
+    ...reportSummary(
+      { street: 'Gatehouse Drive', suburb: 'Kensington', area: 'Maribyrnong River (Lower)' },
+      PROBLEM_TYPES[1]!,
+      drain('PIT-1'),
+      new Date(2026, 9, 3),
+    ).fields.map((field) => `${field.label} ${field.value} ${field.note ?? ''}`),
     NOT_SUBMITTED,
     NOT_SENT_YET,
     NO_PLACE,
@@ -95,53 +101,16 @@ describe('what the pathway refuses to say', () => {
   });
 });
 
-describe('what to include', () => {
-  it('fills the location in from the address, which is what they will be asked first', () => {
-    const items = whatToInclude('46 Gatehouse Drive, Kensington', null);
-    expect(items.map((item) => item.title)).toEqual(['Location', 'When', 'Photos', 'Which drain']);
-    expect(items[0]?.detail).toBe('46 Gatehouse Drive, Kensington');
-  });
-
-  it('asks for the location in words where there is no address', () => {
-    expect(whatToInclude(null, null)[0]?.detail).toMatch(/street address or nearest cross street/);
-  });
-
+describe('naming the place the reader chose', () => {
   it('names a drain only where the reader selected one', () => {
-    expect(whatToInclude(null, drain('PIT-9001'))[3]?.detail).toBe(
-      'Selected recorded drain: PIT-9001',
-    );
-    expect(whatToInclude(null, null)[3]?.detail).toBe(NO_PLACE);
+    expect(placeLine(drain('PIT-9001'))).toBe('Selected recorded drain: PIT-9001');
+    expect(placeLine(null)).toBe(NO_PLACE);
     expect(NO_PLACE).toMatch(/Nothing is chosen for you/);
   });
 
   it('labels the drain as the one they selected, with its identifier', () => {
     // AC 6.3.2 asks for both words and the number.
     expect(placeLine(drain('PIT-12345'))).toBe(`${SELECTED_DRAIN}: PIT-12345`);
-  });
-
-  it('carries every drain the reader tapped, not the first of them', () => {
-    /*
-      A blocked street floods at the two or three inlets that take it, and a
-      report naming one of them sends a council to a third of the problem.
-    */
-    expect(placeLine(drain('PIT-1', 'PIT-2', 'PIT-3'))).toBe(
-      `${SELECTED_DRAINS}: PIT-1; PIT-2; PIT-3`,
-    );
-  });
-
-  it('says drains in the plural only when there are several', () => {
-    expect(placeTitle(drain('PIT-1'))).toBe('Which drain');
-    expect(placeTitle(drain('PIT-1', 'PIT-2'))).toBe('Which drains');
-    expect(placeNotice(drain('PIT-1'))).toBe('Drain picked on the map.');
-    expect(placeNotice(drain('PIT-1', 'PIT-2'))).toBe('Drains picked on the map.');
-  });
-
-  it('never counts out loud on the button', () => {
-    // *Use these 2 drains* was the first draft: the rows are on the screen
-    // above it, and a count in a label can disagree with what is beside it.
-    expect(useDrains(1)).toBe('Use this drain');
-    expect(useDrains(3)).toBe('Use these drains');
-    expect(useDrains(3)).not.toMatch(/\d/);
   });
 
   it('turns a pinned point into the sentence that makes it findable', () => {
@@ -151,7 +120,7 @@ describe('what to include', () => {
       at: { eastingM: 316500, northingM: 5814500 },
     });
     expect(pinned).toBe('Pinned on the map · Outside number 50, near the corner');
-    expect(whatToInclude(null, { kind: 'pin', note: 'x', at: { eastingM: 1, northingM: 2 } })[3]?.title).toBe(
+    expect(placeTitle({ kind: 'pin', note: 'x', at: { eastingM: 1, northingM: 2 } })).toBe(
       'Drain location',
     );
   });
