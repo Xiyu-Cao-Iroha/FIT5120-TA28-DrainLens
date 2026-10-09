@@ -176,9 +176,27 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
   {
     id: 'privacy',
     title: 'Your privacy and data licences',
-    summary: 'Your address stays on your device.',
+    summary: 'Your address is not saved or linked to you.',
     points: [
-      'Address search happens in your browser. Your address is not sent or saved, and it is forgotten when you close the tab.',
+      /*
+        **Rewritten on 9 October, when it stopped being true.**
+
+        It used to read *Address search happens in your browser. Your address
+        is not sent or saved, and it is forgotten when you close the tab.* The
+        first clause is now false: the search is answered by DrainLens's own
+        API, against the council's published addresses in a database. The rest
+        still holds, and saying so plainly is the point -- a privacy panel
+        that quietly drops a sentence it can no longer keep is worse than one
+        that never made it.
+
+        What is claimed here is checked and not aspirational: the request
+        carries the query and nothing else, the route writes no row, it
+        answers `no-store` and keeps no cache keyed on what was typed, and
+        Cloud Run's request log is excluded at the sink before entries are
+        written. `apps/api/test-db/address.test.ts` holds the first three.
+      */
+      'Your address is searched by DrainLens and is not kept: no account, no record of the search, and nothing written to our logs.',
+      'The report you print is not sent anywhere. It is made in your browser.',
       'Your progress through the guides is saved on this device only.',
     ],
     // The credits are rendered here from the loaded artefacts, so a replaced

@@ -330,6 +330,16 @@ Migrations **002** and **003** are new since the first deployment and are applie
 
 **Migration 004 arrived on 12 September**, after the deployment recorded below: `db/migrations/004_scope_areas.sql` widens the flood tables from the board's thirty areas to all 281 and keeps the thirty as the rows carrying a `board_rank`. The next execution of the job applies it the same way. Nothing on this page records that execution against Cloud SQL, so the counts in the logs below are from before it.
 
+> ### Migration 006 and the one ordering on this page that is not advice
+>
+> **`006_address.sql` must be applied, and the job must run, before the service is deployed.** Every other migration on this page could be applied in either order with nothing worse than stale rows: the routes existed and answered from whatever was there. This one adds `POST /api/addresses/search`, and a service on the new image against a database without an `address` table answers it **500**, with `42P01 relation "address" does not exist` in the log. The site falls back to its bundled index and keeps working, so the only symptom is a route that never succeeds and a resident who never knows -- which is the kind of failure this page exists to stop shipping.
+>
+> So for this deployment the sequence is: **build, run the job, then deploy the service.** The reverse order is not dangerous and is not quick to notice.
+>
+> It is also the first migration whose load reads an artefact the API image did not previously carry. `apps/web/public/data/addresses.json` was added to the `COPY` list in `deploy/api/Dockerfile` in the same change; an image built before that will fail the load with `ENOENT ... /app/apps/web/public/data/addresses.json`, which is the row already in the troubleshooting table for exactly this mistake.
+>
+> The load adds about **6.6 s** to a council load, measured: read 25 ms, unpack 267 ms, build the columns 94 ms, one `INSERT ... SELECT FROM unnest(...)` 6,169 ms. 62,397 addresses and 2,293 streets. Kensington loads neither -- the index declares the council and the loader declines rather than clipping, which `db/migrations/006_address.sql` explains.
+
 Build the image at the commit being deployed — on `develop` for Iteration 2, not `main`, which is frozen:
 
 ```bash
@@ -487,6 +497,7 @@ Nothing about the frontend deployment. The site asks the API for `city-of-melbou
 | `duplicate key value violates unique constraint "pit_pkey"` | An image built before `--replace` existed. Rebuild at a commit that has it rather than deleting rows by hand |
 | `ENOENT ... /app/apps/api/data/city-of-melbourne/map.json` | The image predates the committed council artefacts, or was built from a context that excluded them. `/data` is dockerignored and `apps/api/data` deliberately is not |
 | `ENOENT ... /app/apps/web/public/data/map.json` | The image was flattened. `load.ts` resolves the artefacts relative to its own file and `migrate.ts` resolves the migrations the same way; the layout under `/app` in `deploy/api/Dockerfile` is load-bearing, and it breaks at run time rather than at build time |
-| The build says `Building using Buildpacks` | Wrong command. This one is `gcloud builds submit --config=deploy/api/cloudbuild.yaml`; `--source=.` cannot see this Dockerfile |
+| The build says `Building using Buildpacks` | Wrong command. This one is `gcloud builds submit --config=deploy/api/cloudbuild.yaml`; `--source=.` cannot see this Dockerfile. **`gcloud run deploy drainlens-api --source=apps/api` fails the same way and looks different**: Buildpacks uploads only `apps/api`, so `npm ci` installs the nineteen runtime dependencies without the root workspace's TypeScript, and the build ends at `sh: 1: tsc: not found` |
+| `/api/addresses/search` answers 500, `42P01 relation "address" does not exist` | The service is on an image with migration 006 and the database is not. Run the migration job, then re-check; the service does not need redeploying. See *Migration 006* above for why this one is ordered |
 | Cloud Build cannot push, or cannot write logs | Newer projects build as the compute service account, which may need `roles/artifactregistry.writer` and `roles/logging.logWriter`. The error names the missing permission; grant that one rather than a wider role |
 | A connection error naming a socket path | The service or job is missing `--set-cloudsql-instances`, or the account is missing `roles/cloudsql.client`. Do not fix it by adding an authorized network — that opens the instance to the internet to solve an IAM problem |

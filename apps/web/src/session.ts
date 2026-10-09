@@ -282,9 +282,12 @@ export interface Session {
    *
    * Keyed by the place's number, 1 to 3. **In memory and nowhere else**: AC
    * 5.4.1 says the selections are kept for the current browser session only
-   * and are never sent to a server, and this is the same rule the address has
-   * lived under since Iteration 1 — nothing here reaches storage, the URL or
+   * and are never sent to a server — nothing here reaches storage, the URL or
    * a request.
+   *
+   * **The address used to live under this rule and since 9 October does
+   * not**: its search is answered by the API. These selections still do, and
+   * the criterion that says so is their own.
    *
    * Cleared whenever the address changes (AC 5.4.2), because the places are
    * renumbered for the new address and a selection made about Place 2 at one

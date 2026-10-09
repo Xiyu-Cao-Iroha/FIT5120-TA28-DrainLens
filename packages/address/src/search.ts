@@ -1,16 +1,31 @@
 /**
- * Finding an address in the pilot area, without asking anyone.
+ * Finding an address in the pilot area.
  *
- * The index ships with the site and the search runs against it in memory. That
- * is not a performance decision: a search box that calls a server sends every
- * keystroke of somebody's home address to it, and AD1 says this product has no
- * identity and wants none. **Nothing in this file may take a network.**
+ * **Nothing in this file takes a network**, and that has not changed. What
+ * changed on 9 October is why: it used to be the product's privacy posture,
+ * and it is now the shape of a package that runs in two processes. The browser
+ * matches against the bundled index; the API matches against the same
+ * addresses in Postgres. Neither can be handed a module that fetches.
+ *
+ * > **The index no longer only ships with the site.** Until 9 October a search
+ * > box that called a server was ruled out here, on the grounds that it sends
+ * > every keystroke of somebody's home address to it. That is still what it
+ * > does, and the product now says so where an address is typed rather than
+ * > promising it does not. `docs/DATABASE-DESIGN.md` carries the decision and
+ * > what it cost; the short version is that AD1 is about what is *held*, the
+ * > request log is excluded before it is written, and the stronger promise the
+ * > interface used to make was ours to make and ours to withdraw.
  *
  * The other half of the job is telling two failures apart. "We have no record
  * of that address" and "that address is real but outside the pilot area" are
  * different things to a resident, and AC 1.1.8 requires the second to be
  * explained rather than dressed up as the first — or worse, answered with a
  * nearby address they did not ask for.
+ *
+ * **That distinction is the reason this is a package and not two
+ * implementations.** The API answers first and the bundled index answers when
+ * it cannot, so one resident can meet both paths in one session; a ranking
+ * that differed between them would tell them two stories about one house.
  */
 
 /** One address the pilot area covers. */
@@ -402,7 +417,30 @@ export type Resolution =
  * about 46 is the failure the criterion exists to prevent.
  */
 export function resolve(index: AddressIndex, typed: string): Resolution {
-  const matches = search(index, typed);
+  return decide(search(index, typed), typed, () =>
+    namesAKnownStreet(index, normalise(typed)),
+  );
+}
+
+/**
+ * The verdict, given the matches and a way to ask about the street.
+ *
+ * **Split out of `resolve` on 9 October so the API reaches it too.** The
+ * browser has the whole index in memory and can scan it; the API has Postgres
+ * and asks it two narrower questions -- which addresses could match, and, only
+ * if none did, whether the street is one we publish. Those are different
+ * journeys to the same four answers, and the four answers are what a resident
+ * sees. Keeping the branching here is what stops the API and the fallback
+ * disagreeing about a house.
+ *
+ * `streetKnown` is a function rather than a boolean because the no-match
+ * branch is the only one that needs it, and on the API it is a second query.
+ */
+export function decide(
+  matches: readonly Match[],
+  typed: string,
+  streetKnown: () => boolean,
+): Resolution {
   if (matches.length === 1) return { kind: 'found', address: matches[0]!.address };
   if (matches.length > 1) {
     const [best, second] = matches;
@@ -413,9 +451,25 @@ export function resolve(index: AddressIndex, typed: string): Resolution {
     return { kind: 'ambiguous', matches };
   }
 
-  return namesAKnownStreet(index, normalise(typed))
+  return streetKnown()
     ? { kind: 'outside-pilot', typed }
     : { kind: 'not-an-address', typed };
+}
+
+/**
+ * Whether a published street name satisfies a query, for one name.
+ *
+ * `namesAKnownStreet` is this over the whole list. The API holds the list in
+ * Postgres and cannot scan it in JavaScript without fetching it, so the rule
+ * itself is exported and the API applies it to the rows it fetched.
+ */
+export function streetAnswers(name: string, query: string): boolean {
+  const street = normalise(name);
+  if (street.length === 0) return false;
+  // Either the query contains the whole street name, or every word of it —
+  // so "999 bangalore st" matches "Bangalore Street" once `st` is expanded.
+  if (query.includes(street)) return true;
+  return street.split(' ').every((word) => query.includes(word));
 }
 
 /**
@@ -431,13 +485,5 @@ export function namesAKnownStreet(index: AddressIndex, query: string): boolean {
   const streets =
     index.streets ?? index.addresses.map((address) => address.street);
 
-  for (const name of streets) {
-    const street = normalise(name);
-    if (street.length === 0) continue;
-    // Either the query contains the whole street name, or every word of it —
-    // so "999 bangalore st" matches "Bangalore Street" once `st` is expanded.
-    if (query.includes(street)) return true;
-    if (street.split(' ').every((word) => query.includes(word))) return true;
-  }
-  return false;
+  return streets.some((name) => streetAnswers(name, query));
 }

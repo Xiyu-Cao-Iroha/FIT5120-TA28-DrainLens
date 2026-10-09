@@ -29,14 +29,27 @@ import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import pg from 'pg';
 
+import { MAX_SUGGESTIONS } from '@drainlens/address';
+
 import {
   NotFound,
   derivedArtefact,
   floodHistoryArtefact,
   loaded,
   mapArtefact,
+  namesAStreet,
+  searchAddresses,
   traceArtefact,
 } from './queries.js';
+
+/**
+ * The extent the address route answers for unless told otherwise.
+ *
+ * The council is what the deployed database holds, and the only extent whose
+ * addresses are loaded at all -- `db/migrations/006_address.sql` says why
+ * Kensington's are not.
+ */
+const API_EXTENT = 'city-of-melbourne';
 
 /**
  * The Cloud Run services whose pages may read this API from a browser.
@@ -338,6 +351,59 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
   app.get('/api/flood-history', (c) =>
     answer(c, (client) => floodHistoryArtefact(client), ARTEFACT_CACHE, 'flood-history'),
   );
+
+  /*
+    Finding an address, which until 9 October this API had no route for.
+
+    **POST, with the query in the body, and that is not a REST quibble.** A
+    `GET /api/addresses?q=46+gatehouse+drive` puts somebody's home address in a
+    URL, and URLs go places bodies do not: browser history, the `Referer` on
+    the next request, and the access log of any proxy or CDN between here and
+    them. The Cloud Run request log is excluded at the sink, which covers this
+    hop and no other.
+
+    **No memo key and `no-store`.** `answer`'s cache is keyed by a string, and
+    the only string available here is what a resident typed -- a cache of home
+    addresses held in the process for five minutes. The artefact routes are
+    cached because they are the same council data for everyone; this one is
+    not, and the five minutes it would save is not worth the sentence it would
+    cost.
+  */
+  app.post('/api/addresses/search', async (c) => {
+    let body: { q?: unknown; extent?: unknown; limit?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'the request body is not JSON' }, 400);
+    }
+
+    const typed = typeof body.q === 'string' ? body.q : '';
+    if (typed.trim() === '') return c.json({ error: 'a query is required' }, 400);
+    // Long enough for the longest published label and nothing like a payload.
+    if (typed.length > 200) return c.json({ error: 'the query is too long' }, 400);
+
+    const extent = typeof body.extent === 'string' ? body.extent : API_EXTENT;
+    const limit =
+      typeof body.limit === 'number' && Number.isInteger(body.limit) && body.limit > 0
+        ? Math.min(body.limit, MAX_SUGGESTIONS)
+        : undefined;
+
+    return answer(
+      c,
+      async (client) => {
+        const found = await searchAddresses(client, extent, typed, limit);
+        // The street question is asked only where the verdict turns on it,
+        // which is the branch with no matches. `decide` was handed `false`
+        // for it; this is where the real answer is fetched and the verdict
+        // re-taken, so one round trip is saved on every other query.
+        if (found.kind !== 'not-an-address') return { ...found };
+        return (await namesAStreet(client, extent, typed))
+          ? { kind: 'outside-pilot', typed }
+          : { kind: 'not-an-address', typed };
+      },
+      'no-store',
+    );
+  });
 
   app.post('/api/chat', async (c) => {
     const aiServiceUrl = process.env.AI_SERVICE_URL;

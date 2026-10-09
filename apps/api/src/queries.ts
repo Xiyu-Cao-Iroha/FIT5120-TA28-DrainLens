@@ -14,6 +14,15 @@
  * what you query, jsonb for what you serve back untouched.
  */
 
+import {
+  type AddressIndex,
+  type IndexedAddress,
+  type Resolution,
+  decide,
+  normalise,
+  search,
+  streetAnswers,
+} from '@drainlens/address';
 import type pg from 'pg';
 
 import { decimetre, pitFeature } from './artefacts.js';
@@ -329,6 +338,109 @@ export async function floodHistoryArtefact(
  *
  * `scopeAreas` is the new number rather than a redefinition of the old one.
  */
+/**
+ * Resolve a typed address against the rows, reaching the browser's verdict.
+ *
+ * **The ranking is not reimplemented here and must never be.** `scoreOne` in
+ * `packages/address` decides which of two houses a resident meant, and the
+ * same resident can meet this route and the bundled fallback in one session --
+ * the API answers while the database is up and the container copy answers
+ * when it is not. Two rankings would be two answers about one house.
+ *
+ * So Postgres is asked only the question it is better at: *which rows could
+ * possibly match*, which is `scoreOne`'s own first rule -- every word of the
+ * normalised query appears in the normalised label, or the row scores -1 and
+ * is discarded. The rows that survive are scored and ordered by the shared
+ * matcher, over a handful of candidates instead of 62,397.
+ *
+ * The street list is a second query and only in the branch that needs it: it
+ * is asked when nothing matched, to tell *that address is real and outside
+ * the covered part* from *we have no record of that street* (AC 1.1.8).
+ *
+ * **Nothing about the query is kept.** No row is written, the route sets
+ * `no-store` and passes no memo key, and the request log is excluded at the
+ * sink before entries are written. See `db/migrations/006_address.sql`.
+ */
+export async function searchAddresses(
+  client: pg.ClientBase,
+  extent: string,
+  typed: string,
+  limit?: number,
+): Promise<Resolution> {
+  const query = normalise(typed);
+  if (query.length === 0) return { kind: 'not-an-address', typed };
+  const words = query.split(' ');
+
+  /*
+    One `LIKE` per word, ANDed. `label_norm` is already `normalise`d at load
+    time, so this is a plain substring test and not SQL's own idea of case or
+    punctuation -- which would admit a different candidate set than the
+    matcher scores, and quietly make the two paths disagree.
+
+    The words are parameters. `%` and `_` cannot arrive in them: `normalise`
+    keeps only `[a-z0-9/- ]`, and the two wildcards are not in that set.
+  */
+  const conditions = words
+    .map((_, i) => `label_norm LIKE $${String(i + 2)}`)
+    .join(' AND ');
+  const candidates = await client.query<{
+    id: string;
+    label: string;
+    number: string;
+    street: string;
+    suburb: string;
+    e_m: number;
+    n_m: number;
+    at_pos: number;
+  }>(
+    `SELECT id, label, number, street, suburb, e_m, n_m, at_pos
+       FROM address
+      WHERE extent_id = $1 AND ${conditions}`,
+    [extent, ...words.map((word) => `%${word}%`)],
+  );
+
+  const addresses: IndexedAddress[] = candidates.rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    number: row.number,
+    street: row.street,
+    suburb: row.suburb,
+    e: row.e_m,
+    n: row.n_m,
+    at: row.at_pos,
+  }));
+
+  // An index of only the candidates. `search` iterates `addresses` and scores
+  // each one; the rows it would have scored -1 are the rows the SQL left out.
+  const index: AddressIndex = { area: extent, addresses };
+
+  return decide(search(index, typed, limit), typed, () => false);
+}
+
+/**
+ * Whether the query names a street this extent publishes.
+ *
+ * Asked only when nothing matched. The names are fetched and tested with the
+ * shared rule rather than tested in SQL, because the rule expands street
+ * types -- "st" is "street" -- and a `LIKE` here would answer *we have no
+ * record of that street* to somebody who typed one.
+ *
+ * 2,293 names for the council, which is the whole table and a single scan.
+ */
+export async function namesAStreet(
+  client: pg.ClientBase,
+  extent: string,
+  typed: string,
+): Promise<boolean> {
+  const query = normalise(typed);
+  if (query.length === 0) return false;
+  const result = await client.query<{ name: string }>(
+    `SELECT name FROM address_street WHERE extent_id = $1`,
+    [extent],
+  );
+  return result.rows.some((row) => streetAnswers(row.name, query));
+}
+
 export async function loaded(
   client: pg.ClientBase,
 ): Promise<{ pits: number; areas: number; scopeAreas: number }> {

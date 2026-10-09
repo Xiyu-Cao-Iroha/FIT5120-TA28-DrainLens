@@ -16,7 +16,7 @@
  * box, not at the footer.
  */
 
-import { type AddressIndex } from './search.js';
+import { type AddressIndex } from '@drainlens/address';
 import { suburbsOf } from './suburbs.js';
 
 /** How many suburbs are listed before the sentence gets unreadable. */

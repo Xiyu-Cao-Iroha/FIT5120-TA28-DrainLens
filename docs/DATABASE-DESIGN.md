@@ -30,7 +30,11 @@ them, and this document is the correction.
 
 ---
 
-## The line that does not move
+## The line that did not move until 9 October 2026
+
+> **It moved.** The section below is kept as it was written, because the
+> argument is the record of what the change cost and deleting it would leave
+> only the conclusion. What follows it says who moved it and what is true now.
 
 **The address index stays in the browser.** Not because AD1's wording forbids
 otherwise, but because two things already visible to a resident say so:
@@ -64,6 +68,57 @@ street, it is 83 KB on disk and 31 KB gzipped.
 > alternative is a search endpoint that receives every keystroke of a home
 > address, which is the cost this section exists to refuse.
 
+### Where the line is now
+
+**9 October 2026, Xiyu Cao, after the tech mentor observed that the address
+search had no API.** The observation was correct: there was no route and no
+table, and everything above is why. The team decided to build them.
+
+**What was wrong in the argument above, and it is worth naming.** The last
+paragraph says *at 4,089 addresses and 66 KB over the wire there is no
+technical reason to move it either*. That stopped being true on 14 September,
+when the index became the council's — 62,397 addresses, 1.33 MB on disk and
+490 KB gzipped, fifteen times what the sentence was measured against. The
+note added that day carried the new figures and left the conclusion alone.
+The privacy half of the argument was never weakened by that; the *no
+technical reason* half was, for three weeks, and nobody went back for it.
+
+**What is true now.**
+
+| | Before 9 October | Now |
+|---|---|---|
+| Where the addresses live | a file, in the browser | `address` and `address_street` in Postgres, **and** the file |
+| What answers a submitted search | the browser | `POST /api/addresses/search`, the bundled index when it cannot |
+| What answers the suggestions | the browser | the browser |
+| What is on screen | *Address search happens in your browser. Your address is not sent or saved* | *Your address is searched by DrainLens and is not kept: no account, no record of the search, and nothing written to our logs* |
+
+**The alternative this section refused is still refused.** *A search endpoint
+that receives every keystroke of a home address* is not what was built: the
+suggestions are drawn from the index in memory and the request happens once,
+when a search is submitted. That is not a detail of the implementation, it is
+the part of the old argument that survived on its own merits.
+
+**AD1 is unchanged and is not being reinterpreted.** It says the product has
+no accounts and no identity, which is a statement about what is *held* — the
+same distinction this document opened by drawing against "no database". What
+is held after a search is nothing: no row is written, the route answers
+`no-store` and is given no cache key (the only string available to key it on
+is what a resident typed), and Cloud Run's request log is excluded at the
+`_Default` sink before entries are written, which was verified again on
+9 October with a positive control of real traffic.
+
+**The query is in a POST body and never in a URL.** URLs reach browser
+history, the next request's `Referer`, and the access log of any proxy
+between a resident and this service; the sink exclusion covers one hop of
+that and no other.
+
+**The index is still bundled, and this saved nothing on the wire.** The
+drains panel, the demonstration addresses, the suburb list and `searchable()`
+all read the index and none of them is answered by the route, so the 490 KB
+is still fetched. It is also the fallback, which matters more: the address is
+step one of everything else the product does, and a cold database must not
+take the product down with it.
+
 ---
 
 ## What goes in, and what stays a file
@@ -75,7 +130,7 @@ street, it is 83 KB on disk and 31 KB gzipped.
 | Drainage pits, pipes, roads, street labels | **Database** | Tabular and modest: 895 + 893 + 220 + 163 rows. Geometry stored as coordinate arrays, exactly as the artefact holds it. |
 | Downstream links and their termination reasons | **Database** | 893 edges with a reason each — a graph, which is a thing databases are good at. |
 | Surface-water paths, low points, unavailable areas | **Database** | 38 + 310 + 46 shapes. |
-| The address index | **File** | See above. |
+| The address index | **File, and since 9 October 2026 the database too** | 62,397 addresses and 2,293 published streets, in `address` and `address_street`. The file stays: it is what the browser draws suggestions from and what answers a search when the database cannot. See above for what that cost. |
 | `scene/*.bin` — elevation, flow, depressions, coverage | **File** | A 1000 × 1000 `Int16Array` is not a table. Storing a million cells as rows to serve them back as a typed array is a worse version of a file, and the client reads them into `ArrayBuffer`s anyway. |
 
 > **14 September 2026.** The row counts above are Kensington's. Since 11

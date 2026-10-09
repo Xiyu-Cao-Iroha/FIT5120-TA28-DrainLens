@@ -33,15 +33,15 @@ import {
   type IndexedAddress,
   type Match,
   MAX_SUGGESTIONS,
-  resolve,
   search,
-} from '../address/search.js';
+} from '@drainlens/address';
 import {
   COMPARE_DEMONSTRATION_LABELS,
   DEMONSTRATION_LABELS,
   demonstrationAddress,
   demonstrationAddresses,
 } from '../address/demonstration.js';
+import { lookupAddress } from '../address/lookup.js';
 import { suburbsOf } from '../address/suburbs.js';
 import type { Task } from '../session.js';
 import type { SectionId } from '../tutorial/sections.js';
@@ -154,6 +154,16 @@ export const SECTION_TITLES: Partial<Record<SectionId, string>> = {
   'low-areas': 'Find low areas near your address',
 };
 
+/**
+ * What the button says while a search is out.
+ *
+ * It replaces the task's own word rather than sitting beside it, because the
+ * row is already two controls wide on a phone and a third thing appearing
+ * mid-press moves the one being pressed. Both tasks share it: what is
+ * happening is the same either way.
+ */
+export const SEARCHING = 'Searching…';
+
 export const COMPARE_COPY: LandingCopy = {
   title: 'Which address do you want to check?',
   lead: 'We’ll find a drain near it you can test for a blocked-drain comparison.',
@@ -190,6 +200,15 @@ export function Landing({
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
+  /*
+    A search is out.
+
+    The API's measured p95 is 85 ms and its cold start is 0.74 s, so this is
+    usually off before anybody could see it -- but `--min-instances=0` means
+    the first search after an idle period waits, and a button that looks
+    unpressed while a request is in flight gets pressed again.
+  */
+  const [asking, setAsking] = useState(false);
   const examplesId = useId();
 
   const suggestions: Match[] = useMemo(
@@ -205,9 +224,36 @@ export function Landing({
   );
   const suburbs = suburbsOf(index);
 
-  function submit(event: FormEvent) {
+  /*
+    Submitted to the API, and answered from the index in memory when it
+    cannot be reached.
+
+    **This is the only request a search makes.** The suggestions above come
+    from the index on every keystroke, which is where they stayed on
+    9 October when the rest of this moved: a request per character would send
+    a home address to a server one letter at a time to be told what the same
+    function over the same rows has already said here. Pressing the button is
+    one question, asked once.
+
+    `lookupAddress` cannot throw and always answers, so there is no error
+    branch -- a database that is down is a search that is answered by the
+    bundled index, which is the same four verdicts by a different route.
+  */
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const answer = resolve(index, typed);
+    if (asking) return;
+    setAsking(true);
+    const { answer } = await lookupAddress({
+      index,
+      typed,
+      onFallback: (reason) => {
+        // To a console, not to the screen. Which of the two answered is not a
+        // thing to put in front of somebody looking for their street, and the
+        // answer is the same either way.
+        console.warn(`the address search fell back to the bundled index: ${reason}`);
+      },
+    });
+    setAsking(false);
 
     if (answer.kind === 'found') {
       onFound(answer.address);
@@ -275,7 +321,9 @@ export function Landing({
       </p>
 
       <form
-        onSubmit={submit}
+        onSubmit={(event) => {
+          void submit(event);
+        }}
         style={{
           padding: space(5),
           background: surface.raised,
@@ -327,23 +375,24 @@ export function Landing({
           />
           <button
             type="submit"
+            disabled={asking}
             style={{
               padding: `${String(space(3))}px ${String(space(5))}px`,
               font: type(text.body, { weight: weight.semibold }),
               color: ink.inverse,
-              background: brand.base,
+              background: asking ? brand.hover : brand.base,
               border: 'none',
               borderRadius: radius.base,
               transition: 'background-color 120ms ease',
             }}
             onMouseEnter={(event) => {
-              event.currentTarget.style.background = brand.hover;
+              if (!asking) event.currentTarget.style.background = brand.hover;
             }}
             onMouseLeave={(event) => {
-              event.currentTarget.style.background = brand.base;
+              if (!asking) event.currentTarget.style.background = brand.base;
             }}
           >
-            {copy.submit}
+            {asking ? SEARCHING : copy.submit}
           </button>
         </div>
 

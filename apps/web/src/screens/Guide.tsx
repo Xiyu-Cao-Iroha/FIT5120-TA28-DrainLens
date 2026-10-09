@@ -27,7 +27,7 @@
 import { AddressMark } from '../ui/AddressMark.js';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { AddressIndex } from '../address/search.js';
+import type { AddressIndex } from '@drainlens/address';
 import type { AddressCatchmentsArtefact, SubcatchmentsArtefact } from '../catchment/artefact.js';
 import type { Relevance } from '../prepare/places.js';
 import type { MapArtefact } from '../map/artefact.js';

@@ -24,7 +24,7 @@ import type { Pit } from '../map/artefact.js';
 import type { Local } from '../map/viewport.js';
 import { type Link, type TraceArtefact, traceDownstream } from '../trace/graph.js';
 import { surfaceEntryOf } from '../crosssection/section.js';
-import { type PackedIndex, unpack } from '../address/search.js';
+import { type PackedIndex, unpack } from '@drainlens/address';
 
 const pit = (asset_number: number, c: Local, type = 'Grated Side Entry'): Pit =>
   ({ g: 'point', c, asset_number, object_type_lupvalue: type }) as unknown as Pit;

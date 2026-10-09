@@ -30,8 +30,8 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
-import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
-import { MAX_SUGGESTIONS, search } from '../address/search.js';
+import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
+import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';

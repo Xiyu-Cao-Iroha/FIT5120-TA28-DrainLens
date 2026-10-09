@@ -32,6 +32,7 @@ WORKDIR /repo
 # lockfile says and fails if it and package.json have drifted, which is the
 # defect this step exists to catch.
 COPY package.json package-lock.json ./
+COPY packages/address/package.json packages/address/
 COPY packages/schema/package.json packages/schema/
 COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/

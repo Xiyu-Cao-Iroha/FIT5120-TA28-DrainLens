@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from '@drainlens/address';
 import { demonstrationAddress } from './address/demonstration.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';

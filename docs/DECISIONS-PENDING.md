@@ -338,6 +338,54 @@ The same document carried a second list under a dividing line, marked *下一次
 
 ---
 
+## 14 · The address search — **DECIDED 9 October 2026: it goes to the server, and the promise is withdrawn**
+
+### What was settled, and by whom
+
+**Xiyu Cao, 9 October 2026**, after the tech mentor observed that the address had no API. The observation was correct. There was no route and no table: 62,397 council addresses shipped as a 1.33 MB file and the search ran in the browser.
+
+It now runs against Postgres, through `POST /api/addresses/search`, and **the two sentences on screen that promised otherwise were withdrawn in the same change**. That second half is the decision. The first half is a route.
+
+### Why there was no route, which is the part worth keeping
+
+`apps/web/src/App.tsx` carried the reasoning, and it was better than "nobody got to it":
+
+> An address index fetched from an API would still keep that promise, and an index fetched *per query* would not. Bundled is the shape that cannot drift into the second.
+
+So the team had already conceded that **serving the index over the API was compatible with everything the product claimed** — the objection was to a per-query endpoint, and bundling was chosen as a shape that could not become one by accident. That is a defensive-design argument, not a red line, and it is answered by a test rather than by a file layout.
+
+The red line itself was elsewhere, in `search.ts`: *a search box that calls a server sends every keystroke of somebody's home address to it.*
+
+### What was built, and what the old argument still holds
+
+**Suggestions were not moved.** They are drawn from the index in memory on every keystroke, exactly as before. A request per character would send a home address one letter at a time to be told what the same function over the same rows has already said locally. One submitted search is one request. The sentence above is still true of this product.
+
+**One matcher, two callers.** `packages/address` holds the ranking and the four verdicts; the browser runs it over the bundled index, the API runs it over rows. A resident meets both paths in one session, because the API answers while the database is up and the container copy answers when it is not, and two rankings would be two answers about one house. `apps/api/test-db/address.test.ts` runs thirteen queries through both and compares.
+
+**POST, with the query in the body.** A `GET ?q=...` puts a home address in a URL, and URLs reach browser history, the next request's `Referer`, and any proxy's access log. The Cloud Run request-log exclusion covers one hop of that.
+
+**Nothing is kept.** No row is written, the route is given no memo key — the only string available to key it on is what a resident typed — and it answers `no-store`. The `_Default` sink's exclusion of `run.googleapis.com/requests` was re-verified on 9 October with a positive control: real requests to the API that afternoon, zero request-log entries in seven days.
+
+### What it cost, stated plainly
+
+**A sentence the product used to be able to make, and cannot.** *Address search happens in your browser. Your address is not sent or saved, and it is forgotten when you close the tab.* The first clause is now false. It was replaced rather than deleted: *Your address is searched by DrainLens and is not kept: no account, no record of the search, and nothing written to our logs.* Everything in the replacement is checked by a test or by a sink configuration.
+
+**It saves nothing on the wire, and claiming otherwise would be the easy lie.** The index is still fetched, because the drains panel, the demonstration addresses, the suburb list and `searchable()` all read it and the route answers none of them.
+
+### What was wrong in our own documents, and had been for three weeks
+
+`DATABASE-DESIGN.md` argued *at 4,089 addresses and 66 KB over the wire there is no technical reason to move it either*. That stopped being true on **14 September**, when the index became the council's — fifteen times the size. A note added that day carried the new figures and left the conclusion standing. The privacy half of the argument was never weakened; the *no technical reason* half was, and nobody went back for it. Found while answering the mentor, not before.
+
+### AD1 is unchanged
+
+AD1 is that the product has no accounts and no identity — a statement about what is **held**, which is the same distinction `DATABASE-DESIGN.md` opened by drawing against "no database". Nothing survives a search. What this decision withdrew is a stronger promise the team volunteered on top of AD1, which was ours to make and ours to withdraw, in public, in the same change.
+
+### Ordering, for whoever deploys it
+
+**The migration job runs before the service.** A service on the new image against a database without an `address` table answers the route 500 while the site falls back to its bundled index and looks fine — a route that never succeeds and nobody notices. `deploy/API-DEPLOYMENT.md`, *Migration 006*, has the sequence.
+
+---
+
 ## 12 · The hold in front of the full map — **DECIDED 5 October 2026: it stays**
 
 Two reviews asked for opposite things in the same week, and this is the record of which one was followed.

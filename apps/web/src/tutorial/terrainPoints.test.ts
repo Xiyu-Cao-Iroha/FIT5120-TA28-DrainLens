@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { type PackedIndex, unpack } from '../address/search.js';
+import { type PackedIndex, unpack } from '@drainlens/address';
 import type { ContourLine } from '../map/terrainMarks.js';
 import type { TerrainTileIndex } from '../map/terrainTiles.js';
 import { type Local, type Viewport, focus, toScreen } from '../map/viewport.js';
