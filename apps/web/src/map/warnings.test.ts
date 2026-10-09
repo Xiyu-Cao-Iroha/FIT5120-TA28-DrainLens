@@ -60,6 +60,30 @@ describe('when the signs are drawn', () => {
   it("at the guide's opening view, 300 m across a 560-pixel frame", () => {
     expect(warningsVisible(true, 560 / 300)).toBe(true);
   });
+
+  it('draws the before-rain checks at any zoom, because the floor is not about them', () => {
+    /*
+     * Reported on 9 and 10 October as *press before rain check and nothing
+     * happens*. The view opened a shade under the floor in a narrow frame,
+     * so the signs the panel was talking about were not drawn and the reader
+     * was being asked to zoom until they appeared.
+     *
+     * The floor is measured for the low-areas layer: thirteen signs on the
+     * council's worst view, each a claim about a street nobody can see. The
+     * checks are a handful inside `PLACE_RADIUS_M` of an address the reader
+     * typed, numbered in the plan beside the map.
+     */
+    expect(warningsVisible(true, 0.1, true)).toBe(true);
+    expect(warningsVisible(true, 1080 / 1000, true)).toBe(true);
+
+    // The layer still has to be on. Nothing draws signs for nobody.
+    expect(warningsVisible(false, 4, true)).toBe(false);
+  });
+
+  it('leaves the low-areas layer on the floor it was measured for', () => {
+    expect(warningsVisible(true, WARNING_MIN_SCALE - 0.01, false)).toBe(false);
+    expect(warningsVisible(true, WARNING_MIN_SCALE - 0.01)).toBe(false);
+  });
 });
 
 describe('which signs are in view', () => {

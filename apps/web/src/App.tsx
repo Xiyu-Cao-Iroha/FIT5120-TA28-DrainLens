@@ -1225,6 +1225,7 @@ function MapScreen({
       />
       {touring && (
         <Tour
+          hasAddress={session.address !== null}
           onClose={() => {
             setTouring(false);
           }}

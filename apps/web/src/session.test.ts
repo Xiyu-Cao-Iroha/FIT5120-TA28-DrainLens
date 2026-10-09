@@ -750,9 +750,17 @@ describe('opening the map from the homepage', () => {
     expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
   });
 
-  it('forgets the address, and keeps the person’s own assumptions', () => {
-    // Team decision, 16 September: the full map asks for an address again on
-    // every visit. The blockage and rainfall are choices, not a place.
+  it('keeps the address the reader already gave, and their assumptions with it', () => {
+    /*
+     * **The opposite of what this asserted until 10 October.** The rule was
+     * a team decision of 16 September, *the full map asks for an address
+     * again on every visit*, and the team reversed it: an address typed a
+     * minute ago in this tab is not a guess, and asking twice is the product
+     * forgetting what it was told.
+     *
+     * The half that did not change is the test above: a map opened with
+     * nothing searched still arrives with nothing selected.
+     */
     const busy = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'blockage-selected', blockage: 'fully-blocked' },
@@ -760,8 +768,7 @@ describe('opening the map from the homepage', () => {
     ]);
     const end = reduce(busy, { type: 'map-opened' });
 
-    expect(end.address).toBeNull();
-    expect(end.scenario.pitId).toBeNull();
+    expect(end.address).toEqual(GATEHOUSE);
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
 
@@ -1440,15 +1447,19 @@ describe('what the reader says about a place near them', () => {
   });
 
   it('keeps them while the address does not change, and forgets them when it does', () => {
-    // Starting another guide keeps the address now (4 October), so it keeps
-    // the answers with it: they are about places near that address, and the
-    // address has not moved. A different address still clears them (AC 5.4.2).
+    /*
+     * Starting another guide keeps the address (4 October), and so does
+     * opening the full map (10 October), so both keep the answers with it:
+     * they are about places near that address, and the address has not
+     * moved. A different address still clears them (AC 5.4.2), which is the
+     * only thing AC 5.4.2 asks for.
+     */
     let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
     session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
     expect(reduce(session, { type: 'guide-chosen', section: 'low-areas' }).relevance).toEqual({
       1: 'applies',
     });
-    expect(reduce(session, { type: 'map-opened' }).relevance).toEqual({});
+    expect(reduce(session, { type: 'map-opened' }).relevance).toEqual({ 1: 'applies' });
     expect(
       reduce(session, { type: 'address-accepted', address: addressAt('b') }).relevance,
     ).toEqual({});

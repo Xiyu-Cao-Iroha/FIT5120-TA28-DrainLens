@@ -974,9 +974,31 @@ function step(session: Session, event: SessionEvent): Session {
           was written after a rule spread across three cases.
         */
         screen: allLearned(session.learned) ? 'explore' : 'locked',
-        // The full map starts with no address, whatever was searched before
-        // (team decision, 16 September); the map's own search box asks again.
-        ...forgetAddress(session),
+        /*
+          **The full map keeps the address, since 10 October.**
+
+          It used to clear it: *the full map asks for an address again on
+          every visit*, a team decision of 16 September. The team reversed
+          that half on 10 October, and the reason the rule existed is worth
+          separating from the rule, because only one of the two halves was
+          reversed.
+
+          The half that stays: **no route to this map invents an address.**
+          Opening it with nothing searched still lands with nothing selected
+          and the search box along the top asking, because a guessed address
+          puts a marker on a street nobody named. That is what the test above
+          this one checks and it still passes.
+
+          The half that went: an address the reader typed a minute ago, in
+          this tab, is not a guess. Making them type it again on the way from
+          a guide to the full map was the product forgetting something it had
+          been told, which is the opposite of what the privacy rule is for.
+
+          Nothing is cleared with it. The chosen drain, the answers about
+          numbered places and the comparison all belong to that address, and
+          they are still that address's. `forgetAddress` runs where the
+          address actually changes, which is where AC 5.4.2 wants it.
+        */
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',

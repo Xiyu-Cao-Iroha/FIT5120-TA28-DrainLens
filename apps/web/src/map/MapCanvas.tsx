@@ -149,6 +149,11 @@ export interface MapCanvasProps {
    */
   readonly warnings?: readonly WarningPoint[] | null;
   /**
+   * These signs are the before-rain checks near a chosen address, so they
+   * are drawn at any zoom. See `warningsVisible`.
+   */
+  readonly warningsNearAddress?: boolean | undefined;
+  /**
    * Which warning markers are numbered before-rain checks, and what number.
    *
    * Passed as a function rather than a list so the canvas asks about the
@@ -218,6 +223,7 @@ export function MapCanvas({
   difference = null,
   catchment = null,
   warnings = null,
+  warningsNearAddress = false,
   numberOfWarning,
   onWarningPress,
   onSelect,
@@ -335,7 +341,7 @@ export function MapCanvas({
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // Over the low areas they mark and the pits beside them: a press on a sign
     // goes to the sign, so the sign has to be the thing on top.
-    if (warnings && warningsVisible(true, viewport.scale)) {
+    if (warnings && warningsVisible(true, viewport.scale, warningsNearAddress)) {
       drawWarnings(context, warnings, viewport, numberOfWarning);
     }
     // Over the derived layers, under the followed path. The difference is the
@@ -348,7 +354,8 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
-      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings, numberOfWarning]);
+      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings, warningsNearAddress,
+      numberOfWarning]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -440,7 +447,7 @@ export function MapCanvas({
 
       // Then a warning sign, which is painted over the pits. Its target is its
       // own triangle and no wider, so a pit beside it keeps its presses.
-      if (warnings && onWarningPress && warningsVisible(true, viewport.scale)) {
+      if (warnings && onWarningPress && warningsVisible(true, viewport.scale, warningsNearAddress)) {
         const sign = pickWarning(press, viewport, warnings);
         if (sign !== null) {
           onWarningPress(sign);
@@ -466,7 +473,7 @@ export function MapCanvas({
         ),
       );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress, onGround, showPits, showPipes, warnings, onWarningPress, pickPits],
+    [viewport, artefact, onSelect, at, address, onAddressPress, onGround, showPits, showPipes, warnings, warningsNearAddress, onWarningPress, pickPits],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and

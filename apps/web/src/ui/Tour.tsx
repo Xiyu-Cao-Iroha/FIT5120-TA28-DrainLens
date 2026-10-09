@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { type Box, type Placement, caretAt, placeCard, spotlightFor } from './callout.js';
-import { TOUR_STEPS, type TourTarget } from './tourPlan.js';
+import { type TourTarget, tourStepsFor } from './tourPlan.js';
 import {
   ink,
   line,
@@ -74,27 +74,31 @@ function useTargetBox(target: TourTarget): Box | null {
 
 export interface TourProps {
   readonly onClose: () => void;
+  /** Whether this reader already has an address. See `tourStepsFor`. */
+  readonly hasAddress?: boolean | undefined;
 }
 
-export function Tour({ onClose }: TourProps) {
+export function Tour({ onClose, hasAddress = false }: TourProps) {
+  // Held, so the list cannot change length under an index mid-tour.
+  const [steps] = useState(() => tourStepsFor(hasAddress));
   const [index, setIndex] = useState(0);
-  const step = TOUR_STEPS[index];
+  const step = steps[index];
   const cardRef = useRef<HTMLDivElement | null>(null);
   const okRef = useRef<HTMLButtonElement | null>(null);
   const [cardHeight, setCardHeight] = useState(180);
 
   const target = useTargetBox(step?.target ?? 'address');
-  const last = index === TOUR_STEPS.length - 1;
+  const last = index === steps.length - 1;
 
   const advance = useCallback(() => {
     setIndex((current) => {
-      if (current + 1 >= TOUR_STEPS.length) {
+      if (current + 1 >= steps.length) {
         onClose();
         return current;
       }
       return current + 1;
     });
-  }, [onClose]);
+  }, [onClose, steps.length]);
 
   const retreat = useCallback(() => {
     setIndex((current) => Math.max(0, current - 1));
@@ -149,7 +153,7 @@ export function Tour({ onClose }: TourProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Map tour, step ${String(index + 1)} of ${String(TOUR_STEPS.length)}`}
+      aria-label={`Map tour, step ${String(index + 1)} of ${String(steps.length)}`}
       style={{ position: 'fixed', inset: 0, zIndex: 40 }}
     >
       {spot === null ? (
@@ -222,7 +226,7 @@ export function Tour({ onClose }: TourProps) {
             color: ink.subtle,
           }}
         >
-          Step {index + 1} of {TOUR_STEPS.length}
+          Step {index + 1} of {steps.length}
         </p>
 
         <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.base }}>
