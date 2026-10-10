@@ -1,15 +1,37 @@
 from pathlib import Path
 import re
-
+import os
 import chromadb
 from llama_cpp import Llama
 
 
 BASE = Path(__file__).resolve().parent
-DB_PATH = BASE / "chroma_db"
 
-MODEL_PATH = BASE / "models" / "llama-3.2-3b-instruct-q4_k_m.gguf"
-COLLECTION_NAME = "drainlens_guidance_v3"
+DB_PATH = Path(
+    os.getenv(
+        "DRAINLENS_CHROMA_PATH",
+        str(BASE / "chroma_db"),
+    )
+)
+
+MODEL_PATH = Path(
+    os.getenv(
+        "DRAINLENS_MODEL_PATH",
+        str(BASE / "models" / "llama-3.2-3b-instruct-q4_k_m.gguf"),
+    )
+)
+
+COLLECTION_NAME = os.getenv(
+    "DRAINLENS_COLLECTION_NAME",
+    "drainlens_guidance_v3",
+)
+
+CPU_THREADS = int(
+    os.getenv(
+        "DRAINLENS_CPU_THREADS",
+        str(max(1, os.cpu_count() or 1)),
+    )
+)
 
 EMERGENCY_TERMS = [
     "trapped",
@@ -139,23 +161,31 @@ EMERGENCY_RESPONSE = (
 
 # Connect to the locally stored ChromaDB knowledge base
 
-def get_collection():
-    client = chromadb.PersistentClient(
-        path=str(DB_PATH)
-    )
+# Open ChromaDB once when the service process starts.
+CHROMA_CLIENT = chromadb.PersistentClient(
+    path=str(DB_PATH)
+)
 
-    return client.get_collection(
-        name=COLLECTION_NAME
-    )
+COLLECTION = CHROMA_CLIENT.get_collection(
+    name=COLLECTION_NAME
+)
+
+
+# Load the GGUF model once when the service process starts.
+LLM = Llama(
+    model_path=str(MODEL_PATH),
+    n_ctx=4096,
+    n_threads=CPU_THREADS,
+    verbose=False,
+)
+
+
+def get_collection():
+    return COLLECTION
 
 
 def get_llm():
-    return Llama(
-        model_path=str(MODEL_PATH),
-        n_ctx=4096,
-        n_threads=8,
-        verbose=False
-    )
+    return LLM
     
     
 # Retrieve the five document chunks most relevant to the user's question

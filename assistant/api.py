@@ -19,6 +19,37 @@ class ChatRequest(BaseModel):
     message: str
 
 
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
+
+
+def normalise_page(value):
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, float):
+        return int(value)
+
+    try:
+        text = str(value).strip()
+
+        if not text:
+            return None
+
+        return int(float(text))
+    except (TypeError, ValueError):
+        return None
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     question = request.message.strip()
@@ -104,7 +135,7 @@ def chat(request: ChatRequest):
 
         title = metadata.get("title", "Unknown document")
         organisation = metadata.get("organisation", "Unknown")
-        page = metadata.get("page", "Unknown")
+        page = normalise_page(metadata.get("page"))
         url = metadata.get("source_url", "")
 
         source_key = (title, organisation)
