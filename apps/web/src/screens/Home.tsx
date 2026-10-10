@@ -1271,7 +1271,7 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
             className="home__section-title"
             style={{ margin: `${String(space(3))}px 0`, color: ON_PHOTO.title }}
           >
-            Clear or blocked: would rainwater collect in different places?
+            If a nearby drain were blocked, would rainwater collect somewhere new?
           </h2>
           <p
             style={{
@@ -1281,9 +1281,9 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Choose a nearby street drain and compare it clear and blocked with the same amount
-            of rain. See whether water builds up more, collects somewhere new, or shows no
-            visible difference.
+            Compare the same rain with the drain clear and blocked. See whether water builds
+            up more, collects somewhere new, or shows no visible difference in this model.
+            Understand what a blockage could change before heavy rain.
           </p>
           <PrimaryButton label="Compare a nearby drain →" onPress={onCompare} />
           <p
@@ -1293,8 +1293,8 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.quiet,
             }}
           >
-            This is a modelled comparison, not a check of the drain's current condition or a
-            flood forecast.
+            This is a modelled comparison. It does not check whether the drain is blocked now
+            or predict flooding.
           </p>
         </div>
       </div>

@@ -142,6 +142,35 @@ in this report.
 
 ## Proposed home page block for the drain comparison
 
+> **Superseded the same day.** The team wrote their own version after reading
+> this, and it is the one that shipped. It is better than the proposal below
+> on the point the proposal was making: *Understand what a blockage could
+> change before heavy rain* says why somebody would press the button, in one
+> line, without spending a sentence on the statistics. The proposal is kept
+> because the reasoning under it is what the next copy change will need, and
+> because a report that quietly deletes the thing it recommended is a report
+> nobody can check.
+>
+> What shipped:
+>
+> > **If a nearby drain were blocked, would rainwater collect somewhere new?**
+> >
+> > Compare the same rain with the drain clear and blocked. See whether water
+> > builds up more, collects somewhere new, or shows no visible difference in
+> > this model. Understand what a blockage could change before heavy rain.
+> >
+> > Compare a nearby drain →
+> >
+> > This is a modelled comparison. It does not check whether the drain is
+> > blocked now or predict flooding.
+>
+> One thing the proposal below had and this does not: it said most
+> comparisons show no visible difference. The shipped version names that
+> outcome as one of three possibilities instead, which is honest and less
+> likely to be read as the product apologising for itself. Whether a reader
+> needs to be told up front that *no visible difference* is the common answer
+> is still open, and the result screen does say it.
+
 The team wrote the current block on the 10 October list and it shipped in
 #225. It is a clear improvement on what it replaced, and it still answers
 *what* rather than *why*. This keeps its structure and its limits, and adds
