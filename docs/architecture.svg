@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090 800" width="1090" height="800"
+     role="img" aria-label="DrainLens system architecture. A build-time Python pipeline turns four open-data publishers into JSON artefacts, which are both baked into the site image and loaded into Cloud SQL. At run time a React app served by drainlens-dev asks drainlens-api for map, derived, trace, flood history and address data, and falls back to the bundled copy of each artefact when the API cannot answer. The blockage comparison runs in a Web Worker in the browser. drainlens-api reads Cloud SQL and forwards chat questions to a private drainlens-ai service running Llama 3.2 and ChromaDB.">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1f6f5c"/>
+    </marker>
+  </defs>
+
+  <g fill="currentColor" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+
+    <!-- ================= build time ================= -->
+    <rect x="30" y="48" width="250" height="382" rx="10" fill="none" stroke="currentColor"
+          stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
+    <text x="44" y="40" font-size="11" letter-spacing="1.2" opacity="0.65">BUILD TIME · OFFLINE</text>
+
+    <rect x="48" y="66" width="214" height="146" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="60" y="88" font-size="13" font-weight="600">Open data</text>
+    <text x="60" y="110" font-size="11" opacity="0.85">City of Melbourne</text>
+    <text x="60" y="125" font-size="11" opacity="0.7">drains, pipes, roads, addresses,</text>
+    <text x="60" y="140" font-size="11" opacity="0.7">2018 point cloud</text>
+    <text x="60" y="162" font-size="11" opacity="0.85">Melbourne Water · subcatchments</text>
+    <text x="60" y="180" font-size="11" opacity="0.85">VICSES · flood call-outs</text>
+    <text x="60" y="198" font-size="11" opacity="0.85">ABS · population</text>
+
+    <line x1="155" y1="212" x2="155" y2="240" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="48" y="242" width="214" height="62" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="60" y="266" font-size="13" font-weight="600">pipeline/ · Python</text>
+    <text x="60" y="286" font-size="11" opacity="0.7">32 modules, run by hand</text>
+
+    <line x1="155" y1="304" x2="155" y2="332" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="48" y="334" width="214" height="80" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="60" y="358" font-size="13" font-weight="600">Artefacts</text>
+    <text x="60" y="378" font-size="11" opacity="0.7">12 JSON files</text>
+    <text x="60" y="394" font-size="11" opacity="0.7">+ 500 m terrain tiles</text>
+
+    <!-- ================= browser ================= -->
+    <rect x="330" y="48" width="730" height="215" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="344" y="40" font-size="11" letter-spacing="1.2" opacity="0.65">BROWSER</text>
+
+    <rect x="348" y="70" width="215" height="88" rx="7" fill="none" stroke="#1f6f5c" stroke-width="1.6"/>
+    <text x="360" y="94" font-size="13" font-weight="600" fill="#1f6f5c">Bundled artefacts</text>
+    <text x="360" y="114" font-size="11" fill="#1f6f5c" opacity="0.9">fallback when the API</text>
+    <text x="360" y="130" font-size="11" fill="#1f6f5c" opacity="0.9">cannot answer, and the</text>
+    <text x="360" y="146" font-size="11" fill="#1f6f5c" opacity="0.9">address suggestions</text>
+
+    <rect x="588" y="70" width="215" height="172" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="600" y="94" font-size="13" font-weight="600">React SPA</text>
+    <text x="600" y="116" font-size="11" opacity="0.7">TypeScript, strict</text>
+    <text x="600" y="132" font-size="11" opacity="0.7">canvas map, no map library</text>
+    <text x="600" y="156" font-size="11" opacity="0.85">The report is made here</text>
+    <text x="600" y="172" font-size="11" opacity="0.7">and sent by nobody</text>
+    <text x="600" y="196" font-size="11" opacity="0.85">Session in memory only</text>
+    <text x="600" y="212" font-size="11" opacity="0.7">no storage, no cookie</text>
+
+    <rect x="828" y="70" width="215" height="88" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="840" y="94" font-size="13" font-weight="600">Scenario worker</text>
+    <text x="840" y="114" font-size="11" opacity="0.7">the clear vs blocked</text>
+    <text x="840" y="130" font-size="11" opacity="0.7">comparison runs in the</text>
+    <text x="840" y="146" font-size="11" opacity="0.7">browser, not on a server</text>
+
+    <line x1="563" y1="114" x2="584" y2="114" stroke="#1f6f5c" stroke-width="1.6"
+          stroke-dasharray="5 3" marker-end="url(#ag)"/>
+    <line x1="807" y1="114" x2="824" y2="114" stroke="currentColor" stroke-width="1.4" marker-start="url(#a)" marker-end="url(#a)"/>
+
+    <!-- ================= services ================= -->
+    <rect x="348" y="330" width="250" height="150" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="362" y="320" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN</text>
+    <text x="362" y="356" font-size="13" font-weight="600">drainlens-dev</text>
+    <text x="362" y="378" font-size="11" opacity="0.7">nginx, static site</text>
+    <text x="362" y="394" font-size="11" opacity="0.7">serves the app and a copy</text>
+    <text x="362" y="410" font-size="11" opacity="0.7">of every artefact</text>
+    <text x="362" y="434" font-size="11" opacity="0.85">Basic auth gate</text>
+    <text x="362" y="458" font-size="11" opacity="0.6">min 1 · max 2</text>
+
+    <rect x="640" y="330" width="250" height="150" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="654" y="320" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN</text>
+    <text x="654" y="356" font-size="13" font-weight="600">drainlens-api</text>
+    <text x="654" y="378" font-size="11" opacity="0.7">Hono + pg, public</text>
+    <text x="654" y="400" font-size="11" opacity="0.85">GET map · derived · trace</text>
+    <text x="654" y="416" font-size="11" opacity="0.85">GET flood-history</text>
+    <text x="654" y="432" font-size="11" opacity="0.85">POST addresses/search</text>
+    <text x="654" y="448" font-size="11" opacity="0.85">POST chat</text>
+    <text x="654" y="468" font-size="11" opacity="0.6">min 1 · max 2</text>
+
+    <!-- ================= downstream ================= -->
+    <rect x="430" y="560" width="240" height="95" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="444" y="550" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD SQL</text>
+    <text x="444" y="586" font-size="13" font-weight="600">Postgres 16</text>
+    <text x="444" y="608" font-size="11" opacity="0.7">18 tables: the drainage</text>
+    <text x="444" y="624" font-size="11" opacity="0.7">network, the flood board,</text>
+    <text x="444" y="640" font-size="11" opacity="0.7">62,397 addresses</text>
+
+    <rect x="720" y="560" width="340" height="95" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="734" y="550" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN · PRIVATE</text>
+    <text x="734" y="586" font-size="13" font-weight="600">drainlens-ai</text>
+    <text x="734" y="608" font-size="11" opacity="0.7">FastAPI · Llama 3.2 3B (GGUF) · ChromaDB</text>
+    <text x="734" y="624" font-size="11" opacity="0.7">retrieval over the official guides</text>
+    <text x="734" y="640" font-size="11" opacity="0.6">min 1 · max 1 · 8 GiB · 12 to 35 s an answer</text>
+
+    <!-- ================= arrows ================= -->
+    <line x1="655" y1="246" x2="500" y2="326" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="548" y="276" font-size="10" text-anchor="middle" opacity="0.75">the app, and every</text>
+    <text x="548" y="289" font-size="10" text-anchor="middle" opacity="0.75">artefact as a fallback</text>
+
+    <line x1="736" y1="246" x2="770" y2="326" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="784" y="278" font-size="10" opacity="0.75">six routes, tried first</text>
+    <text x="784" y="291" font-size="10" opacity="0.75">for every artefact</text>
+
+    <line x1="700" y1="484" x2="610" y2="556" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="628" y="522" font-size="10" text-anchor="end" opacity="0.75">SQL over a</text>
+    <text x="628" y="535" font-size="10" text-anchor="end" opacity="0.75">private socket</text>
+
+    <line x1="828" y1="484" x2="868" y2="556" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="880" y="516" font-size="10" opacity="0.75">POST /chat with a</text>
+    <text x="880" y="529" font-size="10" opacity="0.75">Google identity token</text>
+
+    <line x1="262" y1="372" x2="344" y2="372" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="303" y="364" font-size="10" text-anchor="middle" opacity="0.75">in the image</text>
+
+    <polyline points="155,414 155,730 540,730 540,659" fill="none" stroke="currentColor"
+              stroke-width="1.4" marker-end="url(#a)"/>
+    <text x="300" y="722" font-size="10" opacity="0.75">loaded by a Cloud Run job, once per extent</text>
+
+    <!-- ================= the claim ================= -->
+    <rect x="330" y="752" width="730" height="34" rx="6" fill="none" stroke="#1f6f5c"
+          stroke-width="1.2" stroke-dasharray="5 3" opacity="0.8"/>
+    <text x="348" y="774" font-size="11" fill="#1f6f5c">Green is the fallback copy: with the API or the database down, the site still draws a map and still finds an address.</text>
+  </g>
+</svg>
