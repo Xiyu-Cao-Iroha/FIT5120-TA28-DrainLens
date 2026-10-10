@@ -127,11 +127,13 @@ describe('reviewing them', () => {
 
   it('counts both answers as reviewed', () => {
     // AC 5.4.1: deciding a place does not apply is reviewing it.
-    expect(reviewedLine(places, { 1: 'applies', 2: 'does-not-apply' })).toBe('2 of 3 reviewed');
+    expect(reviewedLine(places, { 1: 'applies', 2: 'does-not-apply' })).toBe(
+      'Nearby places reviewed: 2 of 3',
+    );
   });
 
   it('starts at none reviewed', () => {
-    expect(reviewedLine(places, {})).toBe('0 of 3 reviewed');
+    expect(reviewedLine(places, {})).toBe('Nearby places reviewed: 0 of 3');
   });
 
   it('names the three states in the reader’s words', () => {

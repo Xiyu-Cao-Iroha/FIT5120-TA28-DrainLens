@@ -71,13 +71,13 @@ export const TOO_FAR_SHORT = 'Not offered for this address: other drains are nea
 /** The comparison map's key, step 1: three marks, three meanings. */
 export const MAP_KEY = {
   address: 'Your address',
-  comparable: 'Drain available to test',
-  other: 'Other drains (can’t be tested)',
+  comparable: 'Drain you can compare',
+  other: 'Other drains (no comparison available)',
 } as const;
 
 /** The legend line on the comparison map. */
 export const SUPPORT_LEGEND =
-  'Only teal-ringed drains can be tested. Most other pits are underground joins, or the council record does not list them as places where street water goes in. This does not show whether those pits work or whether the area may flood.';
+  'Only teal-ringed drains can be compared. Most other drains are underground joins, or the council record does not list them as places where street water goes in. This does not show whether those drains work or whether the area may flood.';
 
 /** What the map offers on a drain that can be compared. */
 export const COMPARE_HERE = 'Compare a blockage scenario at this drain';

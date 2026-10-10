@@ -6,6 +6,15 @@ Requested on the team's 10 October list, item 13, with a harness: read the
 product as a first-time resident rather than as a drainage expert, say what
 you think each thing does, then walk four journeys and report what misleads.
 
+> **A teammate reviewed this and revised the proposed wording on 11 October:
+> [PLAIN-ENGLISH-AUDIT-REVISED.md](./PLAIN-ENGLISH-AUDIT-REVISED.md).** The
+> revision is the one that was built. It keeps the observations below and
+> replaces most of the suggested text, and it catches a real defect in this
+> file's proposed home page block, which is named in that file and in the
+> superseded note further down.
+>
+> Read this one for what was found. Read the revision for what was written.
+
 **Build audited:** `develop` at `4fb774b`, run locally. Not the deployed site,
 which is seven merges behind and would have been the wrong thing to read.
 

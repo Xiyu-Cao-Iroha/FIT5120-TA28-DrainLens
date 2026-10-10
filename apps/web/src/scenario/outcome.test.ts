@@ -285,7 +285,14 @@ describe('the Iteration 2 wording', () => {
   it('names the two bands in plain words', () => {
     // The 14 September copy review replaced AC 3.1.3.e's band names.
     expect(BANDS['higher-than-baseline'].comparison).toBe('More water than with a clear drain');
-    expect(BANDS['no-clear-change'].comparison).toBe('No clear difference');
+    /*
+      **The summary row says what the heading says, since 11 October.** It
+      read *No clear difference* under a heading reading *No visible
+      difference nearby*, and the plain-English audit found readers taking
+      the two for two findings.
+    */
+    expect(BANDS['no-clear-change'].comparison).toBe('No visible difference nearby');
+    expect(BANDS['no-clear-change'].comparison).toBe(BANDS['no-clear-change'].band);
     expect(Object.values(BANDS).map((b) => b.band).join(' ')).not.toMatch(/baseline|change/i);
   });
 
@@ -325,7 +332,9 @@ describe('the Iteration 2 wording', () => {
     expect(e).toMatch(/does not show flood depth or water depth/i);
     expect(f).toMatch(/when floodwater would arrive/i);
     expect(g).toMatch(/flood probability or a risk score/i);
-    expect(h).toMatch(/did not find a clear difference from the clear-drain setting/);
+    // Reworded with the band it explains. What it must still say is the
+    // next two assertions, which are the limitation itself.
+    expect(h).toMatch(/did not separate the two cases/);
     expect(h).toMatch(/does not show whether this drain is blocked now/);
     expect(h).toMatch(/no effect in a real flood/);
     expect(i).toMatch(/only shows differences from the clear-drain setting/i);
@@ -334,12 +343,15 @@ describe('the Iteration 2 wording', () => {
   it('explains total rainfall without intensity, duration or forecast', () => {
     // AC 3.2.3.d and e.
     expect(RAINFALL_EXPLAINED).toMatch(/not a forecast/);
-    expect(RAINFALL_EXPLAINED).toMatch(/does not include rainfall duration or intensity/);
+    // Reworded 11 October to answer the question a reader actually has,
+    // which is *60 mm over how long*. The limit is the same one.
+    expect(RAINFALL_EXPLAINED).toMatch(/does not account for how quickly it falls/);
+    expect(RAINFALL_EXPLAINED).toMatch(/not a forecast/);
   });
 
   it('does not let the rainfall control imply a steady climb', () => {
     // AC 3.2.2.d.
-    expect(RAINFALL_CONTROL_NOTE).toMatch(/need not grow steadily with rainfall/);
+    expect(RAINFALL_CONTROL_NOTE).toMatch(/may not grow steadily with rainfall/);
   });
 
   it('states the simplified assumptions with their numbers, and how strongly to read the result', () => {
@@ -376,7 +388,7 @@ describe('the Blockage Flow copy', () => {
   });
 
   it('uses the prototype’s words on the result’s two buttons', () => {
-    expect(ACTION_LABELS['change-scenario']).toBe('Change the test');
+    expect(ACTION_LABELS['change-scenario']).toBe('Change my choices');
     expect(ACTION_LABELS['return-to-map']).toBe('Return to the map');
   });
 });

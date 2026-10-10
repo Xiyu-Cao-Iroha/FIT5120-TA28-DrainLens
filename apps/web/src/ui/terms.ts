@@ -69,7 +69,7 @@ export const FULL_MAP = 'Full map';
  * history is Greater Melbourne.
  */
 export const COVERAGE = {
-  map: 'Current map scope: City of Melbourne',
+  map: 'Map covers: City of Melbourne',
   addresses: 'Address search covers the City of Melbourne.',
   /** When the map fell back to Kensington, the addresses beyond it went with it. */
   addressesFallback:
