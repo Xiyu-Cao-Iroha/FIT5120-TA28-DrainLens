@@ -15,7 +15,7 @@
  * has a switch of its own — which is the substance those criteria protect,
  * whichever control happens to sit where.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   CHIP_KEYS,
@@ -26,6 +26,7 @@ import {
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { LAYER } from '../ui/terms.js';
+import { narrowNow } from '../ui/narrow.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
 import { WARNING_EDGE, WARNING_FILL } from './warnings.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
@@ -342,8 +343,33 @@ export function LayerChips({
   collapsible = false,
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
-  const [folded, setFolded] = useState(false);
+  /*
+    **Not folded on a phone, which was the first thing tried and was wrong.**
+
+    The six chips wrapped to four rows at 375 px and took the top half of
+    the map, so folding them looked like the fix. Once the row scrolls
+    instead of wrapping it is 36 px, and folding would hide what layers
+    exist behind a button labelled *Map layers*, which is a worse first
+    screen than a row the reader can push sideways: they can see there are
+    drains, pipes and water paths without pressing anything.
+
+    The scroll is `.map-chips` in `base.css`.
+  */
+  const [folded, setFolded] = useState(fold);
+  /*
+    The parent folds the rail when it opens a panel over the map.
+
+    **It skips its first run**, which it did not until 10 October and which
+    cost the phone default above: on mount `fold` is only its own default,
+    and syncing it immediately overwrote the state that had just read the
+    screen width. The prop is for changes, and this now listens for changes.
+  */
+  const synced = useRef(false);
   useEffect(() => {
+    if (!synced.current) {
+      synced.current = true;
+      return;
+    }
     setFolded(fold);
   }, [fold]);
   // A pulse is the tour pointing at one of these. Unfold for it.
@@ -363,6 +389,12 @@ export function LayerChips({
       // Named for the tour, which points at this row as a whole for its second
       // step and at four of its chips individually after that.
       data-tour="chips"
+      /*
+        One line that scrolls on a phone, a wrapping row above that.
+        `.map-chips` in `base.css`; `flexWrap` stays here because it is the
+        desktop behaviour and the query overrides it.
+      */
+      className="map-chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
       {/*
@@ -586,7 +618,16 @@ export function MapLegend({
    */
   readonly fold?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  /*
+    Closed on a phone, open above that.
+
+    At 375 px the legend covers about a third of the map, and the map is
+    what the reader opened. Closing it leaves the `› Show` control in
+    the same corner, so nothing is taken away. This is the one decision in
+    the phone layout a stylesheet cannot make, because it is an opening
+    state rather than a style; see `ui/narrow.ts`.
+  */
+  const [open, setOpen] = useState(() => !narrowNow());
   useEffect(() => {
     if (fold === true) setOpen(false);
   }, [fold]);
