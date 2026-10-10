@@ -97,3 +97,20 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: `Open Layers to show ${LAYER.ground} and ${LAYER.limited}.`,
   },
 ];
+
+/**
+ * The steps worth showing this reader.
+ *
+ * **Step one teaches the search box, and from 10 October somebody can arrive
+ * with their address already set.** The full map used to clear it on the way
+ * in; the team reversed that, so a reader who typed an address in a guide and
+ * then opened the full map was met by a coach mark telling them to search for
+ * one. A tour whose first instruction is already done is a tour the reader
+ * learns to dismiss.
+ *
+ * Dropped rather than skipped past, so the count underneath reads *Step 1 of
+ * 6* instead of opening on *Step 2 of 7* and inviting the question of what
+ * step one was.
+ */
+export const tourStepsFor = (hasAddress: boolean): readonly TourStep[] =>
+  hasAddress ? TOUR_STEPS.filter((step) => step.target !== 'address') : TOUR_STEPS;

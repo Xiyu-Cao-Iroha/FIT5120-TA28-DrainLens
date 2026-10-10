@@ -76,9 +76,27 @@ export const WARNING_MIN_SCALE = 1.25;
 export const WARNING_WIDTH_PX = 24;
 export const WARNING_HEIGHT_PX = 21;
 
-/** Whether the signs are on the map at all, for this layer state and zoom. */
-export function warningsVisible(lowAreasOn: boolean, scale: number): boolean {
-  return lowAreasOn && scale >= WARNING_MIN_SCALE;
+/**
+ * Whether the signs are on the map at all, for this layer state and zoom.
+ *
+ * **`nearAddress` turns the zoom floor off, and the floor's own reasoning is
+ * why.** It exists because a sign drawn over a whole neighbourhood is a claim
+ * about a street nobody can see, and because the council's worst view holds
+ * thirteen of them at 1.25 px/m. Neither is true of the before-rain checks:
+ * they are at most a handful, all within `PLACE_RADIUS_M` of an address the
+ * reader typed, and the plan beside the map numbers them.
+ *
+ * Reported twice, on 9 and 10 October, as *nothing happens when I press
+ * before rain check*. What happened was that the view opened a shade under
+ * 1.25 px/m in a narrow frame, so the signs the panel was talking about were
+ * not drawn, and the reader was being asked to zoom until they appeared.
+ *
+ * The low-areas layer keeps the floor. It is the case the floor was measured
+ * for.
+ */
+export function warningsVisible(on: boolean, scale: number, nearAddress = false): boolean {
+  if (!on) return false;
+  return nearAddress || scale >= WARNING_MIN_SCALE;
 }
 
 /**

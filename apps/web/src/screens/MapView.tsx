@@ -655,21 +655,83 @@ export function MapView({
     inside that threshold -- rather than adding a second rule about when to
     zoom.
   */
+  /*
+    One definition for "these signs are the checks, not the low areas".
+
+    The canvas, the sign's own callout and a place's card all have to agree,
+    and they agreed by each restating the condition until one of them did
+    not. `warningsVisible` takes it as an argument so there is one place to
+    read it from.
+  */
+  const warningsAnyZoom = layers.beforeRain && !layers.lowPoint && address !== null;
+
   const [checksOpened, setChecksOpened] = useState(0);
   const beforeRainOn = layers.beforeRain;
   useEffect(() => {
     if (beforeRainOn) setChecksOpened((was) => was + 1);
   }, [beforeRainOn]);
 
+  /*
+    Where the map goes when the checks are turned on.
+
+    **It fits the places, not a box around the address.** It used to fit a
+    fixed `PLACE_RADIUS_M` square, which is 400 m across whether the nearest
+    place is 30 m away or 190, and on a narrow frame that opened a shade
+    under `WARNING_MIN_SCALE` -- so the signs the panel was talking about
+    were not drawn at all. That is the 9 and 10 October report, twice: *press
+    before rain check and nothing happens*.
+
+    Two halves to the fix and this is one. The other is in `warningsVisible`,
+    which no longer holds these particular signs to a zoom floor; this one
+    makes sure every one of them is on screen rather than just drawable.
+
+    The address goes in with them, because the places are *near your address*
+    and a view of three triangles with no pin is a view of three triangles.
+    With no places, the box around the address is still the right answer: the
+    street drains panel is what opens there, and it is about that street.
+  */
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
+    const here: Local = [address.eastingM, address.northingM];
     const r = PLACE_RADIUS_M;
-    const corners: readonly Local[] = [
-      [address.eastingM - r, address.northingM - r],
-      [address.eastingM + r, address.northingM + r],
-    ];
-    return { key: `places:${address.label}:${String(checksOpened)}`, points: corners, reservePanel: false };
-  }, [layers.beforeRain, address, checksOpened]);
+    const points: readonly Local[] =
+      places.length === 0
+        ? [
+            [address.eastingM - r, address.northingM - r],
+            [address.eastingM + r, address.northingM + r],
+          ]
+        : [here, ...places.map((place) => place.at)];
+    return { key: `places:${address.label}:${String(checksOpened)}`, points, reservePanel: false };
+  }, [layers.beforeRain, address, places, checksOpened]);
+
+  /*
+    The first place's card, opened when the reader turns the checks on
+    (team, 10 October).
+
+    *And a popup*, in their words. Turning the checks on is asking what to
+    check, and a map of numbered triangles answers that only for somebody who
+    already knows to press one. The first is the nearest, which `placesNear`
+    orders them by.
+
+    **On the press, not on the state, and not inside a guide.** Both
+    qualifications were found by driving it. Epic 5's guide opens with this
+    layer already on (`opensWith`) and its first step is *Click Check before
+    heavy rain*, whose hint is *Place 1 opens straight away*: an effect
+    reading the state rather than the change put Place 1 up before the
+    reader had pressed anything, and the step then asked them to do a thing
+    that appeared already done. Inside a guide the cards are the guide's to
+    open.
+
+    With no places there is nothing to put up, and the street drains panel
+    opens there instead.
+  */
+  const checksWere = useRef(beforeRainOn);
+  useEffect(() => {
+    const turnedOn = beforeRainOn && !checksWere.current;
+    checksWere.current = beforeRainOn;
+    if (!turnedOn || guided) return;
+    setOpenPlace((was) => was ?? places[0]?.number ?? null);
+  }, [beforeRainOn, guided, places]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -1115,6 +1177,9 @@ export function MapView({
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
         warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
+        // The checks near an address are drawn at any zoom; the low areas
+        // layer keeps the floor `WARNING_MIN_SCALE` was measured for.
+        warningsNearAddress={warningsAnyZoom}
         numberOfWarning={(point) => (layers.beforeRain ? numberOf(places, point) : null)}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
@@ -1719,7 +1784,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale, warningsAnyZoom) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
@@ -1965,7 +2030,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         openPlace !== null &&
-        warningsVisible(true, viewport.scale) &&
+        warningsVisible(true, viewport.scale, warningsAnyZoom) &&
         (() => {
         const place = places.find((candidate) => candidate.number === openPlace);
         if (place === undefined) return null;
