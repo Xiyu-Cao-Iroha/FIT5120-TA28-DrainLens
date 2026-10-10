@@ -393,6 +393,20 @@ export const ASK_PRIVACY =
 /** While an answer is being found (Figma Q1). */
 export const FINDING_ANSWER = 'Finding an answer in the official guides…';
 
+/**
+ * What the panel says when it cannot get an answer at all.
+ *
+ * One sentence for every way the request can fail, because they are one
+ * fact to the person waiting: the assistant is not answering right now. It
+ * is named here rather than written twice in the panel, which is how the
+ * two copies of it came to differ from each other.
+ *
+ * It is deliberately not a reason. *The service returned 502*, or worse the
+ * text of a parser error, tells a resident nothing they can act on, and the
+ * reasons are in the console and the Cloud Run log where somebody can.
+ */
+export const CHAT_UNAVAILABLE = 'The chat assistant is temporarily unavailable.';
+
 /** The line over the plan link under an answer (Figma Q2). */
 export const IN_YOUR_PLAN = 'In your plan:';
 

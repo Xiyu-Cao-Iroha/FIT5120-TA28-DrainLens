@@ -121,7 +121,7 @@ The measurements behind the first three are in the acceptance file.
 | W5.3 | The privacy pass: the relevance selections and the printed plan reach no storage and no server |
 | W5.4 | Accessibility: the numbered markers, the relevance controls and the printed page |
 | W5.5 | Carried over from Iteration 2 — the copy audit's third tier (15 items), the drain aria-label that still says *the nearest you can test*, and the two model simplifications recorded in DECISIONS-PENDING.md |
-| W5.6 | ~~Operational: `--min-instances=1` on the API, and the gate password~~ — **both settled 4 October.** `drainlens-api` is back to `--min-instances=0` (revision `drainlens-api-00016-f65`), so no service pays for an idle instance; the first request after an idle period is a 0.74 s cold start, which is the trade. **The password is deliberately not being rotated** — the team's call, recorded in DECISIONS-PENDING.md §9 |
+| W5.6 | ~~Operational: `--min-instances=1` on the API, and the gate password~~ — **settled 4 October and half of it reversed on 10 October.** It read: *`drainlens-api` is back to `--min-instances=0`, so no service pays for an idle instance; the first request after an idle period is a 0.74 s cold start, which is the trade.* The team took the other side of that trade before the showcase: `drainlens-api` and `drainlens-dev` both run `--min-instances=1 --max-instances=2`, and five spaced requests to the address route measure 0.20 s with no cold start among them. **`drainlens-ai` is still at zero** and is the one where it hurts: it fetches a 79 MB model on a cold start and took over a minute to answer. **The password is deliberately not being rotated** — the team's call, recorded in DECISIONS-PENDING.md §9 |
 
 ---
 

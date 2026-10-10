@@ -15,6 +15,7 @@ import {
   ASK_PRIVACY,
   BACK_TO_PLAN,
   BASED_ON_YOUR_PLAN,
+  CHAT_UNAVAILABLE,
   FINDING_ANSWER,
   SUGGESTED,
   answerFor,
@@ -108,15 +109,42 @@ export function AskAboutGettingReady({
         }),
       });
 
-      const data = (await response.json()) as {
-        answer?: string;
-        sources?: ChatSource[];
-        error?: string;
-      };
+      /*
+        **Read as text first, parsed second, and the order is the fix.**
 
-      if (!response.ok) {
+        This used to call `response.json()` before looking at
+        `response.ok`. Every failure that answers with something other than
+        JSON then threw a `SyntaxError` out of the parser, and the catch
+        below put its message on screen: a resident asking how to get ready
+        for heavy rain was shown *Unexpected non-whitespace character after
+        JSON at position 4*.
+
+        That was not hypothetical. On 9 October the deployed API had no
+        `/api/chat` at all and answered `404 Not Found` as plain text, which
+        is exactly this path. The shapes that still produce it are a Cloud
+        Run gateway page, a proxy timeout and an HTML error from anything
+        between here and the service, and the service is slow enough to meet
+        them: `drainlens-ai` scales to zero and its first answer after an
+        idle period takes over a minute while it fetches a 79 MB model.
+
+        So the body is text until it has been successfully parsed. A reply
+        that is not JSON is a reply this panel cannot read, which is the
+        same thing to the reader as the service being unavailable, and it
+        says that.
+      */
+      const body = await response.text();
+
+      let data: { answer?: string; sources?: ChatSource[]; error?: string } = {};
+      let readable = true;
+      try {
+        data = JSON.parse(body) as typeof data;
+      } catch {
+        readable = false;
+      }
+
+      if (!response.ok || !readable) {
         throw new Error(
-          data.error ?? 'The chat assistant could not answer.',
+          (readable ? data.error : undefined) ?? CHAT_UNAVAILABLE,
         );
       }
 
@@ -139,10 +167,7 @@ export function AskAboutGettingReady({
           turn.id === id
             ? {
                 ...turn,
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : 'The chat assistant is temporarily unavailable.',
+                error: error instanceof Error ? error.message : CHAT_UNAVAILABLE,
               }
             : turn,
         ),
