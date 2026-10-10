@@ -122,8 +122,15 @@ export const PATHS: readonly {
 }[] = [
   {
     mode: 'drainage',
-    title: 'Recorded drainage',
-    body: 'Street drains near you and the pipes that join them.',
+    /*
+      **The title says what the reader will see, not what the record is.**
+      *Recorded drainage* led with the hedge, and a reader who has not yet
+      met an estimated layer has nothing to contrast it with; they had to
+      read the line underneath to find out it was about drains and pipes.
+      The hedge moves into that line, where it still does its work.
+    */
+    title: 'Street drains and pipes',
+    body: 'Explore council-recorded street drains near you and the pipes that join them.',
     accent: DAY.pit,
   },
   {
@@ -170,7 +177,14 @@ export const PATHS: readonly {
     mode: 'drainage-area',
     title: 'Report a drainage problem',
     body:
-      'Choose the issue, find the right contact, and copy or print the details to send yourself.',
+      /*
+        **`to send yourself` was two readings and one of them was wrong.**
+        It can mean *for you to send* or *email them to yourself*, and the
+        product does neither by itself. The revised audit split it into what
+        the reader does and what DrainLens does not, which is the same
+        promise the report screen already makes above its buttons.
+      */
+      'Choose the problem, find the right contact, and copy or print the details. DrainLens does not send the report for you.',
     accent: BOUNDARY_STROKE,
   },
 ];
@@ -1203,7 +1217,7 @@ function FloodMapCard({
                 background: `repeating-linear-gradient(135deg, ${HATCH_ON_LIGHT} 0 1.5px, ${RAMPS.activity[1] ?? line.base} 1.5px 4px)`,
               }}
             />
-            At least (+)
+            + means at least this many
           </span>
         </span>
         {/*

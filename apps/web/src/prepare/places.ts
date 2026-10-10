@@ -138,7 +138,13 @@ export function statusOf(relevance: Relevance): string {
  */
 export function reviewedLine(places: readonly Place[], relevance: Readonly<Record<number, Relevance>>): string {
   const reviewed = places.filter((place) => (relevance[place.number] ?? null) !== null).length;
-  return `${String(reviewed)} of ${String(places.length)} reviewed`;
+  /*
+    **Named, because *0 of 1 reviewed* reads as a score.** The product
+    already has to follow it with *It is not a safety or readiness score*,
+    and a label that needs a denial underneath is a label doing the wrong
+    job. Saying what is counted is shorter than denying what is not.
+  */
+  return `Nearby places reviewed: ${String(reviewed)} of ${String(places.length)}`;
 }
 
 /** The places that earn a reminder: only those marked as applying (AC 5.2.2). */

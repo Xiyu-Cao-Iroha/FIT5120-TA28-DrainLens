@@ -85,24 +85,29 @@ export function differenceSettings(
   });
 }
 
-const SETTING_NAME: Record<TestedBlockage, string> = {
-  'partly-blocked': 'Partly blocked',
-  'fully-blocked': 'Fully blocked',
-};
-
 /**
  * The hint on step 2, or null when the drain has no recorded difference.
  *
- * "In this model", because the census is of the model: it says where the
- * calculation separates the two settings, not where a real blockage floods.
+ * **It used to list the combinations and no longer does.** It read *In this
+ * model, a blockage at this drain shows a difference with: Partly blocked at
+ * 40 mm or 60 mm; Fully blocked at 20 mm or 40 mm or 60 mm*: two nested
+ * lists joined by a semicolon, which a reader has to decode before choosing
+ * anything. The plain-English audit's revision asked for the warning without
+ * the table, so the reader is told that some choices show nothing and finds
+ * out which by choosing.
+ *
+ * **The census is still what decides whether to say it.** A drain the model
+ * separates under no combination gets null rather than a sentence implying
+ * there is something to find; that is the same rule as before, and it is why
+ * this still reads the artefact rather than being a constant on the screen.
+ *
+ * *in this model* stays, because the census is of the model: it says where
+ * the calculation separates the two cases, not where a real blockage floods.
  */
 export function differenceHint(artefact: DifferencesArtefact | null, asset: string | null): string | null {
   const settings = differenceSettings(artefact, asset);
   if (settings.length === 0) return null;
-  const parts = settings.map(
-    (s) => `${SETTING_NAME[s.blockage]} at ${s.rainfallMm.map((mm) => `${String(mm)} mm`).join(' or ')}`,
-  );
-  return `In this model, a blockage at this drain shows a difference with: ${parts.join('; ')}.`;
+  return 'Some choices may show no visible difference in this model.';
 }
 
 /** Fetch and check it. A failure is an empty list, not a broken comparison. */
