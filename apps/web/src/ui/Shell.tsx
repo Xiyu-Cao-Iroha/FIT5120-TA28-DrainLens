@@ -147,6 +147,7 @@ export function Shell({
     >
       {masthead && (
         <header
+          className="shell__masthead"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -184,7 +185,14 @@ export function Shell({
             >
               DrainLens
             </strong>
+            {/*
+              Hidden under 560 px (`.shell__tagline`). It is three words of
+              reassurance beside a wordmark, and on a 375 px screen it wraps
+              to three lines and pushes the navigation off the row it shares.
+              The wordmark stays; what it costs to lose is a subtitle.
+            */}
             <span
+              className="shell__tagline"
               style={{
                 font: type(text.small, { leading: 1.3 }),
                 color: ink.subtle,
@@ -193,13 +201,32 @@ export function Shell({
               Local drainage explorer
             </span>
           </span>
-          <span style={{ marginLeft: 'auto' }}>{actions}</span>
+          {/*
+            The navigation scrolls sideways under 560 px rather than
+            wrapping or hiding behind a menu.
+
+            At 375 px the four links are about 440 px of text. Wrapping
+            them puts a second row under the wordmark on every screen;
+            a menu hides the four destinations the team spent 8 and
+            10 October adding. Scrolling keeps all four reachable and
+            keeps the header one row tall, and `scroll-snap` stops it
+            resting half way through a label.
+          */}
+          <span className="shell__actions" style={{ marginLeft: 'auto' }}>
+            {actions}
+          </span>
         </header>
       )}
 
       {(crumbs !== undefined || back !== undefined) && (
         <nav
           aria-label={crumbsLabel}
+          /*
+            The map has no masthead, so this row carries the site links and
+            needs the same treatment the masthead's got: see
+            `.shell__crumbs` in `base.css`.
+          */
+          className="shell__crumbs"
           style={{
             display: 'flex',
             alignItems: 'center',
