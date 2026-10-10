@@ -1,5 +1,7 @@
-fastapi
-uvicorn
-chromadb
-llama-cpp-python
-streamlit
+fastapi==0.142.2
+uvicorn==0.54.0
+chromadb==1.5.9
+llama-cpp-python==0.3.36
+pypdf==6.19.0
+streamlit==1.64.0
+pydantic==2.13.5

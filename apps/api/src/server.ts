@@ -21,6 +21,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GoogleAuth } from 'google-auth-library';
 
 import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
@@ -57,7 +58,7 @@ export const ALLOWED_SERVICES = ['drainlens', 'drainlens-dev', 'drainlens-iterat
  * so it is a constant rather than something to look up per service.
  */
 const RUN_HASH = '6et5y2lpgq-ts';
-
+const googleAuth = new GoogleAuth();
 /**
  * One service, as both the URLs Cloud Run answers on.
  *
@@ -371,33 +372,23 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
   }
 
   try {
-    const response = await fetch(
-      `${aiServiceUrl.replace(/\/$/, '')}/chat`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: body.message.trim(),
-        }),
+    const baseUrl = aiServiceUrl.replace(/\/$/, '');
+
+    const client = await googleAuth.getIdTokenClient(baseUrl);
+
+    const response = await client.request({
+      url: `${baseUrl}/chat`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    );
+      data: {
+        message: body.message.trim(),
+      },
+      timeout: 280_000,
+    });
 
-    if (!response.ok) {
-      console.error(
-        `AI service returned ${String(response.status)}`,
-      );
-
-      return c.json(
-        { error: 'The chat assistant is temporarily unavailable.' },
-        502,
-      );
-    }
-
-    const result = await response.json();
-
-    return c.json(result);
+    return c.json(response.data);
   } catch (error) {
     console.error('AI chat service request failed', error);
 
