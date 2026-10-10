@@ -1,134 +1,168 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090 800" width="1090" height="800"
-     role="img" aria-label="DrainLens system architecture. A build-time Python pipeline turns four open-data publishers into JSON artefacts, which are both baked into the site image and loaded into Cloud SQL. At run time a React app served by drainlens-dev asks drainlens-api for map, derived, trace, flood history and address data, and falls back to the bundled copy of each artefact when the API cannot answer. The blockage comparison runs in a Web Worker in the browser. drainlens-api reads Cloud SQL and forwards chat questions to a private drainlens-ai service running Llama 3.2 and ChromaDB.">
-  <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
-    </marker>
-    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#1f6f5c"/>
-    </marker>
-  </defs>
-
-  <g fill="currentColor" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
-
-    <!-- ================= build time ================= -->
-    <rect x="30" y="48" width="250" height="382" rx="10" fill="none" stroke="currentColor"
-          stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
-    <text x="44" y="40" font-size="11" letter-spacing="1.2" opacity="0.65">BUILD TIME · OFFLINE</text>
-
-    <rect x="48" y="66" width="214" height="146" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
-    <text x="60" y="88" font-size="13" font-weight="600">Open data</text>
-    <text x="60" y="110" font-size="11" opacity="0.85">City of Melbourne</text>
-    <text x="60" y="125" font-size="11" opacity="0.7">drains, pipes, roads, addresses,</text>
-    <text x="60" y="140" font-size="11" opacity="0.7">2018 point cloud</text>
-    <text x="60" y="162" font-size="11" opacity="0.85">Melbourne Water · subcatchments</text>
-    <text x="60" y="180" font-size="11" opacity="0.85">VICSES · flood call-outs</text>
-    <text x="60" y="198" font-size="11" opacity="0.85">ABS · population</text>
-
-    <line x1="155" y1="212" x2="155" y2="240" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-
-    <rect x="48" y="242" width="214" height="62" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
-    <text x="60" y="266" font-size="13" font-weight="600">pipeline/ · Python</text>
-    <text x="60" y="286" font-size="11" opacity="0.7">32 modules, run by hand</text>
-
-    <line x1="155" y1="304" x2="155" y2="332" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-
-    <rect x="48" y="334" width="214" height="80" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
-    <text x="60" y="358" font-size="13" font-weight="600">Artefacts</text>
-    <text x="60" y="378" font-size="11" opacity="0.7">12 JSON files</text>
-    <text x="60" y="394" font-size="11" opacity="0.7">+ 500 m terrain tiles</text>
-
-    <!-- ================= browser ================= -->
-    <rect x="330" y="48" width="730" height="215" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
-    <text x="344" y="40" font-size="11" letter-spacing="1.2" opacity="0.65">BROWSER</text>
-
-    <rect x="348" y="70" width="215" height="88" rx="7" fill="none" stroke="#1f6f5c" stroke-width="1.6"/>
-    <text x="360" y="94" font-size="13" font-weight="600" fill="#1f6f5c">Bundled artefacts</text>
-    <text x="360" y="114" font-size="11" fill="#1f6f5c" opacity="0.9">fallback when the API</text>
-    <text x="360" y="130" font-size="11" fill="#1f6f5c" opacity="0.9">cannot answer, and the</text>
-    <text x="360" y="146" font-size="11" fill="#1f6f5c" opacity="0.9">address suggestions</text>
-
-    <rect x="588" y="70" width="215" height="172" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="600" y="94" font-size="13" font-weight="600">React SPA</text>
-    <text x="600" y="116" font-size="11" opacity="0.7">TypeScript, strict</text>
-    <text x="600" y="132" font-size="11" opacity="0.7">canvas map, no map library</text>
-    <text x="600" y="156" font-size="11" opacity="0.85">The report is made here</text>
-    <text x="600" y="172" font-size="11" opacity="0.7">and sent by nobody</text>
-    <text x="600" y="196" font-size="11" opacity="0.85">Session in memory only</text>
-    <text x="600" y="212" font-size="11" opacity="0.7">no storage, no cookie</text>
-
-    <rect x="828" y="70" width="215" height="88" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
-    <text x="840" y="94" font-size="13" font-weight="600">Scenario worker</text>
-    <text x="840" y="114" font-size="11" opacity="0.7">the clear vs blocked</text>
-    <text x="840" y="130" font-size="11" opacity="0.7">comparison runs in the</text>
-    <text x="840" y="146" font-size="11" opacity="0.7">browser, not on a server</text>
-
-    <line x1="563" y1="114" x2="584" y2="114" stroke="#1f6f5c" stroke-width="1.6"
-          stroke-dasharray="5 3" marker-end="url(#ag)"/>
-    <line x1="807" y1="114" x2="824" y2="114" stroke="currentColor" stroke-width="1.4" marker-start="url(#a)" marker-end="url(#a)"/>
-
-    <!-- ================= services ================= -->
-    <rect x="348" y="330" width="250" height="150" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="362" y="320" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN</text>
-    <text x="362" y="356" font-size="13" font-weight="600">drainlens-dev</text>
-    <text x="362" y="378" font-size="11" opacity="0.7">nginx, static site</text>
-    <text x="362" y="394" font-size="11" opacity="0.7">serves the app and a copy</text>
-    <text x="362" y="410" font-size="11" opacity="0.7">of every artefact</text>
-    <text x="362" y="434" font-size="11" opacity="0.85">Basic auth gate</text>
-    <text x="362" y="458" font-size="11" opacity="0.6">min 1 · max 2</text>
-
-    <rect x="640" y="330" width="250" height="150" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="654" y="320" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN</text>
-    <text x="654" y="356" font-size="13" font-weight="600">drainlens-api</text>
-    <text x="654" y="378" font-size="11" opacity="0.7">Hono + pg, public</text>
-    <text x="654" y="400" font-size="11" opacity="0.85">GET map · derived · trace</text>
-    <text x="654" y="416" font-size="11" opacity="0.85">GET flood-history</text>
-    <text x="654" y="432" font-size="11" opacity="0.85">POST addresses/search</text>
-    <text x="654" y="448" font-size="11" opacity="0.85">POST chat</text>
-    <text x="654" y="468" font-size="11" opacity="0.6">min 1 · max 2</text>
-
-    <!-- ================= downstream ================= -->
-    <rect x="430" y="560" width="240" height="95" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="444" y="550" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD SQL</text>
-    <text x="444" y="586" font-size="13" font-weight="600">Postgres 16</text>
-    <text x="444" y="608" font-size="11" opacity="0.7">18 tables: the drainage</text>
-    <text x="444" y="624" font-size="11" opacity="0.7">network, the flood board,</text>
-    <text x="444" y="640" font-size="11" opacity="0.7">62,397 addresses</text>
-
-    <rect x="720" y="560" width="340" height="95" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="734" y="550" font-size="10" letter-spacing="0.8" opacity="0.6">CLOUD RUN · PRIVATE</text>
-    <text x="734" y="586" font-size="13" font-weight="600">drainlens-ai</text>
-    <text x="734" y="608" font-size="11" opacity="0.7">FastAPI · Llama 3.2 3B (GGUF) · ChromaDB</text>
-    <text x="734" y="624" font-size="11" opacity="0.7">retrieval over the official guides</text>
-    <text x="734" y="640" font-size="11" opacity="0.6">min 1 · max 1 · 8 GiB · 12 to 35 s an answer</text>
-
-    <!-- ================= arrows ================= -->
-    <line x1="655" y1="246" x2="500" y2="326" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="548" y="276" font-size="10" text-anchor="middle" opacity="0.75">the app, and every</text>
-    <text x="548" y="289" font-size="10" text-anchor="middle" opacity="0.75">artefact as a fallback</text>
-
-    <line x1="736" y1="246" x2="770" y2="326" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="784" y="278" font-size="10" opacity="0.75">six routes, tried first</text>
-    <text x="784" y="291" font-size="10" opacity="0.75">for every artefact</text>
-
-    <line x1="700" y1="484" x2="610" y2="556" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="628" y="522" font-size="10" text-anchor="end" opacity="0.75">SQL over a</text>
-    <text x="628" y="535" font-size="10" text-anchor="end" opacity="0.75">private socket</text>
-
-    <line x1="828" y1="484" x2="868" y2="556" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="880" y="516" font-size="10" opacity="0.75">POST /chat with a</text>
-    <text x="880" y="529" font-size="10" opacity="0.75">Google identity token</text>
-
-    <line x1="262" y1="372" x2="344" y2="372" stroke="currentColor" stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="303" y="364" font-size="10" text-anchor="middle" opacity="0.75">in the image</text>
-
-    <polyline points="155,414 155,730 540,730 540,659" fill="none" stroke="currentColor"
-              stroke-width="1.4" marker-end="url(#a)"/>
-    <text x="300" y="722" font-size="10" opacity="0.75">loaded by a Cloud Run job, once per extent</text>
-
-    <!-- ================= the claim ================= -->
-    <rect x="330" y="752" width="730" height="34" rx="6" fill="none" stroke="#1f6f5c"
-          stroke-width="1.2" stroke-dasharray="5 3" opacity="0.8"/>
-    <text x="348" y="774" font-size="11" fill="#1f6f5c">Green is the fallback copy: with the API or the database down, the site still draws a map and still finds an address.</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 1499" width="1160" height="1499" role="img" aria-label="DrainLens system architecture as deployed on 10 October 2026: a build-time Python pipeline, three Cloud Run services, Cloud SQL, and a browser that holds a fallback copy of every artefact and runs the blockage comparison itself.">
+<title>DrainLens system architecture</title>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1A1A1A"/></marker></defs>
+<rect width="1160" height="1499" fill="#FFFFFF"/>
+<text x="32" y="46" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="19" font-weight="600" fill="#1A1A1A" >DrainLens · system architecture</text>
+<text x="32" y="68" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#6B6B6B" >Iteration 3, as deployed 10 October 2026 · Cloud Run and Cloud SQL, australia-southeast1, project fit5120-504507</text>
+<line x1="32" y1="84" x2="1128" y2="84" stroke="#999999" stroke-width="1"/>
+<text x="32" y="110" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="#6B6B6B" letter-spacing="0.09em" >BUILD TIME · OFFLINE, RUN BY HAND, NEVER DEPLOYED</text>
+<line x1="32" y1="119" x2="1128" y2="119" stroke="#DDDDDD" stroke-width="1"/>
+<rect x="32" y="132" width="330" height="236" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="48" y="158" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Published data</text>
+<text x="48" y="174" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >six datasets, four publishers</text>
+<line x1="48" y1="186" x2="346" y2="186" stroke="#DDDDDD" stroke-width="1"/>
+<text x="48" y="206" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Stormwater pits · drainpipes · road corridors</text>
+<text x="48" y="221" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >street names · street addresses</text>
+<text x="48" y="236" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >City of Melbourne Open Data Portal, CC BY 4.0</text>
+<text x="48" y="259" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Photogrammetric point cloud, about 4 GB, fetched</text>
+<text x="48" y="274" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >a tile at a time by HTTP range request</text>
+<text x="48" y="297" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Melbourne Water subcatchments, from the feature</text>
+<text x="48" y="312" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >service: 35 of 3,409 reach the council extent</text>
+<text x="48" y="335" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >VICSES incidents per SA1, 2009 to 2015, CC BY 4.0</text>
+<text x="48" y="350" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >ABS ASGS 2011 for the area names, CC BY 2.5 AU</text>
+<rect x="394" y="132" width="330" height="236" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="410" y="158" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Python pipeline</text>
+<text x="410" y="174" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >pipeline/ · 32 modules · 713 tests</text>
+<line x1="410" y1="186" x2="708" y2="186" stroke="#DDDDDD" stroke-width="1"/>
+<text x="410" y="206" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Ground filter over the point cloud, then bare-earth</text>
+<text x="410" y="221" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >surface, conditioned surface, D8 flow field,</text>
+<text x="410" y="236" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >depressions, and the derived layers on the map</text>
+<text x="410" y="259" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Drainage graph and downstream trace resolved here,</text>
+<text x="410" y="274" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >because map.json cannot tell a pipe clipped at our</text>
+<text x="410" y="289" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >boundary from one the council never finished</text>
+<text x="410" y="312" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Each address matched to one subcatchment against</text>
+<text x="410" y="327" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >the service geometry, not the drawn rings: 62,396 of</text>
+<text x="410" y="342" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >62,397 in exactly one, none in two, one in none</text>
+<rect x="756" y="132" width="372" height="236" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="772" y="158" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Versioned artefacts</text>
+<text x="772" y="174" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >apps/web/public/data · committed to the repository</text>
+<line x1="772" y1="186" x2="1112" y2="186" stroke="#DDDDDD" stroke-width="1"/>
+<text x="772" y="206" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >addresses.json  1.4 MB · 62,397 addresses, by street</text>
+<text x="772" y="221" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >map.json  348 KB · pits, pipes, roads, street labels</text>
+<text x="772" y="236" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >derived.json  172 KB · the calculated layers</text>
+<text x="772" y="251" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >sa2-points.json  180 KB · the flood area boundaries</text>
+<text x="772" y="266" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >address-catchments.json  120 KB · address to area</text>
+<text x="772" y="281" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >subcatchments.json  64 KB · 35 boundaries</text>
+<text x="772" y="296" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >trace.json  40 KB · the downstream graph</text>
+<text x="772" y="311" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >five smaller files, and 424 terrain tiles as WebP</text>
+<text x="772" y="334" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Every value carries a basis saying where it came</text>
+<text x="772" y="349" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >from: recorded, derived, assumed or inferred.</text>
+<line x1="364" y1="250" x2="390" y2="250" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<line x1="726" y1="250" x2="752" y2="250" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="32" y="408" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="#6B6B6B" letter-spacing="0.09em" >DEPLOYED · GOOGLE CLOUD</text>
+<line x1="32" y1="417" x2="1128" y2="417" stroke="#DDDDDD" stroke-width="1"/>
+<rect x="394" y="430" width="330" height="122" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="410" y="456" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Cloud Run job · drainlens-migrate</text>
+<text x="410" y="472" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >built from the same image as the API</text>
+<line x1="410" y1="484" x2="708" y2="484" stroke="#DDDDDD" stroke-width="1"/>
+<text x="410" y="504" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Applies numbered migrations, then loads the published</text>
+<text x="410" y="519" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >artefacts in one transaction. Six migrations so far;</text>
+<text x="410" y="534" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >006 added the addresses, which used to be a file only.</text>
+<rect x="756" y="430" width="372" height="399" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="772" y="456" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Cloud SQL · PostgreSQL 16</text>
+<text x="772" y="472" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >db-f1-micro · no authorised network</text>
+<line x1="772" y1="484" x2="1112" y2="484" stroke="#DDDDDD" stroke-width="1"/>
+<text x="772" y="504" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Eighteen tables. Reached only through the Cloud SQL</text>
+<text x="772" y="519" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >connector, over TLS, with IAM: a public address that</text>
+<text x="772" y="534" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >accepts no direct connection.</text>
+<text x="772" y="557" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >The connection string lives in Secret Manager, never</text>
+<text x="772" y="572" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >in a deploy command and never in the repository.</text>
+<text x="772" y="595" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Derived from the artefacts rather than written by the</text>
+<text x="772" y="610" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >pipeline: one derivation, one writer, one truth.</text>
+<text x="772" y="633" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >address and address_street arrived on 10 October.</text>
+<text x="772" y="648" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Until then no table held an address, and the search</text>
+<text x="772" y="663" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >ran only in the browser. DATABASE-DESIGN.md records</text>
+<text x="772" y="678" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >what moving that line cost.</text>
+<rect x="32" y="586" width="330" height="243" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="48" y="612" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Cloud Run · drainlens-dev</text>
+<text x="48" y="628" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >nginx · static · Basic Auth in the container · min 1, max 2</text>
+<line x1="48" y1="640" x2="346" y2="640" stroke="#DDDDDD" stroke-width="1"/>
+<text x="48" y="660" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >index.html, hashed bundles, the self-hosted font, and</text>
+<text x="48" y="675" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >a copy of every artefact the browser falls back to.</text>
+<text x="48" y="698" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >The htpasswd file is built at start-up from the</text>
+<text x="48" y="713" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >environment. Without it the container refuses to start</text>
+<text x="48" y="728" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >rather than serving an ungated site.</text>
+<rect x="394" y="586" width="330" height="243" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="410" y="612" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Cloud Run · drainlens-api</text>
+<text x="410" y="628" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >Node · Hono · public · min 1, max 2</text>
+<line x1="410" y1="640" x2="708" y2="640" stroke="#DDDDDD" stroke-width="1"/>
+<text x="410" y="660" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >GET  /health</text>
+<text x="410" y="675" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >GET  /api/map/:extent · /api/derived/:extent</text>
+<text x="410" y="690" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >GET  /api/trace/:extent · /api/flood-history</text>
+<text x="410" y="705" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >POST /api/addresses/search</text>
+<text x="410" y="720" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >POST /api/chat</text>
+<text x="410" y="743" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >The two POSTs are new in Iteration 3 and are the only</text>
+<text x="410" y="758" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >routes that take a body. Neither is cached and neither</text>
+<text x="410" y="773" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >is logged: the request log is excluded at the sink.</text>
+<text x="410" y="796" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >CORS allow-list. Artefacts max-age=300, the two POSTs</text>
+<text x="410" y="811" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >no-store.</text>
+<rect x="756" y="863" width="372" height="160" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="772" y="889" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Cloud Run · drainlens-ai</text>
+<text x="772" y="905" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >FastAPI · private, no public URL · min 1, max 1 · 8 GiB</text>
+<line x1="772" y1="917" x2="1112" y2="917" stroke="#DDDDDD" stroke-width="1"/>
+<text x="772" y="937" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Llama 3.2 3B as GGUF, with ChromaDB over the official</text>
+<text x="772" y="952" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >guidance documents. Reached only by drainlens-api,</text>
+<text x="772" y="967" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >with a Google identity token and roles/run.invoker.</text>
+<text x="772" y="990" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Measured on 10 October: 12 to 35 seconds an answer,</text>
+<text x="772" y="1005" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >and over a minute on the first after an idle period.</text>
+<line x1="726" y1="491" x2="752" y2="491" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="739" y="483" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="middle" >writes</text>
+<line x1="726" y1="707.5" x2="752" y2="707.5" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="739" y="699.5" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="middle" >reads</text>
+<line x1="654" y1="831" x2="826" y2="859" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="836" y="853" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="start" >POST /chat, identity token</text>
+<line x1="906" y1="370" x2="609" y2="426" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="792" y="414" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="start" >loaded by the job</text>
+<polyline points="776,370 776,388 197,388 197,582" fill="none" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="207" y="491" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="start" >baked into the site image</text>
+<text x="32" y="1097" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="#6B6B6B" letter-spacing="0.09em" >IN THE BROWSER</text>
+<line x1="32" y1="1106" x2="1128" y2="1106" stroke="#DDDDDD" stroke-width="1"/>
+<rect x="32" y="1119" width="1096" height="242" rx="3" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="48" y="1145" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >React + TypeScript, one canvas</text>
+<text x="48" y="1161" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" >apps/web · 101 test files, 1,725 tests across the workspace · session state in memory for the life of the tab, and one localStorage key: drainlens.tour.seen</text>
+<line x1="48" y1="1173" x2="1112" y2="1173" stroke="#DDDDDD" stroke-width="1"/>
+<rect x="48" y="1177" width="252.5" height="166" rx="3" fill="#F4F4F4" stroke="#1A1A1A" stroke-width="1"/>
+<text x="64" y="1203" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >The map</text>
+<line x1="64" y1="1215" x2="284.5" y2="1215" stroke="#DDDDDD" stroke-width="1"/>
+<text x="64" y="1235" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >One affine transform on a canvas.</text>
+<text x="64" y="1250" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >No map library, no basemap, and no</text>
+<text x="64" y="1265" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >third-party tile ever requested.</text>
+<text x="64" y="1280" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Metres from the extent corner.</text>
+<rect x="318.5" y="1177" width="252.5" height="166" rx="3" fill="#F4F4F4" stroke="#1A1A1A" stroke-width="1"/>
+<text x="334.5" y="1203" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Address search · both ways</text>
+<line x1="334.5" y1="1215" x2="555" y2="1215" stroke="#DDDDDD" stroke-width="1"/>
+<text x="334.5" y="1235" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >Suggestions come from the bundled</text>
+<text x="334.5" y="1250" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >index on every keystroke and reach</text>
+<text x="334.5" y="1265" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >no server. A submitted search goes</text>
+<text x="334.5" y="1280" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >to the API, and falls back to that</text>
+<text x="334.5" y="1295" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >same index. packages/address ranks</text>
+<text x="334.5" y="1310" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >for both, so one house cannot get</text>
+<text x="334.5" y="1325" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >two answers.</text>
+<rect x="589" y="1177" width="252.5" height="166" rx="3" fill="#F4F4F4" stroke="#1A1A1A" stroke-width="1"/>
+<text x="605" y="1203" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >Scenario engine</text>
+<line x1="605" y1="1215" x2="825.5" y2="1215" stroke="#DDDDDD" stroke-width="1"/>
+<text x="605" y="1235" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >packages/scenario, in a Web Worker.</text>
+<text x="605" y="1250" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >On a route since Iteration 2: the</text>
+<text x="605" y="1265" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >clear against blocked comparison</text>
+<text x="605" y="1280" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >runs in the browser, not a server.</text>
+<rect x="859.5" y="1177" width="252.5" height="166" rx="3" fill="#F4F4F4" stroke="#1A1A1A" stroke-width="1"/>
+<text x="875.5" y="1203" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1A1A1A" >The report, and the question</text>
+<line x1="875.5" y1="1215" x2="1096" y2="1215" stroke="#DDDDDD" stroke-width="1"/>
+<text x="875.5" y="1235" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >The report is built here and printed</text>
+<text x="875.5" y="1250" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >or copied here. Street and suburb</text>
+<text x="875.5" y="1265" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >only, never the house number.</text>
+<text x="875.5" y="1288" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >A question typed into the assistant</text>
+<text x="875.5" y="1303" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >is the one thing a reader sends.</text>
+<text x="875.5" y="1318" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#1A1A1A" >It carries no address.</text>
+<line x1="197" y1="831" x2="197" y2="1115" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="207" y="1071" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="start" >page, bundle, fallback copies</text>
+<line x1="559" y1="831" x2="559" y2="1115" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#head)"/>
+<text x="569" y="1071" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="start" >six routes, asked first</text>
+<text x="1128" y="1049" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#6B6B6B" text-anchor="end" >Every artefact is asked of the API first and falls back to the copy in the site container. The footer does not say which answered, only that the fallback map is smaller.</text>
+<line x1="32" y1="1395" x2="1128" y2="1395" stroke="#999999" stroke-width="1"/>
+<text x="32" y="1415" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="#6B6B6B" letter-spacing="0.09em" >WHAT MUST STAY TRUE</text>
+<text x="32" y="1437" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#1A1A1A" >·  AD1 · no accounts and no retained IP. The _Default sink excludes LOG_ID(run.googleapis.com/requests), re-verified on 10 October with a positive control: real traffic that afternoon, zero request-log entries in seven days.</text>
+<text x="32" y="1453" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#1A1A1A" >·  Two things now leave the browser and both were decided, not drifted: a submitted address search and a typed question. Neither is stored, neither is cached on what was typed, and the report still leaves by no route at all.</text>
+<text x="32" y="1469" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#1A1A1A" >·  The house number does not travel. The report shows street and suburb, and ReportWhere has no field for a number, so no future caller can pass one.</text>
+<text x="32" y="1485" font-family="'Segoe UI', Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="#1A1A1A" >·  packages/schema holds one definition of provenance and vocabulary, and packages/address one ranking for the browser and the API, so a decision made in either cannot drift between its two callers.</text>
 </svg>
