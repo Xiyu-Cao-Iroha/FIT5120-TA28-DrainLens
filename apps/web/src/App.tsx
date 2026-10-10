@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from '@drainlens/address';
 import { demonstrationAddress } from './address/demonstration.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
@@ -45,6 +45,7 @@ import type { SolvedPosition } from './scenario/worker.js';
 import {
   INITIAL_SESSION,
   type Session,
+  type MapOrigin,
   type SessionEvent,
   type SupportedAddress,
   reduce,
@@ -339,21 +340,7 @@ export function App() {
           credits={credits}
           extentName={loaded.extentName}
           actions={
-            <SiteNav
-              current="home"
-              onOpenHome={() => {
-                dispatch({ type: 'go-home' });
-              }}
-              onOpenGuides={() => {
-                dispatch({ type: 'explore-chosen' });
-              }}
-              onOpenHistory={() => {
-                dispatch({ type: 'history-opened' });
-              }}
-              onOpenFullMap={() => {
-                dispatch({ type: 'map-opened' });
-              }}
-            />
+            <SiteNav {...siteNavProps(dispatch, 'home')} />
           }
         >
           <Home
@@ -415,6 +402,12 @@ export function App() {
               : creditsForSources([areas.data.scope.source, areas.data.scope.geographySource, areas.data.population.source])
           }
           creditNotice={FLOOD_CHANGES_NOTICE}
+          /*
+            Reported on 10 October: this screen had a breadcrumb saying how
+            the reader got here and nothing saying where else they could go.
+            It is the board's map, so the board is the page it belongs to.
+          */
+          actions={<SiteNav {...siteNavProps(dispatch, 'history', 'history')} />}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -465,21 +458,7 @@ export function App() {
           ])}
           creditNotice={BOARD_CHANGES_NOTICE}
           actions={
-            <SiteNav
-              current="history"
-              onOpenHome={() => {
-                dispatch({ type: 'go-home' });
-              }}
-              onOpenGuides={() => {
-                dispatch({ type: 'explore-chosen' });
-              }}
-              onOpenHistory={() => {
-                dispatch({ type: 'history-opened' });
-              }}
-              onOpenFullMap={() => {
-                dispatch({ type: 'map-opened', from: 'history' });
-              }}
-            />
+            <SiteNav {...siteNavProps(dispatch, 'history', 'history')} />
           }
           back={{
             label: 'Home',
@@ -551,21 +530,7 @@ export function App() {
           credits={credits}
           extentName={loaded.extentName}
           actions={
-            <SiteNav
-              current="tutorial"
-              onOpenHome={() => {
-                dispatch({ type: 'go-home' });
-              }}
-              onOpenGuides={() => {
-                dispatch({ type: 'explore-chosen' });
-              }}
-              onOpenHistory={() => {
-                dispatch({ type: 'history-opened' });
-              }}
-              onOpenFullMap={() => {
-                dispatch({ type: 'map-opened' });
-              }}
-            />
+            <SiteNav {...siteNavProps(dispatch, 'tutorial')} />
           }
         >
           <Choose
@@ -961,6 +926,17 @@ export function App() {
           credits={credits}
           extentName={loaded.extentName}
           {...(leave === undefined ? {} : { back: leave })}
+          /*
+            **Marked as the tutorial, and given no link of its own.**
+
+            The team's note of 10 October: *this page shows under the
+            tutorial branch, no separate navigation button for it.* The
+            comparison is reached from the guide chooser and from the
+            homepage's own band, and a fifth item in a four-item bar for a
+            screen nobody navigates to directly would be a destination the
+            bar invents.
+          */
+          actions={<SiteNav {...siteNavProps(dispatch, 'tutorial')} />}
           crumbs={crumbs}
         >
           {children}
@@ -1225,6 +1201,7 @@ function MapScreen({
       />
       {touring && (
         <Tour
+          hasAddress={session.address !== null}
           onClose={() => {
             setTouring(false);
           }}
@@ -1325,6 +1302,36 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * about the past across Greater Melbourne the same weight as the way into
  * everything else. It is one of the two choices behind this button now.
  */
+/**
+ * The four destinations, wired to the reducer.
+ *
+ * **Written once because there are now five screens wearing them**, and four
+ * copies of a `dispatch` is four places for one of them to be wrong. The
+ * caller says which page it is on and where the full map should think it was
+ * opened from; everything else is the same everywhere.
+ */
+function siteNavProps(
+  dispatch: (event: SessionEvent) => void,
+  current: SiteNavProps['current'],
+  from: MapOrigin = 'home',
+): SiteNavProps {
+  return {
+    current,
+    onOpenHome: () => {
+      dispatch({ type: 'go-home' });
+    },
+    onOpenGuides: () => {
+      dispatch({ type: 'explore-chosen' });
+    },
+    onOpenHistory: () => {
+      dispatch({ type: 'history-opened' });
+    },
+    onOpenFullMap: () => {
+      dispatch({ type: 'map-opened', from });
+    },
+  };
+}
+
 /**
  * The homepage's navigation bar.
  *

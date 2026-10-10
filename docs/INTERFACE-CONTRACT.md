@@ -10,9 +10,17 @@ Read the last section first if you are short of time. Most of this document desc
 
 ## The shape of the system, in one paragraph
 
-**Almost nothing goes to a server.** The map, the terrain, the drainage network and the address index are static files built offline and served as-is. The scenario engine runs in a Web Worker in the browser. The address search runs against an index that ships with the site. A resident can use the entire product — search an address, follow the drainage, run a blockage comparison, read the result — **without a single request that says anything about them**.
+**Almost nothing goes to a server.** The map, the terrain, the drainage network and the address index are static files built offline and served as-is, or the same data from Postgres where the API answers. The scenario engine runs in a Web Worker in the browser. A resident can follow the drainage, run a blockage comparison and read the result **without a single request that says anything about them**.
 
-That is not an optimisation. It is AD1: the product has no accounts and no identity, and the cheapest way to keep a promise about data is to never receive it.
+> **Two exceptions since October 2026, and they are the whole of the list.**
+>
+> **A submitted address search** goes to `POST /api/addresses/search` (9 October). The suggestions under the field do not — they are drawn from the index in memory on every keystroke — and neither does anything else about the session. The paragraph above used to end *search an address* among the things that reach nobody, and it no longer can.
+>
+> **A question typed into the assistant** goes to `POST /api/chat` and on to a retrieval service (8 October, DECISIONS-PENDING.md §10). It carries the question and not the address.
+>
+> Both are decisions the team took and recorded rather than drift. Neither is held: no row, no cache keyed on what was typed, and the Cloud Run request log is excluded at the sink before entries are written.
+
+That is not an optimisation. It is AD1: the product has no accounts and no identity. **AD1 is about what is held, not about what crosses a wire** — the same distinction `DATABASE-DESIGN.md` draws against "no database" — and the two routes above are inside it because nothing survives them. What this contract still forbids is an endpoint that *keeps* something about a resident, and there is none.
 
 ---
 

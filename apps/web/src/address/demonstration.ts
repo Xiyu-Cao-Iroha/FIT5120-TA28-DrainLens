@@ -34,7 +34,7 @@
  * screens agree with the tests.
  */
 
-import type { AddressIndex, IndexedAddress } from './search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 
 /**
  * The label to offer, matched case-insensitively against the index.

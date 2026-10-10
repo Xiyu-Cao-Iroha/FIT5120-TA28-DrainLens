@@ -249,6 +249,22 @@ jobs:
       - name: Install
         run: npm ci
 
+      # **The workspace packages have to be built before this suite runs.**
+      #
+      # It was not needed until 9 October, when `apps/api/src/load.ts` began
+      # importing `@drainlens/address`. The suite reaches the API through its
+      # source -- `../src/load.js` -- which vitest transforms, but a workspace
+      # package is resolved through its `package.json`, and that points at
+      # `dist/`. Without this step the whole suite fails to collect with
+      # *Failed to resolve entry for package "@drainlens/address"*, which it
+      # did on the pull request that added the import.
+      #
+      # `check` never hit it because `npm run typecheck` is `tsc --build` and
+      # leaves `dist/` behind. This job does not run that, so it builds the
+      # packages it needs and nothing else.
+      - name: Build the shared packages
+        run: npm run build --workspace packages/address --workspace packages/schema --workspace packages/scenario
+
       # The suite applies the migration itself and loads the published
       # artefacts, so there is no fixture to keep in step with the schema.
       - name: Test against Postgres

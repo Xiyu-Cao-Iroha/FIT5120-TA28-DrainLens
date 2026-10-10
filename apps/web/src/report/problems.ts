@@ -27,7 +27,6 @@
  * another organisation's behalf.
  */
 
-import { type ReportPlace, placeLine, placeTitle } from './place.js';
 import {
   COUNCIL_FORM,
   COUNCIL_URGENT,
@@ -58,57 +57,41 @@ export interface ProblemType {
   readonly urgent: boolean;
 }
 
-/** One line of the recommended information: what it is, and what to have ready. */
-export interface IncludeItem {
-  readonly id: string;
-  readonly title: string;
-  /** Filled in for the reader where the product already knows it. */
-  readonly detail: string;
-}
-
 /**
- * The heading over that list (renamed 8 October 2026, on the team's list).
+ * The heading over the summary (renamed twice, and the second time is why).
  *
  * It was *What to include*, over four squares that looked like a form the
- * reader had to fill in before the buttons below would work. Nothing here is
- * a field and nothing is submitted: it is what these organisations ask for,
- * said before the reader rings one. The name says which of the two it is.
- */
-export const RECOMMENDED_INFORMATION = 'Recommended information for reporting';
-
-/**
- * What to have ready, whoever it goes to (AC 6.3.2).
+ * reader had to fill in before the buttons below would work. On 8 October it
+ * became *Recommended information for reporting*, which fixed the mood and
+ * left the shape: still a list of prompts.
  *
- * `location` carries the reader's address where there is one, because it is
- * the first thing every one of these organisations asks for and the product
- * already knows it.
+ * **On 10 October it stopped being a list of prompts.** The team's note was
+ * that the report should show what it knows rather than ask for it, and most
+ * of it is known by the time somebody presses Copy: the street, the drainage
+ * area, the drain they chose, the problem they picked, the date. Those are
+ * fields with answers in them now, built once in `reportSummary` and
+ * rendered from the same array on screen and on paper. `whatToInclude` was
+ * the second copy of that list and is gone.
  */
-export function whatToInclude(address: string | null, place: ReportPlace): readonly IncludeItem[] {
-  return [
-    {
-      id: 'location',
-      title: 'Location',
-      detail: address === null || address === '' ? 'The street address or nearest cross street' : address,
-    },
-    { id: 'when', title: 'When', detail: 'Date and time you saw it' },
-    // The parenthetical is on the printed copy too, where it is the answer
-    // to the question a printout raises: nothing is uploaded here, so the
-    // photographs go to the organisation the same way the report does.
-    { id: 'photos', title: 'Photos', detail: 'Taken from a safe place (not included in print)' },
-    {
-      id: 'drain',
-      // AC 6.3.2: only where the reader selected one, and never the nearest.
-      title: placeTitle(place),
-      detail: placeLine(place),
-    },
-  ];
-}
+export const RECOMMENDED_INFORMATION = 'What to send them';
 
 /** What this product does, and the part it does not do (AC 6.3.2). */
 export const NOT_SUBMITTED = 'DrainLens does not send this report. Nothing leaves your browser.';
 
 /** The same thing, said once on the screen where the reader is still choosing. */
 export const NOT_SENT_YET = 'DrainLens helps you prepare a report. It does not send it for you.';
+
+/**
+ * The same promise in the words Figma D4b uses, for the guide's last step.
+ *
+ * Shorter because it sits under a prompt rather than over a panel, and the
+ * half it drops -- that DrainLens helps you prepare one -- is what the step
+ * the reader just finished has already shown them.
+ */
+export const NOT_SENT_YET_SHORT = 'DrainLens does not send the report for you.';
+
+/** The problem type Figma D4 names, which is the one most reports are. */
+export const BLOCKED_DRAIN = 'Blocked or flooded street drain';
 
 /** The five, emergency first (Figma B3, AC 6.3.4). */
 export const PROBLEM_TYPES: readonly ProblemType[] = [

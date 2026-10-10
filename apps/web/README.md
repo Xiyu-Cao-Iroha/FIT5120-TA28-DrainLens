@@ -49,9 +49,11 @@ What is still not built: the mobile layouts, and Playwright coverage of the navi
 
 ## Two decisions worth knowing before you change anything
 
-### The address never leaves memory
+### The address is never written down
 
 Address, task and scenario inputs live in one object for the life of the tab. Not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. That follows from AD1 — no accounts, no identity — and an address written to any of those is an identity left on a shared machine after the person has gone.
+
+> **This heading used to read *The address never leaves memory*, and since 9 October that would be read as a promise this product no longer makes.** A submitted search goes to `POST /api/addresses/search`; the suggestions do not, and nothing below this line changed. The rule here was always about *storage* — what is still on a shared machine after somebody walks away — and storage is where it still holds, absolutely. `DECISIONS-PENDING.md` §14 has the rest.
 
 The rule is enforced by behaviour, not by reading the source. `session.test.ts` stubs traps in place of both storages, `history` and `document.cookie`, plays a thirteen-event session through the reducer and asserts nothing was written. **A grep for `localStorage` is a rule a refactor walks around; a trap is not.**
 
@@ -63,7 +65,7 @@ An extent is a rectangle, north-up, and the pipeline ships its geometry as **met
 
 > **One layer has since grown two levels, and it is still ours.** Since 14 September Ground height is drawn from 500 m tiles cut on the point cloud's own grid, with a 4 m overview of the whole council below half a pixel per metre (`terrainTiles.ts`). The switch is one fixed scale, never what happens to be in view; the tiles are images this repository builds and serves, placed by the same transform as everything else. That is a level of detail, not a pyramid, and there is still no tile server.
 
-**It stopped being one square kilometre and the transform did not change.** The map is the whole City of Melbourne — 8.5 by 9 km, 21,113 pits and 17,242 pipes — whenever the database answers, and the Kensington square kilometre in this container when it does not. What the extent grew into instead was a frame problem: every artefact's coordinates are relative to *its own* corner, so the address index built for Kensington put every pin 1.5 km west and 6 km south of the house when it was drawn over the council map. `address/search.ts` now shifts an index into the frame of the map it is drawn on, and refuses if it does not fit.
+**It stopped being one square kilometre and the transform did not change.** The map is the whole City of Melbourne — 8.5 by 9 km, 21,113 pits and 17,242 pipes — whenever the database answers, and the Kensington square kilometre in this container when it does not. What the extent grew into instead was a frame problem: every artefact's coordinates are relative to *its own* corner, so the address index built for Kensington put every pin 1.5 km west and 6 km south of the house when it was drawn over the council map. `packages/address` (`search.ts`, moved out of `apps/web` on 9 October so the API could rank the same way) now shifts an index into the frame of the map it is drawn on, and refuses if it does not fit.
 
 MapLibre is several hundred kilobytes solving problems this product does not have. The streets come from the City's own road-corridor polygons, baked into the artefact, so nothing at runtime depends on a tile server being up, licensed or free.
 

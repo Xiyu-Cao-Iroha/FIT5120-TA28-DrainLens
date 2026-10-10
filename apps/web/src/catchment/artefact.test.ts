@@ -21,7 +21,7 @@ import {
   loadCatchments,
   streetKey,
 } from './artefact.js';
-import type { IndexedAddress } from '../address/search.js';
+import type { IndexedAddress } from '@drainlens/address';
 
 const address = (over: Partial<IndexedAddress> = {}): IndexedAddress => ({
   id: 'com:46-gatehouse-drive-kensington',
@@ -160,7 +160,7 @@ describe('against the published files', () => {
   const published = async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('../address/search.js');
+    const { unpack } = await import('@drainlens/address');
     const read = (file: string): unknown => JSON.parse(readFileSync(file, 'utf8')) as unknown;
     const data = (name: string) => read(path.resolve(__dirname, '../../public/data', name));
     // The council map, which is the frame the published assignment was built in.

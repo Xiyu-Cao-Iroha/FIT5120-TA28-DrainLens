@@ -18,7 +18,7 @@
  * the honest answer rather than a guess at a street.
  */
 
-import type { AddressIndex, IndexedAddress } from '../address/search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 import type { MapArtefact } from '../map/artefact.js';
 import type { Local } from '../map/viewport.js';
 

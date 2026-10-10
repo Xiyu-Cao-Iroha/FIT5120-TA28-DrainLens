@@ -27,7 +27,7 @@
 import { AddressMark } from '../ui/AddressMark.js';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { AddressIndex } from '../address/search.js';
+import type { AddressIndex } from '@drainlens/address';
 import type { AddressCatchmentsArtefact, SubcatchmentsArtefact } from '../catchment/artefact.js';
 import type { Relevance } from '../prepare/places.js';
 import type { MapArtefact } from '../map/artefact.js';
@@ -48,6 +48,8 @@ import {
   type Step,
   type StepCard,
   chipFor,
+  pressFor,
+  usesReport,
   finished,
   highlightFor,
   latch,
@@ -328,6 +330,15 @@ export function Guide({
   */
   const waiting = intro === null && !lookingBack && !done && step !== undefined && !stepDone;
   const pulseChip = waiting && step.kind === 'do' ? chipFor(step.requires) : null;
+  /*
+    The same answer for the controls that live inside a card.
+
+    Reported on 9 October against the step this guide used to have: it said
+    *Now open Why are there different organisations?* and the fold it meant
+    was one small triangle among three, with nothing to say which. A chip
+    pulses; these had no equivalent and now do.
+  */
+  const pulsePress = waiting && step.kind === 'do' ? pressFor(step.requires) : null;
   const highlight =
     intro === null && step !== undefined && (step.kind !== 'do' || waiting) ? highlightFor(step, now) : null;
 
@@ -396,6 +407,8 @@ export function Guide({
           openWith={lesson.opensWith ?? NOTHING_ON}
           chipKeys={lesson.chips(index0, now)}
           pulseChip={pulseChip}
+          pulsePress={pulsePress}
+          reportInGuide={usesReport(steps)}
           highlight={highlight}
           overlay={overlay}
           onViewport={seeView}

@@ -196,8 +196,10 @@ button:disabled {
  *   what stops the picture: a sticky box cannot leave its containing block.
  * - `.home__backdrop-photo` is sticky at the top of `<main>`'s scrollport, one
  *   screen tall. `100vh` is taller than `<main>` by the header and the footer,
- *   so the last ~150 px of the wrapper scroll the picture with it — the edge
- *   meets "How to use the map" rather than floating over it.
+ *   so the last ~150 px of the wrapper scroll the picture with it, and the
+ *   edge meets the section below rather than floating over it. That section
+ *   was "How to use the map" until 10 October and is now the limits note;
+ *   the measurement is of the wrapper, so nothing here depends on which.
  *
  * Nothing moves by itself. Sticky is the browser holding an element still, not
  * an animation, so there is nothing for `prefers-reduced-motion` to switch off.
@@ -716,5 +718,127 @@ button:disabled {
   .chip--pulse {
     animation: none !important;
     box-shadow: 0 0 0 2px #b4690e, 0 0 0 5px rgba(180, 105, 14, 0.3);
+  }
+}
+
+/*
+  The phone layout, at and under 560 px.
+
+  **560 is not a new number.** `fitBounds.ts` already calls it
+  `NARROW_FRAME_PX`, the width below which the map stops reserving room for
+  a panel beside it, and a second breakpoint a hundred pixels away would be
+  two rules nobody could hold in their head at once.
+
+  Built against 375 x 667, which is 9:16 and the smallest screen anybody is
+  likely to bring: an iPhone SE. There is no mobile design in Figma, so these
+  are decisions rather than a transcription, and each one says what it gave
+  up.
+*/
+@media (max-width: 560px) {
+  /*
+    Three words of reassurance that wrap to three lines at 375 px and push
+    the navigation off the header.
+  */
+  .shell__tagline {
+    display: none;
+  }
+
+  /*
+    The four site links get a row of their own.
+
+    Measured rather than guessed: the wordmark takes 139 px and the four
+    links about 310, so on one row at 375 px the last of them starts at
+    409 and is off the screen. Until 10 October it simply overflowed and
+    *Full map* could not be reached at all.
+
+    A second row was chosen over the two obvious alternatives. Scrolling
+    the row keeps the header one line tall and leaves a half-cut word
+    sitting at rest, which looks like a rendering fault. A menu hides the
+    four destinations the team spent 8 and 10 October adding, to save the
+    same 40 px. The row costs 40 px once, at the top, and every
+    destination stays visible and one tap away.
+
+    `overflow-x` stays as insurance: a longer label set, or a reader with
+    larger text, scrolls instead of overflowing.
+  */
+  .shell__masthead {
+    flex-wrap: wrap;
+  }
+
+  .shell__actions {
+    margin-left: 0 !important;
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell__actions > nav {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+
+  .shell__actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shell__actions > * {
+    scroll-snap-align: end;
+  }
+
+  /*
+    The map's layer chips: one line that scrolls, not four that wrap.
+
+    Six chips wrap to four rows at 375 px and take the top half of the map.
+    They also start folded there, which the stylesheet cannot do; see
+    `ui/narrow.ts`. This is for when the reader opens them.
+  */
+  .map-chips {
+    /*
+      `!important` because the row sets `flexWrap: 'wrap'` inline, which is
+      the desktop behaviour and the right default. An inline style beats a
+      stylesheet rule, so the phone case has to say so out loud.
+    */
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .map-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Chips must not squash to fit; the row scrolls instead. */
+  .map-chips > * {
+    flex: 0 0 auto;
+  }
+
+  /*
+    The breadcrumb row, which on the map is where the site links live.
+
+    Same problem as the masthead and not the same fix: this row has no
+    wordmark to drop below, and giving it a second line would take 40 px
+    off the map on a screen where the map is already short. It scrolls, and
+    `flex-shrink: 0` on the items stops them squashing into each other
+    rather than queueing.
+  */
+  .shell__crumbs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell__crumbs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shell__crumbs > * {
+    flex: 0 0 auto;
   }
 }

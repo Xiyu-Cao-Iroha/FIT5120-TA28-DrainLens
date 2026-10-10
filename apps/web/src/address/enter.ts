@@ -10,7 +10,7 @@
  * Kept out of the component so the rule can be tested without a browser.
  */
 
-import { type AddressIndex, type IndexedAddress, namesAKnownStreet, normalise, resolve } from './search.js';
+import { type AddressIndex, type IndexedAddress, namesAKnownStreet, normalise, resolve } from '@drainlens/address';
 
 /**
  * The address Enter goes to, or null to leave the suggestions open.

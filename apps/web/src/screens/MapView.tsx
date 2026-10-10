@@ -30,8 +30,8 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { addressForEnter, nextActive } from '../address/enter.js';
-import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
-import { MAX_SUGGESTIONS, search } from '../address/search.js';
+import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
+import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
@@ -59,6 +59,7 @@ import { cardSentence, waterNearby } from '../map/nearby.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
+import type { Press } from '../tutorial/lesson.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
 import { AskAboutGettingReady } from './AskAboutGettingReady.js';
@@ -187,6 +188,19 @@ export interface MapViewProps {
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
   /**
+   * The control inside a card the current step waits on, outlined.
+   *
+   * `pulseChip`'s counterpart for things that are not chips. See `pressFor`.
+   */
+  readonly pulsePress?: Press | null | undefined;
+  /**
+   * Let a guide reach *Report a problem*, which guides otherwise hide.
+   *
+   * Only Epic 6's does, and only because the design's third and fourth
+   * frames are that flow. See `usesReport`.
+   */
+  readonly reportInGuide?: boolean | undefined;
+  /**
    * The map tour is running.
    *
    * Three of its seven steps point at a chip, and the row can be collapsed
@@ -305,6 +319,8 @@ export function MapView({
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  pulsePress = null,
+  reportInGuide = false,
   touring = false,
   highlight = null,
   overlay = null,
@@ -458,7 +474,14 @@ export function MapView({
     `rolesOpen` goes with it, and a step the reader had already done would
     come undone under them.
   */
-  const [rolesOpened, setRolesOpened] = useState(false);
+  /*
+    What Epic 6's last two steps wait on (Figma D3, D4).
+
+    Read off `reportOpen` and `reportProblem` rather than kept beside them,
+    because those already exist and a second copy of a fact is a second
+    thing to forget to update. `latch` in the guide does the latching; this
+    only has to say what is true now.
+  */
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
   /*
@@ -632,21 +655,83 @@ export function MapView({
     inside that threshold -- rather than adding a second rule about when to
     zoom.
   */
+  /*
+    One definition for "these signs are the checks, not the low areas".
+
+    The canvas, the sign's own callout and a place's card all have to agree,
+    and they agreed by each restating the condition until one of them did
+    not. `warningsVisible` takes it as an argument so there is one place to
+    read it from.
+  */
+  const warningsAnyZoom = layers.beforeRain && !layers.lowPoint && address !== null;
+
   const [checksOpened, setChecksOpened] = useState(0);
   const beforeRainOn = layers.beforeRain;
   useEffect(() => {
     if (beforeRainOn) setChecksOpened((was) => was + 1);
   }, [beforeRainOn]);
 
+  /*
+    Where the map goes when the checks are turned on.
+
+    **It fits the places, not a box around the address.** It used to fit a
+    fixed `PLACE_RADIUS_M` square, which is 400 m across whether the nearest
+    place is 30 m away or 190, and on a narrow frame that opened a shade
+    under `WARNING_MIN_SCALE` -- so the signs the panel was talking about
+    were not drawn at all. That is the 9 and 10 October report, twice: *press
+    before rain check and nothing happens*.
+
+    Two halves to the fix and this is one. The other is in `warningsVisible`,
+    which no longer holds these particular signs to a zoom floor; this one
+    makes sure every one of them is on screen rather than just drawable.
+
+    The address goes in with them, because the places are *near your address*
+    and a view of three triangles with no pin is a view of three triangles.
+    With no places, the box around the address is still the right answer: the
+    street drains panel is what opens there, and it is about that street.
+  */
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
+    const here: Local = [address.eastingM, address.northingM];
     const r = PLACE_RADIUS_M;
-    const corners: readonly Local[] = [
-      [address.eastingM - r, address.northingM - r],
-      [address.eastingM + r, address.northingM + r],
-    ];
-    return { key: `places:${address.label}:${String(checksOpened)}`, points: corners, reservePanel: false };
-  }, [layers.beforeRain, address, checksOpened]);
+    const points: readonly Local[] =
+      places.length === 0
+        ? [
+            [address.eastingM - r, address.northingM - r],
+            [address.eastingM + r, address.northingM + r],
+          ]
+        : [here, ...places.map((place) => place.at)];
+    return { key: `places:${address.label}:${String(checksOpened)}`, points, reservePanel: false };
+  }, [layers.beforeRain, address, places, checksOpened]);
+
+  /*
+    The first place's card, opened when the reader turns the checks on
+    (team, 10 October).
+
+    *And a popup*, in their words. Turning the checks on is asking what to
+    check, and a map of numbered triangles answers that only for somebody who
+    already knows to press one. The first is the nearest, which `placesNear`
+    orders them by.
+
+    **On the press, not on the state, and not inside a guide.** Both
+    qualifications were found by driving it. Epic 5's guide opens with this
+    layer already on (`opensWith`) and its first step is *Click Check before
+    heavy rain*, whose hint is *Place 1 opens straight away*: an effect
+    reading the state rather than the change put Place 1 up before the
+    reader had pressed anything, and the step then asked them to do a thing
+    that appeared already done. Inside a guide the cards are the guide's to
+    open.
+
+    With no places there is nothing to put up, and the street drains panel
+    opens there instead.
+  */
+  const checksWere = useRef(beforeRainOn);
+  useEffect(() => {
+    const turnedOn = beforeRainOn && !checksWere.current;
+    checksWere.current = beforeRainOn;
+    if (!turnedOn || guided) return;
+    setOpenPlace((was) => was ?? places[0]?.number ?? null);
+  }, [beforeRainOn, guided, places]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -1033,7 +1118,8 @@ export function MapView({
       planOpen,
       placesReviewed,
       whyOpen,
-      rolesOpened,
+      reportOpened: reportOpen,
+      problemChosen: reportProblem !== null,
     });
   }, [
     terrainOn,
@@ -1052,7 +1138,8 @@ export function MapView({
     planOpen,
     placesReviewed,
     whyOpen,
-    rolesOpened,
+    reportOpen,
+    reportProblem,
     onMapNow,
   ]);
 
@@ -1090,6 +1177,9 @@ export function MapView({
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
         warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
+        // The checks near an address are drawn at any zoom; the low areas
+        // layer keeps the floor `WARNING_MIN_SCALE` was measured for.
+        warningsNearAddress={warningsAnyZoom}
         numberOfWarning={(point) => (layers.beforeRain ? numberOf(places, point) : null)}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
@@ -1694,7 +1784,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale, warningsAnyZoom) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
@@ -1762,10 +1852,20 @@ export function MapView({
         {panel && viewport !== null && reportOpen && (
           <MapNote title={REPORT_HEADING}>
             <ReportProblem
-              address={address?.label ?? null}
+              /*
+                The street and the suburb, from the index entry rather than
+                from the label. `whereLine` says why the house number does
+                not travel with a report.
+              */
+              where={{
+                street: yourAddress?.street ?? null,
+                suburb: yourAddress?.suburb ?? null,
+                area: area?.displayName ?? null,
+              }}
               place={reportPlace}
               chosen={reportProblem}
               onChoose={setReportProblem}
+              pulse={pulsePress === 'problem'}
               onPick={() => {
                 // The map takes over. The report card is still open behind it
                 // and comes back with whatever was picked.
@@ -1827,19 +1927,27 @@ export function MapView({
                 // back, and it takes the boundary with it.
                 toggle('catchment');
               }}
-              onRolesOpen={() => {
-                setRolesOpened(true);
-              }}
-              {...(guided
+
+              {...(guided && !reportInGuide
                 ? {}
                 : {
-                    // Not inside a guide. A guide teaches one thing at a time,
-                    // and this opens a card taller than the guide's map frame
-                    // over a step that was asking about something else.
+                    /*
+                      A guide teaches one thing at a time, and this opens a
+                      card taller than the guide's map frame over a step that
+                      was asking about something else. That is why every
+                      guide hid it.
+
+                      **Epic 6's guide is the one whose subject this is.**
+                      Figma D3 asks the reader to press it and D4 asks them
+                      to choose a problem type, so hiding it there left two
+                      of the design's four frames unbuildable. `usesReport`
+                      says which lesson that is, from its steps.
+                    */
                     onReport: () => {
                       openReport(null);
                     },
                   })}
+              pulseReport={pulsePress === 'report'}
             />
             {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
               <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
@@ -1922,7 +2030,7 @@ export function MapView({
       {panel &&
         viewport !== null &&
         openPlace !== null &&
-        warningsVisible(true, viewport.scale) &&
+        warningsVisible(true, viewport.scale, warningsAnyZoom) &&
         (() => {
         const place = places.find((candidate) => candidate.number === openPlace);
         if (place === undefined) return null;
