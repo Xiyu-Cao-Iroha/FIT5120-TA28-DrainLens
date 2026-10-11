@@ -57,6 +57,15 @@ export interface PrintedLine {
   readonly text: string;
   /** Shown under the line, smaller. `Estimated by DrainLens` on a reminder. */
   readonly source?: string;
+  /**
+   * What the line means in practice, between it and its source (Figma A5).
+   *
+   * Only the general actions have one, and it is the team's own sentence
+   * rather than a publisher's. It is drawn in the page's reading size, not
+   * in the small grey `source` line, so the two are not mistaken for each
+   * other: one is advice, the other is who the advice came from.
+   */
+  readonly detail?: string;
 }
 
 /** The page, as data. */
@@ -134,6 +143,9 @@ export function printedPlan(
     })),
     generalActions: chosen.map((action) => ({
       text: action.text,
+      detail: action.detail,
+      // The publisher of the quotation the action came from, and of nothing
+      // else on the line: `detail` is ours. See `GeneralAction.detail`.
       source: action.publisher,
     })),
     safety: SAFETY,
@@ -163,8 +175,8 @@ const lines = (items: readonly PrintedLine[]): string =>
     .map(
       (line) =>
         `<li>${escapeHtml(line.text)}${
-          line.source === undefined ? '' : `<span>${escapeHtml(line.source)}</span>`
-        }</li>`,
+          line.detail === undefined ? '' : `<span class="detail">${escapeHtml(line.detail)}</span>`
+        }${line.source === undefined ? '' : `<span>${escapeHtml(line.source)}</span>`}</li>`,
     )
     .join('');
 
@@ -195,12 +207,15 @@ export function planHtml(plan: PrintedPlan): string {
   ul { margin: 0; padding: 0; list-style: none; }
   li { margin: 0 0 8pt; }
   li span { display: block; font-size: 9pt; color: #4a5551; }
+  li span.detail { font-size: 10.5pt; color: #1f2421; margin: 2pt 0 1pt; }
   p.keep { margin: 18pt 0 0; font-size: 10pt; color: #4a5551; }
 </style>
 </head>
 <body>
 <h1>${escapeHtml(plan.title)}</h1>
-<p class="where">${escapeHtml(plan.address)}</p>
+<!-- One line under the title, as A5 draws it: the address and the day it
+     was made. The address stays on the plan object as well, because the
+     page is data before it is HTML and a caller may want it alone. -->
 <p class="when">${escapeHtml(plan.preparedOn)}</p>
 ${section(PRINTED_REMINDERS, plan.reminders.length === 0 ? '' : `<ul>${lines(plan.reminders)}</ul>`)}
 ${section(PRINTED_EVERY_HOME, `<ul>${lines(plan.generalActions)}</ul>`)}
