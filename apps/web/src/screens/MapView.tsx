@@ -1100,6 +1100,14 @@ export function MapView({
   const placesReviewed = places.filter(
     (place) => (relevance[place.number] ?? null) !== null,
   ).length;
+  /*
+    How many places this address has, for the guide that is written twice.
+
+    Null while the markers are still loading, which the guide needs kept apart
+    from zero: at an address with none it drops the two steps that are about a
+    place, and *not loaded yet* is not an answer to that question.
+  */
+  const placeCount = warningPoints === null ? null : places.length;
   useEffect(() => {
     onMapNow?.({
       pits: pitsOn,
@@ -1116,6 +1124,7 @@ export function MapView({
       terrainShown: terrainOn,
       catchment: layers.catchment,
       planOpen,
+      placeCount,
       placesReviewed,
       whyOpen,
       reportOpened: reportOpen,
@@ -1136,6 +1145,7 @@ export function MapView({
     layers.catchment,
     // Epic 5's two, for the same reason.
     planOpen,
+    placeCount,
     placesReviewed,
     whyOpen,
     reportOpen,

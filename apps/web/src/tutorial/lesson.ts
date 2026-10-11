@@ -208,6 +208,15 @@ export interface MapNow {
   readonly catchment: boolean;
   /** The preparation plan, open now. */
   readonly planOpen: boolean;
+  /**
+   * How many numbered places this address has, or null while unknown.
+   *
+   * Null until the warning markers have loaded, which is not the same as
+   * zero: 58.6% of addresses genuinely have none (`prepare/places.ts`), and a
+   * guide that reads *not yet* as *none* would hand the majority case to
+   * whichever arrived first.
+   */
+  readonly placeCount: number | null;
   /** How many numbered places the reader has answered for. */
   readonly placesReviewed: number;
   /** *Why this place?* opened on a reminder in the plan (Figma G4). */
@@ -233,6 +242,7 @@ export const NOTHING_ON_MAP: MapNow = {
   terrainShown: false,
   catchment: false,
   planOpen: false,
+  placeCount: null,
   placesReviewed: 0,
   whyOpen: false,
   reportOpened: false,
@@ -346,6 +356,25 @@ export interface Lesson {
    * the data arriving mid-lesson cannot move the reader.
    */
   readonly withGround?: (points: TerrainPoints | null) => readonly Step[];
+  /**
+   * The steps and the finish page, given how many places this address has.
+   *
+   * Epic 5's guide walks the reader through deciding about Place 1, and
+   * 58.6% of addresses have no Place 1: at one of those the second step asks
+   * for a decision about something that is not on the map and the fourth asks
+   * for a fold that does not exist, so the guide cannot be finished at all.
+   * The plan already has an answer for that address (AC 5.1.3) and these
+   * steps walk the reader to it instead.
+   *
+   * **Unlike `withGround`, the step count does change.** It has to: the
+   * missing steps are missing because there is nothing to do in them, and a
+   * placeholder would be a step that waits forever. What makes that safe is
+   * that the count is a fact about the address rather than a file still
+   * loading, it is known before the first step is satisfied, and both
+   * versions share the first step, so a reader cannot be moved off a step by
+   * the answer arriving.
+   */
+  readonly withPlaces?: (placeCount: number | null) => Pick<Lesson, 'steps' | 'finished'>;
 }
 
 /**

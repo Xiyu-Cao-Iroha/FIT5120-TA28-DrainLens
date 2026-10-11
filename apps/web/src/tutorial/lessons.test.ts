@@ -27,6 +27,7 @@ import {
   stepIndex,
 } from './lesson.js';
 import { GUIDED_SECTIONS, LESSONS, lessonFor } from './lessons.js';
+import { HEAVY_RAIN, heavyRainFor } from './heavyRain.js';
 import { SECTION_ORDER, SECTIONS } from './sections.js';
 import { CHIP_KEYS, PANEL_KEYS } from '../map/modes.js';
 
@@ -42,8 +43,22 @@ const now = (over: Partial<MapNow> = {}): MapNow => ({ ...NOTHING_ON_MAP, ...ove
 const isPressFeedback = (before: Step | undefined): boolean =>
   before?.kind === 'do' && before.done === undefined;
 
-/** The lessons as pairs, so a failure names the section it is in. */
-const written = GUIDED_SECTIONS.map((id) => [id, LESSONS[id]!] as const);
+/**
+ * Every lesson written, so a failure names the section it is in.
+ *
+ * Epic 5's appears twice. Its steps are a function of how many places the
+ * address has (`withPlaces`), and the version for an address with none is a
+ * second list of steps that nothing else here would ever look at. Written
+ * once and never checked is exactly the situation this file exists for.
+ */
+const written = [
+  ...GUIDED_SECTIONS.map((id) => [id as string, LESSONS[id]!, id] as const),
+  [
+    'heavy-rain, at an address with no places',
+    { ...HEAVY_RAIN, ...heavyRainFor(0) },
+    'heavy-rain' as const,
+  ] as const,
+];
 
 describe('which sections are on offer', () => {
   it('offers exactly the sections that have a lesson', () => {
@@ -74,7 +89,7 @@ describe('which sections are on offer', () => {
   });
 });
 
-describe.each(written)('%s', (id, lesson) => {
+describe.each(written)('%s', (_label, lesson, id) => {
   it('asks for something at every step that can be acted on', () => {
     for (const step of lesson.steps) {
       if (step.kind === 'do') expect(step.requires).toBeTruthy();

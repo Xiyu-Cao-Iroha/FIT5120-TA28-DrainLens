@@ -25,6 +25,12 @@
  */
 
 import { type LayerKey, NOTHING_ON } from '../map/modes.js';
+import {
+  FOR_EVERY_HOME,
+  NO_PLACES_MEANS,
+  PLACE_RADIUS_M,
+  checkButton,
+} from '../prepare/places.js';
 import { type Lesson } from './lesson.js';
 
 export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
@@ -66,13 +72,91 @@ export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
   },
 ];
 
+/**
+ * The same guide at an address with nothing marked near it.
+ *
+ * **This is the majority address, not an edge case.** There are 91 published
+ * markers in the council and 200 m is what *near this address* means, so
+ * 58.6% of the 62,397 addresses have no place to number (`prepare/places.ts`).
+ * At one of those the five steps above are unfinishable: the second waits for
+ * a decision about a Place 1 that was never drawn, and the fourth for a fold
+ * under a reminder that cannot exist. A reader at 11 Neale Street reached
+ * *Decide whether Place 1 applies to you* with nothing on the map to decide
+ * about and only Previous to press.
+ *
+ * **It is the plan's own answer, walked through.** Nothing here is new copy
+ * about risk: the plan already says what AC 5.1.3 asks it to say, and these
+ * steps take the reader to it and then to the actions every home gets. The
+ * absence is stated once, with what it does not mean beside it, in the
+ * product's words rather than the guide's.
+ *
+ * **No Figma frame for it.** The design draws G1 to G5 and the *doesn't
+ * apply* branch, all of them at an address with places. This follows the
+ * frames that do exist -- the address card's two ways on (A8) and the plan's
+ * empty state -- rather than inventing a screen.
+ */
+export const HEAVY_RAIN_NO_PLACES_STEPS: Lesson['steps'] = [
+  {
+    kind: 'do',
+    id: 'plan-opened',
+    /*
+      The same button as the guide with places, and for the same reason it
+      is the same step: in a guide the full address card is suppressed, and
+      the only way into the plan is the callout on the address, which is
+      labelled by `checkButton` and loses its count rather than its name.
+      The two ways on the design draws for an empty address (Figma A8, *See
+      what every home can do*) are on the card, which is not here.
+    */
+    prompt: `Click ${checkButton([])}.`,
+    hint: 'It opens your plan. No places were marked near this address, so the plan starts at what every home can do.',
+    requires: 'plan-opened',
+  },
+  {
+    kind: 'read',
+    id: 'no-places',
+    // The heading points at the panel and the note says why; the panel's own
+    // sentence (`NO_PLACES`) is two inches away and does not need repeating.
+    prompt: 'Read why there is nothing to review here.',
+    note: `${NO_PLACES_MEANS} None of the published pooling markers fall within ${String(PLACE_RADIUS_M)} m of this address, and those markers are the only thing this layer numbers.`,
+  },
+  {
+    kind: 'read',
+    id: 'every-home',
+    prompt: `Read the actions ${FOR_EVERY_HOME.toLowerCase()}.`,
+    note: 'These actions are the same for every address, whether or not a place was marked near it. Each one opens to show where it came from, and the plan can be printed or saved from the bottom of the panel.',
+  },
+];
+
+const FINISHED: Lesson['finished'] = {
+  headline: 'Well done! You finished the heavy rain guide.',
+  unlocked:
+    'Your before-rain checks and your plan are on the full map, and your answers last until you close this tab.',
+};
+
+const FINISHED_NO_PLACES: Lesson['finished'] = {
+  headline: 'Well done! You finished the heavy rain guide.',
+  // Not "your answers": at this address there was nothing to answer. The plan
+  // is still there, and it is what the reader leaves with.
+  unlocked:
+    'Your before-rain checks and your plan are on the full map, and the plan can be printed from there.',
+};
+
+/**
+ * Which version of the guide this address gets.
+ *
+ * A null count is the markers not loaded yet, and it takes the version with
+ * places: it is the one the first step is written for either way, and an
+ * address that turns out to have none switches before that step is satisfied.
+ */
+export const heavyRainFor = (placeCount: number | null): Pick<Lesson, 'steps' | 'finished'> =>
+  placeCount === 0
+    ? { steps: HEAVY_RAIN_NO_PLACES_STEPS, finished: FINISHED_NO_PLACES }
+    : { steps: HEAVY_RAIN_STEPS, finished: FINISHED };
+
 export const HEAVY_RAIN: Lesson = {
   steps: HEAVY_RAIN_STEPS,
-  finished: {
-    headline: 'Well done! You finished the heavy rain guide.',
-    unlocked:
-      'Your before-rain checks and your plan are on the full map, and your answers last until you close this tab.',
-  },
+  finished: FINISHED,
+  withPlaces: heavyRainFor,
   /*
     One chip, on from the start.
 
