@@ -146,6 +146,67 @@ button:disabled {
 }
 
 /*
+ * The street under the address screen.
+ *
+ * A photograph of a Melbourne residential street, team supplied and AI
+ * generated, recorded in `docs/IMAGE-CREDITS.md`. It is decoration: it shows
+ * nothing this product has measured and nothing about the reader's address,
+ * which is why it is a background and not an <img> with a caption.
+ *
+ * **No text is ever drawn over it, and that is a measurement rather than a
+ * preference.** This page's muted grey reaches 4.9:1 on the page colour,
+ * which is just past the 4.5:1 that AA asks for. Over the photograph, under
+ * any veil light enough to leave a street visible, it lands between 3.0 and
+ * 3.9:1. There is no veil that keeps both the picture and that text, so the
+ * picture goes below the text instead of behind it.
+ *
+ * The band is a flex item after the column, with `margin-top: auto`: it sits
+ * under the content on a long page and at the foot of the window on a short
+ * one. An earlier version pinned it to the viewport, which looked the same
+ * on this screen and put the open *More information* panels straight over
+ * the road as soon as anybody scrolled.
+ */
+.landing__street {
+  display: flex;
+  flex-direction: column;
+  /* Fill whatever the shell gives this screen, so the band has somewhere to
+     be on a tall window and is not forced into a scroll on a short one. */
+  min-height: 100%;
+  background-color: #f5f8f7;
+}
+
+.landing__street::after {
+  content: '';
+  /* Takes the room the column does not want, down to a strip. */
+  flex: 1 1 auto;
+  min-height: clamp(140px, 20vh, 300px);
+  background-image:
+    linear-gradient(
+      to bottom,
+      #f5f8f7 0%,
+      rgba(245, 248, 247, 0.74) 34%,
+      rgba(245, 248, 247, 0.34) 100%
+    ),
+    url('/street.webp');
+  background-repeat: no-repeat, no-repeat;
+  background-size: cover, cover;
+  background-position: center, center bottom;
+}
+
+/*
+ * Nothing but the colour, where the reader has asked for less.
+ *
+ * `prefers-reduced-data` is not widely supported yet and costs one rule: on
+ * a metered connection a 134 KB decoration is the first thing that should
+ * not be fetched.
+ */
+@media (prefers-reduced-data: reduce) {
+  .landing__street::after {
+    background-image: none;
+  }
+}
+
+/*
  * The homepage.
  *
  * A media query rather than a JS breakpoint: the hero draws a canvas sized to
