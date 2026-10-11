@@ -10,7 +10,14 @@
  * Kept out of the component so the rule can be tested without a browser.
  */
 
-import { type AddressIndex, type IndexedAddress, namesAKnownStreet, normalise, resolve } from '@drainlens/address';
+import {
+  type AddressIndex,
+  type IndexedAddress,
+  type Resolution,
+  namesAKnownStreet,
+  normalise,
+  resolve,
+} from '@drainlens/address';
 
 /**
  * The address Enter goes to, or null to leave the suggestions open.
@@ -29,7 +36,30 @@ import { type AddressIndex, type IndexedAddress, namesAKnownStreet, normalise, r
  * own; here the list, or its absence, already says it.
  */
 export function addressForEnter(index: AddressIndex, typed: string): IndexedAddress | null {
-  const answer = resolve(index, typed);
+  return addressFrom(index, typed, resolve(index, typed));
+}
+
+/**
+ * The same rule, over a verdict somebody else reached.
+ *
+ * **Lifted off `resolve` on 11 October, when the map's search started asking
+ * the API.** The decision above is about what Enter does with a verdict, and
+ * the verdict can now arrive from Postgres as easily as from the index in
+ * memory -- both ends run the same matcher, so the two are the same four
+ * kinds by different routes. Splitting them is what lets the map await one
+ * without this rule being written twice.
+ *
+ * **The street guard still reads the local index**, and deliberately. The
+ * published index and the `address` table are loaded from the same file, so
+ * in practice they know the same streets; where they could ever differ, this
+ * asks the smaller of the two and Enter leaves the suggestions open rather
+ * than guessing. Cautious is the safe direction for a key that moves the map.
+ */
+export function addressFrom(
+  index: AddressIndex,
+  typed: string,
+  answer: Resolution,
+): IndexedAddress | null {
   if (answer.kind === 'found') return answer.address;
   if (answer.kind !== 'ambiguous') return null;
   const [best] = answer.matches;

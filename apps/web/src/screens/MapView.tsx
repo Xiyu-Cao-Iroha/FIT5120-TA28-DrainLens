@@ -29,7 +29,8 @@ import {
 } from '../scenario/support.js';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import { addressForEnter, nextActive } from '../address/enter.js';
+import { addressFrom, nextActive } from '../address/enter.js';
+import { lookupAddress } from '../address/lookup.js';
 import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
 import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
@@ -2582,6 +2583,23 @@ function MapSearch({
   const [focused, setFocused] = useState(false);
   // The suggestion the arrow keys are on, or -1 for the typed text itself.
   const [active, setActive] = useState(-1);
+  /*
+    Whether a search is out with the API, and shown rather than kept quiet.
+
+    The timeout is four seconds, and a field that does nothing at all for four
+    seconds after Enter reads as a key that is not wired up -- which is the
+    exact complaint from the 15 September user test that put Enter here in the
+    first place.
+  */
+  const [asking, setAsking] = useState(false);
+  /*
+    What is in the field *now*, for the one question an `await` cannot put to
+    the state variable: a closure holds the text from the render that made it.
+  */
+  const typedRef = useRef(typed);
+  useEffect(() => {
+    typedRef.current = typed;
+  }, [typed]);
   const listId = useId();
 
   const matches: Match[] = useMemo(
@@ -2597,6 +2615,60 @@ function MapSearch({
     setActive(-1);
   };
 
+  /*
+    Enter, which asks the API as of 11 October and did not before it.
+
+    **This box was the half of the 9 October decision nobody wired up.** The
+    address search moved to `POST /api/addresses/search` that day and reached
+    the first screen only, so the full map -- where somebody who has used the
+    product before starts -- went on answering every query from the index in
+    the browser. Two fields offering the same search over the same rows should
+    not disagree about where the answer comes from.
+
+    **A highlighted suggestion does not ask.** The arrow keys landed on a row
+    that already *is* an `IndexedAddress`; there is no question left to put to
+    a database, and putting one would send a home address away to be told what
+    is on the screen. The request is for typed text alone, which is the only
+    case where the verdict is not already in hand -- and it is one request on
+    one keypress, not one per character, for the reason `lookup.ts` gives.
+
+    **Nothing on screen changes when the API cannot answer.** `lookupAddress`
+    falls back to the same `resolve` this used to call, so a database that is
+    down is this field behaving exactly as it did last week.
+  */
+  async function choose() {
+    if (asking) return;
+
+    const highlightedAddress = matches[highlighted]?.address;
+    if (highlightedAddress !== undefined) {
+      pick(highlightedAddress);
+      return;
+    }
+    if (typed.trim() === '') return;
+
+    const query = typed;
+    setAsking(true);
+    const { answer } = await lookupAddress({
+      index,
+      typed: query,
+      onFallback: (reason) => {
+        // The note the first screen leaves, for the same reason: which side
+        // answered is not a thing to put in front of somebody looking for
+        // their street, and the verdict is the same either way.
+        console.warn(`the address search fell back to the bundled index: ${reason}`);
+      },
+    });
+    setAsking(false);
+
+    // Edited while it was away. Four seconds is long enough to type a
+    // different street into, and moving the map to the answer to a question
+    // nobody is asking any more is worse than doing nothing.
+    if (typedRef.current !== query) return;
+
+    const chosen = addressFrom(index, query, answer);
+    if (chosen) pick(chosen);
+  }
+
   return (
     <div data-tour="address" style={{ position: 'relative', width: 268 }}>
       <div
@@ -2611,10 +2683,36 @@ function MapSearch({
           boxShadow: shadow.floating,
         }}
       >
-        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
-          <circle cx="7" cy="7" r="4.6" fill="none" stroke={ink.subtle} strokeWidth="1.5" />
-          <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
+        {/*
+          The magnifier, or an arc turning in its place.
+
+          Same `spinner` class as the page-level one, so it slows rather than
+          stops under `prefers-reduced-motion` -- the note beside that rule in
+          `base.css` says why, and it applies here for the same reason. Hidden
+          from screen readers because `aria-busy` on the combobox below says
+          the same thing in the place a reader is already listening to.
+        */}
+        {asking ? (
+          <svg className="spinner" width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <circle cx="8" cy="8" r="5.6" fill="none" stroke={line.base} strokeWidth="1.6" />
+            {/* A quarter of the circumference, written as the arithmetic. */}
+            <circle
+              cx="8"
+              cy="8"
+              r="5.6"
+              fill="none"
+              stroke={brand.ink}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeDasharray={`${String(2 * Math.PI * 5.6 * 0.25)} ${String(2 * Math.PI * 5.6 * 0.75)}`}
+            />
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <circle cx="7" cy="7" r="4.6" fill="none" stroke={ink.subtle} strokeWidth="1.5" />
+            <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        )}
         <input
           value={typed}
           onChange={(event) => {
@@ -2629,8 +2727,7 @@ function MapSearch({
               setActive(nextActive(highlighted, matches.length, event.key));
             } else if (event.key === 'Enter') {
               event.preventDefault();
-              const chosen = matches[highlighted]?.address ?? addressForEnter(index, typed);
-              if (chosen) pick(chosen);
+              void choose();
             } else if (event.key === 'Escape' && highlighted >= 0) {
               setActive(-1);
             }
@@ -2647,6 +2744,7 @@ function MapSearch({
           aria-autocomplete="list"
           aria-expanded={matches.length > 0}
           aria-controls={listId}
+          aria-busy={asking}
           {...(highlighted >= 0 ? { 'aria-activedescendant': optionId(highlighted) } : {})}
           autoComplete="off"
           style={{
