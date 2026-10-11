@@ -62,6 +62,7 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { SPOT_A_PROBLEM_CHIP } from '../report/problems.js';
+import { ReportGlyph } from '../ui/ReportGlyph.js';
 import type { Press } from '../tutorial/lesson.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
@@ -1638,6 +1639,13 @@ export function MapView({
             {guided && reportInGuide && (
               <PlainChip
                 label={SPOT_A_PROBLEM_CHIP}
+                /*
+                  16, which is the design's (Figma D1). A `Chip`'s swatch is
+                  18, so a row holding both would be two pixels out; no
+                  lesson shows both today, and the day one does this is the
+                  number to change.
+                */
+                icon={<ReportGlyph size={16} />}
                 on={reportOpen}
                 pulse={pulsePress === 'report'}
                 onPress={() => {

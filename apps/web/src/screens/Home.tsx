@@ -60,6 +60,7 @@ import { BlockedDrainFigure } from './BlockedDrain.js';
 import { DAY } from '../map/draw.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from '../map/catchmentBoundary.js';
 import { WARNING_EDGE, WARNING_FILL } from '../map/warnings.js';
+import { ReportGlyph } from '../ui/ReportGlyph.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
@@ -560,6 +561,9 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
  * No external images, and none fetched: this product loads nothing from a
  * third party, and four thumbnails are not the place to start.
  */
+/** The near-black the report panel's own bars are drawn in (Figma T1). */
+const REPORT_INK = '#17242e';
+
 export function PathThumb({ mode }: { readonly mode: MapMode }) {
   const frame = { width: '100%', height: 104, display: 'block' } as const;
   const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
@@ -602,20 +606,50 @@ export function PathThumb({ mode }: { readonly mode: MapMode }) {
   }
 
   if (mode === 'drainage-area') {
-    // A dashed boundary around a street corner: the thing the guide's first
-    // press draws, in the colours it draws it in.
+    /*
+      The report panel on a street, from Figma T1's card of 11 October.
+
+      **It was a dashed subcatchment boundary**, which is what the card used
+      to be about. The card is *Spot a drainage problem?* now and the
+      boundary is not in the guide at all, so the picture was advertising
+      something the press no longer does.
+
+      The design's frame is 200x150 and this one is 200x104, so the rows are
+      the frame's own sizes with the gaps tightened rather than everything
+      scaled: a 3 px bar scaled to 2.1 px is a smudge. Bar widths, radii and
+      colours are the design's; the ground and the road are this product's
+      map palette, because the picture sits in a row of seven and the other
+      six are drawn in it.
+    */
+    const row = (y: number, w: number, fill: string, h = 3) => (
+      <rect key={`${String(y)}-${String(w)}`} x="60" y={y} width={w} height={h} rx={h / 2} fill={fill} />
+    );
     return (
       <svg {...common}>
+        <defs>
+          <filter id="report-card-lift" x="-20%" y="-20%" width="140%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.14" />
+          </filter>
+        </defs>
         <rect width="200" height="104" fill={DAY.ground} />
-        <path d="M-8 70h216M70 -8v120" stroke={DAY.road} strokeWidth="13" fill="none" />
-        <path
-          d="M34 20h104l26 26v30l-30 26H52L26 70V38Z"
-          fill={BOUNDARY_FILL}
-          stroke={BOUNDARY_STROKE}
-          strokeWidth="2.5"
-          strokeDasharray="7 5"
-          strokeLinejoin="round"
-        />
+        {/* One road, behind the panel, which is why it looks like two. */}
+        <path d="M-6 80 206 12" stroke={DAY.road} strokeWidth="16" fill="none" />
+
+        <g filter="url(#report-card-lift)">
+          <rect x="44" y="12" width="112" height="80" rx="8" fill="#ffffff" />
+        </g>
+        {/* The heading. */}
+        <rect x="54" y="21" width="58" height="6" rx="3" fill={REPORT_INK} />
+        {/* A problem not chosen, one chosen, and who to contact. */}
+        <rect x="54" y="33" width="92" height="14" rx="4" fill="#ffffff" stroke="#d9dfdd" />
+        {row(38.5, 50, '#bfc7c4')}
+        <rect x="54" y="51" width="92" height="14" rx="4" fill="#ffffff" stroke="#b8731f" strokeWidth="1.5" />
+        {row(56.5, 58, REPORT_INK)}
+        <rect x="54" y="69" width="92" height="16" rx="4" fill="#e3ede8" />
+        {row(73, 26, '#1f6f5c')}
+        {row(79, 52, REPORT_INK)}
+
+        <ReportGlyph x={20} y={4} size={26} />
       </svg>
     );
   }
