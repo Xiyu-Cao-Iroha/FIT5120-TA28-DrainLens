@@ -11,8 +11,15 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { addressForEnter, nextActive } from './enter.js';
-import { type AddressIndex, type IndexedAddress, type PackedIndex, search, unpack } from '@drainlens/address';
+import { addressForEnter, addressFrom, nextActive } from './enter.js';
+import {
+  type AddressIndex,
+  type IndexedAddress,
+  type PackedIndex,
+  resolve,
+  search,
+  unpack,
+} from '@drainlens/address';
 
 const at = (id: string, number: string, street: string, suburb = 'Kensington'): IndexedAddress => ({
   id,
@@ -74,6 +81,52 @@ describe('Enter in the map search', () => {
     const index = unpack(packed, packed.extent);
     expect(search(index, '10 Lygon Street')[0]?.address.label).toBe('10 Lygon Street, Carlton');
     expect(addressForEnter(index, '10 Lygon Street')?.label).toBe('10 Lygon Street, Carlton');
+  });
+});
+
+/*
+  The map's search sends what was typed to `POST /api/addresses/search` and
+  gets back one of these four. There is no browser here to press Enter in, so
+  what is pinned is the half that decides: given a verdict, which address the
+  map moves to.
+*/
+describe('a verdict that came from the API', () => {
+  it('takes an address the browser\u2019s own index has never heard of', () => {
+    /*
+      **The point of the whole exercise, in one assertion.** The published
+      index in the container and the `address` table are loaded from the same
+      file today, so almost any case would pass whichever side answered. This
+      one cannot: 8 Macaulay Road is in no fixture here, and Enter reaching it
+      is only possible if the verdict is used rather than recomputed locally.
+    */
+    const fromDatabase = at('db', '8', 'Macaulay Road');
+    expect(search(INDEX, '8 Macaulay Road')).toHaveLength(0);
+    expect(addressFrom(INDEX, '8 Macaulay Road', { kind: 'found', address: fromDatabase })).toBe(
+      fromDatabase,
+    );
+  });
+
+  it('still refuses to guess when the API calls it ambiguous', () => {
+    // The same rule as the local path, applied to somebody else's matches:
+    // a whole-query prefix on a street the index knows is taken, and the bare
+    // number that is a prefix of hundreds of labels is not.
+    const matches = search(INDEX, '10 Neale Street');
+    expect(addressFrom(INDEX, '10 Neale Street', { kind: 'ambiguous', matches })?.id).toBe('d');
+    expect(addressFrom(INDEX, '10', { kind: 'ambiguous', matches: search(INDEX, '10') })).toBeNull();
+  });
+
+  it('does nothing with the two failures', () => {
+    const typed = '9 Harper Street';
+    expect(addressFrom(INDEX, typed, { kind: 'outside-pilot', typed })).toBeNull();
+    expect(addressFrom(INDEX, typed, { kind: 'not-an-address', typed })).toBeNull();
+  });
+
+  it('agrees with the local path when handed the local verdict', () => {
+    // `addressForEnter` is this function over `resolve`, and the equality is
+    // what keeps the fallback from being a lesser answer than the request.
+    for (const typed of ['46 Gatehouse Drive', '10 Neale Street', '10', 'gatehouse', '']) {
+      expect(addressFrom(INDEX, typed, resolve(INDEX, typed))).toEqual(addressForEnter(INDEX, typed));
+    }
   });
 });
 
