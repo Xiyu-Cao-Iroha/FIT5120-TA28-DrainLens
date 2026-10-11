@@ -15,7 +15,9 @@ import {
   DRAIN_SOURCE,
   NO_DRAINS_STILL,
   OTHER_DRAINS_WHY,
-  SWEEP_DETAIL,
+  SWEEP_FULL,
+  SWEEP_LEAD,
+  SWEEP_REST,
   SWEEP_SUMMARY,
   drainCount,
   moreStreets,
@@ -41,23 +43,33 @@ describe('the count sentence', () => {
 });
 
 describe('what the sweep note is allowed to say', () => {
-  it('carries on from the summary rather than repeating it', () => {
-    // It opened with the summary's own sentence, so the fold read as the same
-    // note printed twice.
-    expect(SWEEP_DETAIL).not.toContain(SWEEP_SUMMARY.replace('…', ''));
-    expect(SWEEP_DETAIL.startsWith('Sweep them')).toBe(true);
+  it('is one sentence folded, not two sentences stacked', () => {
+    /*
+      The 11 October report: the text is still broken when it opens. It was
+      a summary and then a paragraph of its own, so the fold added a second
+      sentence where the design lengthens the first. Open has to be the
+      folded line with the rest of its own sentence on the end, to the
+      character, or the ellipsis is promising something it does not deliver.
+    */
+    expect(SWEEP_SUMMARY).toBe(`${SWEEP_LEAD}…`);
+    expect(SWEEP_FULL).toBe(`${SWEEP_LEAD}${SWEEP_REST}`);
+    expect(SWEEP_FULL.startsWith(SWEEP_LEAD)).toBe(true);
+    // The join is a space inside one sentence, not a full stop between two.
+    expect(SWEEP_LEAD.endsWith('.')).toBe(false);
+    expect(SWEEP_REST.startsWith(' ')).toBe(true);
+    expect(SWEEP_FULL).toContain('sweep them away when it is dry');
   });
 
   it('offers only what is safe, and then says what is not', () => {
     expect(SWEEP_SUMMARY).toMatch(/sweep them away/);
     for (const boundary of [/when it is dry/, /stay on the footpath/, /Never lift the cover/, /reach inside/, /stand in the road/]) {
-      expect(SWEEP_DETAIL).toMatch(boundary);
+      expect(SWEEP_FULL).toMatch(boundary);
     }
   });
 
   it('sends a drain that is still blocked to the report rather than to a tool', () => {
-    expect(SWEEP_DETAIL).toMatch(/report it/);
-    expect(SWEEP_DETAIL).not.toMatch(/clear it|unblock|rod|hose/i);
+    expect(SWEEP_FULL).toMatch(/report it/);
+    expect(SWEEP_FULL).not.toMatch(/clear it|unblock|rod|hose/i);
   });
 });
 

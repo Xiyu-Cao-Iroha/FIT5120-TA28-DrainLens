@@ -102,6 +102,25 @@ button:disabled {
   border-radius: 4px;
 }
 
+/*
+ * The same ring, in the colour of the card it lands on.
+ *
+ * The sweep note is the one warm card in the product -- cream, with brown
+ * ink -- and the brand-green ring on it was reported on 11 October as a
+ * green box nobody could account for or get rid of. It is the keyboard
+ * focus ring, and it stays once the fold has been worked with the keyboard,
+ * which is what it is for; what was wrong is that it was the only green
+ * thing on a card with no green in it, so it read as a stray box rather
+ * than as *this is where you are*.
+ *
+ * Only the colour changes. The ring is the same width, the same offset, and
+ * appears in exactly the same cases. `advisory.ink` against `advisory.fill`
+ * is 6.34:1, measured, where a focus indicator needs 3:1.
+ */
+.sweep-note__toggle:focus-visible {
+  outline-color: #6b5a2b;
+}
+
 ::selection {
   background: #dcece6;
   color: #17242e;
