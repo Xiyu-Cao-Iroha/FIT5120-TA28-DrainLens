@@ -57,9 +57,39 @@ Not files: inline SVG, written in the components that draw them, so they carry n
 
 | Where | What |
 |---|---|
+| `ui/Logo.tsx` | the DrainLens mark in the masthead |
+| `ui/ReportGlyph.tsx` | the notepad on the report card and its chip |
 | `screens/BlockagePictures.tsx` | the three grate drawings in the blockage comparison |
 | `screens/Home.tsx` (`PathThumb`), `screens/BlockedDrain.tsx` (`CompareThumb`) | the guide cards' thumbnails |
 | `map/MapLayers.tsx` | the legend's swatches |
+
+**The mark is the team's own artwork**, supplied on 11 October 2026 as
+`Logo.zip` with two files: `Logo.svg` and `Logo with words.svg`. The product
+uses the first. The second is not in the repository, because the masthead
+sets *DrainLens* in type beside the mark and a logo carrying the word as well
+would say it twice; if a wordmark is ever wanted for a slide or a poster, the
+file is the team's to hand out and does not need to live here.
+
+It replaced a dark square with a `≈` in it, which was a stand-in for artwork
+that did not exist yet.
+
+**The browser tab icon is the same drawing**, and the only place it is a
+file: a `<link rel="icon">` cannot point at a component.
+
+| File | Where it is shown |
+|---|---|
+| `apps/web/public/favicon.svg` | the browser tab, in every current browser |
+| `apps/web/public/favicon-32.png` | the browser tab, where SVG icons are not taken |
+
+Both are generated from `Logo.svg`, not redrawn: the SVG wraps the mark's own
+paths in a 64-unit square on a pale tile, so it reads on a dark tab bar as
+well as a light one, and the PNG is that SVG rasterised. Nothing about the
+artwork changed, so nothing new needs approving.
+
+**There is no home-screen icon.** iOS uses `apple-touch-icon` for *Add to
+Home Screen* and ignores SVG for it, so a phone that saves the site gets a
+screenshot instead of the mark. One 180 px PNG would fix that; nobody has
+asked for it.
 
 ---
 

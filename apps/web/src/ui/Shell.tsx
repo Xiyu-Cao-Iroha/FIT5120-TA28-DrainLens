@@ -26,6 +26,7 @@ import {
   weight,
 } from './theme.js';
 import { COVERAGE } from './terms.js';
+import { LOGO_TITLE, Logo } from './Logo.js';
 import { SourceLink, SourcesProvider } from './SourcesPanel.js';
 
 export interface ShellProps {
@@ -81,15 +82,25 @@ export interface ShellProps {
    * On the homepage the masthead says what this is to somebody who has just
    * arrived. On the map it says it again to somebody who is already inside,
    * and costs 56 pixels of the thing they came for — stacked with the
-   * breadcrumb, the map was starting well down a laptop window. Nothing goes
-   * with it: the mark is not a link, and the way back is the Back control on
-   * the row below.
+   * breadcrumb, the map was starting well down a laptop window. The map's way
+   * back is the Back control and the site links on the row below, which is
+   * also where its *Home page* link is.
    *
    * **The footer is not part of this and cannot be turned off.** Its summary
    * line says *Not a flood warning*, and the screen most likely to be mistaken
    * for an official flood map is exactly the screen this prop exists for.
    */
   readonly masthead?: boolean;
+  /**
+   * Where the mark goes when it is pressed (team, 11 October).
+   *
+   * The mark was decoration until today, and the request was that it behave
+   * the way a logo behaves everywhere else: wherever it is, pressing it is
+   * the way home. `App` fills this in for every screen through `AppShell`,
+   * so it cannot be missed on one of them; without it the mark renders as
+   * the picture it used to be rather than as a dead button.
+   */
+  readonly onHome?: (() => void) | undefined;
   /**
    * Who the data belongs to, read from the artefacts.
    *
@@ -119,6 +130,7 @@ export function Shell({
   trailing,
   crumbsLabel = 'Breadcrumb',
   masthead = true,
+  onHome,
   credits,
   creditNotice,
   extentName,
@@ -158,22 +170,39 @@ export function Shell({
             flexShrink: 0,
           }}
         >
-          <span
-            aria-hidden
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: radius.base,
-              background: ink.strong,
-              color: ink.inverse,
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 17,
-              lineHeight: 1,
-            }}
-          >
-            ≈
-          </span>
+          {/*
+            The mark, and the way home.
+
+            It was a dark square with a `≈` in it, standing in for artwork
+            that did not exist yet; the team's own logo arrived on
+            11 October. The wordless file, because *DrainLens* is set in
+            type immediately to its right and a logo that carries the word
+            as well would say it twice.
+
+            A button rather than a picture, because that is what the team
+            asked for and what a logo does on every other site. The button
+            is the mark alone: the name beside it stays text, so a reader
+            dragging across the header to copy the name does not press it.
+          */}
+          {onHome === undefined ? (
+            <Logo height={34} />
+          ) : (
+            <button
+              type="button"
+              onClick={onHome}
+              aria-label={`${LOGO_TITLE}, home page`}
+              style={{
+                display: 'inline-flex',
+                padding: 0,
+                border: 'none',
+                borderRadius: radius.base,
+                background: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <Logo height={34} />
+            </button>
+          )}
           <span>
             <strong
               style={{
