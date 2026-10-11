@@ -31,7 +31,7 @@ import {
   OTHER_DRAINS_WHY,
   STREET_DRAINS_HEADING,
   STREET_DRAINS_STEP,
-  SWEEP_DETAIL,
+  SWEEP_FULL,
   SWEEP_SUMMARY,
   drainCount,
   moreStreets,
@@ -165,7 +165,6 @@ export function StreetDrains({
  * lift the cover, never reach inside, never stand in the road.
  */
 function SweepNote() {
-  const id = useId();
   const [open, setOpen] = useState(false);
   return (
     <div
@@ -178,36 +177,48 @@ function SweepNote() {
         color: advisory.ink,
       }}
     >
+      {/*
+        One sentence that grows, not a sentence with a second one under it.
+
+        It was a summary and a paragraph, and the paragraph started a new
+        sentence: the fold read as two notes, which the team reported on
+        11 October as the text being broken. The design draws one paragraph
+        (Figma S1), and the copy is now written to be one -- so this is a
+        single run of text that gets longer, in one weight, with nothing
+        drawn between the half that was always there and the half that
+        arrives.
+
+        That makes the whole paragraph the button, which is also what the
+        design draws: the chevron is at its right-hand end and the words
+        beside it are what you press.
+      */}
       <button
         type="button"
+        className="sweep-note__toggle"
         aria-expanded={open}
-        aria-controls={id}
         onClick={() => {
           setOpen((was) => !was);
         }}
         style={{
           display: 'flex',
           gap: space(2),
-          alignItems: 'baseline',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
           width: '100%',
           background: 'none',
           border: 'none',
           padding: 0,
-          font: type(text.small, { weight: weight.semibold, leading: 1.45 }),
+          font: type(text.small, { weight: weight.semibold, leading: 1.5 }),
           color: advisory.ink,
           textAlign: 'left',
           cursor: 'pointer',
         }}
       >
-        <span>{SWEEP_SUMMARY}</span>
-        <span aria-hidden>{open ? '⌃' : '⌄'}</span>
+        <span>{open ? SWEEP_FULL : SWEEP_SUMMARY}</span>
+        <span aria-hidden style={{ flexShrink: 0 }}>
+          {open ? '⌃' : '⌄'}
+        </span>
       </button>
-      {open && (
-        <p id={id} style={{ margin: `${String(space(2))}px 0 0`, font: type(text.small, { leading: 1.55 }) }}>
-          {SWEEP_DETAIL}
-        </p>
-      )}
     </div>
   );
 }
