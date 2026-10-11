@@ -147,6 +147,16 @@ export const SAFETY: readonly string[] = [
   'Call Triple Zero (000) in a life-threatening emergency.',
 ];
 
+/**
+ * The pink strip at the foot of the plan (Figma A3, A8b and the F frames).
+ *
+ * The strip used to be `SAFETY`'s last two sentences run together, which put
+ * the state service before the one number to ring when somebody is in
+ * danger. The design leads with 000 and is half the length. Both numbers
+ * are the register's, with the quotations they came from.
+ */
+export const EMERGENCY_STRIP = 'Emergency? Call 000. Flood or storm help: VICSES 132 500.';
+
 /** Where current warnings live, which this product is not (AC 5.2.3). */
 export const VICEMERGENCY = {
   label: 'VicEmergency',

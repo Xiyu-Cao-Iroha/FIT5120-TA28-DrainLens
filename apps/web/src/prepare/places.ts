@@ -123,6 +123,10 @@ export const WHY_THIS_PLACE =
 /** What the place is, and is not, under *Why this place?* (AC 5.3.1). */
 export const PLACE_SOURCE = 'Estimated by DrainLens · Not a live warning · Guidance: VICSES';
 
+/** Whose decision a printed reminder was, and whose estimate (Figma A5). */
+export const REMINDER_IS_YOURS = 'You said this place applies to you';
+export const ESTIMATED_BY_DRAINLENS = 'Estimated by DrainLens';
+
 /** That the place is the street rather than the reader's property (AC 5.3.1). */
 export const PLACE_IS_THE_STREET =
   'This describes the street near your address, not your property.';

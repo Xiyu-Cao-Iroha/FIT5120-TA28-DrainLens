@@ -61,6 +61,28 @@ export function listed(ids: readonly SectionId[]): string {
 export const beforeTheMap = (ids: readonly SectionId[]): string =>
   `We suggest finishing ${listed(ids)} before exploring the ${FULL_MAP.toLowerCase()}.`;
 
+/**
+ * The heading over it, with how long the next guide takes (Figma L7).
+ *
+ * Two minutes is the chooser's own estimate -- *Each guide takes a few
+ * minutes* -- made specific where the design makes it specific. It is the
+ * same for every guide, which is why it is a constant and not a field: a
+ * per-guide number nobody has measured would be a figure invented to fill a
+ * slot.
+ */
+export const NEXT_GUIDE_LABEL = 'Next guide · about 2 min';
+
+/**
+ * What the two address guides add (Figma L7).
+ *
+ * The reason somebody stops between guides is the thought of filling in the
+ * address again, and they do not have to. Only the two that ask for one say
+ * it; on the others it would be a sentence about nothing.
+ */
+export const SAME_ADDRESS = 'Same address, no need to type it again.';
+
+const USES_ADDRESS: readonly SectionId[] = ['heavy-rain', 'drainage-area'];
+
 /** The card that offers the next guide (Figma G5). */
 export function NextGuide({
   id,
@@ -90,7 +112,7 @@ export function NextGuide({
           color: ink.subtle,
         }}
       >
-        Next guide
+        {NEXT_GUIDE_LABEL}
       </span>
       <span style={{ font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
         {SECTIONS[id].label}
@@ -99,6 +121,7 @@ export function NextGuide({
           it is described on the chooser rather than in new words. */}
       <span style={{ font: type(text.small, { leading: 1.5 }), color: ink.muted }}>
         {PATHS.find((path) => path.mode === id)?.body ?? ''}
+        {USES_ADDRESS.includes(id) ? ` ${SAME_ADDRESS}` : ''}
       </span>
       <button
         type="button"

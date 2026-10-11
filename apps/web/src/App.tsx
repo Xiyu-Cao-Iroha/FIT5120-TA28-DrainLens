@@ -535,6 +535,7 @@ export function App() {
         >
           <Choose
             learned={session.learned}
+            compared={session.compared}
             guided={GUIDED_SECTIONS}
             address={session.address?.label ?? null}
             onChangeAddress={() => {

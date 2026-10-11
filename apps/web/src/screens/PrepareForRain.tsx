@@ -27,6 +27,7 @@ import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import { quietButton } from '../ui/controls.js';
 
 import {
+  EMERGENCY_STRIP,
   GENERAL_ACTIONS,
   type GeneralAction,
   NOT_A_SCORE,
@@ -430,7 +431,7 @@ export function PreparePlan({
           font: type(text.small, { leading: 1.5 }),
         }}
       >
-        {SAFETY.slice(-2).join(' ')}
+        {EMERGENCY_STRIP}
       </p>
 
       {/*

@@ -51,8 +51,15 @@ export interface ChooseProps {
   /** The sections with a guide written. The rest cannot be started yet. */
   readonly guided: readonly SectionId[];
   readonly onStart: (section: SectionId) => void;
-  /** The comparison: an address first, then the setup. Not a guide. */
+  /** The comparison: an address first, then the setup. */
   readonly onCompare: () => void;
+  /**
+   * Whether one has been run to a result, for its *Done ✓* badge.
+   *
+   * Figma T1 counts it among the seven and marks it done like any other
+   * card. It still has no steps and no `Learned` entry; see `session.ts`.
+   */
+  readonly compared?: boolean | undefined;
   readonly onSkip: () => void;
   readonly onBack: () => void;
 }
@@ -96,10 +103,12 @@ export function Choose({
   onChangeAddress,
   onStart,
   onCompare,
+  compared = false,
   onSkip,
   onBack,
 }: ChooseProps) {
-  const done = countLearned(learned);
+  // Seven cards, and the comparison is one of them (Figma T1).
+  const done = countLearned(learned) + (compared ? 1 : 0);
 
   /*
     The first guide not yet done, marked so there is a place to begin.
@@ -243,7 +252,7 @@ export function Choose({
             title={COMPARE_CARD.title}
             body={COMPARE_CARD.body}
             accent={COMPARE_ACCENT}
-            done={false}
+            done={compared}
             ready
             status="Start comparison"
             onStart={onCompare}
@@ -296,7 +305,16 @@ const LEARN_THE_MAP = ['drainage', 'water-flow', 'terrain', 'low-areas'] as cons
 const USE_YOUR_ADDRESS = ['heavy-rain', 'drainage-area'] as const;
 
 /** How many guides there are to finish, for *n of seven*. */
-const SECTION_COUNT = Object.keys(SECTIONS).length;
+/*
+  Seven, which is six guides and the comparison.
+
+  The comparison was never counted until 11 October, on the ground that it
+  is not a guide (review 2, item 6). Figma T1 counts it and badges it done,
+  so the number the reader sees includes it. What it still does not do is
+  gate anything: `allLearned`, which the full map's notice reads, is about
+  the sections with steps.
+*/
+const SECTION_COUNT = Object.keys(SECTIONS).length + 1;
 
 const grid = {
   display: 'grid',
