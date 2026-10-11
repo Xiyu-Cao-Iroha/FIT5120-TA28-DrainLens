@@ -19,7 +19,10 @@ describe('the address screen’s words', () => {
     expect(copy).toBe(COMPARE_COPY);
     // The team's Figma, H2 and H3.
     expect(copy.title).toBe('Which address do you want to check?');
-    expect(copy.lead).toMatch(/a drain near it you can test/);
+    // *Compare*, not *test*: the audit's first finding, and this screen
+    // sets the expectation before any of the labels inside the flow do.
+    expect(copy.lead).toBe('We’ll find a drain near it to compare clear against blocked.');
+    expect(copy.lead).not.toMatch(/test/i);
     expect(copy.submit).toBe('Find a drain →');
   });
 

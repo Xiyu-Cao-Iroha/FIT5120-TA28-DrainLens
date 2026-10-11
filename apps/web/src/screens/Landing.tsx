@@ -166,7 +166,16 @@ export const SEARCHING = 'Searching…';
 
 export const COMPARE_COPY: LandingCopy = {
   title: 'Which address do you want to check?',
-  lead: 'We’ll find a drain near it you can test for a blocked-drain comparison.',
+  /*
+    *Compare*, not *test*.
+
+    This is the first screen of the comparison and it said *a drain near it
+    you can test*, which is the claim the plain-English audit's first
+    finding is about: the product never looks at a drain. The four labels
+    inside the flow were changed and this one, which sets the reader's
+    expectation before any of them, was missed.
+  */
+  lead: 'We’ll find a drain near it to compare clear against blocked.',
   submit: 'Find a drain →',
 };
 

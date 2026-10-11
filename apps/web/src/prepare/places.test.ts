@@ -9,13 +9,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHECK_STREET_DRAINS,
+  EVERY_HOME,
   MAX_PLACES,
+  NOT_AN_ORDER,
+  NO_PLACES,
   PLACE_ACTION,
   PLACE_IS_THE_STREET,
   PLACE_RADIUS_M,
   NO_PLACES_IN_RING,
   NO_PLACES_MEANS,
   NO_PLACES_STILL,
+  WHY_THIS_PLACE,
   applying,
   checkButton,
   numberOf,
@@ -151,5 +156,39 @@ describe('reviewing them', () => {
   it('counts the places on the button, and drops the count when there are none', () => {
     expect(checkButton(places)).toBe('Check before heavy rain (3)');
     expect(checkButton([])).toBe('Check before heavy rain');
+  });
+});
+
+/**
+ * The word the product stopped using.
+ *
+ * The plain-English audit's first finding: four labels said the product
+ * tests a real drain, and the home page says in as many words that it does
+ * not. Those four were changed on 10 October and three more were missed: the
+ * address screen that opens the comparison, the map button's label for a
+ * screen reader, and a spinner. A regular expression is a blunt guard, and
+ * blunt is what this one needs.
+ */
+describe('the comparison never says it tests a drain', () => {
+  it('keeps the word out of the places and comparison vocabulary', () => {
+    const words = [
+      NOT_AN_ORDER,
+      NO_PLACES,
+      NO_PLACES_MEANS,
+      NO_PLACES_IN_RING,
+      NO_PLACES_STILL,
+      CHECK_STREET_DRAINS,
+      EVERY_HOME,
+      PLACE_ACTION,
+      WHY_THIS_PLACE,
+    ];
+    for (const line of words) expect(line).not.toMatch(/\btest/i);
+  });
+});
+
+describe('the plan is a list, not a form', () => {
+  it('says the three parts are not an order', () => {
+    // The numbers are the design's (Figma A8b, G6). This is what they mean.
+    expect(NOT_AN_ORDER).toMatch(/not an order/);
   });
 });

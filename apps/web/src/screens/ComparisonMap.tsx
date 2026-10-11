@@ -219,7 +219,16 @@ export function ComparisonMap({
               key={drain.assetNumber}
               type="button"
               className="comparison__drain"
-              aria-label={`${suggested ? 'Highlighted drain, the nearest you can test' : 'Drain you can test'}: ID ${drain.assetNumber}, about ${String(aboutMetres(drain.distanceM))} m from your address`}
+              /*
+                The key's own words, not a second set.
+
+                The visible key says *Drain you can compare*; this said
+                *Drain you can test* until 11 October, so a screen reader
+                heard the one word the plain-English audit asked the product
+                to stop using, on the control the key was describing. Read
+                from `MAP_KEY` now, so the two cannot part again.
+              */
+              aria-label={`${suggested ? `Highlighted drain, the nearest. ${MAP_KEY.comparable}` : MAP_KEY.comparable}: ID ${drain.assetNumber}, about ${String(aboutMetres(drain.distanceM))} m from your address`}
               onClick={() => {
                 onChoose(drain.assetNumber, suggested);
               }}
