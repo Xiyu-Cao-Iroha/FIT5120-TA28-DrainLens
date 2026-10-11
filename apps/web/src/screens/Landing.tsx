@@ -162,9 +162,35 @@ export const NEXT_AFTER_ADDRESS: Partial<Record<SectionId, string>> = {
 /** T0m, for the way in that opens the map rather than a guide. */
 export const FULL_MAP_LEAD = 'Enter it once. The full map opens next.';
 
-/** T0's line under the suburbs, which the product did not say anywhere. */
+/**
+ * T0's line under the suburbs, which the product did not say anywhere.
+ *
+ * **Rewritten on 11 October, three weeks after it stopped being true.** It
+ * read *Your address stays in this browser only. You can change it at any
+ * time.* The first clause went false on 9 October, when a submitted search
+ * moved to `POST /api/addresses/search`. `DECISIONS-PENDING.md` §14
+ * records that decision as withdrawing the on-screen promise in the same
+ * change, and the privacy panel in `ui/sources.ts` was rewritten that day --
+ * this line was missed, which is how the product spent three weeks making a
+ * promise its own documents said it had withdrawn.
+ *
+ * **It is replaced rather than cut**, for the reason the panel gives: a line
+ * that quietly drops a sentence it can no longer keep is worse than one that
+ * never made it, and going silent here would leave *stays in this browser* as
+ * the last thing a resident read about their address. So it still says where
+ * the address goes and what becomes of it. The second clause is untouched; it
+ * was never in question.
+ *
+ * It is the panel's claim in fewer words, because this sits under a search
+ * field rather than in a panel: *no account, no record of the search, and
+ * nothing written to our logs* is the whole of it, one press away under *Data
+ * sources and limits*. The name stays `ADDRESS_STAYS_HERE` because the rule
+ * it was named for is unchanged -- nothing about the address is written down,
+ * here or at the other end. See *The address is never written down* in
+ * `apps/web/README.md`.
+ */
 export const ADDRESS_STAYS_HERE =
-  'Your address stays in this browser only. You can change it at any time.';
+  'Your address is searched by DrainLens and is not kept. You can change it at any time.';
 
 
 
@@ -452,9 +478,11 @@ export function Landing({
         )}
 
         {/*
-          T0's last line. The address never leaves the tab and the product
-          says so on the page that asks for it, rather than only in About
-          the data.
+          T0's last line. What becomes of the address is said on the page that
+          asks for it, rather than only in About the data. It used to say the
+          address never leaves the tab; since 9 October a submitted search is
+          answered by our own API, so what is promised here is the narrower
+          thing the privacy panel promises -- see `ADDRESS_STAYS_HERE`.
         */}
         <p
           style={{

@@ -138,11 +138,13 @@ async function load(): Promise<Loaded> {
       onFallback: note,
     }),
     // **Never from a server, and not routed through `fetchArtefact` so that no
-    // later edit there can change that.** The landing page tells a resident the
-    // search runs in their browser and that nothing about the address is sent
-    // anywhere; an address index fetched from an API would still keep that
-    // promise, and an index fetched *per query* would not. Bundled is the shape
-    // that cannot drift into the second.
+    // later edit there can change that.** The reason is no longer a sentence on
+    // the landing page: that promise was withdrawn on 9 October, when a
+    // submitted search moved to `POST /api/addresses/search`. What survived it
+    // is the red line in `packages/address` -- suggestions are ranked over this
+    // index on every keystroke, and an index fetched *per query* would send a
+    // home address to a server one letter at a time. Bundled is the shape that
+    // cannot drift into that. `DECISIONS-PENDING.md` §14.
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
