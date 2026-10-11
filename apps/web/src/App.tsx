@@ -497,6 +497,7 @@ export function App() {
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
+            recent={session.recent}
             // The comparison's own words when it is the task waiting.
             task={session.pendingTask}
             // The title follows the guide card that was pressed (copy audit v2, #16).
@@ -1172,6 +1173,7 @@ function MapScreen({
         derived={loaded.derived}
         trace={loaded.trace}
         address={session.address}
+        recent={session.recent}
         task={session.task}
         mode={session.mapMode}
         index={loaded.index}

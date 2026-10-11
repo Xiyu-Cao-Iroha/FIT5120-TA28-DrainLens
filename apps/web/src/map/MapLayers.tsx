@@ -15,6 +15,8 @@
  * has a switch of its own — which is the substance those criteria protect,
  * whichever control happens to sit where.
  */
+import type { ReactNode } from 'react';
+
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -264,11 +266,21 @@ function Chip({
  */
 export function PlainChip({
   label,
+  icon,
   on,
   pulse = false,
   onPress,
 }: {
   readonly label: string;
+  /**
+   * The mark that goes before the label, where the design draws one.
+   *
+   * Every other chip in this row has a swatch of the thing it draws, and a
+   * chip with nothing in front of its words reads as a different kind of
+   * control. This one is not a layer and has no swatch to show, so the
+   * design gives it an icon instead (Figma D1).
+   */
+  readonly icon?: ReactNode;
   readonly on: boolean;
   readonly pulse?: boolean;
   readonly onPress: () => void;
@@ -282,6 +294,9 @@ export function PlainChip({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
+        // The gap a `Chip`'s swatch leaves, so the row's chips line up
+        // whether the mark is a swatch or an icon.
+        gap: space(2),
         padding: `${String(space(2))}px ${String(space(3))}px`,
         border: `1px solid ${on ? brand.base : line.base}`,
         borderRadius: radius.base,
@@ -293,6 +308,7 @@ export function PlainChip({
         cursor: 'pointer',
       }}
     >
+      {icon}
       {label}
     </button>
   );

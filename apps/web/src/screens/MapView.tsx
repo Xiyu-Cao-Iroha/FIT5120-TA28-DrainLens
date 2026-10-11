@@ -31,6 +31,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { addressFrom, nextActive } from '../address/enter.js';
 import { lookupAddress } from '../address/lookup.js';
+import { RECENT_LABEL, recall } from '../address/recent.js';
 import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
 import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
@@ -61,6 +62,7 @@ import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js'
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
 import { SPOT_A_PROBLEM_CHIP } from '../report/problems.js';
+import { ReportGlyph } from '../ui/ReportGlyph.js';
 import type { Press } from '../tutorial/lesson.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
@@ -168,6 +170,8 @@ export interface MapViewProps {
   readonly onResetPlaces?: (() => void) | undefined;
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
+  /** The addresses looked up in this tab, newest first. */
+  readonly recent?: readonly SupportedAddress[] | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
   /**
    * Let the address go again.
@@ -316,6 +320,7 @@ export function MapView({
   onReviewPlace,
   onResetPlaces,
   index,
+  recent = [],
   onAddress,
   onClearAddress,
   chipKeys,
@@ -590,20 +595,22 @@ export function MapView({
   /*
     The before-rain layer opens something, always (change list, item 11).
 
-    Reported from the guide: step two says *decide whether Place 1 applies to
-    you* over a map with nothing open on it, and the reader has to work out
-    that the thing to press is a small warning triangle somewhere among the
-    streets. The design opens the first place's card for them, so the step is
-    about the decision rather than about finding the control.
+    The reason is that it used to open nothing: numbered triangles appeared
+    among the streets and the reader had to work out that one of them was
+    the thing to press. Silence also looks like a layer that did not load.
 
-    Where there are no places it opens the address card instead, which is
-    where the *none near this address* sentence is. An address with nothing to
-    check is a result and has to look like one; silence looks like a layer
-    that did not load.
+    **What it opens is the address card, and only that** (11 October). It
+    opened the first place's card where there were places, and the address
+    card where there were none, so a reader who searched an address with the
+    layer on got both at once, overlapping. The address card is the right
+    one either way: with nothing near the address it carries the *none near
+    this address* sentence (Figma A8), and with places near it, it carries
+    *Check before heavy rain (3)*, which is the press the plan and Place 1
+    belong to.
 
-    Once per address and per switch-on: `opened` is the key it has already
-    done, so a reader who closes the card is not handed it again on the next
-    render.
+    Once per address and per switch-on: `openedFor` is the key it has
+    already done, so a reader who closes the card is not handed it again on
+    the next render.
   */
   const openedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -622,14 +629,15 @@ export function MapView({
     if (openedFor.current === key) return;
     openedFor.current = key;
     /*
-      Nothing near the address: the address card is the answer (Figma A8), so
-      it is opened rather than left for the reader to find the pin.
+      The address card, whatever the count.
+
+      With nothing near the address it is the answer (Figma A8). With places
+      near it, it is the thing that *has* the way in: *Check before heavy
+      rain (3)*. It used to open Place 1 here instead, and the two cards
+      then sat on the map at once -- reported on 11 October with a
+      screenshot of one over the other.
     */
-    if (places.length === 0) {
-      setAddressCardOpen(true);
-      return;
-    }
-    setOpenPlace((current) => current ?? places[0]?.number ?? null);
+    setAddressCardOpen(true);
   }, [guided, layers.beforeRain, address, places]);
 
   /*
@@ -707,33 +715,35 @@ export function MapView({
   }, [layers.beforeRain, address, places, checksOpened]);
 
   /*
-    The first place's card, opened when the reader turns the checks on
-    (team, 10 October).
+    A card when the reader turns the checks on (team, 10 October), and it is
+    the address card.
 
     *And a popup*, in their words. Turning the checks on is asking what to
     check, and a map of numbered triangles answers that only for somebody who
-    already knows to press one. The first is the nearest, which `placesNear`
-    orders them by.
+    already knows to press one.
 
-    **On the press, not on the state, and not inside a guide.** Both
+    **It put up Place 1 until 11 October, and that was the wrong card.** The
+    report came with a screenshot: the address card and Place 1 open
+    together, overlapping, neither of them asked for. The order the team
+    wants is the one the screens are built for -- the address card, then
+    *Check before heavy rain*, and the plan and Place 1 on that press -- so
+    this opens the card that carries the button and the press does the rest.
+
+    **On the change, not on the state, and not inside a guide.** Both
     qualifications were found by driving it. Epic 5's guide opens with this
     layer already on (`opensWith`) and its first step is *Click Check before
-    heavy rain*, whose hint is *Place 1 opens straight away*: an effect
-    reading the state rather than the change put Place 1 up before the
-    reader had pressed anything, and the step then asked them to do a thing
-    that appeared already done. Inside a guide the cards are the guide's to
-    open.
-
-    With no places there is nothing to put up, and the street drains panel
-    opens there instead.
+    heavy rain*: an effect reading the state rather than the change put a
+    card up before the reader had pressed anything, and the step then asked
+    them to do a thing that appeared already done. Inside a guide the cards
+    are the guide's to open.
   */
   const checksWere = useRef(beforeRainOn);
   useEffect(() => {
     const turnedOn = beforeRainOn && !checksWere.current;
     checksWere.current = beforeRainOn;
     if (!turnedOn || guided) return;
-    setOpenPlace((was) => was ?? places[0]?.number ?? null);
-  }, [beforeRainOn, guided, places]);
+    setAddressCardOpen(true);
+  }, [beforeRainOn, guided]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -1605,6 +1615,7 @@ export function MapView({
               <MapSearch
                 index={index}
                 address={address}
+                recent={recent}
                 onPick={onAddress}
                 onClear={onClearAddress}
               />
@@ -1633,6 +1644,13 @@ export function MapView({
             {guided && reportInGuide && (
               <PlainChip
                 label={SPOT_A_PROBLEM_CHIP}
+                /*
+                  16, which is the design's (Figma D1). A `Chip`'s swatch is
+                  18, so a row holding both would be two pixels out; no
+                  lesson shows both today, and the day one does this is the
+                  number to change.
+                */
+                icon={<ReportGlyph size={16} />}
                 on={reportOpen}
                 pulse={pulsePress === 'report'}
                 onPress={() => {
@@ -2571,11 +2589,13 @@ function midpoint(path: readonly Local[]): Local {
 function MapSearch({
   index,
   address,
+  recent,
   onPick,
   onClear,
 }: {
   readonly index: AddressIndex;
   readonly address: SupportedAddress | null;
+  readonly recent: readonly SupportedAddress[];
   readonly onPick: (address: IndexedAddress) => void;
   readonly onClear: () => void;
 }) {
@@ -2606,7 +2626,46 @@ function MapSearch({
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
-  const highlighted = active >= 0 && active < matches.length ? active : -1;
+
+  /*
+    What was searched for earlier in this tab, minus the one the map is on.
+
+    The current address is named in this field's own placeholder and the map
+    is centred on it, so a row that re-chooses it is a row that does nothing.
+    Memoised on the list and the index, neither of which changes while the map
+    is panned -- which matters here more than on the first screen, because
+    this component re-renders on every frame of a drag.
+  */
+  const recalled = useMemo(
+    () => recall(index, recent, address?.id ?? null),
+    [index, recent, address],
+  );
+
+  /*
+    **Shown on focus with an empty field, and only then.**
+
+    The list below is not gated on focus, deliberately -- the note there says
+    why. This one has to be: a dropdown of addresses hanging over the map
+    whenever nobody is typing is a panel the reader did not open. A press
+    still lands, because the rows cancel the mousedown that would blur the
+    field first.
+  */
+  const showingRecent = focused && typed.trim() === '' && recalled.length > 0;
+
+  /*
+    **One list, from one of two places, so the keyboard does not care which.**
+
+    The field is a combobox over a listbox, and the arrows, `Enter` and
+    `aria-activedescendant` were all written against the suggestions. Putting
+    the recent addresses through the same array is what keeps that true: the
+    reader arrows down into their own addresses exactly as they would into
+    matches, and nothing below had to learn about a second kind of row.
+  */
+  const options: readonly IndexedAddress[] = useMemo(
+    () => (showingRecent ? recalled : matches.map((match) => match.address)),
+    [showingRecent, recalled, matches],
+  );
+  const highlighted = active >= 0 && active < options.length ? active : -1;
   const optionId = (at: number) => `${listId}-option-${String(at)}`;
 
   const pick = (chosen: IndexedAddress) => {
@@ -2639,7 +2698,7 @@ function MapSearch({
   async function choose() {
     if (asking) return;
 
-    const highlightedAddress = matches[highlighted]?.address;
+    const highlightedAddress = options[highlighted];
     if (highlightedAddress !== undefined) {
       pick(highlightedAddress);
       return;
@@ -2721,10 +2780,10 @@ function MapSearch({
           }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              if (matches.length === 0) return;
+              if (options.length === 0) return;
               // Otherwise the caret jumps to the start or end of the text.
               event.preventDefault();
-              setActive(nextActive(highlighted, matches.length, event.key));
+              setActive(nextActive(highlighted, options.length, event.key));
             } else if (event.key === 'Enter') {
               event.preventDefault();
               void choose();
@@ -2742,7 +2801,7 @@ function MapSearch({
           aria-label="Search for an address"
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={matches.length > 0}
+          aria-expanded={options.length > 0}
           aria-controls={listId}
           aria-busy={asking}
           {...(highlighted >= 0 ? { 'aria-activedescendant': optionId(highlighted) } : {})}
@@ -2829,11 +2888,11 @@ function MapSearch({
         </p>
       )}
 
-      {matches.length > 0 && (
+      {options.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          aria-label="Matching addresses"
+          aria-label={showingRecent ? RECENT_LABEL : 'Matching addresses'}
           style={{
             position: 'absolute',
             left: 0,
@@ -2855,9 +2914,28 @@ function MapSearch({
             A press still chooses, and the pointer moves the highlight so the
             arrows carry on from where it was.
           */}
-          {matches.map((match, at) => (
+          {/*
+            The heading, when these are the reader's own addresses rather than
+            matches for what they typed. `presentation` because a listbox's
+            children are options and this is not one: it is the answer to
+            *why am I being shown these*, which an unlabelled list of five
+            addresses under an empty field does not give.
+          */}
+          {showingRecent && (
             <li
-              key={match.address.id}
+              role="presentation"
+              style={{
+                padding: `${String(space(1))}px ${String(space(2))}px`,
+                font: type(text.small),
+                color: ink.subtle,
+              }}
+            >
+              {RECENT_LABEL}
+            </li>
+          )}
+          {options.map((option, at) => (
+            <li
+              key={option.id}
               id={optionId(at)}
               role="option"
               aria-selected={at === highlighted}
@@ -2870,7 +2948,7 @@ function MapSearch({
                 setActive(at);
               }}
               onClick={() => {
-                pick(match.address);
+                pick(option);
               }}
               style={{
                 padding: `${String(space(2))}px ${String(space(2))}px`,
@@ -2881,7 +2959,7 @@ function MapSearch({
                 cursor: 'pointer',
               }}
             >
-              {match.address.label}
+              {option.label}
             </li>
           ))}
         </ul>

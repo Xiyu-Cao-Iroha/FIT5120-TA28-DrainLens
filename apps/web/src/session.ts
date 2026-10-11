@@ -29,6 +29,7 @@ import {
   isValidatedRainfall,
 } from '@drainlens/schema';
 
+import { remember } from './address/recent.js';
 import type { MapMode } from './map/modes.js';
 import {
   NOTHING_LEARNED,
@@ -199,6 +200,20 @@ export type Outcome =
 export interface Session {
   readonly screen: Screen;
   readonly address: SupportedAddress | null;
+  /**
+   * The addresses looked up in this tab, newest first.
+   *
+   * **Here, because here is the one place an address is allowed to be kept.**
+   * The rule at the top of this file is about storage, not about memory: an
+   * address may live as long as the tab and not a moment longer, and this
+   * list is bounded by exactly the same thing the rest of the session is.
+   * `address/recent.ts` carries the reasoning and the cap.
+   *
+   * It is not a history of what was *done* -- no count, no timestamp, no note
+   * of which guide was opened where. It is the labels in the order they were
+   * chosen, which is the least that answers *take me back to the last one*.
+   */
+  readonly recent: readonly SupportedAddress[];
   /** What they typed that turned out not to be supported, so the screen can say it back. */
   readonly rejectedAddress: string | null;
   readonly task: Task | null;
@@ -329,6 +344,7 @@ export const EMPTY_SCENARIO: ScenarioInputs = {
 export const INITIAL_SESSION: Session = {
   screen: 'home',
   address: null,
+  recent: [],
   rejectedAddress: null,
   task: null,
   mapMode: null,
@@ -638,9 +654,25 @@ function forgetAddress(
 
 export function reduce(session: Session, event: SessionEvent): Session {
   const next = step(session, event);
-  return next.screen === 'explore' && session.screen !== 'explore'
-    ? { ...next, mapOpenings: next.mapOpenings + 1 }
-    : next;
+  const counted =
+    next.screen === 'explore' && session.screen !== 'explore'
+      ? { ...next, mapOpenings: next.mapOpenings + 1 }
+      : next;
+
+  /*
+    The recent list is kept here rather than in the branches that set an
+    address, for the reason `mapOpenings` is counted here: there are three
+    ways to arrive at an address -- `address-accepted`, `address-moved` and
+    `example-address-chosen` -- which is three chances to forget one, and a
+    fourth the day somebody adds a route. Reading the address that came out
+    cannot miss a path, because every path produces one.
+
+    `remember` hands back the same array when the front of the list is already
+    this address, so the common case -- every event that is not about an
+    address at all -- costs a comparison and allocates nothing.
+  */
+  const recent = remember(counted.recent, counted.address);
+  return recent === counted.recent ? counted : { ...counted, recent };
 }
 
 function step(session: Session, event: SessionEvent): Session {

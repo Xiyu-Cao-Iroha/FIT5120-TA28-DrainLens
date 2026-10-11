@@ -42,8 +42,9 @@ import {
   demonstrationAddresses,
 } from '../address/demonstration.js';
 import { lookupAddress } from '../address/lookup.js';
+import { RECENT_LABEL, recall } from '../address/recent.js';
 import { suburbsOf } from '../address/suburbs.js';
-import type { Task } from '../session.js';
+import type { SupportedAddress, Task } from '../session.js';
 import type { SectionId } from '../tutorial/sections.js';
 import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
 import { COVERAGE, LAYER } from '../ui/terms.js';
@@ -87,6 +88,14 @@ export interface LandingProps {
   /** Present only while the index is a stand-in. */
   readonly fixtureNote?: string | undefined;
   readonly onFound: (address: IndexedAddress) => void;
+  /**
+   * The addresses looked up in this tab, newest first.
+   *
+   * Optional so the screen still renders in isolation, and defaulted to the
+   * empty list rather than to undefined so that nothing downstream has to ask
+   * which kind of nothing it got.
+   */
+  readonly recent?: readonly SupportedAddress[] | undefined;
   readonly onUnsupported: (typed: string) => void;
   /**
    * Leave without giving an address.
@@ -237,6 +246,7 @@ type Problem =
 export function Landing({
   index,
   fixtureNote,
+  recent = [],
   onFound,
   onUnsupported,
   onBack,
@@ -260,11 +270,30 @@ export function Landing({
   */
   const [asking, setAsking] = useState(false);
   const examplesId = useId();
+  const recentId = useId();
 
   const suggestions: Match[] = useMemo(
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
+
+  /*
+    What was searched for earlier in this tab, as rows this screen can offer.
+
+    Resolved against the index rather than carried in the session, for the
+    reason `recent.ts` gives -- and memoised on the list itself, which only
+    changes when an address is chosen, so the pass over the index happens once
+    per search rather than once per keystroke.
+  */
+  const recalled = useMemo(() => recall(index, recent), [index, recent]);
+
+  /*
+    **The recent list replaces the examples rather than stacking above them.**
+    *Not sure? Try one of these* is for somebody who does not know what to
+    type; somebody with their own addresses to go back to is not that person,
+    and two lists of addresses under one field is a choice nobody asked for.
+  */
+  const showingRecent = typed.trim() === '' && problem === null && recalled.length > 0;
 
   // Three to choose from (team feedback, 17 September), the comparison's own
   // where it is waiting: each of those is near a drain that shows a difference.
@@ -512,7 +541,33 @@ export function Landing({
           </ul>
         )}
 
-        {suggestions.length === 0 && problem === null && examples.length > 0 && (
+        {showingRecent && (
+          <div style={{ margin: `${String(space(3))}px 0 0` }}>
+            <p
+              id={recentId}
+              style={{ margin: 0, font: type(text.label), color: ink.subtle }}
+            >
+              {RECENT_LABEL}
+            </p>
+            <ul
+              aria-labelledby={recentId}
+              style={{ listStyle: 'none', margin: `${String(space(2))}px 0 0`, padding: 0 }}
+            >
+              {recalled.map((address) => (
+                <li key={address.id}>
+                  <SuggestionButton
+                    label={address.label}
+                    onPick={() => {
+                      onFound(address);
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {!showingRecent && suggestions.length === 0 && problem === null && examples.length > 0 && (
           <div
             style={{
               margin: `${String(space(3))}px 0 0`,

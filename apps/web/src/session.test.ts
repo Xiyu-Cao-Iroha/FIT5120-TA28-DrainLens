@@ -29,6 +29,47 @@ const NEALE: SupportedAddress = {
 const play = (events: readonly SessionEvent[], from: Session = INITIAL_SESSION): Session =>
   events.reduce(reduce, from);
 
+describe('the recent addresses', () => {
+  it('records every route to an address, not just the first screen', () => {
+    /*
+      **Three events set an address, and this is why the list is not kept in
+      their branches.** `address-accepted` is the first screen, `address-moved`
+      is the map's own search and `example-address-chosen` is the *Not sure?*
+      row. `reduce` reads the address that came out instead, so a fourth route
+      added later is recorded without anybody remembering to.
+    */
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }]).recent).toEqual([GATEHOUSE]);
+    expect(play([{ type: 'address-moved', address: NEALE }]).recent).toEqual([NEALE]);
+    expect(play([{ type: 'example-address-chosen', address: NEALE }]).recent).toEqual([NEALE]);
+  });
+
+  it('puts the newest first and holds an address once', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'address-moved', address: NEALE },
+      { type: 'address-moved', address: GATEHOUSE },
+    ]);
+    expect(end.recent).toEqual([GATEHOUSE, NEALE]);
+  });
+
+  it('survives clearing the address, which is not unsearching it', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'address-cleared' },
+    ]);
+    expect(end.address).toBeNull();
+    expect(end.recent).toEqual([GATEHOUSE]);
+  });
+
+  it('is left alone, as the same array, by events that are not about an address', () => {
+    // The reason is in `recent.ts`: a new array per event would invalidate the
+    // memo that resolves these against the index, on every frame of a drag.
+    const one = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    expect(reduce(one, { type: 'task-chosen', task: 'compare' }).recent).toBe(one.recent);
+    expect(reduce(one, { type: 'rainfall-selected', rainfallMm: 40 }).recent).toBe(one.recent);
+  });
+});
+
 describe('the golden path', () => {
   it('runs address to result without leaving anything unset', () => {
     const end = play([
@@ -401,6 +442,22 @@ describe('nothing about the person leaves memory', () => {
     const writes = trapStorage();
     globalThis.localStorage.setItem('drainlens-address', GATEHOUSE.label);
     expect(writes).toEqual(['localStorage.setItem(drainlens-address)']);
+  });
+
+  it('holds the recent addresses there too, and starts with none', () => {
+    /*
+      **The list of five is the same promise as the one, and needs saying.**
+      Closing the tab is the whole of the clearing mechanism -- which is why
+      `recent.ts` offers no *Clear history* control -- and that only holds if
+      the list is written nowhere the tab outlives. The trap above covers a
+      session that searches twice, so this reads what it produced.
+    */
+    expect(INITIAL_SESSION.recent).toEqual([]);
+    const writes = trapStorage();
+    const end = play(wholeSession);
+    expect(writes).toEqual([]);
+    expect(end.recent).toEqual([NEALE, GATEHOUSE]);
+    expect(JSON.stringify(INITIAL_SESSION)).not.toContain('Gatehouse');
   });
 
   it('holds the address only on the object the caller can drop', () => {
