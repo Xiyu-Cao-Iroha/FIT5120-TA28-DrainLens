@@ -405,9 +405,15 @@ export function Landing({
       >
         {copy.title}
       </h1>
+      {/*
+        `ink.base`, not `ink.muted`. This is the one line of text on the
+        screen with the photograph behind it rather than a card: over the
+        picture's darkest pixel under the wash, muted reaches 3.9:1 and base
+        7.1:1, against the 4.5:1 AA asks for. See `.landing__street`.
+      */}
       <p
         className="landing__lead"
-        style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
+        style={{ margin: `0 0 ${String(space(8))}px`, color: ink.base, maxWidth: 560 }}
       >
         {lead}
       </p>
