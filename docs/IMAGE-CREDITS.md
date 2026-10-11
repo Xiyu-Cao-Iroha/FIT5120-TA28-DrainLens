@@ -57,9 +57,21 @@ Not files: inline SVG, written in the components that draw them, so they carry n
 
 | Where | What |
 |---|---|
+| `ui/Logo.tsx` | the DrainLens mark in the masthead |
+| `ui/ReportGlyph.tsx` | the notepad on the report card and its chip |
 | `screens/BlockagePictures.tsx` | the three grate drawings in the blockage comparison |
 | `screens/Home.tsx` (`PathThumb`), `screens/BlockedDrain.tsx` (`CompareThumb`) | the guide cards' thumbnails |
 | `map/MapLayers.tsx` | the legend's swatches |
+
+**The mark is the team's own artwork**, supplied on 11 October 2026 as
+`Logo.zip` with two files: `Logo.svg` and `Logo with words.svg`. The product
+uses the first. The second is not in the repository, because the masthead
+sets *DrainLens* in type beside the mark and a logo carrying the word as well
+would say it twice; if a wordmark is ever wanted for a slide or a poster, the
+file is the team's to hand out and does not need to live here.
+
+It replaced a dark square with a `≈` in it, which was a stand-in for artwork
+that did not exist yet.
 
 ---
 

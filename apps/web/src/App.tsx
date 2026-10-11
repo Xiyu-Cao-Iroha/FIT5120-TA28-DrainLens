@@ -50,7 +50,7 @@ import {
   type SupportedAddress,
   reduce,
 } from './session.js';
-import { Shell } from './ui/Shell.js';
+import { Shell, type ShellProps } from './ui/Shell.js';
 import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
@@ -289,16 +289,16 @@ export function App() {
 
   if (problem !== null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <p style={{ padding: 24 }}>{problem}</p>
-      </Shell>
+      </AppShell>
     );
   }
   if (loaded === null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <Spinner label="Loading the map…" />
-      </Shell>
+      </AppShell>
     );
   }
 
@@ -337,7 +337,8 @@ export function App() {
   switch (session.screen) {
     case 'home':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -388,7 +389,7 @@ export function App() {
               dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'flood-map': {
@@ -396,7 +397,8 @@ export function App() {
         dispatch({ type: 'back' });
       };
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={
             areas.data === null
@@ -443,13 +445,14 @@ export function App() {
               onBack={back}
             />
           )}
-        </Shell>
+        </AppShell>
       );
     }
 
     case 'history':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={creditsForSources([
             loaded.history.source,
@@ -486,14 +489,18 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'address':
     case 'unsupported':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName}>
+        <AppShell
+          dispatch={dispatch}
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+        >
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -523,12 +530,13 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'choose':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -563,12 +571,13 @@ export function App() {
               dispatch({ type: 'back' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'locked':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -602,12 +611,13 @@ export function App() {
               dispatch({ type: 'leave-map' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'guide':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -684,12 +694,13 @@ export function App() {
               }}
             />
           )}
-        </Shell>
+        </AppShell>
       );
 
     case 'task':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -712,7 +723,7 @@ export function App() {
             onChoose={(task) => dispatch({ type: 'task-chosen', task })}
             onChangeAddress={() => dispatch({ type: 'change-address' })}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'drain':
@@ -925,7 +936,8 @@ export function App() {
       );
 
       const shell = (children: React.ReactNode) => (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -944,7 +956,7 @@ export function App() {
           crumbs={crumbs}
         >
           {children}
-        </Shell>
+        </AppShell>
       );
 
       const fullMap = () => {
@@ -1113,7 +1125,8 @@ function MapScreen({
   }, []);
 
   return (
-    <Shell
+    <AppShell
+      dispatch={dispatch}
       at={session.screen}
       credits={credits}
           extentName={loaded.extentName}
@@ -1212,7 +1225,7 @@ function MapScreen({
           }}
         />
       )}
-    </Shell>
+    </AppShell>
   );
 }
 
@@ -1368,6 +1381,31 @@ export interface SiteNavProps {
  * breadcrumb row's contents and that row is the landmark. Everywhere else
  * `SiteNav` wraps these in one.
  */
+/**
+ * Every `Shell` on this screen, with the way home already in it.
+ *
+ * The team asked for the masthead's logo to go home from anywhere
+ * (11 October). There are a dozen `Shell`s in this file and a thirteenth is
+ * one feature away, so the handler is injected once here rather than passed
+ * at each of them: a screen cannot be given a logo that does nothing by
+ * somebody forgetting a prop.
+ *
+ * `go-home` is the same event the *Home page* link dispatches.
+ */
+function AppShell({
+  dispatch,
+  ...rest
+}: ShellProps & { readonly dispatch: (event: SessionEvent) => void }) {
+  return (
+    <Shell
+      {...rest}
+      onHome={() => {
+        dispatch({ type: 'go-home' });
+      }}
+    />
+  );
+}
+
 function SiteNavItems({
   current,
   onOpenHome,
