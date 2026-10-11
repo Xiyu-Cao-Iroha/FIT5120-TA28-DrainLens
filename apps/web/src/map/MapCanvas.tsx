@@ -115,6 +115,14 @@ export interface MapCanvasProps {
    */
   readonly address?: Local | null;
   /**
+   * How far *near this address* reaches, in metres, or null for no ring.
+   *
+   * A number rather than a circle, because the centre is always the address
+   * and two ways of saying where it is would be one too many. See
+   * `NEAR_RING` in `draw.ts` for what it is and why it is dashed.
+   */
+  readonly nearRadiusM?: number | null;
+  /**
    * Where to open when there is no address, in local metres.
    *
    * The comparison opened on a drain from the map has a drain and no address;
@@ -218,6 +226,7 @@ export function MapCanvas({
   showPipes = true,
   showPits = true,
   address = null,
+  nearRadiusM = null,
   openAt = null,
   trace = null,
   difference = null,
@@ -321,6 +330,9 @@ export function MapCanvas({
       address,
       showPipes,
       showPits,
+      ...(address && nearRadiusM !== null && nearRadiusM > 0
+        ? { near: { at: address, radiusM: nearRadiusM } }
+        : {}),
       ...(terrain
         ? {
             palette: { ...DAY, road: ROAD_OVER_TERRAIN },
@@ -355,7 +367,7 @@ export function MapCanvas({
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
       terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings, warningsNearAddress,
-      numberOfWarning]);
+      numberOfWarning, nearRadiusM]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

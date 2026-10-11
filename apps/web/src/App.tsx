@@ -660,6 +660,21 @@ export function App() {
         >
           {session.address === null || session.guideSection === null ? null : (
             <Guide
+              /*
+                A new guide starts from nothing.
+
+                Without this key, starting the next guide from the end of
+                one keeps everything the last one left behind: the layers
+                it turned on, the panel it opened, the steps already
+                acknowledged. Pressing *Start next guide* at the end of the
+                heavy rain guide opened Recorded drainage at *3 of 6*, with
+                the drains list still over the map and the first two steps
+                already satisfied, which the team reported on 11 October as
+                the guide being in a 割裂 state. A guide reads the map to
+                decide where the reader is, so the map has to be a map this
+                guide has not already been driven across.
+              */
+              key={session.guideSection}
               map={loaded.map}
               derived={loaded.derived}
               trace={loaded.trace}

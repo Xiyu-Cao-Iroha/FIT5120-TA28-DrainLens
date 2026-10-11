@@ -83,7 +83,7 @@ import {
   placesNear,
 } from '../prepare/places.js';
 import { LAYER } from '../ui/terms.js';
-import { type NamedDrain, streetDrains } from '../drains/nearby.js';
+import { DRAIN_RADIUS_M, type NamedDrain, streetDrains } from '../drains/nearby.js';
 import {
   DRAIN_BLOCKED_QUESTION,
   DRAIN_SOURCE,
@@ -107,7 +107,14 @@ import {
   useDrains,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
-import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
+import {
+  CARD_WIDTH,
+  DrainageArea,
+  GUIDE_CARD_WIDTH,
+  MapNote,
+  MapNoteStack,
+  WhoCanHelpLevels,
+} from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
@@ -702,17 +709,32 @@ export function MapView({
   */
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
-    const here: Local = [address.eastingM, address.northingM];
+    /*
+      The box the ring sits in, which is the box everything this view is
+      about sits in.
+
+      **It fitted the places themselves until 12 October**, which put every
+      sign on screen as large as the frame allowed and left the 200 m the
+      panel keeps talking about mostly outside it. Now that the ring is
+      drawn (item 7, `NEAR_RING`), a view that cuts it in half is a view of
+      an arc going nowhere, and the design draws the whole circle with room
+      around it (Figma S1).
+
+      Fitting the box still puts every place on screen -- they are all
+      within `PLACE_RADIUS_M` by definition, which is what the box is -- so
+      nothing the place fit guaranteed is given up. The signs do not shrink
+      with it: `drawWarnings` draws them at a fixed pixel size, and
+      `warningsVisible` stopped holding them to a zoom floor at the same
+      time, which together were the 9 and 10 October fix for *press before
+      rain check and nothing happens*.
+    */
     const r = PLACE_RADIUS_M;
-    const points: readonly Local[] =
-      places.length === 0
-        ? [
-            [address.eastingM - r, address.northingM - r],
-            [address.eastingM + r, address.northingM + r],
-          ]
-        : [here, ...places.map((place) => place.at)];
+    const points: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
     return { key: `places:${address.label}:${String(checksOpened)}`, points, reservePanel: false };
-  }, [layers.beforeRain, address, places, checksOpened]);
+  }, [layers.beforeRain, address, checksOpened]);
 
   /*
     A card when the reader turns the checks on (team, 10 October), and it is
@@ -886,6 +908,37 @@ export function MapView({
    * the same place needs the same room.
    */
   const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
+
+  /*
+    How far *near this address* reaches, for the two views that are about a
+    radius (team, 11 October, item 7).
+
+    Both say it in words already -- *within 200 m of 46 Gatehouse Drive*, and
+    *No places to check were found within 200 m of this address* -- and
+    neither drew it, so the reader could see eleven markers and not what had
+    been counted. Figma S1 draws the ring; `NEAR_RING` in `draw.ts` draws it
+    here.
+
+    The two constants are the same number and are still read separately: one
+    is how far the places were looked for, the other how far the drains were,
+    and a ring drawn from the wrong one would be a line in the wrong place
+    the day they stop agreeing.
+
+    Not while the map is being used as an input: a press during picking
+    answers a question about one drain, and a ring around the address is
+    about something else.
+  */
+  /** A guide's map is small, so its cards are narrower. See `GUIDE_CARD_WIDTH`. */
+  const noteWidth = guided ? GUIDE_CARD_WIDTH : CARD_WIDTH;
+
+  const nearRadiusM =
+    address === null || picking !== null
+      ? null
+      : drainsOpen
+        ? DRAIN_RADIUS_M
+        : layers.beforeRain
+          ? PLACE_RADIUS_M
+          : null;
 
   /*
     The box a callout may not leave.
@@ -1238,6 +1291,7 @@ export function MapView({
         showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
         showPipes={picking === null && layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
+        nearRadiusM={nearRadiusM}
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
         warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
@@ -1621,28 +1675,25 @@ export function MapView({
                 onClear={onClearAddress}
               />
             )}
-            <LayerChips
-              collapsible={!guided && !touring}
-              fold={anySidebarOpen}
-              state={layers}
-              onToggle={toggle}
-              unavailableKeys={notYet}
-              layersButton={layersButton}
-              pulse={pulseChip}
-              pulseLayers={highlight === 'layers'}
-              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
-              onPanelChange={panelChanged}
-              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
-            />
-
             {/*
-              Epic 6's guide opens the reporting pathway from here (Figma D1
-              to D3), where the other guides put the layer they teach. It is
-              not a layer, so it is not in `LayerChips` and not in
-              `CHIP_KEYS`; it exists only while a lesson's steps ask for the
-              report, which `usesReport` decides.
+              The way into the reporting pathway, as a chip (Figma D1).
+
+              It is not a layer, so it is not in `LayerChips` and not in
+              `CHIP_KEYS`. Epic 6's guide has opened the pathway from here
+              since the guide was built, and the other guides hide it
+              because a card taller than the guide's frame over a step about
+              something else teaches nothing -- `usesReport` says which
+              lesson is the exception.
+
+              **The full map has it too, from 12 October.** Reporting was
+              reachable there only from inside the *Recorded subcatchment
+              area* card, which is a card about who looks after the pipes:
+              somebody who had come to report a blocked grate had to turn on
+              a boundary layer to find the button. The team's item 3 of
+              11 October is that chip, on the main map, drawn the way the
+              design draws it.
             */}
-            {guided && reportInGuide && (
+            {(guided ? reportInGuide : true) && (
               <PlainChip
                 label={SPOT_A_PROBLEM_CHIP}
                 /*
@@ -1664,6 +1715,20 @@ export function MapView({
                 }}
               />
             )}
+            <LayerChips
+              collapsible={!guided && !touring}
+              fold={anySidebarOpen}
+              state={layers}
+              onToggle={toggle}
+              unavailableKeys={notYet}
+              layersButton={layersButton}
+              pulse={pulseChip}
+              pulseLayers={highlight === 'layers'}
+              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
+              onPanelChange={panelChanged}
+              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
+            />
+
           </div>
 
           {/*
@@ -2006,13 +2071,27 @@ export function MapView({
           </MapNote>
         )}
 
+        {/*
+          The plan and the drains list, where the window has no room for a
+          sidebar -- which a guide's map frame never has.
+
+          `fill` keeps the heading and scrolls the body: the column scrolls
+          otherwise, and the first thing out of it is the heading, clipped a
+          few pixels under the layer chip above. `noteWidth` is narrower
+          inside a guide so the card stops short of the address pin the map
+          is centred on. Both reported on 11 October, items 5 and 6.
+        */}
         {planInCard && (
-          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+          <MapNote fill width={noteWidth} title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
             {askOpen ? askPanel : planPanel}
           </MapNote>
         )}
 
-        {drainsInCard && <MapNote title={STREET_DRAINS_HEADING}>{drainsList}</MapNote>}
+        {drainsInCard && (
+          <MapNote fill width={noteWidth} title={STREET_DRAINS_HEADING}>
+            {drainsList}
+          </MapNote>
+        )}
 
         {panel && viewport !== null && layers.catchment && !reportOpen && (
           <MapNote title={DRAINAGE_AREA}>

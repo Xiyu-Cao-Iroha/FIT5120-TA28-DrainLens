@@ -646,6 +646,8 @@ export interface DrawOptions {
   readonly selectedPipe?: number | null;
   /** The selected address, in local metres. Drawn last so nothing covers it. */
   readonly address?: Local | null;
+  /** How far *near this address* reaches, drawn as a ring. See `NEAR_RING`. */
+  readonly near?: { readonly at: Local; readonly radiusM: number } | null;
   /**
    * Which recorded layers to draw.
    *
@@ -787,6 +789,50 @@ export function drawAddress(
   context.fill();
 }
 
+/**
+ * The ring the before-rain checks and the street drains are about.
+ *
+ * Both are *within 200 m of this address*: `PLACE_RADIUS_M` for the numbered
+ * places and `DRAIN_RADIUS_M` for the recorded drains, which are the same
+ * number for the same reason. The panels have always said it in words and
+ * the map never drew it, so a reader looking at eleven markers had no way to
+ * see what was counted and what was just outside. The design draws it as a
+ * dashed circle with the ground inside it a shade darker (Figma S1), and the
+ * team asked for it on 11 October (item 7).
+ *
+ * **Dashed, and faint.** A solid ring is a boundary -- a drainage area, a
+ * council edge -- and this is neither: it is how far the question looked,
+ * which is a decision this product made rather than a thing on the ground.
+ * It is drawn under the network so the drains it is about stay on top of it.
+ */
+export const NEAR_RING = {
+  line: 'rgba(31, 111, 92, 0.62)',
+  fill: 'rgba(31, 111, 92, 0.05)',
+  dash: [7, 6],
+} as const;
+
+export function drawNearRing(
+  context: CanvasRenderingContext2D,
+  viewport: Viewport,
+  at: Local,
+  radiusM: number,
+): void {
+  const radiusPx = radiusM * viewport.scale;
+  if (!(radiusPx > 0)) return;
+  const [x, y] = toScreen(viewport, at);
+
+  context.save();
+  context.beginPath();
+  context.arc(x, y, radiusPx, 0, Math.PI * 2);
+  context.fillStyle = NEAR_RING.fill;
+  context.fill();
+  context.setLineDash([...NEAR_RING.dash]);
+  context.lineWidth = 1.5;
+  context.strokeStyle = NEAR_RING.line;
+  context.stroke();
+  context.restore();
+}
+
 export function drawMap(
   context: CanvasRenderingContext2D,
   artefact: MapArtefact,
@@ -816,6 +862,8 @@ export function drawMap(
     drawRoads(context, viewport, artefact.layers.road ?? [], palette, seen);
   }
   options.overRoads?.(context);
+  // Under the network, over the ground: see `NEAR_RING`.
+  if (options.near) drawNearRing(context, viewport, options.near.at, options.near.radiusM);
   if (options.showPipes !== false) {
     drawPipes(context, viewport, artefact.layers.pipe ?? [], palette, seen, options.selectedPipe ?? null);
   }
