@@ -25,6 +25,7 @@ import { type ReactNode, useId, useState } from 'react';
 
 import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import { quietButton } from '../ui/controls.js';
+import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
 
 import {
   EMERGENCY_STRIP,
@@ -150,6 +151,7 @@ export function PreparePlan({
   onAsk,
   onCheckDrains,
   pulseDrains = false,
+  pulseWhy = false,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -173,6 +175,8 @@ export function PreparePlan({
    * which is what `pressFor` exists to answer.
    */
   readonly pulseDrains?: boolean | undefined;
+  /** Ring the reminder's *Why this place?*, for the guide's step 4 (Figma G4). */
+  readonly pulseWhy?: boolean | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -256,7 +260,10 @@ export function PreparePlan({
                         reader who answered and moved on has the plan, and the
                         design puts the explanation where the reminder is.
                       */}
-                      <WhyThisPlace {...(onWhyOpen === undefined ? {} : { onOpen: onWhyOpen })} />
+                      <WhyThisPlace
+                        pulse={pulseWhy}
+                        {...(onWhyOpen === undefined ? {} : { onOpen: onWhyOpen })}
+                      />
                     </span>
                   )}
                   {onShowOnMap !== undefined && (
@@ -343,19 +350,7 @@ export function PreparePlan({
         <section aria-label={STREET_DRAINS_NEAR_YOU} style={{ marginBottom: space(4) }}>
           <StepHeading step={3} label={STREET_DRAINS_NEAR_YOU} />
           {onCheckDrains !== undefined && (
-            <span
-              style={{
-                display: 'block',
-                padding: pulseDrains ? space(1) : 0,
-                borderRadius: radius.base,
-                border: pulseDrains ? `2px solid ${brand.base}` : '2px solid transparent',
-                background: pulseDrains ? brand.wash : 'transparent',
-              }}
-            >
-              <button type="button" onClick={onCheckDrains} style={primaryButton}>
-                {CHECK_STREET_DRAINS} ›
-              </button>
-            </span>
+            <CheckDrainsButton pulse={pulseDrains} onPress={onCheckDrains} />
           )}
           {onReport !== undefined && (
             <button type="button" onClick={onReport} style={warningButton}>
@@ -665,6 +660,34 @@ function StepHeading({
   );
 }
 
+/**
+ * Step 3's button, which the guide rings and scrolls to (Figma G6).
+ *
+ * Its own component only because the ring needs a ref and a hook, and the
+ * plan it sits in is not a component that may hold one per control.
+ */
+function CheckDrainsButton({
+  pulse,
+  onPress,
+}: {
+  readonly pulse: boolean;
+  readonly onPress: () => void;
+}) {
+  const ref = useRingIntoView<HTMLButtonElement>(pulse);
+
+  return (
+    <button
+      type="button"
+      ref={ref}
+      className={ringClass(pulse)}
+      onClick={onPress}
+      style={primaryButton}
+    >
+      {CHECK_STREET_DRAINS} ›
+    </button>
+  );
+}
+
 /** The heading over the safety boundary, as the design writes it. */
 const SAFETY_HEADING = 'Before you rely on this';
 
@@ -675,9 +698,21 @@ const SAFETY_HEADING = 'Before you rely on this';
  * design puts it in both and a reader who has moved on to the plan has no way
  * back to the card. `onOpen` is how the guide's fourth step knows it happened.
  */
-function WhyThisPlace({ onOpen }: { readonly onOpen?: (() => void) | undefined }) {
+function WhyThisPlace({
+  onOpen,
+  pulse = false,
+}: {
+  readonly onOpen?: (() => void) | undefined;
+  /** Ringed while the guide's step 4 waits on it. */
+  readonly pulse?: boolean;
+}) {
   const whyId = useId();
   const [open, setOpen] = useState(false);
+  /*
+    The ring goes on the summary rather than on a wrapper: a `details` with
+    anything between it and its `summary` stops being a disclosure.
+  */
+  const ref = useRingIntoView<HTMLElement>(pulse && !open);
 
   return (
     <details
@@ -688,7 +723,12 @@ function WhyThisPlace({ onOpen }: { readonly onOpen?: (() => void) | undefined }
         if (nowOpen) onOpen?.();
       }}
     >
-      <summary aria-controls={whyId} style={{ cursor: 'pointer', color: brand.ink }}>
+      <summary
+        ref={ref}
+        className={ringClass(pulse && !open)}
+        aria-controls={whyId}
+        style={{ cursor: 'pointer', color: brand.ink, borderRadius: radius.small }}
+      >
         Why this place?
       </summary>
       <div id={whyId} style={{ marginTop: space(1) }}>

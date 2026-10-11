@@ -19,7 +19,7 @@
  * and runs for three seconds.
  */
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 import { type Learned, type SectionId, SECTION_ORDER, SECTIONS } from '../tutorial/sections.js';
 import { PATHS } from './Home.js';
@@ -87,9 +87,23 @@ const USES_ADDRESS: readonly SectionId[] = ['heavy-rain', 'drainage-area'];
 export function NextGuide({
   id,
   onStart,
+  back,
 }: {
   readonly id: SectionId;
   readonly onStart: (section: SectionId) => void;
+  /**
+   * A way back, beside the way on (team, 11 October, item 4).
+   *
+   * The ground height guide's finish page has had *← Previous* since
+   * September and the other four had nothing: the end of a guide offered
+   * the next one, the guidance page and the full map, and no way to look
+   * again at the step just passed. It is passed in rather than built here
+   * because what *back* means belongs to the guide, not to this card.
+   *
+   * On the left, with the way on to the right of it, which is the order the
+   * team asked for and the order the ground height guide already used.
+   */
+  readonly back?: ReactNode;
 }) {
   return (
     <div
@@ -123,24 +137,36 @@ export function NextGuide({
         {PATHS.find((path) => path.mode === id)?.body ?? ''}
         {USES_ADDRESS.includes(id) ? ` ${SAME_ADDRESS}` : ''}
       </span>
-      <button
-        type="button"
-        onClick={() => {
-          onStart(id);
-        }}
+      <div
         style={{
           marginTop: space(1),
-          padding: `${String(space(2))}px ${String(space(4))}px`,
-          borderRadius: radius.pill,
-          border: `1px solid ${brand.base}`,
-          background: brand.base,
-          color: ink.inverse,
-          font: type(text.small, { weight: weight.semibold }),
-          cursor: 'pointer',
+          width: '100%',
+          display: 'flex',
+          gap: space(3),
+          alignItems: 'center',
+          justifyContent: back === undefined ? 'flex-start' : 'space-between',
+          flexWrap: 'wrap',
         }}
       >
-        Start next guide →
-      </button>
+        {back}
+        <button
+          type="button"
+          onClick={() => {
+            onStart(id);
+          }}
+          style={{
+            padding: `${String(space(2))}px ${String(space(4))}px`,
+            borderRadius: radius.pill,
+            border: `1px solid ${brand.base}`,
+            background: brand.base,
+            color: ink.inverse,
+            font: type(text.small, { weight: weight.semibold }),
+            cursor: 'pointer',
+          }}
+        >
+          Start next guide →
+        </button>
+      </div>
     </div>
   );
 }
