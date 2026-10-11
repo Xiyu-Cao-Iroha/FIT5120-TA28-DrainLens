@@ -24,10 +24,13 @@
  * score; the site does not use that word (see `RETIRED_TERMS`).
  */
 
+import { MAX_PLACES } from '../prepare/places.js';
+
 export type SourceSectionId =
   | 'drains'
   | 'ground'
   | 'flood-history'
+  | 'preparation-plan'
   | 'drainage-areas'
   | 'rate'
   | 'events'
@@ -141,6 +144,35 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
     source:
       'Official publications only, such as the Bureau of Meteorology, Melbourne Water and the Australian Institute for Disaster Resilience Knowledge Hub.',
     ac: ['4.2.1', '4.2.2', '4.2.3', '4.3.4'],
+  },
+  {
+    /*
+      Epic 5, from Figma A6 of 11 October, where it sits between Flood
+      history and the subcatchment areas and is marked *New in Iteration 3*.
+      
+      **Most of it is what the product does not do**, which is why it had to
+      exist: the numbered signs near an address are the one part of
+      DrainLens a reader is most likely to take for a prediction, and
+      nothing on the page said how a place is chosen or what being near a
+      drain does not mean. Every line is the design's own.
+    */
+    id: 'preparation-plan',
+    title: 'Preparation plan',
+    summary:
+      'The numbered warning signs near your address and the reminders in your plan come from fixed rules, not a prediction.',
+    points: [
+      'Places to check are the deep low areas near your address, the same places marked with a warning sign on the map. Water may pool there in heavy rain.',
+      'You decide whether each place applies to you. Only places that apply become reminders in your plan and on your printout.',
+      'Ground slope is only used to explain a place, not to mark one.',
+      'We do not mark where water may flow. The Water paths layer already shows this, and DrainLens does not suggest routes.',
+      'We do not mark the nearest drain. Being close does not show that it serves your property. If you see a blocked drain, select it on the map and report it.',
+      `Up to ${String(MAX_PLACES)} places are shown within a set distance of your address. Many addresses have none.`,
+      'No place near you does not mean your area cannot flood.',
+      'Your address and choices stay in your browser and are cleared when you close it.',
+    ],
+    source:
+      'Guidance: VICSES, City of Melbourne, Melbourne Water. Places to check: estimated by DrainLens from City of Melbourne open data.',
+    ac: ['5.1.1', '5.1.3', '5.2.2', '5.3.1', '5.4.2'],
   },
   {
     id: 'drainage-areas',

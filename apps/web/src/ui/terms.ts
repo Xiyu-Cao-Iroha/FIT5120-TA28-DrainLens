@@ -69,7 +69,8 @@ export const FULL_MAP = 'Full map';
  * history is Greater Melbourne.
  */
 export const COVERAGE = {
-  map: 'Map covers: City of Melbourne',
+  // Figma T0 and the B frames: *Current map scope*.
+  map: 'Current map scope: City of Melbourne',
   addresses: 'Address search covers the City of Melbourne.',
   /** When the map fell back to Kensington, the addresses beyond it went with it. */
   addressesFallback:

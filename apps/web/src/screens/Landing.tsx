@@ -139,20 +139,34 @@ export interface LandingCopy {
  * Which suburbs that is stays under the input, where it is read while typing.
  */
 export const EXPLORE_COPY: LandingCopy = {
-  title: 'Enter your address',
-  lead: 'Covers the City of Melbourne.',
-  submit: 'Explore this area →',
+  // Figma T0. One title for every way in, and the lead says what happens
+  // next instead; see `landingCopyFor`.
+  title: 'Start with your address',
+  lead: 'Enter it once. Every guide and the full map will use it.',
+  submit: 'Continue →',
 };
 
 /**
- * A title per guide section, so the screen matches the card that was pressed.
- * Terrain has no guide yet and takes the plain title.
+ * What comes after the address, said on the screen that asks for it.
+ *
+ * Figma draws one of these per entry point (T0g, T0d, T0m) and the generic
+ * T0 for everything else. It replaced a title per section, which named the
+ * guide in the heading and left the line underneath saying only which
+ * council the map covers.
  */
-export const SECTION_TITLES: Partial<Record<SectionId, string>> = {
-  drainage: 'Find drains near your address',
-  'water-flow': 'See where rain may flow near your address',
-  'low-areas': 'Find low areas near your address',
+export const NEXT_AFTER_ADDRESS: Partial<Record<SectionId, string>> = {
+  'heavy-rain': 'Enter it once. The Get ready for heavy rain guide starts next.',
+  'drainage-area': 'Enter it once. The drainage problem guide starts next.',
 };
+
+/** T0m, for the way in that opens the map rather than a guide. */
+export const FULL_MAP_LEAD = 'Enter it once. The full map opens next.';
+
+/** T0's line under the suburbs, which the product did not say anywhere. */
+export const ADDRESS_STAYS_HERE =
+  'Your address stays in this browser only. You can change it at any time.';
+
+
 
 /**
  * What the button says while a search is out.
@@ -184,8 +198,9 @@ export const landingCopyFor = (
   section: SectionId | null | undefined = null,
 ): LandingCopy => {
   if (task === 'compare') return COMPARE_COPY;
-  const title = section === null || section === undefined ? undefined : SECTION_TITLES[section];
-  return title === undefined ? EXPLORE_COPY : { ...EXPLORE_COPY, title };
+  if (task === 'full-map') return { ...EXPLORE_COPY, lead: FULL_MAP_LEAD };
+  const lead = section === null || section === undefined ? undefined : NEXT_AFTER_ADDRESS[section];
+  return lead === undefined ? EXPLORE_COPY : { ...EXPLORE_COPY, lead };
 };
 
 type Problem =
@@ -422,6 +437,21 @@ export function Landing({
             Supported suburbs: {suburbs.join(', ')}
           </p>
         )}
+
+        {/*
+          T0's last line. The address never leaves the tab and the product
+          says so on the page that asks for it, rather than only in About
+          the data.
+        */}
+        <p
+          style={{
+            margin: `${String(space(2))}px 0 0`,
+            font: type(text.small, { leading: 1.5 }),
+            color: ink.muted,
+          }}
+        >
+          {ADDRESS_STAYS_HERE}
+        </p>
 
         {suggestions.length > 0 && (
           <ul

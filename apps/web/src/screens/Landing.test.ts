@@ -30,29 +30,44 @@ describe('the address screen’s words', () => {
     expect(landingCopyFor(null)).toBe(EXPLORE_COPY);
     expect(landingCopyFor(undefined)).toBe(EXPLORE_COPY);
     expect(landingCopyFor('follow')).toBe(EXPLORE_COPY);
-    expect(landingCopyFor('full-map')).toBe(EXPLORE_COPY);
-    expect(EXPLORE_COPY.submit).toBe('Explore this area →');
-    // Copy audit v2, #16: what to do, and where the search covers.
-    expect(EXPLORE_COPY.title).toBe('Enter your address');
-    expect(EXPLORE_COPY.lead).toBe('Covers the City of Melbourne.');
+    // Figma T0: one title for every way in, and the lead says what is next.
+    expect(EXPLORE_COPY.submit).toBe('Continue →');
+    expect(EXPLORE_COPY.title).toBe('Start with your address');
+    expect(EXPLORE_COPY.lead).toBe('Enter it once. Every guide and the full map will use it.');
   });
 
-  it('names the guide section waiting for the address in the title', () => {
-    expect(landingCopyFor(null, 'drainage').title).toBe('Find drains near your address');
-    expect(landingCopyFor(null, 'water-flow').title).toBe('See where rain may flow near your address');
-    expect(landingCopyFor(null, 'low-areas').title).toBe('Find low areas near your address');
-    // No guide for terrain yet, so the plain title.
+  it('says what the address is for, where the design draws a screen for it', () => {
+    /*
+      T0g, T0d and T0m. It was a title per section -- *Find drains near your
+      address* -- which named the guide in the heading and left the line
+      under it saying only which council the map covers. The design keeps
+      one heading and spends the line on what happens next.
+    */
+    expect(landingCopyFor(null, 'heavy-rain').lead).toBe(
+      'Enter it once. The Get ready for heavy rain guide starts next.',
+    );
+    expect(landingCopyFor(null, 'drainage-area').lead).toBe(
+      'Enter it once. The drainage problem guide starts next.',
+    );
+    expect(landingCopyFor('full-map').lead).toBe('Enter it once. The full map opens next.');
+
+    // The guides the design draws no screen for keep T0's generic line.
+    expect(landingCopyFor(null, 'drainage')).toBe(EXPLORE_COPY);
     expect(landingCopyFor(null, 'terrain')).toBe(EXPLORE_COPY);
-    // The section changes only the title.
-    expect(landingCopyFor(null, 'drainage').lead).toBe(EXPLORE_COPY.lead);
-    expect(landingCopyFor(null, 'drainage').submit).toBe(EXPLORE_COPY.submit);
+
+    // The title and the button never change with the section.
+    expect(landingCopyFor(null, 'heavy-rain').title).toBe(EXPLORE_COPY.title);
+    expect(landingCopyFor(null, 'heavy-rain').submit).toBe(EXPLORE_COPY.submit);
+
     // The comparison keeps its own words whatever section was last chosen.
     expect(landingCopyFor('compare', 'drainage')).toBe(COMPARE_COPY);
   });
 
   it('reads the section from the session the chooser leaves behind', () => {
-    const chosen = reduce(INITIAL_SESSION, { type: 'guide-chosen', section: 'drainage' });
+    const chosen = reduce(INITIAL_SESSION, { type: 'guide-chosen', section: 'heavy-rain' });
     expect(chosen.screen).toBe('address');
-    expect(landingCopyFor(chosen.pendingTask, chosen.guideSection).title).toBe('Find drains near your address');
+    expect(landingCopyFor(chosen.pendingTask, chosen.guideSection).lead).toBe(
+      'Enter it once. The Get ready for heavy rain guide starts next.',
+    );
   });
 });

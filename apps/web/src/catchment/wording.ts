@@ -71,7 +71,17 @@ export const MAY_NOT_REFLECT_DEVELOPMENT =
 
 /** The address no recorded area contains (AC 6.1.5). */
 export const NO_AREA_FOUND =
-  'A drainage area could not be confidently identified for this address.';
+  'We could not find a recorded subcatchment area for this address. The records cover the City of Melbourne area.';
+
+/**
+ * And what is still worth doing (Figma B1-none).
+ *
+ * The card said the area could not be identified and stopped. The frame
+ * offers the one thing an address with no recorded area can still do, which
+ * is the same shape as the before-rain card's answer for an address with no
+ * places: say the absence, then say what is left.
+ */
+export const NO_AREA_STILL = 'You can still report a drainage problem near this address.';
 
 /**
  * What the card says before there is an address to answer about.
