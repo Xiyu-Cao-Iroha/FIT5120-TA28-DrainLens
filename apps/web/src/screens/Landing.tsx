@@ -294,13 +294,26 @@ export function Landing({
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 720,
-        margin: '0 auto',
-        padding: `${String(space(12))}px ${String(space(6))}px ${String(space(16))}px`,
-      }}
-    >
+    /*
+      The street behind it, and the column on top.
+
+      Two elements rather than one: the photograph has to fill the window
+      and the content has to stay in its 720 px column, and a single element
+      cannot do both. `.landing__street` carries the picture and the white
+      veil that keeps the text readable; see `base.css` for the measured
+      contrast.
+    */
+    <div className="landing__street">
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          /* Less room under the column than the other screens keep: the
+             street below it closes the page, so a second block of empty
+             space would only push it off the bottom. */
+          padding: `${String(space(12))}px ${String(space(6))}px ${String(space(8))}px`,
+        }}
+      >
       {/*
         The way out, in the same two places every other screen keeps it: Back
         on the left, Home on the right. `justifyContent` puts Home against the
@@ -552,6 +565,7 @@ export function Landing({
           <Claims title="What it does not" items={DOES_NOT} tone="quiet" />
         </div>
       </details>
+      </div>
     </div>
   );
 }

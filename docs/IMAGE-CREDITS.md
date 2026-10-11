@@ -23,6 +23,34 @@ Taken by the team, so there is no external licence to honour and no attribution 
 
 ---
 
+## Generated images
+
+Made with an image generator and supplied by the team. There is no
+photographer and no stock licence, and nothing in them is a record of a real
+place: the street is invented.
+
+| File | Where it is shown | What it shows |
+|---|---|---|
+| `apps/web/public/street.webp` | behind the lower part of the address screen | a wet residential street with plane trees and iron fences, in the manner of inner Melbourne |
+
+**Confirmed by Xiyu Cao on 11 October 2026** as AI generated and supplied by
+the team, in answer to a direct question about where it came from. Re-encoded
+to WebP at 1600 px wide, 134 KB, from a 1774 px JPEG.
+
+**It is decoration and the page treats it as decoration.** It is a CSS
+background with no `alt` text, because there is nothing in it a reader needs
+described: it is not Kensington, not the reader's street, and not anything
+this product has measured. A caption would invite it to be read as evidence.
+
+**No text is drawn over it**, which is a measurement rather than a taste.
+This page's muted grey reaches 4.9:1 on the page colour, just past the 4.5:1
+AA asks for; over the photograph, under any veil light enough to leave a
+street visible, it lands between 3.0 and 3.9:1. There is no veil that keeps
+both, so the picture sits below the text instead of behind it. See
+`.landing__street` in `apps/web/src/ui/base.css`.
+
+---
+
 ## Illustrations drawn in the code
 
 Not files: inline SVG, written in the components that draw them, so they carry no licence at all.
