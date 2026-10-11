@@ -41,10 +41,21 @@ Read by `apps/web/src/prepare/actions.ts`. AC 5.2.3 asks for three to four, each
 
 | Shown as | Source quotation | Publisher | Page | Read |
 |---|---|---|---|---|
-| Clean gutters, downpipes and drains when it is safe to do so. | "Clean your gutters, downpipes and drains to ensure they are not blocked." | Victoria State Emergency Service | ses.vic.gov.au (Storm) | 2026-10-02 |
+| Clean gutters and downpipes when it is safe. | "Clean your gutters, downpipes and drains to ensure they are not blocked." | Victoria State Emergency Service | ses.vic.gov.au (Storm) | 2026-10-02 |
 | Lift valuables up high. | "Lift it: Lift your valuables up high" | Victoria State Emergency Service | ses.vic.gov.au (Flood) | 2026-10-08 |
-| Pack an emergency kit with enough essentials for three days. | "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
-| Monitor weather warnings and official forecasts. | "Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226)." | Victoria State Emergency Service | ses.vic.gov.au (Flood) | 2026-10-08 |
+| Keep an emergency kit ready. | "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate." | Melbourne Water | melbournewater.com.au (Prepare for flooding) | 2026-10-08 |
+| Know where to find current warnings. | "Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226)." | Victoria State Emergency Service | ses.vic.gov.au (Flood) | 2026-10-08 |
+
+> **Three of the four lines were shortened on 11 October** to the design's
+> (Figma A5, F1-5, G3 to G6). The quotation and the publisher behind each one
+> did not change; only how much of it the screen says. *Keep an emergency kit
+> ready* drops the three days the quotation gives, and the fold under the
+> action still shows the sentence that gives them.
+>
+> **The fourth was not shortened.** Figma says *Move valuable items above
+> floor level*, which this register refused on 2 October for having no page
+> behind it. The frame re-proposing it is the same mock-up that decision was
+> about, so the line stays the publisher's and `actions.test.ts` holds it.
 
 ### What was removed, and why the fourth is here now
 
@@ -53,6 +64,29 @@ Read by `apps/web/src/prepare/actions.ts`. AC 5.2.3 asks for three to four, each
 **The fourth action is no longer waiting for a source.** Until 8 October this section recorded that the design's *Move valuable items above floor level* had no official page behind it and was therefore not in the product, because a mock-up is not a source. VICSES's flood page carries *Lift it: Lift your valuables up high*, read on 8 October, so the action is in — under the publisher's own words rather than the mock-up's. That settles the open question §5 used to carry.
 
 **Each action now carries a photograph**, which is a separate kind of claim and has its own record: `IMAGE-CREDITS.md`. None of them is evidence about the reader's house; the sentence is the thing with a source.
+
+---
+
+## 2a · What each action means in practice — **DrainLens's own words**
+
+Read by `GeneralAction.detail` in `apps/web/src/prepare/actions.ts`, shown under each action on the printed page only (Figma A5).
+
+> **Confirmed by the team on 11 October 2026.** These four sentences are **not** quotations and **no publisher wrote them**. They are the product's own, and the printed page attributes them that way: the action line above carries the publisher it was taken from, and the detail does not.
+
+| Under which action | What it says |
+|---|---|
+| Clean gutters and downpipes when it is safe. | Clear leaves from gutters and check water runs out of the downpipe. Do not climb a ladder in wind or rain. |
+| Lift valuables up high. | Put documents, photos and electronics on a high shelf or upstairs, off the floor. |
+| Keep an emergency kit ready. | Torch, portable radio, spare batteries, first aid kit, medicines and copies of important documents. |
+| Know where to find current warnings. | Check the VicEmergency app or website, and listen to ABC local radio. |
+
+### Why this section is separate
+
+Every other row in this register is somebody else's sentence with the page it came from. These are ours, and mixing them into §2 would make four unsourced lines look sourced.
+
+**They were left out of the product for a day.** The 11 October sweep found them in the frames, and they went in only once the team confirmed them, because the rule this register is for is that nothing reads as official guidance unless an official page says it.
+
+**What a reviewer should check.** That none of them states a number, a threshold or an outcome; that none of them is attributed to VICSES, Melbourne Water or the council in the markup; and that the two with a named service behind them -- the VicEmergency app, and ABC local radio as Victoria's emergency broadcaster -- say only where to look, not what will be found. `actions.test.ts` holds the first two of those.
 
 ---
 

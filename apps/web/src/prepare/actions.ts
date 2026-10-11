@@ -25,6 +25,17 @@ export interface GeneralAction {
   readonly id: string;
   /** One short sentence, as the plan shows it. */
   readonly text: string;
+  /**
+   * What the action means in practice, on the printed page (Figma A5).
+   *
+   * **These are the team's own words, not a publisher's**, and they are the
+   * one piece of guidance in this product that is. Confirmed by the team on
+   * 11 October and recorded in `GUIDANCE-CONTENT-REGISTER.md` §3 as ours.
+   * The printed page attributes them that way: the action line carries the
+   * publisher it was taken from and the detail under it does not, because a
+   * sentence no publisher wrote must not sit under one of their names.
+   */
+  readonly detail: string;
   /** The sentence it was taken from, for the register and for review. */
   readonly quote: string;
   readonly publisher: string;
@@ -70,17 +81,20 @@ const MELBOURNE_WATER_FLOODING =
   sentence that says three days, so the detail is one press away rather than
   gone.
 
-  **The design also draws a second line under each action on the printed
-  page** -- "Torch, portable radio, spare batteries...", "listen to ABC local
-  radio" and two more. Those are not in any approved quotation and no
-  publisher is named for them, which is the one thing this register exists to
-  stop, so they are not here. They need a source and an approval, not a
-  copy-paste.
+  **The second line under each action is the team's, and says so.** Figma
+  A5 draws one per action -- "Torch, portable radio, spare batteries...",
+  "listen to ABC local radio" and two more. None of them is in an approved
+  quotation and no publisher wrote them, so for a day they were left out.
+  The team confirmed them on 11 October as the product's own words, and
+  `GUIDANCE-CONTENT-REGISTER.md` §3 records that: ours, approved, and
+  attributed to nobody else. See `detail`.
 */
 export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   {
     id: 'gutters',
     text: 'Clean gutters and downpipes when it is safe.',
+    detail:
+      'Clear leaves from gutters and check water runs out of the downpipe. Do not climb a ladder in wind or rain.',
     quote: 'Clean your gutters, downpipes and drains to ensure they are not blocked.',
     publisher: 'Victoria State Emergency Service',
     page: VICSES_STORM,
@@ -100,6 +114,7 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
       this line.
     */
     text: 'Lift valuables up high.',
+    detail: 'Put documents, photos and electronics on a high shelf or upstairs, off the floor.',
     quote: 'Lift it: Lift your valuables up high',
     publisher: 'Victoria State Emergency Service',
     page: VICSES_FLOOD,
@@ -109,6 +124,8 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   {
     id: 'emergency-kit',
     text: 'Keep an emergency kit ready.',
+    detail:
+      'Torch, portable radio, spare batteries, first aid kit, medicines and copies of important documents.',
     quote:
       "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate.",
     publisher: 'Melbourne Water',
@@ -119,6 +136,7 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   {
     id: 'warnings',
     text: 'Know where to find current warnings.',
+    detail: 'Check the VicEmergency app or website, and listen to ABC local radio.',
     quote:
       'Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226).',
     publisher: 'Victoria State Emergency Service',

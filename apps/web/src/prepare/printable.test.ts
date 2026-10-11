@@ -132,3 +132,22 @@ describe('the document itself', () => {
     expect(planHtml(page)).toContain('12 &lt;b&gt;Smith&lt;/b&gt; &amp; Co Lane');
   });
 });
+
+describe('the detail under each printed action', () => {
+  it('is on the page, between the action and its publisher', () => {
+    const page = plan({});
+    for (const line of page.generalActions) {
+      expect(line.detail).toBeTruthy();
+      expect(line.source).toBeTruthy();
+      expect(line.detail).not.toBe(line.source);
+    }
+  });
+
+  it('is drawn apart from the source line, not inside it', () => {
+    // The source line is 9pt grey and says who wrote the action. Running the
+    // team's own sentence into it would read as the publisher's words.
+    const html = planHtml(plan({}));
+    expect(html).toContain('class="detail"');
+    expect(html).toContain('Torch, portable radio, spare batteries');
+  });
+});

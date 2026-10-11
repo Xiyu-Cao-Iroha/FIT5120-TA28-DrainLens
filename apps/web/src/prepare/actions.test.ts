@@ -92,3 +92,32 @@ describe('what the plan is not', () => {
     expect(NOT_A_SCORE).toMatch(/not a safety or readiness score/i);
   });
 });
+
+/**
+ * The second line, which is the one piece of guidance DrainLens wrote.
+ *
+ * Figma A5 draws it under each action on the printed page. It was left out
+ * on 11 October for having no publisher, and put in the same day once the
+ * team confirmed it as the product's own words. The point of these
+ * assertions is that it stays the product's: a detail attributed to VICSES
+ * or Melbourne Water would be this project putting sentences in their
+ * mouths, which is what the register exists to stop.
+ */
+describe('what each action means in practice', () => {
+  it('gives every action one, in a full sentence', () => {
+    for (const action of GENERAL_ACTIONS) {
+      expect(action.detail.length).toBeGreaterThan(20);
+      expect(action.detail.endsWith('.')).toBe(true);
+      expect(action.detail).not.toBe(action.text);
+    }
+  });
+
+  it('claims no publisher for it', () => {
+    // The quotation is what the publisher wrote. The detail is not in it,
+    // and must not be presented as though it were.
+    for (const action of GENERAL_ACTIONS) {
+      expect(action.quote).not.toContain(action.detail);
+      expect(action.detail).not.toMatch(/VICSES|Melbourne Water|City of Melbourne/);
+    }
+  });
+});
