@@ -146,51 +146,59 @@ button:disabled {
 }
 
 /*
- * The street under the address screen.
+ * The street behind the address screen.
  *
  * A photograph of a Melbourne residential street, team supplied and AI
  * generated, recorded in `docs/IMAGE-CREDITS.md`. It is decoration: it shows
  * nothing this product has measured and nothing about the reader's address,
  * which is why it is a background and not an <img> with a caption.
  *
- * **No text is ever drawn over it, and that is a measurement rather than a
- * preference.** This page's muted grey reaches 4.9:1 on the page colour,
- * which is just past the 4.5:1 that AA asks for. Over the photograph, under
- * any veil light enough to leave a street visible, it lands between 3.0 and
- * 3.9:1. There is no veil that keeps both the picture and that text, so the
- * picture goes below the text instead of behind it.
+ * **The same shape as `.choose__backdrop`**, which is the screen the reader
+ * arrives from: full bleed, a wash heaviest where the words are and lifting
+ * towards the foot, and an opaque surface under anything the wash cannot
+ * carry. Two earlier versions of this one got it wrong in opposite
+ * directions -- a flat 0.9 wash that erased the street, then a crisp band
+ * below the content that only appeared on a window tall enough to have room
+ * left over, which at 1100x800 meant never.
  *
- * The band is a flex item after the column, with `margin-top: auto`: it sits
- * under the content on a long page and at the foot of the window on a short
- * one. An earlier version pinned it to the viewport, which looked the same
- * on this screen and put the open *More information* panels straight over
- * the road as soon as anybody scrolled.
+ * **What the wash can and cannot carry**, measured against the picture's
+ * darkest pixel, which is an iron fence 36% down: at 0.9 the heading reads
+ * at 11.8:1 and the body at 7.1:1, and the page's muted grey at 3.9:1
+ * against the 4.5:1 AA asks for. So the lead under the heading is `ink.base`
+ * on this screen rather than `ink.muted`, the search card is opaque already,
+ * and the folded panels get a surface of their own -- they open far enough
+ * down the page for the wash to have thinned to 0.12.
  */
 .landing__street {
   display: flex;
   flex-direction: column;
-  /* Fill whatever the shell gives this screen, so the band has somewhere to
-     be on a tall window and is not forced into a scroll on a short one. */
   min-height: 100%;
   background-color: #f5f8f7;
-}
-
-.landing__street::after {
-  content: '';
-  /* Takes the room the column does not want, down to a strip. */
-  flex: 1 1 auto;
-  min-height: clamp(140px, 20vh, 300px);
   background-image:
     linear-gradient(
-      to bottom,
-      #f5f8f7 0%,
-      rgba(245, 248, 247, 0.74) 34%,
-      rgba(245, 248, 247, 0.34) 100%
+      180deg,
+      rgba(245, 248, 247, 0.94) 0%,
+      rgba(245, 248, 247, 0.88) 38%,
+      rgba(245, 248, 247, 0.5) 72%,
+      rgba(245, 248, 247, 0.12) 100%
     ),
     url('/street.webp');
-  background-repeat: no-repeat, no-repeat;
-  background-size: cover, cover;
-  background-position: center, center bottom;
+  background-repeat: no-repeat;
+  background-size: cover;
+  /*
+    42%, not the centre and not the bottom. The photograph is 2:1 and a
+    window is rarely that shape, so `cover` shows a slice of it; 42% puts
+    the slice through the houses and the tree line, where the picture is
+    legible. Anchored at the bottom it was wet tarmac and nothing else.
+  */
+  background-position: center 42%;
+}
+
+/* The folded panels, where the wash has thinned too far to carry them. */
+.landing__more {
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(247, 250, 249, 0.94);
 }
 
 /*
@@ -201,7 +209,7 @@ button:disabled {
  * not be fetched.
  */
 @media (prefers-reduced-data: reduce) {
-  .landing__street::after {
+  .landing__street {
     background-image: none;
   }
 }
