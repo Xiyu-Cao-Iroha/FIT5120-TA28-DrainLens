@@ -81,11 +81,18 @@ export function NoMatch({ addressLabel, onAnotherAddress, onExample, onFullMap }
   );
 }
 
-/** "Finding drains you can test near this address…", while the worker loads its list. */
+/** "Finding drains to compare near this address…", while the worker loads its list. */
 export function FindingDrains({ nearAddress }: { readonly nearAddress: boolean }) {
   return (
     <Stage>
-      <Spinner label={nearAddress ? 'Finding drains you can test near this address…' : 'Finding drains you can test…'} />
+      {/* *Compare*, not *test*: see `COMPARE_COPY`, and the audit's first finding. */}
+      <Spinner
+        label={
+          nearAddress
+            ? 'Finding drains to compare near this address…'
+            : 'Finding drains to compare…'
+        }
+      />
     </Stage>
   );
 }

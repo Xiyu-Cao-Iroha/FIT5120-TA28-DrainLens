@@ -193,3 +193,15 @@ export const PLACES_NEAR_YOU = 'Places near you';
 
 /** The heading over the general actions, which every address gets. */
 export const FOR_EVERY_HOME = 'For every home';
+
+/**
+ * That the plan's three parts are a list, not a sequence.
+ *
+ * The plain-English review of 11 October: *Step 1*, *Step 2* and *Step 3*
+ * read as something to complete in order, and nothing in the plan has to be
+ * done before anything else. The numbers are the design's own (Figma A8b and
+ * G6 label all three), so they stay and this says what they mean. At the
+ * majority of addresses part one is not there at all, which would make a
+ * sequence start at two.
+ */
+export const NOT_AN_ORDER = 'These three parts are not an order. Read or use them however suits you.';

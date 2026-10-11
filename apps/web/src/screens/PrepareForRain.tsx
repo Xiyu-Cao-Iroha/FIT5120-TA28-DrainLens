@@ -38,6 +38,7 @@ import {
 import {
   FOR_EVERY_HOME,
   CHECK_STREET_DRAINS,
+  NOT_AN_ORDER,
   NO_PLACES,
   NO_PLACES_MEANS,
   PLACES_NEAR_YOU,
@@ -178,6 +179,19 @@ export function PreparePlan({
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
       {/* `PREPARE_HEADING` belongs to the card around this, for the same
           reason the place card's title does. */}
+
+      {/*
+        What the numbers are not.
+
+        The plain-English review of 11 October: the three headings read as a
+        sequence to finish, and a plan that looks like a form is a plan
+        somebody abandons at part two. The numbers themselves are the
+        design's (Figma A8b and G6 label all three), so they stay and this
+        says what they mean. The places section is numbered 1 and is missing
+        at most addresses, which is the same point from the other side.
+      */}
+      <p style={{ margin: `0 0 ${String(space(3))}px`, color: ink.muted }}>{NOT_AN_ORDER}</p>
+
       {places.length === 0 ? (
         /*
           AC 5.1.3, and the majority of addresses: no section for places at

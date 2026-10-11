@@ -55,7 +55,7 @@ export const COACH_WIDTH_PX = 232;
 export const COACH_HEIGHT_PX = 76;
 
 /**
- * About as wide as "Nearest drain you can test · about 200 m away" sets.
+ * About as wide as "Nearest drain you can compare · about 200 m away" sets.
  * Measured at 254 px for "about 20 m" in Chromium on Windows, with a little
  * over for a wider system font.
  */
