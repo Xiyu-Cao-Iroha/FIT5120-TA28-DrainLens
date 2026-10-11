@@ -50,14 +50,13 @@ export interface AskSource {
 /** One answer the panel is allowed to give. */
 export interface AskAnswer {
   readonly id: string;
-  /** The question as the suggested chip asks it, and the panel echoes back. */
   readonly question: string;
-  /** The line before the points, as the design writes it. */
+  readonly aliases?: readonly string[];
   readonly intro: string;
   readonly points: readonly string[];
   readonly sources: readonly AskSource[];
-  /** Rows of the Stage 2 evaluation this answer covers. */
   readonly evaluated: readonly string[];
+  
   /**
    * The plan action this answer is already about, or `null`.
    *
@@ -106,6 +105,12 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'gutters',
     question: 'How do I clean gutters and drains safely?',
+    aliases: [
+      'How should I clean my gutters?',
+      'How do I clear blocked drains?',
+      'How do I prepare my gutters for heavy rain?',
+      'Should I clean my gutters before a storm?',
+    ],
     intro: 'Official guidance is to clear them before rain, not during it:',
     points: [
       'Clear leaves and debris out of gutters, downpipes and drains.',
@@ -129,6 +134,12 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'water-out',
     question: 'What can I do to keep water out of my home?',
+    aliases: [
+      'How can I stop water entering my house?',
+      'How do I keep floodwater out of my home?',
+      'What can I do before water enters my house?',
+      'Should I use sandbags?',
+    ],  
     intro: 'Three things the guides name, in the order they are usually done:',
     points: [
       'Seal cracks or gaps in the foundations.',
@@ -171,6 +182,11 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'valuables',
     question: 'What should I do with valuable things in the house?',
+    aliases: [
+      'How do I protect valuables from flooding?',
+      'Where should I move my valuables?',
+      'How do I protect furniture and electronics?',
+    ],  
     intro: 'Height is the whole of it:',
     points: [
       'Lift valuables up high.',
@@ -194,6 +210,11 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'documents',
     question: 'How should I keep documents and photographs safe?',
+    aliases: [
+      'How do I protect important documents?',
+      'How should I store documents during a flood?',
+      'How do I keep photos safe from water?',
+    ],  
     intro: 'Waterproof, or not on paper at all:',
     points: [
       'Put important documents and valuables in waterproof containers.',
@@ -237,6 +258,13 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'kit',
     question: 'What goes in an emergency kit?',
+    aliases: [
+      'What should I put in an emergency kit?',
+      'What should an emergency kit contain?',
+      'What do I need in an emergency kit?',
+      'What items should be in an emergency kit?',
+      'What should I keep in my emergency kit?',
+    ],
     intro: 'Official guides describe a kit that lasts three days:',
     points: [
       'Enough essentials for three days, in case the power goes out or you have to leave.',
@@ -264,9 +292,15 @@ export const ANSWERS: readonly AskAnswer[] = [
     planAction: null,
     words: ['kit', 'pack', 'packed', 'essentials', 'supplies', 'medications', 'pets'],
   },
+  
   {
     id: 'leaving',
     question: 'What should I do if I have to leave?',
+    aliases: [
+      'What should I do if I need to evacuate?',
+      'What should I do before leaving my house?',
+      'When should I leave during flooding?',
+    ],  
     intro: 'Leave early, and before you go:',
     points: [
       'Turn off the gas and electricity.',
@@ -297,6 +331,12 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'car',
     question: 'How can I protect my car?',
+    aliases: [
+      'How do I protect my car from flooding?',
+      'Where should I park my car during heavy rain?',
+      'How can I keep my car safe during a flood?',
+      'Can I drive through floodwater?',
+    ],
     intro: 'Where it is parked, and where it is never driven:',
     points: [
       'Park under cover, or away from trees.',
@@ -324,6 +364,12 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'warnings',
     question: 'Where do I find current warnings?',
+    aliases: [
+      'Where can I check flood warnings?',
+      'Where can I see emergency warnings?',
+      'How do I get flood alerts?',
+      'Where can I check current weather warnings?',
+    ],
     intro: 'Not here. DrainLens is not a warning service, and these are:',
     points: [
       'VicEmergency — website, app, or the hotline on 1800 226 226.',
@@ -348,6 +394,11 @@ export const ANSWERS: readonly AskAnswer[] = [
   {
     id: 'local-risk',
     question: 'How do I find out about flooding in my suburb?',
+    aliases: [
+      'How do I check flood risk in my suburb?',
+      'Where can I find local flood information?',
+      'Does my suburb have a flood guide?',
+    ],  
     intro: 'VICSES publishes a guide for the places that have one:',
     points: [
       'Check whether your suburb has a VICSES Local Flood Guide.',

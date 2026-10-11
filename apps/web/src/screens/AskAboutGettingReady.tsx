@@ -10,6 +10,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../data/source.js';
 import {
+  ANSWERS,
   ASK_NOTE,
   ASK_PLACEHOLDER,
   ASK_PRIVACY,
@@ -132,21 +133,23 @@ export function AskAboutGettingReady({
         same thing to the reader as the service being unavailable, and it
         says that.
       */
-      const body = await response.text();
+const body = await response.text();
 
-      let data: { answer?: string; sources?: ChatSource[]; error?: string } = {};
-      let readable = true;
-      try {
-        data = JSON.parse(body) as typeof data;
-      } catch {
-        readable = false;
-      }
+let data: { answer?: string; sources?: ChatSource[]; error?: string } = {};
+let readable = true;
 
-      if (!response.ok || !readable) {
-        throw new Error(
-          (readable ? data.error : undefined) ?? CHAT_UNAVAILABLE,
-        );
-      }
+try {
+  data = JSON.parse(body) as typeof data;
+} catch {
+  readable = false;
+}
+
+if (!response.ok || !readable) {
+  throw new Error(
+    (readable ? data.error : undefined) ?? CHAT_UNAVAILABLE,
+  );
+}
+
 
       setTurns((current) =>
         current.map((turn) =>
@@ -174,6 +177,75 @@ export function AskAboutGettingReady({
       );
     }
   };
+
+
+const normaliseQuestion = (question: string): string =>
+  question
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!]+$/, '')
+    .replace(/\s+/g, ' ');
+
+const findInstantAnswer = (question: string) => {
+  const normalised = normaliseQuestion(question);
+
+  return (
+    ANSWERS.find((answer) => {
+      const questions = [
+        answer.question,
+        ...(answer.aliases ?? []),
+      ];
+
+      return questions.some(
+        (candidate) => normaliseQuestion(candidate) === normalised,
+      );
+    }) ?? null
+  );
+};
+
+
+
+const askSuggested = (
+  answer: ReturnType<typeof answerFor>,
+  askedQuestion?: string,
+): void => {
+  if (answer === null) return;
+
+  const id = nextTurnId.current;
+  nextTurnId.current += 1;
+
+  const answerText = [
+    answer.intro,
+    '',
+    ...answer.points.map((point) => `• ${point}`),
+  ].join('\n');
+
+  setTurns((current) => [
+    ...current,
+    {
+      id,
+      question: askedQuestion ?? answer.question,
+      result: {
+        answer: answerText,
+        sources: Array.from(
+          new Map(
+            answer.sources.map((source) => [
+              source.href,
+              {
+                organisation: source.publisher,
+                title: source.document,
+                url: source.href,
+              },
+            ]),
+          ).values(),
+        ),
+      },
+      error: null,
+    },
+  ]);
+
+  setTyped('');
+};
 
   useEffect(() => {
     if (
@@ -229,7 +301,7 @@ export function AskAboutGettingReady({
                 key={id}
                 type="button"
                 onClick={() => {
-                  void ask(answer.question);
+                  askSuggested(answer);
                 }}
                 style={{
                   padding: `${String(space(1))}px ${String(space(2))}px`,
@@ -331,7 +403,14 @@ export function AskAboutGettingReady({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void ask(typed);
+
+          const instantAnswer = findInstantAnswer(typed);
+
+          if (instantAnswer !== null) {
+            askSuggested(instantAnswer, typed.trim());
+          } else {
+            void ask(typed);
+          }
         }}
         style={{ marginTop: space(3) }}
       >
