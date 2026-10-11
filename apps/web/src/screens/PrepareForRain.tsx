@@ -37,6 +37,7 @@ import {
 
 import {
   FOR_EVERY_HOME,
+  CHECK_STREET_DRAINS,
   NO_PLACES,
   NO_PLACES_MEANS,
   PLACES_NEAR_YOU,
@@ -135,6 +136,7 @@ export function PreparePlan({
   onWhyOpen,
   onAsk,
   onCheckDrains,
+  pulseDrains = false,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -149,6 +151,15 @@ export function PreparePlan({
   readonly onAsk?: ((actionId?: string) => void) | undefined;
   /** Step 3's first button: show the recorded drains near the address. */
   readonly onCheckDrains?: (() => void) | undefined;
+  /**
+   * Ring that button, while a guide's step is waiting on it (Figma G6).
+   *
+   * The plan scrolls, and the button sits under the places, the general
+   * actions and a heading. A step that says *Click Check the street drains
+   * near you* beside a panel not showing it is the 9 October report again,
+   * which is what `pressFor` exists to answer.
+   */
+  readonly pulseDrains?: boolean | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -306,9 +317,19 @@ export function PreparePlan({
         <section aria-label={STREET_DRAINS_NEAR_YOU} style={{ marginBottom: space(4) }}>
           <StepHeading step={3} label={STREET_DRAINS_NEAR_YOU} />
           {onCheckDrains !== undefined && (
-            <button type="button" onClick={onCheckDrains} style={primaryButton}>
-              Check the street drains near you ›
-            </button>
+            <span
+              style={{
+                display: 'block',
+                padding: pulseDrains ? space(1) : 0,
+                borderRadius: radius.base,
+                border: pulseDrains ? `2px solid ${brand.base}` : '2px solid transparent',
+                background: pulseDrains ? brand.wash : 'transparent',
+              }}
+            >
+              <button type="button" onClick={onCheckDrains} style={primaryButton}>
+                {CHECK_STREET_DRAINS} ›
+              </button>
+            </span>
           )}
           {onReport !== undefined && (
             <button type="button" onClick={onReport} style={warningButton}>

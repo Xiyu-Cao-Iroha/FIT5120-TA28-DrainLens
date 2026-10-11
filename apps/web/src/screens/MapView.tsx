@@ -845,6 +845,18 @@ export function MapView({
     panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0;
 
   /**
+   * And in the map, where the window has no room for a sidebar.
+   *
+   * The plan has had this since there were narrow windows (`planInCard`);
+   * the list did not, so opening it under 620 px closed the plan and showed
+   * nothing in its place. A guide's map frame is always under that, which is
+   * where it was found: Figma G6 makes this the guide's fifth step, and the
+   * press turned the drain layer on and left the reader looking at a map.
+   */
+  const drainsInCard =
+    panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth === 0;
+
+  /**
    * What a panel actually takes from the map.
    *
    * Folded it is the rail, which is why the chrome moves by this rather than
@@ -903,6 +915,24 @@ export function MapView({
   };
 
 
+  const drainsList =
+    drainsNear === null || address === null ? null : (
+      <StreetDrains
+        address={streetAddress}
+        found={drainsNear}
+        yourStreet={yourStreet}
+        selected={drainPicked?.id ?? null}
+        onSelect={(drain) => {
+          setDrainPicked(drain);
+        }}
+        onBack={() => {
+          setDrainsOpen(false);
+          setDrainPicked(null);
+          setPlanOpen(true);
+        }}
+      />
+    );
+
   const planPanel = (
     <PreparePlan
       address={address?.label ?? ''}
@@ -915,6 +945,17 @@ export function MapView({
         setWhyOpen(true);
       }}
       {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
+      /*
+        Step 3's first button, which opens the list (Figma S1).
+
+        In the guide as well, which it was not until 11 October. Figma G6
+        makes the street drain check the guide's fifth step and draws this
+        button ringed inside the plan, and G2z makes it the only press an
+        address with no places has left -- and the plan had no such button
+        while a guide was running, so neither step could be finished.
+      */
+      onCheckDrains={openDrains}
+      pulseDrains={pulsePress === 'drains'}
       {...(guided
         ? {}
         : {
@@ -930,10 +971,6 @@ export function MapView({
               );
               setAskOpen(true);
             },
-
-            // Step 3's first button, which opens the list (Figma S1).
-            onCheckDrains: openDrains,
-
           })}
     />
   );
@@ -1100,6 +1137,14 @@ export function MapView({
   const placesReviewed = places.filter(
     (place) => (relevance[place.number] ?? null) !== null,
   ).length;
+  /*
+    How many places this address has, for the guide that is written twice.
+
+    Null while the markers are still loading, which the guide needs kept apart
+    from zero: at an address with none it drops the two steps that are about a
+    place, and *not loaded yet* is not an answer to that question.
+  */
+  const placeCount = warningPoints === null ? null : places.length;
   useEffect(() => {
     onMapNow?.({
       pits: pitsOn,
@@ -1116,8 +1161,12 @@ export function MapView({
       terrainShown: terrainOn,
       catchment: layers.catchment,
       planOpen,
+      // The map says what is true now; the guide latches this one too.
+      planOpened: planOpen,
+      placeCount,
       placesReviewed,
       whyOpen,
+      drainsOpened: drainsOpen,
       reportOpened: reportOpen,
       problemChosen: reportProblem !== null,
     });
@@ -1136,8 +1185,10 @@ export function MapView({
     layers.catchment,
     // Epic 5's two, for the same reason.
     planOpen,
+    placeCount,
     placesReviewed,
     whyOpen,
+    drainsOpen,
     reportOpen,
     reportProblem,
     onMapNow,
@@ -1917,6 +1968,8 @@ export function MapView({
           </MapNote>
         )}
 
+        {drainsInCard && <MapNote title={STREET_DRAINS_HEADING}>{drainsList}</MapNote>}
+
         {panel && viewport !== null && layers.catchment && !reportOpen && (
           <MapNote title={DRAINAGE_AREA}>
             <DrainageArea
@@ -1979,6 +2032,11 @@ export function MapView({
         beforeRainCallout &&
         layers.beforeRain &&
         !planOpen &&
+        // And not over the street drains list, which takes the plan's place
+        // rather than closing it (Figma G6b). The callout came back the
+        // moment the plan went, on top of the list the reader had just
+        // asked for.
+        !drainsOpen &&
         openPlace === null &&
         onScreen([address.eastingM, address.northingM], viewport) && (
           <MapCallout
@@ -2132,20 +2190,7 @@ export function MapView({
             setDrainPicked(null);
           }}
         >
-          <StreetDrains
-            address={streetAddress}
-            found={drainsNear}
-            yourStreet={yourStreet}
-            selected={drainPicked?.id ?? null}
-            onSelect={(drain) => {
-              setDrainPicked(drain);
-            }}
-            onBack={() => {
-              setDrainsOpen(false);
-              setDrainPicked(null);
-              setPlanOpen(true);
-            }}
-          />
+          {drainsList}
         </Sidebar>
       )}
 

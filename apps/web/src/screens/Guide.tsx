@@ -279,7 +279,15 @@ export function Guide({
     return <NotWritten section={section} onFinish={onFinish} />;
   }
 
-  const steps = lesson.withGround === undefined ? lesson.steps : lesson.withGround(points);
+  /*
+    Epic 5's guide is written twice: once for an address with places to
+    decide about and once for the 58.6% with none, whose steps two and four
+    would otherwise wait for a Place 1 that was never drawn. See `withPlaces`.
+  */
+  const forPlaces = lesson.withPlaces?.(now.placeCount);
+  const steps =
+    lesson.withGround === undefined ? forPlaces?.steps ?? lesson.steps : lesson.withGround(points);
+  const finishedCopy = forPlaces?.finished ?? lesson.finished;
   const index0 = stepIndex(steps, now, teachingId, acknowledged);
   const done = finished(steps, now, teachingId, acknowledged);
   const intro = lesson.intro !== undefined && !started ? lesson.intro : null;
@@ -460,6 +468,7 @@ export function Guide({
       <Coach
         address={address}
         lesson={lesson}
+        finishedCopy={finishedCopy}
         intro={intro}
         step={step}
         stepNumber={shown}
@@ -511,6 +520,7 @@ const changeLink = {
 function Coach({
   address,
   lesson,
+  finishedCopy,
   intro,
   step,
   stepNumber,
@@ -541,6 +551,8 @@ function Coach({
   readonly section: SectionId;
   readonly address: SupportedAddress;
   readonly lesson: Lesson;
+  /** The finish page for this address, which Epic 5 picks from its place count. */
+  readonly finishedCopy: Lesson['finished'];
   /** The entry screen's copy, while it is showing. */
   readonly intro: LessonIntro | null;
   readonly step: Step | undefined;
@@ -626,9 +638,9 @@ function Coach({
           <Progress done={done ? total : stepNumber} total={total} />
 
           {done ? (
-            lesson.finished.badge === undefined ? (
+            finishedCopy.badge === undefined ? (
               <Done
-                copy={lesson.finished}
+                copy={finishedCopy}
                 onFinish={onFinish}
                 {...(noPipeShown ? { note: NO_PIPE_NOTE } : {})}
                 next={nextGuide(section, learned, guided)}
@@ -639,7 +651,7 @@ function Coach({
               />
             ) : (
               <>
-                <Complete copy={lesson.finished} onPrevious={onPrevious} onFinish={onFinish} />
+                <Complete copy={finishedCopy} onPrevious={onPrevious} onFinish={onFinish} />
                 <GuideEnd
                   next={nextGuide(section, learned, guided)}
                   learned={learned}
