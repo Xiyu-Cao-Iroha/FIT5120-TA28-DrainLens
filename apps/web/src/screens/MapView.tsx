@@ -31,6 +31,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { addressFrom, nextActive } from '../address/enter.js';
 import { lookupAddress } from '../address/lookup.js';
+import { RECENT_LABEL, recall } from '../address/recent.js';
 import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
 import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
@@ -168,6 +169,8 @@ export interface MapViewProps {
   readonly onResetPlaces?: (() => void) | undefined;
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
+  /** The addresses looked up in this tab, newest first. */
+  readonly recent?: readonly SupportedAddress[] | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
   /**
    * Let the address go again.
@@ -316,6 +319,7 @@ export function MapView({
   onReviewPlace,
   onResetPlaces,
   index,
+  recent = [],
   onAddress,
   onClearAddress,
   chipKeys,
@@ -1605,6 +1609,7 @@ export function MapView({
               <MapSearch
                 index={index}
                 address={address}
+                recent={recent}
                 onPick={onAddress}
                 onClear={onClearAddress}
               />
@@ -2571,11 +2576,13 @@ function midpoint(path: readonly Local[]): Local {
 function MapSearch({
   index,
   address,
+  recent,
   onPick,
   onClear,
 }: {
   readonly index: AddressIndex;
   readonly address: SupportedAddress | null;
+  readonly recent: readonly SupportedAddress[];
   readonly onPick: (address: IndexedAddress) => void;
   readonly onClear: () => void;
 }) {
@@ -2606,7 +2613,46 @@ function MapSearch({
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
-  const highlighted = active >= 0 && active < matches.length ? active : -1;
+
+  /*
+    What was searched for earlier in this tab, minus the one the map is on.
+
+    The current address is named in this field's own placeholder and the map
+    is centred on it, so a row that re-chooses it is a row that does nothing.
+    Memoised on the list and the index, neither of which changes while the map
+    is panned -- which matters here more than on the first screen, because
+    this component re-renders on every frame of a drag.
+  */
+  const recalled = useMemo(
+    () => recall(index, recent, address?.id ?? null),
+    [index, recent, address],
+  );
+
+  /*
+    **Shown on focus with an empty field, and only then.**
+
+    The list below is not gated on focus, deliberately -- the note there says
+    why. This one has to be: a dropdown of addresses hanging over the map
+    whenever nobody is typing is a panel the reader did not open. A press
+    still lands, because the rows cancel the mousedown that would blur the
+    field first.
+  */
+  const showingRecent = focused && typed.trim() === '' && recalled.length > 0;
+
+  /*
+    **One list, from one of two places, so the keyboard does not care which.**
+
+    The field is a combobox over a listbox, and the arrows, `Enter` and
+    `aria-activedescendant` were all written against the suggestions. Putting
+    the recent addresses through the same array is what keeps that true: the
+    reader arrows down into their own addresses exactly as they would into
+    matches, and nothing below had to learn about a second kind of row.
+  */
+  const options: readonly IndexedAddress[] = useMemo(
+    () => (showingRecent ? recalled : matches.map((match) => match.address)),
+    [showingRecent, recalled, matches],
+  );
+  const highlighted = active >= 0 && active < options.length ? active : -1;
   const optionId = (at: number) => `${listId}-option-${String(at)}`;
 
   const pick = (chosen: IndexedAddress) => {
@@ -2639,7 +2685,7 @@ function MapSearch({
   async function choose() {
     if (asking) return;
 
-    const highlightedAddress = matches[highlighted]?.address;
+    const highlightedAddress = options[highlighted];
     if (highlightedAddress !== undefined) {
       pick(highlightedAddress);
       return;
@@ -2721,10 +2767,10 @@ function MapSearch({
           }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              if (matches.length === 0) return;
+              if (options.length === 0) return;
               // Otherwise the caret jumps to the start or end of the text.
               event.preventDefault();
-              setActive(nextActive(highlighted, matches.length, event.key));
+              setActive(nextActive(highlighted, options.length, event.key));
             } else if (event.key === 'Enter') {
               event.preventDefault();
               void choose();
@@ -2742,7 +2788,7 @@ function MapSearch({
           aria-label="Search for an address"
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={matches.length > 0}
+          aria-expanded={options.length > 0}
           aria-controls={listId}
           aria-busy={asking}
           {...(highlighted >= 0 ? { 'aria-activedescendant': optionId(highlighted) } : {})}
@@ -2829,11 +2875,11 @@ function MapSearch({
         </p>
       )}
 
-      {matches.length > 0 && (
+      {options.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          aria-label="Matching addresses"
+          aria-label={showingRecent ? RECENT_LABEL : 'Matching addresses'}
           style={{
             position: 'absolute',
             left: 0,
@@ -2855,9 +2901,28 @@ function MapSearch({
             A press still chooses, and the pointer moves the highlight so the
             arrows carry on from where it was.
           */}
-          {matches.map((match, at) => (
+          {/*
+            The heading, when these are the reader's own addresses rather than
+            matches for what they typed. `presentation` because a listbox's
+            children are options and this is not one: it is the answer to
+            *why am I being shown these*, which an unlabelled list of five
+            addresses under an empty field does not give.
+          */}
+          {showingRecent && (
             <li
-              key={match.address.id}
+              role="presentation"
+              style={{
+                padding: `${String(space(1))}px ${String(space(2))}px`,
+                font: type(text.small),
+                color: ink.subtle,
+              }}
+            >
+              {RECENT_LABEL}
+            </li>
+          )}
+          {options.map((option, at) => (
+            <li
+              key={option.id}
               id={optionId(at)}
               role="option"
               aria-selected={at === highlighted}
@@ -2870,7 +2935,7 @@ function MapSearch({
                 setActive(at);
               }}
               onClick={() => {
-                pick(match.address);
+                pick(option);
               }}
               style={{
                 padding: `${String(space(2))}px ${String(space(2))}px`,
@@ -2881,7 +2946,7 @@ function MapSearch({
                 cursor: 'pointer',
               }}
             >
-              {match.address.label}
+              {option.label}
             </li>
           ))}
         </ul>
