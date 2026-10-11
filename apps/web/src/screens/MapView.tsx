@@ -595,20 +595,22 @@ export function MapView({
   /*
     The before-rain layer opens something, always (change list, item 11).
 
-    Reported from the guide: step two says *decide whether Place 1 applies to
-    you* over a map with nothing open on it, and the reader has to work out
-    that the thing to press is a small warning triangle somewhere among the
-    streets. The design opens the first place's card for them, so the step is
-    about the decision rather than about finding the control.
+    The reason is that it used to open nothing: numbered triangles appeared
+    among the streets and the reader had to work out that one of them was
+    the thing to press. Silence also looks like a layer that did not load.
 
-    Where there are no places it opens the address card instead, which is
-    where the *none near this address* sentence is. An address with nothing to
-    check is a result and has to look like one; silence looks like a layer
-    that did not load.
+    **What it opens is the address card, and only that** (11 October). It
+    opened the first place's card where there were places, and the address
+    card where there were none, so a reader who searched an address with the
+    layer on got both at once, overlapping. The address card is the right
+    one either way: with nothing near the address it carries the *none near
+    this address* sentence (Figma A8), and with places near it, it carries
+    *Check before heavy rain (3)*, which is the press the plan and Place 1
+    belong to.
 
-    Once per address and per switch-on: `opened` is the key it has already
-    done, so a reader who closes the card is not handed it again on the next
-    render.
+    Once per address and per switch-on: `openedFor` is the key it has
+    already done, so a reader who closes the card is not handed it again on
+    the next render.
   */
   const openedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -627,14 +629,15 @@ export function MapView({
     if (openedFor.current === key) return;
     openedFor.current = key;
     /*
-      Nothing near the address: the address card is the answer (Figma A8), so
-      it is opened rather than left for the reader to find the pin.
+      The address card, whatever the count.
+
+      With nothing near the address it is the answer (Figma A8). With places
+      near it, it is the thing that *has* the way in: *Check before heavy
+      rain (3)*. It used to open Place 1 here instead, and the two cards
+      then sat on the map at once -- reported on 11 October with a
+      screenshot of one over the other.
     */
-    if (places.length === 0) {
-      setAddressCardOpen(true);
-      return;
-    }
-    setOpenPlace((current) => current ?? places[0]?.number ?? null);
+    setAddressCardOpen(true);
   }, [guided, layers.beforeRain, address, places]);
 
   /*
@@ -712,33 +715,35 @@ export function MapView({
   }, [layers.beforeRain, address, places, checksOpened]);
 
   /*
-    The first place's card, opened when the reader turns the checks on
-    (team, 10 October).
+    A card when the reader turns the checks on (team, 10 October), and it is
+    the address card.
 
     *And a popup*, in their words. Turning the checks on is asking what to
     check, and a map of numbered triangles answers that only for somebody who
-    already knows to press one. The first is the nearest, which `placesNear`
-    orders them by.
+    already knows to press one.
 
-    **On the press, not on the state, and not inside a guide.** Both
+    **It put up Place 1 until 11 October, and that was the wrong card.** The
+    report came with a screenshot: the address card and Place 1 open
+    together, overlapping, neither of them asked for. The order the team
+    wants is the one the screens are built for -- the address card, then
+    *Check before heavy rain*, and the plan and Place 1 on that press -- so
+    this opens the card that carries the button and the press does the rest.
+
+    **On the change, not on the state, and not inside a guide.** Both
     qualifications were found by driving it. Epic 5's guide opens with this
     layer already on (`opensWith`) and its first step is *Click Check before
-    heavy rain*, whose hint is *Place 1 opens straight away*: an effect
-    reading the state rather than the change put Place 1 up before the
-    reader had pressed anything, and the step then asked them to do a thing
-    that appeared already done. Inside a guide the cards are the guide's to
-    open.
-
-    With no places there is nothing to put up, and the street drains panel
-    opens there instead.
+    heavy rain*: an effect reading the state rather than the change put a
+    card up before the reader had pressed anything, and the step then asked
+    them to do a thing that appeared already done. Inside a guide the cards
+    are the guide's to open.
   */
   const checksWere = useRef(beforeRainOn);
   useEffect(() => {
     const turnedOn = beforeRainOn && !checksWere.current;
     checksWere.current = beforeRainOn;
     if (!turnedOn || guided) return;
-    setOpenPlace((was) => was ?? places[0]?.number ?? null);
-  }, [beforeRainOn, guided, places]);
+    setAddressCardOpen(true);
+  }, [beforeRainOn, guided]);
 
   /*
     The plan and an open place card are no longer exclusive.
