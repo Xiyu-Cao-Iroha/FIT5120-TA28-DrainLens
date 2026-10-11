@@ -49,10 +49,17 @@ export type Requirement =
   | 'terrain-off'
   /* Epic 6's chip (Figma, *Your drainage area* D1). */
   | 'catchment-on'
-  /* Epic 5's three (Figma, *Get ready for heavy rain*, G1, G2 and G4). */
+  /* Epic 5's four (Figma, *Get ready for heavy rain*, G1, G2, G4 and G6). */
   | 'plan-opened'
   | 'place-reviewed'
   | 'why-opened'
+  /*
+    The street drain check, Figma G6.
+
+    Latched, like the report guide's two: the list can be closed again, and
+    closing it does not undo the press the step was waiting for.
+  */
+  | 'drains-opened'
   /*
     Epic 6's last two, from Figma D3 and D4.
 
@@ -209,6 +216,15 @@ export interface MapNow {
   /** The preparation plan, open now. */
   readonly planOpen: boolean;
   /**
+   * Latched: the plan has been open during this lesson.
+   *
+   * The step that asks for it used to read `planOpen` as it is, and the
+   * guide's own fifth step closes the plan: pressing *Check the street
+   * drains near you* puts the list where the plan was, which sent the reader
+   * back to step one with the list open in front of them.
+   */
+  readonly planOpened: boolean;
+  /**
    * How many numbered places this address has, or null while unknown.
    *
    * Null until the warning markers have loaded, which is not the same as
@@ -221,6 +237,8 @@ export interface MapNow {
   readonly placesReviewed: number;
   /** *Why this place?* opened on a reminder in the plan (Figma G4). */
   readonly whyOpen: boolean;
+  /** Latched: the street drains list has been opened (Figma G6). */
+  readonly drainsOpened: boolean;
   /** Latched: the report panel has been opened (Figma D3). */
   readonly reportOpened: boolean;
   /** Latched: a problem type has been chosen in it (Figma D4). */
@@ -242,9 +260,11 @@ export const NOTHING_ON_MAP: MapNow = {
   terrainShown: false,
   catchment: false,
   planOpen: false,
+  planOpened: false,
   placeCount: null,
   placesReviewed: 0,
   whyOpen: false,
+  drainsOpened: false,
   reportOpened: false,
   problemChosen: false,
 };
@@ -263,6 +283,8 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
   reportOpened: before.reportOpened || next.reportOpened,
   problemChosen: before.problemChosen || next.problemChosen,
+  drainsOpened: before.drainsOpened || next.drainsOpened,
+  planOpened: before.planOpened || next.planOpened || next.planOpen,
 });
 
 /**
@@ -396,7 +418,7 @@ export interface Lesson {
  *
  * Null for every step that waits on a chip, or on nothing a reader presses.
  */
-export type Press = 'report' | 'problem';
+export type Press = 'report' | 'problem' | 'drains';
 
 export function pressFor(requires: Requirement): Press | null {
   switch (requires) {
@@ -404,6 +426,10 @@ export function pressFor(requires: Requirement): Press | null {
       return 'report';
     case 'problem-chosen':
       return 'problem';
+    // Figma G6 rings it too, and the plan it sits in scrolls: the button is
+    // under the places, the general actions and a heading.
+    case 'drains-opened':
+      return 'drains';
     default:
       return null;
   }
@@ -438,6 +464,7 @@ export function chipFor(requires: Requirement): LayerKey | null {
     case 'why-opened':
     case 'report-opened':
     case 'problem-chosen':
+    case 'drains-opened':
       /*
         None is a chip: the address card's button, a choice on a place's own
         card, a fold under a reminder in the plan, and two controls inside
@@ -500,13 +527,15 @@ export function satisfied(
 ): boolean {
   switch (requires) {
     case 'plan-opened':
-      return now.planOpen;
+      return now.planOpened;
     case 'place-reviewed':
       // Any answer counts, including *doesn't apply to me*: the step asks for
       // a decision, and both are decisions (AC 5.4.1).
       return now.placesReviewed > 0;
     case 'why-opened':
       return now.whyOpen;
+    case 'drains-opened':
+      return now.drainsOpened;
     case 'report-opened':
       return now.reportOpened;
     case 'problem-chosen':

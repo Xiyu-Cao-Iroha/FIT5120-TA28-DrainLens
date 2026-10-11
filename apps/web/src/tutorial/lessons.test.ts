@@ -277,7 +277,7 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
     case 'terrain-shown':
       return latch(state, { ...state, terrain: true });
     case 'plan-opened':
-      return latch(state, { ...state, planOpen: true });
+      return latch(state, { ...state, planOpen: true, planOpened: true });
     case 'place-reviewed':
       return latch(state, { ...state, placesReviewed: state.placesReviewed + 1 });
     case 'why-opened':
@@ -286,6 +286,8 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, reportOpened: true });
     case 'problem-chosen':
       return latch(state, { ...state, problemChosen: true });
+    case 'drains-opened':
+      return latch(state, { ...state, drainsOpened: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'terrain-off':
