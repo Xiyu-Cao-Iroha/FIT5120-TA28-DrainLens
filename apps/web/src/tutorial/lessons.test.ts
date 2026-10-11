@@ -420,3 +420,51 @@ describe('what the ground height guide added to every lesson', () => {
     expect(stepForward(8, 9)).toBeNull();
   });
 });
+
+/**
+ * What a step points at, when the thing it waits for is not a chip.
+ *
+ * The team's bug list of 11 October opened with two of these: step five of
+ * the heavy rain guide said *Click Check the street drains near you* with
+ * nothing marked and the button three screens down inside a card, and step
+ * four said *Open Why this place?* with nothing marked at all. Both are
+ * `do` steps whose requirement `chipFor` returns null for, which is the set
+ * this watches: every one of them either has a ring inside a card
+ * (`pressFor`), a map control to outline (`highlightFor`), or is listed here
+ * as answered by something the reader is already looking at.
+ */
+describe('every step has something to point at', () => {
+  /** Waits whose target is the thing the step is already about. */
+  const ANSWERED_ELSEWHERE: Readonly<Record<string, string>> = {
+    // The guide rings the teaching pit on the map itself.
+    'pit-selected': 'the ringed pit',
+    // The button is on the card the press before it opened.
+    'trace-following': 'the open pit card',
+    // The two answers are the only controls on the place card.
+    'place-reviewed': 'the place card',
+    // The button is the address card's one filled control.
+    'plan-opened': 'the address card',
+  };
+
+  it.each(GUIDED_SECTIONS)('%s', (id) => {
+    const lesson = lessonFor(id);
+    if (lesson === null || lesson === undefined) return;
+    for (const step of lesson.steps) {
+      if (step.kind !== 'do') continue;
+      if (chipFor(step.requires) !== null) continue;
+      const marked =
+        pressFor(step.requires) !== null ||
+        highlightFor(step, NOTHING_ON_MAP) !== null ||
+        highlightFor(step, now({ layersOpen: true })) !== null ||
+        step.requires in ANSWERED_ELSEWHERE;
+      expect(marked, `${step.id} waits on ${step.requires} with nothing marked`).toBe(true);
+    }
+  });
+
+  it('rings the fold under the reminder, and the button under the plan', () => {
+    expect(pressFor('why-opened')).toBe('why');
+    expect(pressFor('drains-opened')).toBe('drains');
+    expect(pressFor('report-opened')).toBe('report');
+    expect(pressFor('problem-chosen')).toBe('problem');
+  });
+});

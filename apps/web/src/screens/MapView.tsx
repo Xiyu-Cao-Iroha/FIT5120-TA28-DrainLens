@@ -968,6 +968,7 @@ export function MapView({
       */
       onCheckDrains={openDrains}
       pulseDrains={pulsePress === 'drains'}
+      pulseWhy={pulsePress === 'why'}
       {...(guided
         ? {}
         : {

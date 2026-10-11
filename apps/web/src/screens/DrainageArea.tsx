@@ -47,6 +47,7 @@ import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchmen
 import { WHY_ORGANISATIONS } from '../catchment/wording.js';
 import { REPORT_HEADING } from '../report/problems.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
+import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /**
@@ -104,6 +105,7 @@ export function DrainageArea({
   const [moreOpen, setMoreOpen] = useState(false);
   const rolesId = useId();
   const [rolesOpen, setRolesOpen] = useState(false);
+  const reportRing = useRingIntoView<HTMLButtonElement>(pulseReport);
 
   const back =
     onBack === undefined ? null : (
@@ -252,6 +254,8 @@ export function DrainageArea({
       {onReport !== undefined && (
         <button
           type="button"
+          ref={reportRing}
+          className={ringClass(pulseReport)}
           onClick={onReport}
           style={{
             display: 'block',
@@ -259,16 +263,14 @@ export function DrainageArea({
             marginBottom: space(3),
             borderRadius: radius.base,
             /*
-              Two pixels of brand edge while a step is waiting on it, which
-              is what the layer chips do and what this had no equivalent of.
-              The extra pixel comes out of the padding, so the button is the
-              same size either way and the card below it does not shift.
+              The ring while a step waits on it is the amber one the map
+              chips use (`ui/GuideRing.tsx`). It was two pixels of brand
+              green, which on a card already edged in green said *button*
+              rather than *press this now* (team, 11 October).
             */
-            border: pulseReport
-              ? `2px solid ${brand.base}`
-              : `1px solid ${line.strong}`,
-            padding: pulseReport ? `${String(space(3) - 1)}px` : space(3),
-            background: pulseReport ? brand.wash : surface.raised,
+            border: `1px solid ${line.strong}`,
+            padding: space(3),
+            background: surface.raised,
             color: ink.strong,
             font: type(text.label, { weight: weight.semibold }),
             cursor: 'pointer',
