@@ -57,17 +57,18 @@ export const guideTitleOf = (id: SectionId): string => SECTIONS[id].guideTitle ?
 export const SECTIONS: Record<SectionId, Section> = {
   drainage: {
     id: 'drainage',
-    label: 'Local drainage pits and pipes',
+    // Figma T1's card titles, all of them, as of 11 October.
+    label: 'Recorded drainage',
     locked: 'Start guide',
   },
   'water-flow': {
     id: 'water-flow',
-    label: 'Where rainwater may move',
+    label: 'Water paths',
     locked: 'Start guide',
   },
   'low-areas': {
     id: 'low-areas',
-    label: 'Low areas where water may collect',
+    label: 'Low areas',
     locked: 'Start guide',
   },
   terrain: {
@@ -78,7 +79,13 @@ export const SECTIONS: Record<SectionId, Section> = {
   },
   'drainage-area': {
     id: 'drainage-area',
-    label: 'Your drainage area',
+    /*
+      Figma T1, rewritten on 11 October: the card was *Recorded subcatchment
+      area* and the guide behind it was about the boundary. Both are now
+      about reporting a problem. The id stays, because `SectionId` is
+      `MapMode` and the modes are the homepage's ways into the map.
+    */
+    label: 'Spot a drainage problem?',
     locked: 'Start guide',
   },
   'heavy-rain': {

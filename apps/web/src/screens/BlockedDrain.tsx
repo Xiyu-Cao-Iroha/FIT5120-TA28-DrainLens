@@ -54,7 +54,7 @@ export const COMPARE_ACCENT = DIFFERENCE_FILL;
 /** The words for the comparison's way in, shared by the homepage and the chooser. */
 export const COMPARE_CARD = {
   title: 'What happens if a drain is blocked?',
-  body: 'Pick a nearby drain and compare it clear and blocked under the same rainfall.',
+  body: 'Compare a drain clear and blocked under the same rain.',
   caption: 'Blocked drain comparison',
 } as const;
 

@@ -16,7 +16,7 @@
 import type { Lesson } from './lesson.js';
 import { SECTION_ORDER, type SectionId } from './sections.js';
 import { DRAINAGE } from './drainage.js';
-import { DRAINAGE_AREA } from './drainageArea.js';
+import { REPORT_PROBLEM } from './reportProblem.js';
 import { HEAVY_RAIN } from './heavyRain.js';
 import { LOW_AREAS } from './lowAreas.js';
 import { TERRAIN } from './terrain.js';
@@ -27,7 +27,8 @@ export const LESSONS: Partial<Record<SectionId, Lesson>> = {
   'water-flow': WATER_FLOW,
   'low-areas': LOW_AREAS,
   terrain: TERRAIN,
-  'drainage-area': DRAINAGE_AREA,
+  // Epic 6. Still keyed on the mode id; the guide is the report one now.
+  'drainage-area': REPORT_PROBLEM,
   'heavy-rain': HEAVY_RAIN,
 };
 
