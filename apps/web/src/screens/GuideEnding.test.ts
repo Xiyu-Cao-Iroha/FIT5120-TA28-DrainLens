@@ -46,9 +46,9 @@ describe('what it says before the full map', () => {
 
   it('reads as a sentence rather than a list', () => {
     expect(listed(['drainage', 'water-flow'])).toBe(
-      'Local drainage pits and pipes and Where rainwater may move',
+      'Recorded drainage and Water paths',
     );
-    expect(listed(['drainage'])).toBe('Local drainage pits and pipes');
+    expect(listed(['drainage'])).toBe('Recorded drainage');
     expect(listed([])).toBe('');
   });
 

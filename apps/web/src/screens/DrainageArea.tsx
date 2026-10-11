@@ -31,6 +31,7 @@ import {
   NOT_THE_SAME_RISK,
   NO_ADDRESS_YET,
   NO_AREA_FOUND,
+  NO_AREA_STILL,
   NO_AREA_MEANS,
   RECORD_UPDATED,
   areaLine,
@@ -141,6 +142,8 @@ export function DrainageArea({
       <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
         <p style={{ margin: 0 }}>{NO_AREA_FOUND}</p>
         <p style={{ margin: `${String(space(2))}px 0 0`, color: ink.muted }}>{NO_AREA_MEANS}</p>
+        {/* Figma B1-none: the one thing this address can still do. */}
+        <p style={{ margin: `${String(space(2))}px 0 0` }}>{NO_AREA_STILL}</p>
         <span style={{ display: 'block', marginTop: space(2) }}>
           <SourceLink id="drainageArea" />
         </span>

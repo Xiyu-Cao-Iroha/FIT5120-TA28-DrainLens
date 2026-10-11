@@ -27,6 +27,7 @@ import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import { quietButton } from '../ui/controls.js';
 
 import {
+  EMERGENCY_STRIP,
   GENERAL_ACTIONS,
   type GeneralAction,
   NOT_A_SCORE,
@@ -44,6 +45,7 @@ import {
   PLACES_NEAR_YOU,
   PLACE_ACTION,
   PLACE_IS_THE_STREET,
+  PLACE_QUESTION,
   PLACE_RADIUS_M,
   PLACE_SOURCE,
   type Place,
@@ -88,6 +90,16 @@ export function PlaceCard({
       */}
       {/* The action before its explanation, as AC 5.1.2 asks. */}
       <p style={{ margin: `0 0 ${String(space(2))}px` }}>{PLACE_ACTION}</p>
+
+      {/* The question the two buttons answer (Figma A2, A9 and the F frames). */}
+      <p
+        style={{
+          margin: `0 0 ${String(space(2))}px`,
+          font: type(text.small, { weight: weight.semibold }),
+        }}
+      >
+        {PLACE_QUESTION}
+      </p>
 
       <div style={{ display: 'flex', gap: space(2), flexWrap: 'wrap', marginBottom: space(2) }}>
         <Answer
@@ -419,7 +431,7 @@ export function PreparePlan({
           font: type(text.small, { leading: 1.5 }),
         }}
       >
-        {SAFETY.slice(-2).join(' ')}
+        {EMERGENCY_STRIP}
       </p>
 
       {/*

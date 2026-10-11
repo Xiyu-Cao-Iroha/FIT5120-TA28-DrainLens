@@ -21,6 +21,7 @@ import {
   chipFor,
   highlightFor,
   latch,
+  pressFor,
   satisfied,
   stepBack,
   stepForward,
@@ -124,7 +125,19 @@ describe.each(written)('%s', (_label, lesson, id) => {
     // layer is behind the Layers button, which its map shows instead.
     const chips = lesson.chips(0, NOTHING_ON_MAP);
     expect(chips.length).toBeLessThanOrEqual(1);
-    if (chips.length === 0) expect(lesson.mapChrome?.layersButton).toBe(true);
+    /*
+      No chip is allowed only where the first step points somewhere else:
+      the ground height guide's layer is behind the Layers button, and Epic
+      6's first press is the *Spot a problem?* chip, which is not a layer
+      and which `pressFor` rings instead.
+    */
+    if (chips.length === 0) {
+      const first = lesson.steps[0];
+      const elsewhere =
+        (lesson.mapChrome?.layersButton ?? false) ||
+        (first?.kind === 'do' && pressFor(first.requires) !== null);
+      expect(elsewhere).toBe(true);
+    }
   });
 
   it('shows the Layers button exactly when a step asks for something behind it', () => {
@@ -198,8 +211,19 @@ describe.each(written)('%s', (_label, lesson, id) => {
         expect(step.prompt).not.toMatch(/\?$/);
       }
     });
+    /*
+      The house sentence, with the two the design overrides.
+
+      The ground height guide's finish page is a *Guide complete* chip and a
+      heading (Figma Terrain Tutorial, frame 10), which is what `badge` is
+      for. Epic 6's is *Well done! You finished all 7 guides* (Figma D5):
+      it is the last guide in the order, and the design says so rather than
+      naming itself.
+    */
     if (lesson.finished.badge === undefined) {
-      expect(lesson.finished.headline).toMatch(/^Well done! You finished the .+ guide\.$/);
+      expect(lesson.finished.headline).toMatch(
+        /^Well done! You finished (the .+ guide|all 7 guides)\.$/,
+      );
     }
     expect(lesson.finished.body).toBeUndefined();
   });

@@ -40,7 +40,7 @@ import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
 import { PIT_SUMMARY, publicLabelOf, surfaceEntryOf } from '../crosssection/section.js';
 import { MapCanvas, type MapCanvasProps } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
-import { LayerChips, MapLegend } from '../map/MapLayers.js';
+import { LayerChips, MapLegend, PlainChip } from '../map/MapLayers.js';
 import {
   ALL_ON,
   GUIDED_ON,
@@ -59,6 +59,7 @@ import { cardSentence, waterNearby } from '../map/nearby.js';
 import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
 import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
 import { DRAINAGE_AREA } from '../catchment/wording.js';
+import { SPOT_A_PROBLEM_CHIP } from '../report/problems.js';
 import type { Press } from '../tutorial/lesson.js';
 import { PREPARE_HEADING } from '../prepare/actions.js';
 import { ASK_HEADING, questionForAction } from '../ask/answers.js';
@@ -1620,6 +1621,29 @@ export function MapView({
               onPanelChange={panelChanged}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
+
+            {/*
+              Epic 6's guide opens the reporting pathway from here (Figma D1
+              to D3), where the other guides put the layer they teach. It is
+              not a layer, so it is not in `LayerChips` and not in
+              `CHIP_KEYS`; it exists only while a lesson's steps ask for the
+              report, which `usesReport` decides.
+            */}
+            {guided && reportInGuide && (
+              <PlainChip
+                label={SPOT_A_PROBLEM_CHIP}
+                on={reportOpen}
+                pulse={pulsePress === 'report'}
+                onPress={() => {
+                  if (reportOpen) {
+                    setReportOpen(false);
+                    setReportProblem(null);
+                  } else {
+                    openReport(null);
+                  }
+                }}
+              />
+            )}
           </div>
 
           {/*

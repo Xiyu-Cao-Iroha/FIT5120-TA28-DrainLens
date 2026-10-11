@@ -48,7 +48,13 @@ describe('the general actions', () => {
     */
     const lift = GENERAL_ACTIONS.find((action) => action.id === 'raise-items');
     expect(lift?.quote).toBe('Lift it: Lift your valuables up high');
-    expect(lift?.text).not.toMatch(/valuable items/i);
+    /*
+      Still held on 11 October, when the other three lines were taken from
+      the frames and this one was not. *Above floor level* is a specific
+      the publisher does not give, and a frame re-proposing it is the same
+      mock-up the 2 October decision was about.
+    */
+    expect(lift?.text).not.toMatch(/valuable items|floor level/i);
   });
 
   it('gives each action a photograph the repository actually ships', () => {

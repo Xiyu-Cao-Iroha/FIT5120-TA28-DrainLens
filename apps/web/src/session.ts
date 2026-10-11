@@ -238,6 +238,16 @@ export interface Session {
    * finishes the guide, it just starts again next time.
    */
   readonly learned: Learned;
+  /**
+   * Whether a comparison has been run to a result.
+   *
+   * Figma T1 of 11 October draws a *Done ✓* badge on the blocked-drain card
+   * and counts seven guides, so the comparison is one of the things the
+   * chooser tracks. It is still not a `Learned` section: it has no steps and
+   * no lesson, and `allLearned` -- what the full map's notice reads -- is
+   * about the six that do.
+   */
+  readonly compared: boolean;
   /** The section being taught, or null outside the guide. */
   readonly guideSection: SectionId | null;
   /**
@@ -325,6 +335,7 @@ export const INITIAL_SESSION: Session = {
   mapOrigin: 'home',
   mapOpenings: 0,
   learned: NOTHING_LEARNED,
+  compared: false,
   guideSection: null,
   pendingTask: null,
   pendingTaskFrom: 'home',
@@ -862,7 +873,7 @@ function step(session: Session, event: SessionEvent): Session {
       // Only the answer being waited for. After Cancel nothing is; after a
       // second start, it is the second run's.
       if (!session.running || (event.run ?? null) !== session.run) return session;
-      return { ...session, running: false, screen: 'result', outcome: event.outcome };
+      return { ...session, running: false, screen: 'result', outcome: event.outcome, compared: true };
 
     case 'comparison-cancelled':
       // The prototype's C5 to C4: back to the review, with every choice intact.

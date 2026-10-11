@@ -250,6 +250,54 @@ function Chip({
   );
 }
 
+/**
+ * A chip for something that is not a layer (Figma D1 to D3).
+ *
+ * Epic 6's guide opens the reporting pathway from the chip row, where every
+ * other guide puts the layer it is about. Reporting draws nothing on the
+ * map, so there is no swatch and no `aria-pressed` state to show beyond
+ * whether the panel is open.
+ *
+ * It borrows `Chip`'s shape deliberately: it sits in that row, and a control
+ * there that looked like something else would read as a different kind of
+ * thing to press.
+ */
+export function PlainChip({
+  label,
+  on,
+  pulse = false,
+  onPress,
+}: {
+  readonly label: string;
+  readonly on: boolean;
+  readonly pulse?: boolean;
+  readonly onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={pulse ? 'chip--pulse' : undefined}
+      onClick={onPress}
+      aria-expanded={on}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: `${String(space(2))}px ${String(space(3))}px`,
+        border: `1px solid ${on ? brand.base : line.base}`,
+        borderRadius: radius.base,
+        background: on ? brand.base : surface.raised,
+        color: on ? ink.inverse : ink.base,
+        font: type(text.label, { weight: on ? weight.semibold : weight.medium, leading: 1.2 }),
+        transition: 'background-color 120ms ease, border-color 120ms ease',
+        whiteSpace: 'nowrap',
+        cursor: 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export interface LayerChipsProps {
   readonly state: LayerState;
   readonly onToggle: (key: LayerKey) => void;

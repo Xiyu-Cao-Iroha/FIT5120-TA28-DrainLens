@@ -129,13 +129,13 @@ export const PATHS: readonly {
       read the line underneath to find out it was about drains and pipes.
       The hedge moves into that line, where it still does its work.
     */
-    title: 'Street drains and pipes',
-    body: 'Explore council-recorded street drains near you and the pipes that join them.',
+    title: 'Recorded drainage',
+    body: 'Street drains near you and the pipes that join them.',
     accent: DAY.pit,
   },
   {
     mode: 'water-flow',
-    title: 'Where rainwater may move',
+    title: 'Water paths',
     body: 'Arrows show which way rain may flow downhill.',
     accent: DERIVED_DAY.channel,
   },
@@ -159,7 +159,7 @@ export const PATHS: readonly {
     // something rather than to understand something.
     mode: 'heavy-rain',
     title: 'Get ready for heavy rain',
-    body: 'Places to check near you, and what every home can do.',
+    body: 'Check places near your address and make a short plan.',
     accent: WARNING_FILL,
   },
   {
@@ -175,7 +175,9 @@ export const PATHS: readonly {
       the map keeps the layer's name, because there it names a layer.
     */
     mode: 'drainage-area',
-    title: 'Report a drainage problem',
+    // Figma T1 of 11 October. The card asks the question the guide
+    // answers; what the product does and does not do is the body's job.
+    title: 'Spot a drainage problem?',
     body:
       /*
         **`to send yourself` was two readings and one of them was wrong.**
@@ -184,7 +186,10 @@ export const PATHS: readonly {
         the reader does and what DrainLens does not, which is the same
         promise the report screen already makes above its buttons.
       */
-      'Choose the problem, find the right contact, and copy or print the details. DrainLens does not send the report for you.',
+      // Figma T1's own line. *DrainLens does not send the report for you*
+      // was here as well and is not on the card in the design; it is still
+      // said twice inside the pathway, where the reader is about to act.
+      'Find out who to contact and what to tell them.',
     accent: BOUNDARY_STROKE,
   },
 ];

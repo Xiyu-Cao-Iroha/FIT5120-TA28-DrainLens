@@ -94,6 +94,15 @@ export const placeTitle = (place: Place): string =>
   `Place ${String(place.number)} · Check before heavy rain`;
 
 /**
+ * The question over the two answers (Figma A2, A9, F1-2 and the rest).
+ *
+ * The buttons had the action sentence above them and nothing asking
+ * anything, so *Applies to me* was answering a question the screen had not
+ * put. Every frame that draws the card draws this line.
+ */
+export const PLACE_QUESTION = 'Does this place matter to you?';
+
+/**
  * The conditional action, which is the same at every place (AC 5.2.2).
  *
  * Conditional and about the street: the marker is on a public road near the
@@ -109,14 +118,18 @@ export const reminderFor = (place: Place): string =>
 
 /** Why this place is on the list: the low area and the paths into it (AC 5.3.1). */
 export const WHY_THIS_PLACE =
-  'Because this spot sits in a low area where nearby water paths gather.';
+  'Because: this spot sits in a deep low area where nearby water paths gather.';
 
 /** What the place is, and is not, under *Why this place?* (AC 5.3.1). */
-export const PLACE_SOURCE = 'Estimated by DrainLens · Not a live warning';
+export const PLACE_SOURCE = 'Estimated by DrainLens · Not a live warning · Guidance: VICSES';
+
+/** Whose decision a printed reminder was, and whose estimate (Figma A5). */
+export const REMINDER_IS_YOURS = 'You said this place applies to you';
+export const ESTIMATED_BY_DRAINLENS = 'Estimated by DrainLens';
 
 /** That the place is the street rather than the reader's property (AC 5.3.1). */
 export const PLACE_IS_THE_STREET =
-  'It describes the street near your address, not your property.';
+  'This describes the street near your address, not your property.';
 
 /** How a place's status reads in the plan (AC 5.2.3, 5.4.1). */
 export function statusOf(relevance: Relevance): string {

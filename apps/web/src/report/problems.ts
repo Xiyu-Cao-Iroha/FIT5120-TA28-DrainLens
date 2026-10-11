@@ -140,6 +140,16 @@ export const problemFor = (id: ProblemId): ProblemType =>
 /** The heading over the whole pathway, as the design names it. */
 export const REPORT_HEADING = 'Report a problem';
 
+/**
+ * The chip that opens the pathway in Epic 6's guide (Figma D1 to D3).
+ *
+ * A question, where every other chip is a noun, because it is not a layer
+ * and does not draw anything: it asks the reader whether they have something
+ * to report. The step that waits on it drops the question mark, as D1 does.
+ */
+export const SPOT_A_PROBLEM_CHIP = 'Spot a problem?';
+export const SPOT_A_PROBLEM = 'Spot a problem';
+
 /** The step the reader is on first. */
 export const CHOOSE_PROBLEM = 'What is the problem?';
 

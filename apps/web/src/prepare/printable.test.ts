@@ -30,7 +30,8 @@ describe('what the page says it is', () => {
   it('names the address and the day it was printed', () => {
     const page = plan({});
     expect(page.address).toBe(ADDRESS);
-    expect(page.preparedOn).toBe('Prepared on 3 October 2026');
+    // Figma A5 puts the address and the date on one line under the title.
+    expect(page.preparedOn).toBe(`${ADDRESS} · Made on 3 October 2026`);
   });
 
   it('writes the month out, because a printed date outlives its reader', () => {

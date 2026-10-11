@@ -21,7 +21,14 @@
  */
 
 import { GENERAL_ACTIONS, SAFETY, VICEMERGENCY } from './actions.js';
-import { PLACE_SOURCE, type Place, type Relevance, applying, reminderFor } from './places.js';
+import {
+  ESTIMATED_BY_DRAINLENS,
+  REMINDER_IS_YOURS,
+  type Place,
+  type Relevance,
+  applying,
+  reminderFor,
+} from './places.js';
 
 /** The page's own title, which is also the browser's print header. */
 export const PRINTED_TITLE = 'My heavy rain plan';
@@ -113,13 +120,17 @@ export function printedPlan(
   return {
     title: PRINTED_TITLE,
     address,
-    preparedOn: `Prepared on ${printedDate(on)}`,
+    // Figma A5: the address and the date on one line, under the title.
+    preparedOn: `${address} · Made on ${printedDate(on)}`,
     // Only the places the reader said apply to them. A place they said does
     // not apply, or never answered, puts nothing on the page: the reminder is
     // the thing they agreed to, and the page is the agreement.
     reminders: applying(places, relevance).map((place) => ({
       text: reminderFor(place),
-      source: PLACE_SOURCE,
+      // Figma A5. The page carries only the places the reader agreed to, and
+      // this says whose decision each line was before it says whose estimate
+      // the place is.
+      source: `${REMINDER_IS_YOURS} · ${ESTIMATED_BY_DRAINLENS}`,
     })),
     generalActions: chosen.map((action) => ({
       text: action.text,

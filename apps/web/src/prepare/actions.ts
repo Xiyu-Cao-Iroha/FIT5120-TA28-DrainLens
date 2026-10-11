@@ -60,10 +60,27 @@ const MELBOURNE_WATER_FLOODING =
  * `GUIDANCE-CONTENT-REGISTER.md` §2 records the swap, and says plainly that
  * the three new ones are not covered by the 4 October approval.
  */
+/*
+  The four lines are Figma's (A5, F1-5, G3 to G6), re-read on 11 October.
+
+  **Each is still a paraphrase of the quotation beside it**, which is what
+  the register approves: the quotation and the publisher did not change, only
+  how short the line on screen is. *Keep an emergency kit ready* drops the
+  three days the quotation gives, and the fold under it still shows the
+  sentence that says three days, so the detail is one press away rather than
+  gone.
+
+  **The design also draws a second line under each action on the printed
+  page** -- "Torch, portable radio, spare batteries...", "listen to ABC local
+  radio" and two more. Those are not in any approved quotation and no
+  publisher is named for them, which is the one thing this register exists to
+  stop, so they are not here. They need a source and an approval, not a
+  copy-paste.
+*/
 export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   {
     id: 'gutters',
-    text: 'Clean gutters, downpipes and drains when it is safe to do so.',
+    text: 'Clean gutters and downpipes when it is safe.',
     quote: 'Clean your gutters, downpipes and drains to ensure they are not blocked.',
     publisher: 'Victoria State Emergency Service',
     page: VICSES_STORM,
@@ -72,6 +89,16 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   },
   {
     id: 'raise-items',
+    /*
+      The one of the four that stays the product's.
+
+      Figma says *Move valuable items above floor level*, and that wording
+      was rejected on 2 October because no official page carries it: VICSES
+      says *Lift it: Lift your valuables up high*, and *above floor level*
+      is a specific the publisher does not give. The design re-proposed it
+      on 11 October and the reason has not changed. `actions.test.ts` holds
+      this line.
+    */
     text: 'Lift valuables up high.',
     quote: 'Lift it: Lift your valuables up high',
     publisher: 'Victoria State Emergency Service',
@@ -81,7 +108,7 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   },
   {
     id: 'emergency-kit',
-    text: 'Pack an emergency kit with enough essentials for three days.',
+    text: 'Keep an emergency kit ready.',
     quote:
       "Pack an emergency flood kit with at least three days' worth of essentials, in case you lose power or need to evacuate.",
     publisher: 'Melbourne Water',
@@ -91,7 +118,7 @@ export const GENERAL_ACTIONS: readonly GeneralAction[] = [
   },
   {
     id: 'warnings',
-    text: 'Monitor weather warnings and official forecasts.',
+    text: 'Know where to find current warnings.',
     quote:
       'Stay informed – monitor weather warnings and forecasts at the Bureau of Meteorology website, and warnings through the VicEmergency app, website and hotline (1800 226 226).',
     publisher: 'Victoria State Emergency Service',
@@ -119,6 +146,16 @@ export const SAFETY: readonly string[] = [
   'Call VICSES on 132 500 for flood and storm assistance.',
   'Call Triple Zero (000) in a life-threatening emergency.',
 ];
+
+/**
+ * The pink strip at the foot of the plan (Figma A3, A8b and the F frames).
+ *
+ * The strip used to be `SAFETY`'s last two sentences run together, which put
+ * the state service before the one number to ring when somebody is in
+ * danger. The design leads with 000 and is half the length. Both numbers
+ * are the register's, with the quotations they came from.
+ */
+export const EMERGENCY_STRIP = 'Emergency? Call 000. Flood or storm help: VICSES 132 500.';
 
 /** Where current warnings live, which this product is not (AC 5.2.3). */
 export const VICEMERGENCY = {
