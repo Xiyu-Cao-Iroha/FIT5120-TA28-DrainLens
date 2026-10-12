@@ -679,8 +679,23 @@ export function MapView({
     and they agreed by each restating the condition until one of them did
     not. `warningsVisible` takes it as an argument so there is one place to
     read it from.
+
+    **It is the layer, and nothing else** (team, 12 October: *地图上的警示
+    图标，不要随着地图缩小而消失*). It used to carry two more conditions
+    and both of them took the signs away while the chip that draws them was
+    still on: with Low areas turned on beside the checks, zooming out left
+    an address pin and no checks at all, and with no address chosen the
+    same. Neither is a state in which somebody has stopped asking for the
+    signs.
+
+    The zoom floor stays where it was measured, which is the low-areas
+    layer on its own: there the signs annotate the hollows, and
+    `WARNING_MIN_SCALE` exists because the council's worst view holds
+    thirteen of them at 1.25 px/m. Here the signs *are* the layer, and a
+    layer that empties itself when you zoom out is a layer that looks
+    broken.
   */
-  const warningsAnyZoom = layers.beforeRain && !layers.lowPoint && address !== null;
+  const warningsAnyZoom = layers.beforeRain;
 
   const [checksOpened, setChecksOpened] = useState(0);
   const beforeRainOn = layers.beforeRain;
@@ -1321,7 +1336,7 @@ export function MapView({
         warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
         // The checks near an address are drawn at any zoom; the low areas
         // layer keeps the floor `WARNING_MIN_SCALE` was measured for.
-        warningsNearAddress={warningsAnyZoom}
+        warningsAnyZoom={warningsAnyZoom}
         numberOfWarning={(point) => (layers.beforeRain ? numberOf(places, point) : null)}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
