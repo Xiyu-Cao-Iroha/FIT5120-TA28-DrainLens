@@ -564,9 +564,156 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
 /** The near-black the report panel's own bars are drawn in (Figma T1). */
 const REPORT_INK = '#17242e';
 
-export function PathThumb({ mode }: { readonly mode: MapMode }) {
-  const frame = { width: '100%', height: 104, display: 'block' } as const;
-  const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
+export function PathThumb({
+  mode,
+  fill = false,
+}: {
+  readonly mode: MapMode;
+  /**
+   * Cover the slot rather than sit inside it at its own height.
+   *
+   * The five cards in the first group give a thumbnail a box 208 wide and
+   * 104 tall, which is the shape these are drawn in, so they very nearly
+   * fill it. The two wide cards below give it 40% of a card whose height
+   * comes from the words beside it -- 222 by 171 -- and a 104-tall picture
+   * in it left 67 pixels of white under the drawing and eleven down each
+   * side, so the marks read as a few pale boxes floating in a corner
+   * rather than as a picture of a street. Reported 12 October.
+   *
+   * `slice` rather than stretching: these are maps, and a map with its
+   * aspect pulled about is a map of somewhere else. It crops instead,
+   * which is what a thumbnail does.
+   */
+  readonly fill?: boolean;
+}) {
+  const frame = fill
+    ? ({ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' } as const)
+    : ({ width: '100%', height: 104, display: 'block' } as const);
+  /*
+    Two frames, because the two cards are two shapes.
+
+    A card in the first group gives its picture 208 by 104, which is what
+    these are drawn in. The two wide cards give it 40% of a card as tall as
+    the words beside it, near enough 222 by 170, and a 104-tall drawing in
+    that left 67 pixels of white underneath: the marks read as a few pale
+    boxes in a corner rather than as a picture of a street. Reported
+    12 October.
+
+    Cropping the wide frame out of the short one was the first try and was
+    worse -- at that difference in shape it cuts a third off each side, and
+    the first marker went with it. So the two modes that appear in a wide
+    card are composed again at the design's own proportions (Figma T1's
+    cards are 212 by 170), rather than scaled or cropped from the short one.
+
+    **Both frames cover rather than fit**, which means both crop, because
+    the slot's shape is not fixed: the two wide cards hand their picture
+    anything from 143 by 196 at 800 px to 222 by 171 at 1400, as the words
+    beside it wrap or do not. Covering a 200 by 170 frame across that range
+    leaves x 47 to 153 and y 8 to 162 always on screen -- measured at
+    375, 800 and 1400 -- so the tall compositions keep their marks inside
+    that, and what the crop takes is ground and road.
+  */
+  const common = {
+    viewBox: fill ? '0 0 200 170' : '0 0 200 104',
+    role: 'presentation',
+    style: frame,
+    preserveAspectRatio: 'xMidYMid slice',
+  } as const;
+
+  if (mode === 'heavy-rain' && fill) {
+    /*
+      The design's card: a crossroads, the address where they cross, and two
+      numbered checks in the blocks either side (Figma T1, *Get ready for
+      heavy rain*).
+
+      **The design draws the checks as orange pills and this draws the
+      triangles the map draws.** The rule these pictures follow is that the
+      mark here is the mark you meet when the map opens, and the map's
+      numbered warning signs are triangles. A pill would be a promise about
+      a symbol that does not exist.
+    */
+    return (
+      <svg {...common}>
+        <rect width="200" height="170" fill={DAY.ground} />
+        <path d="M-8 86h216M100 -8v186" stroke={DAY.road} strokeWidth="21" fill="none" />
+        {([
+          [70, 46],
+          [128, 124],
+        ] as const).map(([cx, cy], index) => (
+          <g key={index}>
+            <path
+              d={`M${String(cx)} ${String(cy - 13)}l14 25H${String(cx - 14)}Z`}
+              fill={WARNING_FILL}
+              stroke={WARNING_EDGE}
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <circle cx={cx + 13} cy={cy - 12} r="8" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1.5" />
+            <text
+              x={cx + 13}
+              y={cy - 8}
+              fontSize="10"
+              fontWeight="600"
+              textAnchor="middle"
+              fill={WARNING_EDGE}
+            >
+              {index + 1}
+            </text>
+          </g>
+        ))}
+        {/*
+          The address, at the crossing, in the warm colour no layer uses --
+          the same reason `drawAddress` keeps it: this is the person's own
+          place, not a recorded asset.
+        */}
+        <g transform="translate(100 94)">
+          <path
+            d="M0 0C-6.5-9.5-9.5-13-9.5-18.5A9.5 9.5 0 1 1 9.5-18.5C9.5-13 6.5-9.5 0 0Z"
+            fill={DAY.address}
+            stroke={DAY.addressHalo}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <circle cx="0" cy="-18.5" r="3.4" fill={DAY.addressHalo} />
+        </g>
+      </svg>
+    );
+  }
+
+  if (mode === 'drainage-area' && fill) {
+    /* The same report panel as the short frame, laid out for the tall one. */
+    const row = (y: number, w: number, bar: string, h = 3) => (
+      <rect key={`${String(y)}-${String(w)}`} x="68" y={y} width={w} height={h} rx={h / 2} fill={bar} />
+    );
+    return (
+      <svg {...common}>
+        <defs>
+          <filter id="report-card-lift-tall" x="-20%" y="-20%" width="140%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodOpacity="0.14" />
+          </filter>
+        </defs>
+        <rect width="200" height="170" fill={DAY.ground} />
+        {/* One road, behind the panel, which is why it looks like two. */}
+        <path d="M-6 132 206 34" stroke={DAY.road} strokeWidth="21" fill="none" />
+
+        <g filter="url(#report-card-lift-tall)">
+          <rect x="50" y="32" width="102" height="108" rx="10" fill="#ffffff" />
+        </g>
+        {/* The heading. */}
+        <rect x="62" y="46" width="52" height="6" rx="3" fill={REPORT_INK} />
+        {/* A problem not chosen, one chosen, and who to contact. */}
+        <rect x="62" y="60" width="78" height="18" rx="5" fill="#ffffff" stroke="#d9dfdd" />
+        {row(66, 44, '#bfc7c4')}
+        <rect x="62" y="82" width="78" height="18" rx="5" fill="#ffffff" stroke="#b8731f" strokeWidth="1.5" />
+        {row(88, 50, REPORT_INK)}
+        <rect x="62" y="104" width="78" height="22" rx="5" fill="#e3ede8" />
+        {row(110, 24, '#1f6f5c')}
+        {row(117, 46, REPORT_INK)}
+
+        <ReportGlyph x={48} y={18} size={28} />
+      </svg>
+    );
+  }
 
   if (mode === 'heavy-rain') {
     // Three numbered checks on a street corner: what the guide's first step
