@@ -274,7 +274,7 @@ export function Choose({
             return (
               <WideCard
                 key={path.mode}
-                thumb={<PathThumb mode={path.mode} />}
+                thumb={<PathThumb mode={path.mode} fill />}
                 title={path.title}
                 body={path.body}
                 accent={path.accent}
