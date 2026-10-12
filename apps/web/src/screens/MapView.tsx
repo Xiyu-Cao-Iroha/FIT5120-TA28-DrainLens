@@ -314,6 +314,17 @@ export interface MapViewProps {
   readonly onCompare?: ((pitId: string) => void) | undefined;
 }
 
+/**
+ * The four doors into the reporting pathway.
+ *
+ * `area` is the *Recorded subcatchment area* card, which the full map's
+ * *Spot a problem?* chip draws; `plan` is the before-rain plan's own
+ * *Report a drainage problem*; `drain` is *Report this drain* on a drain
+ * picked from the street-drains list; `chip` is Epic 6's guide, whose own
+ * chip opens the report directly.
+ */
+type ReportFrom = 'area' | 'plan' | 'drain' | 'chip';
+
 export function MapView({
   map,
   derived,
@@ -499,18 +510,31 @@ export function MapView({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
   /*
-    Where a report was opened from, so it has somewhere to go back to (bug 4).
+    Which control opened the report, so the one that opened it can take it
+    away again.
 
-    Reported on 9 October: the only way back to the plan after a report was
-    report → Close → press a warning sign → *Applies to me*, which is four
-    presses and two of them accidental. `Close` dismisses the pathway and
-    leaves the map; a report opened from the plan now also offers the plan.
+    It was a boolean, `reportFromPlan`, for one reason (bug 4, 9 October):
+    the only way back to the plan after a report was report → Close → press
+    a warning sign → *Applies to me*, four presses and two of them
+    accidental, so a report opened from the plan offers the plan.
+
+    **It needs the other three now** (team, 12 October). *Spot a problem?*
+    on the full map is the subcatchment chip, and its card is where the
+    report is opened from; turning the chip off left the report standing
+    there with nothing lit that would close it. The chip should take the
+    pathway with it, the way Drain pits takes its pit card and Low areas
+    takes its sign. But only the pathway it opened: the plan's own route
+    in (*Report a drainage problem*) runs with that chip off and must not
+    be closed by a chip the reader never pressed. A boolean cannot tell
+    those two apart, so this says which door was used.
   */
-  const [reportFromPlan, setReportFromPlan] = useState(false);
+  const [reportFrom, setReportFrom] = useState<ReportFrom | null>(null);
+  /** Whether the report offers a way back to the plan. */
+  const reportFromPlan = reportFrom === 'plan';
 
-  const openReport = (place: ReportPlace, fromPlan = false) => {
+  const openReport = (place: ReportPlace, from: ReportFrom) => {
     setReportPlace(place);
-    setReportFromPlan(fromPlan);
+    setReportFrom(from);
     setReportOpen(true);
   };
   /*
@@ -1051,7 +1075,7 @@ export function MapView({
         : {
             onReport: () => {
               setPlanOpen(false);
-              openReport(null, true);
+              openReport(null, 'plan');
             },
 
             
@@ -1156,6 +1180,22 @@ export function MapView({
     }
     // The sign goes with the layer it belongs to, for the same reason.
     if (key === 'lowPoint' && layers.lowPoint) setWarning(null);
+    /*
+      And the report goes with the chip that opened it (team, 12 October).
+
+      On the full map this chip is *Spot a problem?*, and the card it draws
+      is where *Report a problem* is pressed. Turning the chip off used to
+      leave the report standing with nothing lit that would close it.
+
+      **Only the report this chip opened.** The plan's route in runs with
+      this chip off, and closing somebody's report because they pressed a
+      chip they never used to open it would be the worse bug of the two.
+      `reportFrom` is what tells them apart.
+    */
+    if (key === 'catchment' && layers.catchment && reportFrom === 'area') {
+      setReportOpen(false);
+      setReportProblem(null);
+    }
     if (key === 'pipe' && layers.pipe) {
       // The trace is drawn as pipes, so it goes with them even when what is
       // selected is the pit at the top of it.
@@ -1731,7 +1771,7 @@ export function MapView({
                     setReportOpen(false);
                     setReportProblem(null);
                   } else {
-                    openReport(null);
+                    openReport(null, 'chip');
                   }
                 }}
               />
@@ -2142,7 +2182,7 @@ export function MapView({
                       says which lesson that is, from its steps.
                     */
                     onReport: () => {
-                      openReport(null);
+                      openReport(null, 'area');
                     },
                   })}
               pulseReport={pulsePress === 'report'}
@@ -2359,16 +2399,19 @@ export function MapView({
             <button
               type="button"
               onClick={() => {
-                openReport({
-                  kind: 'drain',
-                  drains: [
-                    {
-                      assetNumber: drainPicked.id,
-                      street: drainPicked.street,
-                      distanceM: Math.round(drainPicked.distanceM),
-                    },
-                  ],
-                });
+                openReport(
+                  {
+                    kind: 'drain',
+                    drains: [
+                      {
+                        assetNumber: drainPicked.id,
+                        street: drainPicked.street,
+                        distanceM: Math.round(drainPicked.distanceM),
+                      },
+                    ],
+                  },
+                  'drain',
+                );
               }}
               style={primaryCardButton}
             >
