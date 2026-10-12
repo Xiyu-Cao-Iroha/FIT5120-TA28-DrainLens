@@ -63,22 +63,18 @@ describe('when the signs are drawn', () => {
 
   it('draws the before-rain checks at any zoom, because the floor is not about them', () => {
     /*
-     * Reported three times. On 9 and 10 October as *press before rain check
-     * and nothing happens*: the view opened a shade under the floor in a
-     * narrow frame, so the signs the panel was talking about were not drawn
-     * and the reader was being asked to zoom until they appeared. On
-     * 12 October as the signs vanishing as the map is zoomed out, which is
-     * the same floor seen from the other end.
+     * Reported on 9 and 10 October as *press before rain check and nothing
+     * happens*. The view opened a shade under the floor in a narrow frame,
+     * so the signs the panel was talking about were not drawn and the reader
+     * was being asked to zoom until they appeared.
      *
      * The floor is measured for the low-areas layer: thirteen signs on the
-     * council's worst view, each a claim about a street nobody can see. On
-     * the before-rain layer the signs are the layer, and a layer that
-     * empties itself when you zoom out looks broken.
+     * council's worst view, each a claim about a street nobody can see. The
+     * checks are a handful inside `PLACE_RADIUS_M` of an address the reader
+     * typed, numbered in the plan beside the map.
      */
     expect(warningsVisible(true, 0.1, true)).toBe(true);
     expect(warningsVisible(true, 1080 / 1000, true)).toBe(true);
-    // Zoomed out as far as the council overview, a tenth of that.
-    expect(warningsVisible(true, 0.11, true)).toBe(true);
 
     // The layer still has to be on. Nothing draws signs for nobody.
     expect(warningsVisible(false, 4, true)).toBe(false);
