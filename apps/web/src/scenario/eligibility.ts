@@ -37,6 +37,16 @@ import type { Local } from '../map/viewport.js';
  */
 export const COMPARISON_RADIUS_M = 200;
 
+/**
+ * What the comparison's address box says when nothing it matched is usable.
+ *
+ * Here rather than on the screen so the sentence and the number it quotes
+ * cannot drift apart. It names the radius and says that the radius is not
+ * the whole rule, because it is not: a recorded drain inside it still has
+ * to be one the scene tiles give a calculation window.
+ */
+export const NO_COMPARABLE_ADDRESS = `No address matching that has a drain this comparison can use. It needs a recorded drain within ${String(COMPARISON_RADIUS_M)} m, and not every recorded drain can be calculated.`;
+
 /** One drain the comparison can use, and how far it is from the address. */
 export interface ComparableDrain {
   /** The asset number, as the worker and the session name it. */

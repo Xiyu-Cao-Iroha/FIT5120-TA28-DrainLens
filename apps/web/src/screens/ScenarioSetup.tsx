@@ -18,8 +18,8 @@
  * and the person carries without having agreed to it.
  */
 
-import { useEffect, useState } from 'react';
-import { BlockageInfo } from './BlockagePictures.js';
+import { useEffect, useId, useState } from 'react';
+import { BlockageInfoButton, BlockagePictures } from './BlockagePictures.js';
 
 import { type BlockageSetting, VALIDATED_RAINFALL_LEVELS_MM } from '@drainlens/schema';
 
@@ -101,6 +101,13 @@ export function ScenarioChoices({ scenario, distanceM, differenceHint = null, on
   const missing = missingScenarioInput(scenario);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const intake = WHAT_IS_UNCERTAIN[0];
+  /*
+    The ⓘ's panel is rendered here rather than by the button, because the
+    button lives in a `<legend>` and the panel must not. See
+    `BlockageInfoButton`.
+  */
+  const picturesId = useId();
+  const [picturesOpen, setPicturesOpen] = useState(false);
 
   return (
     <div style={panelBody}>
@@ -117,8 +124,15 @@ export function ScenarioChoices({ scenario, distanceM, differenceHint = null, on
         <legend style={question}>
           Imagine this drain is... <SettingTag />
           {/* Team request, 4 October: show what the three settings look like. */}
-          <BlockageInfo />
+          <BlockageInfoButton
+            open={picturesOpen}
+            panelId={picturesId}
+            onToggle={() => {
+              setPicturesOpen((was) => !was);
+            }}
+          />
         </legend>
+        {picturesOpen && <BlockagePictures id={picturesId} />}
         <div role="radiogroup" aria-label="Drain condition" style={{ display: 'grid', gap: space(2) }}>
           {BLOCKAGE_OPTIONS.map((option) => {
             const chosen = scenario.blockage === option.setting;

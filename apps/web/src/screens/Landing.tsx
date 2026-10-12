@@ -83,6 +83,39 @@ const DOES_NOT: readonly string[] = [
   'It does not cover addresses outside the City of Melbourne.',
 ];
 
+/**
+ * How many matches to ask for before filtering, as a multiple of what is
+ * shown.
+ *
+ * Only the comparison filters, and on the bundled square 92% of addresses
+ * pass, so four times is generous. The loop below stops as soon as it has
+ * enough, so the multiple is a ceiling rather than a cost.
+ */
+const SEARCH_OVERSHOOT = 4;
+
+/**
+ * The first `limit` matches this task can use.
+ *
+ * Exported for the test, and written as a loop rather than `filter().slice()`
+ * because `usable` walks the pits near each address: stopping at `limit`
+ * is the difference between asking about five addresses and asking about
+ * twenty on every keystroke.
+ */
+export function usableMatches(
+  matches: readonly Match[],
+  usable: ((address: IndexedAddress) => boolean) | undefined,
+  limit: number = MAX_SUGGESTIONS,
+): Match[] {
+  if (usable === undefined) return matches.slice(0, limit);
+  const kept: Match[] = [];
+  for (const match of matches) {
+    if (!usable(match.address)) continue;
+    kept.push(match);
+    if (kept.length >= limit) break;
+  }
+  return kept;
+}
+
 export interface LandingProps {
   readonly index: AddressIndex;
   /** Present only while the index is a stand-in. */
@@ -96,6 +129,28 @@ export interface LandingProps {
    * which kind of nothing it got.
    */
   readonly recent?: readonly SupportedAddress[] | undefined;
+  /**
+   * Which addresses this task can actually answer for, or absent for all.
+   *
+   * The comparison is the only task that cannot answer for every supported
+   * address: it needs a drain within `COMPARISON_RADIUS_M` that the scene
+   * tiles can calculate, and 0.5% of the council's addresses have none.
+   * Offering those in the search box is offering a door that opens onto
+   * *no drain near this address* (team, 12 October), so the box stops
+   * offering them.
+   *
+   * A predicate rather than a list, because the caller is the one that
+   * knows what its task needs, and because the list would be 62,397 long.
+   * Absent while the thing it needs is still loading, so a slow worker
+   * shows every address rather than none.
+   */
+  readonly usable?: ((address: IndexedAddress) => boolean) | undefined;
+  /**
+   * One line for when a search matched addresses and this task can use none
+   * of them. Without it the box would simply say nothing, which is how a
+   * working search looks when it is broken.
+   */
+  readonly usableNote?: string | undefined;
   readonly onUnsupported: (typed: string) => void;
   /**
    * Leave without giving an address.
@@ -253,6 +308,8 @@ export function Landing({
   onHome,
   task,
   section,
+  usable,
+  usableNote,
 }: LandingProps) {
   const copy = landingCopyFor(task, section);
   // On the Kensington fallback the search covers less than the lead says.
@@ -272,10 +329,21 @@ export function Landing({
   const examplesId = useId();
   const recentId = useId();
 
-  const suggestions: Match[] = useMemo(
-    () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
-    [index, typed],
+  /*
+    Every match for what was typed, before the task has had its say. Kept
+    so the screen can tell *nothing matched* from *nothing here is one this
+    task can use*, which are two different things to say.
+  */
+  const matched: Match[] = useMemo(
+    () =>
+      typed.trim().length >= 2
+        ? search(index, typed, usable === undefined ? MAX_SUGGESTIONS : MAX_SUGGESTIONS * SEARCH_OVERSHOOT)
+        : [],
+    [index, typed, usable],
   );
+  const suggestions: Match[] = useMemo(() => usableMatches(matched, usable), [matched, usable]);
+  /** Something matched, and this task can use none of it. */
+  const noneUsable = matched.length > 0 && suggestions.length === 0;
 
   /*
     What was searched for earlier in this tab, as rows this screen can offer.
@@ -285,7 +353,10 @@ export function Landing({
     changes when an address is chosen, so the pass over the index happens once
     per search rather than once per keystroke.
   */
-  const recalled = useMemo(() => recall(index, recent), [index, recent]);
+  const recalled = useMemo(() => {
+    const found = recall(index, recent);
+    return usable === undefined ? found : found.filter((address) => usable(address));
+  }, [index, recent, usable]);
 
   /*
     **The recent list replaces the examples rather than stacking above them.**
@@ -297,10 +368,14 @@ export function Landing({
 
   // Three to choose from (team feedback, 17 September), the comparison's own
   // where it is waiting: each of those is near a drain that shows a difference.
-  const examples = demonstrationAddresses(
+  const offered = demonstrationAddresses(
     index,
     copy === COMPARE_COPY ? COMPARE_DEMONSTRATION_LABELS : DEMONSTRATION_LABELS,
   );
+  // The examples are chosen to be usable, and are filtered anyway: the day
+  // one of them stops being usable, it should leave the list rather than
+  // become the one suggestion that leads nowhere.
+  const examples = usable === undefined ? offered : offered.filter((address) => usable(address));
   const suburbs = suburbsOf(index);
 
   /*
@@ -545,6 +620,23 @@ export function Landing({
               </li>
             ))}
           </ul>
+        )}
+
+        {/*
+          Something matched and this task can use none of it. Said here
+          rather than left as an empty list, because a box that answers
+          nothing is how a broken search looks.
+        */}
+        {noneUsable && usableNote !== undefined && (
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              font: type(text.label, { leading: 1.5 }),
+              color: ink.muted,
+            }}
+          >
+            {usableNote}
+          </p>
         )}
 
         {showingRecent && (

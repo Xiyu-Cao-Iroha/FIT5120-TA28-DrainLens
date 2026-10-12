@@ -9,7 +9,6 @@
  * would invite reading the difference off the drain rather than off the cover.
  */
 
-import { useId, useState } from 'react';
 
 import {
   BLOCKAGE_PICTURES,
@@ -20,20 +19,40 @@ import {
 } from '../scenario/blockagePicture.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
-/** The circled i, beside the question it is about. */
-export function BlockageInfo() {
-  const panelId = useId();
-  const [open, setOpen] = useState(false);
-
+/**
+ * The circled i, beside the question it is about, and its panel, which is
+ * **not** beside it.
+ *
+ * They were one component and it rendered both, which put the panel inside
+ * the `<legend>` the ⓘ sits in. A `<legend>` takes phrasing content; a
+ * `<div>` holding a grid of drawings is flow content, and the fieldset's
+ * box is the one place in CSS where the browser reserves room for a child
+ * it lays out specially. A 475 px disclosure in there makes the fieldset's
+ * height depend on that reserved box, which is the shape of the blank
+ * space the team reported on 12 October after opening the ⓘ and closing
+ * it again.
+ *
+ * So the button stays in the legend, where it belongs and where it is
+ * valid, and the panel is rendered by the caller as the fieldset's first
+ * child. It lands in the same place on screen: directly under the question
+ * and above the three options, which is where it was.
+ */
+export function BlockageInfoButton({
+  open,
+  panelId,
+  onToggle,
+}: {
+  readonly open: boolean;
+  /** The panel this controls, which the caller renders. */
+  readonly panelId: string;
+  readonly onToggle: () => void;
+}) {
   return (
-    <>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => {
-          setOpen((was) => !was);
-        }}
+        onClick={onToggle}
         title={SEE_WHAT_IT_LOOKS_LIKE}
         style={{
           width: 20,
@@ -50,10 +69,14 @@ export function BlockageInfo() {
       >
         i
       </button>
+  );
+}
 
-      {open && (
+/** What it opens: the three settings, drawn. */
+export function BlockagePictures({ id }: { readonly id: string }) {
+  return (
         <div
-          id={panelId}
+          id={id}
           style={{
             marginTop: space(3),
             padding: space(3),
@@ -120,8 +143,6 @@ export function BlockageInfo() {
             {NOT_THIS_DRAIN}
           </p>
         </div>
-      )}
-    </>
   );
 }
 
