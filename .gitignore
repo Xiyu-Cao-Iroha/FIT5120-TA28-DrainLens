@@ -45,3 +45,21 @@ docs/*.pptx
 /.venv/
 /assistant/models/
 *.gguf
+
+# Local AI security audit environment
+/.venv-audit/
+
+# Local dependency lock backups
+/assistant/*.lock.backup
+
+# Local security audit reports
+/assistant/ai07-*.json
+/assistant/ai08-*.json
+# AI-09 local ChromaDB release snapshot
+/assistant/chroma_db_release_snapshot/
+
+# AI-09 immutable corpus release snapshot
+/assistant/chroma_db_release_v3/
+
+# AI-09 temporary ChromaDB runtime database
+/assistant/chroma_db_runtime_test/

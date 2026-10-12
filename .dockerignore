@@ -30,3 +30,14 @@ pipeline/.venv
 .idea
 .claude
 coverage
+
+# AI-09: Exclude local AI model and ChromaDB artifacts
+assistant/models/
+assistant/chroma_db/
+assistant/chroma_db_release_snapshot/
+
+# AI-09 local immutable corpus release snapshot
+assistant/chroma_db_release_v3/
+
+# AI-09 temporary ChromaDB runtime database
+assistant/chroma_db_runtime_test/

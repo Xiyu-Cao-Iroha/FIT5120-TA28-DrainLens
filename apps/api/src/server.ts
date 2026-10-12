@@ -50,6 +50,20 @@ import {
  * addresses are loaded at all -- `db/migrations/006_address.sql` says why
  * Kensington's are not.
  */
+
+
+const MAX_CHAT_MESSAGE_LENGTH = 500;
+const MAX_CHAT_BODY_BYTES = 4096;
+
+const MAX_CHAT_ANSWER_LENGTH = 4000;
+const MAX_CHAT_SOURCES = 2;
+const MAX_CHAT_SOURCE_TEXT_LENGTH = 200;
+
+const APPROVED_CHAT_SOURCE_HOSTS = new Set([
+  'www.ses.vic.gov.au',
+  'www.melbournewater.com.au',
+]);
+
 const API_EXTENT = 'city-of-melbourne';
 
 /**
@@ -216,6 +230,8 @@ export function createMemo(ttlMs: number, now: () => number = Date.now): Memo {
 
 export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)): Hono {
   const app = new Hono();
+  let activeChatRequests = 0;
+  const MAX_CONCURRENT_CHAT_REQUESTS = 1;
 
   app.use('*', cors({ origin: allowedOrigins() }));
 
@@ -406,36 +422,227 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
     );
   });
 
+  const isApprovedChatSourceUrl = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+
+  try {
+    const parsed = new URL(value);
+
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.username === '' &&
+      parsed.password === '' &&
+      APPROVED_CHAT_SOURCE_HOSTS.has(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const validateChatResponse = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  if (!('answer' in value) || typeof value.answer !== 'string') {
+    return null;
+  }
+
+  if (
+    value.answer.trim().length === 0 ||
+    value.answer.length > MAX_CHAT_ANSWER_LENGTH
+  ) {
+    return null;
+  }
+
+  if (!('sources' in value) || !Array.isArray(value.sources)) {
+    return null;
+  }
+
+  if (value.sources.length > MAX_CHAT_SOURCES) {
+    return null;
+  }
+
+  const sources = [];
+
+  for (const source of value.sources) {
+    if (
+      typeof source !== 'object' ||
+      source === null ||
+      Array.isArray(source)
+    ) {
+      return null;
+    }
+
+    const title =
+      'title' in source ? source.title : undefined;
+
+    const organisation =
+      'organisation' in source ? source.organisation : undefined;
+
+    const page =
+      'page' in source ? source.page : undefined;
+
+    const url =
+      'url' in source ? source.url : undefined;
+
+    if (
+      title !== undefined &&
+      (
+        typeof title !== 'string' ||
+        title.length > MAX_CHAT_SOURCE_TEXT_LENGTH
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      organisation !== undefined &&
+      (
+        typeof organisation !== 'string' ||
+        organisation.length > MAX_CHAT_SOURCE_TEXT_LENGTH
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      page !== undefined &&
+      page !== null &&
+      (
+        typeof page !== 'number' ||
+        !Number.isInteger(page) ||
+        page <= 0
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      url !== undefined &&
+      !isApprovedChatSourceUrl(url)
+    ) {
+      return null;
+    }
+
+    sources.push({
+      ...(title !== undefined ? { title } : {}),
+      ...(organisation !== undefined ? { organisation } : {}),
+      ...(page !== undefined ? { page } : {}),
+      ...(url !== undefined ? { url } : {}),
+    });
+  }
+
+  return {
+    answer: value.answer,
+    sources,
+  };
+};
+
+
+  const chatJson = (
+    c: Context,
+    body: Record<string, unknown>,
+    status: 200 | 400 | 413 | 429 | 502 | 503 = 200,
+  ) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json(body, status);
+  };
+
   app.post('/api/chat', async (c) => {
     const aiServiceUrl = process.env.AI_SERVICE_URL;
 
     if (!aiServiceUrl || aiServiceUrl.trim() === '') {
-      return c.json(
+      return chatJson(
+        c,
         { error: 'AI chat service is not configured.' },
         503,
       );
   }
 
-  let body: { message?: unknown };
+  const contentLength = c.req.header('content-length');
+
+  if (
+    contentLength !== undefined &&
+    Number(contentLength) > MAX_CHAT_BODY_BYTES
+  ) {
+      return chatJson(
+        c,
+        { error: 'Request body is too large.' },
+        413,
+      );
+  }
+
+  const rawBody = await c.req.text();
+
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_CHAT_BODY_BYTES) {
+    return chatJson(
+      c,
+      { error: 'Request body is too large.' },
+      413,
+    );
+  }
+
+  let body: unknown;
 
   try {
-    body = await c.req.json();
+    body = JSON.parse(rawBody);
   } catch {
-    return c.json(
+    return chatJson(
+      c,
       { error: 'Invalid request body.' },
       400,
     );
   }
 
   if (
-    typeof body.message !== 'string' ||
-    body.message.trim() === ''
+    typeof body !== 'object' ||
+    body === null ||
+    Array.isArray(body) ||
+    !('message' in body) ||
+    typeof body.message !== 'string'
   ) {
-    return c.json(
+    return chatJson(
+      c,
       { error: 'A message is required.' },
       400,
     );
   }
+
+  const message = body.message.trim();
+
+  if (message === '') {
+    return chatJson(
+      c,
+      { error: 'A message is required.' },
+      400,
+    );
+  }
+
+  if (message.length > MAX_CHAT_MESSAGE_LENGTH) {
+    return chatJson(
+      c,
+      { error: 'Message is too long.' },
+      400,
+    );
+  }
+
+  if (activeChatRequests >= MAX_CONCURRENT_CHAT_REQUESTS) {
+    c.header('Retry-After', '5');
+    return chatJson(
+      c,
+      { error: 'The chat assistant is busy. Please try again shortly.' },
+      429,
+    );
+  }
+
+  activeChatRequests++;
 
   try {
     const baseUrl = aiServiceUrl.replace(/\/$/, '');
@@ -449,19 +656,41 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
         'Content-Type': 'application/json',
       },
       data: {
-        message: body.message.trim(),
+        message,
       },
-      timeout: 280_000,
+      timeout: 90_000,
     });
 
-    return c.json(response.data);
-  } catch (error) {
-    console.error('AI chat service request failed', error);
+    const validatedResponse = validateChatResponse(response.data);
 
-    return c.json(
+    if (validatedResponse === null) {
+      console.error('AI chat response validation failed', {
+        category: 'invalid_upstream_response',
+      });
+
+      return chatJson(
+        c,
+        { error: 'The chat assistant is temporarily unavailable.' },
+        502,
+      );
+    }
+
+    return chatJson(
+      c,
+      validatedResponse,
+    );
+  } catch {
+    console.error('AI chat service request failed', {
+      category: 'upstream_request_failed',
+    });
+
+    return chatJson(
+      c,
       { error: 'The chat assistant is temporarily unavailable.' },
       502,
     );
+  } finally {
+    activeChatRequests--;
   }
 });
 

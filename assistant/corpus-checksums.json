@@ -1,0 +1,27 @@
+﻿[
+    {
+        "path":  "1171ba58-3e4d-4833-941c-357ed2d0a5ea/data_level0.bin",
+        "size_bytes":  167600,
+        "sha256":  "cb6c4e6f679bc81ebcee46dc83881c9da049f192308876ae99c37dc49a1ba6a7"
+    },
+    {
+        "path":  "1171ba58-3e4d-4833-941c-357ed2d0a5ea/header.bin",
+        "size_bytes":  100,
+        "sha256":  "a0e81c3b22454233bc12d0762f06dcca48261a75231cf87c79b75e69a6c00150"
+    },
+    {
+        "path":  "1171ba58-3e4d-4833-941c-357ed2d0a5ea/length.bin",
+        "size_bytes":  400,
+        "sha256":  "61bed1ed9e5e2c29eb9e76b829be97b7bb6e24e92e4509e739453bd5443efabf"
+    },
+    {
+        "path":  "1171ba58-3e4d-4833-941c-357ed2d0a5ea/link_lists.bin",
+        "size_bytes":  0,
+        "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+        "path":  "chroma.sqlite3",
+        "size_bytes":  8646656,
+        "sha256":  "8b2917d32ca090e621a567aff3f37214efeeda76457c57de802099aafb10c3e5"
+    }
+]
