@@ -79,27 +79,24 @@ export const WARNING_HEIGHT_PX = 21;
 /**
  * Whether the signs are on the map at all, for this layer state and zoom.
  *
- * **`checksLayer` turns the zoom floor off, and the floor's own reasoning is
- * why.** The floor exists because a sign drawn over a whole neighbourhood is
- * a claim about a street nobody can see, and because the council's worst view
- * holds thirteen of them at 1.25 px/m. That is the low-areas layer, where the
- * signs annotate the hollows and are not the thing the reader asked for.
+ * **`nearAddress` turns the zoom floor off, and the floor's own reasoning is
+ * why.** It exists because a sign drawn over a whole neighbourhood is a claim
+ * about a street nobody can see, and because the council's worst view holds
+ * thirteen of them at 1.25 px/m. Neither is true of the before-rain checks:
+ * they are at most a handful, all within `PLACE_RADIUS_M` of an address the
+ * reader typed, and the plan beside the map numbers them.
  *
- * On the before-rain layer the signs *are* the layer. A layer that empties
- * itself when you zoom out is a layer that looks broken, which is what this
- * was reported as twice in October: on the 9th and 10th as *nothing happens
- * when I press before rain check* (the view opened a shade under 1.25 px/m in
- * a narrow frame, so the signs the panel was talking about were not drawn),
- * and on the 12th as *地图上的警示图标，不要随着地图缩小而消失*.
+ * Reported twice, on 9 and 10 October, as *nothing happens when I press
+ * before rain check*. What happened was that the view opened a shade under
+ * 1.25 px/m in a narrow frame, so the signs the panel was talking about were
+ * not drawn, and the reader was being asked to zoom until they appeared.
  *
- * The argument was named `nearAddress` while it also asked for an address and
- * for the low-areas layer to be off. Both of those took the signs away while
- * the chip that draws them was still on, and neither is a state in which
- * somebody has stopped asking for them, so both went and the name followed.
+ * The low-areas layer keeps the floor. It is the case the floor was measured
+ * for.
  */
-export function warningsVisible(on: boolean, scale: number, checksLayer = false): boolean {
+export function warningsVisible(on: boolean, scale: number, nearAddress = false): boolean {
   if (!on) return false;
-  return checksLayer || scale >= WARNING_MIN_SCALE;
+  return nearAddress || scale >= WARNING_MIN_SCALE;
 }
 
 /**
