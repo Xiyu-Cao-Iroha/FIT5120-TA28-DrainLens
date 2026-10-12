@@ -697,7 +697,26 @@ export function App() {
               }}
               learned={session.learned}
               guided={GUIDED_SECTIONS}
+              /*
+                *Start next guide* is on the finish page, so the guide it
+                leaves was finished.
+
+                It dispatched only `guide-chosen`, which sets the new
+                section and nothing else, so a reader who followed the
+                design's own chain (Figma G5 puts the next guide at the end
+                of each one) never had a single guide recorded: the chooser
+                showed none of them done, the count stayed at 0 of 7, and
+                `nextGuide` kept offering the one just finished. Pressing
+                *Back to guidance page* instead recorded it, which is what
+                made it look like the guides were not being counted at all
+                rather than like this one path was missing a step.
+
+                Found by the self test of 12 October: finish the heavy rain
+                guide, press *Start next guide*, and `drainlens.learned` is
+                still six zeroes.
+              */
               onStartSection={(next) => {
+                dispatch({ type: 'guide-finished' });
                 dispatch({ type: 'guide-chosen', section: next });
               }}
               onFullMap={() => {

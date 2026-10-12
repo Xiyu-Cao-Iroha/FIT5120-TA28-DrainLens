@@ -164,18 +164,18 @@ Thirty to forty minutes. The order below reaches every screen once and never goe
 ### 2.1 Home page to address, the call to action
 
 1. Open the site with no address chosen. Read the first screen: it should say what the product does and that it is not a flood warning.
-2. Press `Get started`. The address screen asks for an address and says which suburbs are covered.
+2. Press `Get started →`. It opens the guide chooser, not the address screen. Press `Set your address` there: that screen asks for an address and says which suburbs are covered.
 3. Type `qqqq`. It should say nothing matched what you typed.
 4. Type `1 Collins Street`. It should say that place is not in this map, which is a different sentence from the one above. **If both cases give the same message, that is a defect.**
 5. Type `46 Gat`. The list should narrow as you type. Press the down arrow, then Enter. Keyboard alone must work.
-6. Use the three example addresses under `Not sure? Try one of these`. All three must resolve.
+6. Use the three example addresses under `Not sure? Try one of these`. All three must resolve. They are offered on a first visit only: once anything has been searched in this tab, that list becomes `Recently searched in this tab`.
 
 ### 2.2 Every button on the full map
 
 7. Open `Full map`. Press each of the six layer buttons along the top in turn, then press each one again to turn it off. Nothing should be left drawn with no button lit.
 8. Open `Layers`. Turn `Ground height` on and off.
 9. Fold the legend with `‹ Hide` and open it again.
-10. Press a drain, then `Show connected drain pipe`. Press a pipe. Press empty ground: the card should close.
+10. Press a drain, then `Show connected drain pipe`. Press a pipe. A press on empty ground changes nothing, which is deliberate: the card closes with its own ×.
 11. Zoom out to the whole square with `−`, then in again with `+`. **The before-rain markers must still be drawn at the smallest zoom.**
 12. Drag the map. The address pin may leave the screen; the view must not snap back.
 
@@ -255,7 +255,7 @@ So recovery is tested from the browser, not from the database:
 | --- | --- |
 | Block `drainlens-api` in DevTools, Network, then reload the map | The map still draws, from the copies in the site's own container. The footer says which source answered |
 | Reload the page with a plan half answered | The answers are gone. **This is AC 5.4.1 working, not a defect:** selections are kept for the session only and never reach a server |
-| Reload after finishing a guide | The guide is still marked done. `drainlens.learned` holds six `0`/`1` characters in local storage and nothing else |
+| Reload after finishing a guide | The guide is still marked done. `drainlens.learned` holds six `0`/`1` characters, one per guide, and `drainlens.tour.seen` holds `1` once the map tour has been seen. Those two keys are the whole of local storage |
 | Clear site data, reload | Everything resets to a first visit |
 | Open DevTools, Application, Storage, with an address chosen | **No address anywhere**: not in local storage, not in session storage, not in the URL, not in history state, not in any request |
 
