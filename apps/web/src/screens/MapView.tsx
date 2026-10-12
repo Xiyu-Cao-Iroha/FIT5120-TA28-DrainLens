@@ -83,7 +83,7 @@ import {
   placesNear,
 } from '../prepare/places.js';
 import { LAYER } from '../ui/terms.js';
-import { type NamedDrain, streetDrains } from '../drains/nearby.js';
+import { DRAIN_RADIUS_M, type NamedDrain, streetDrains } from '../drains/nearby.js';
 import {
   DRAIN_BLOCKED_QUESTION,
   DRAIN_SOURCE,
@@ -107,7 +107,14 @@ import {
   useDrains,
 } from '../report/place.js';
 import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
-import { CARD_WIDTH, DrainageArea, MapNote, MapNoteStack, WhoCanHelpLevels } from './DrainageArea.js';
+import {
+  CARD_WIDTH,
+  DrainageArea,
+  GUIDE_CARD_WIDTH,
+  MapNote,
+  MapNoteStack,
+  WhoCanHelpLevels,
+} from './DrainageArea.js';
 import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
@@ -595,20 +602,22 @@ export function MapView({
   /*
     The before-rain layer opens something, always (change list, item 11).
 
-    Reported from the guide: step two says *decide whether Place 1 applies to
-    you* over a map with nothing open on it, and the reader has to work out
-    that the thing to press is a small warning triangle somewhere among the
-    streets. The design opens the first place's card for them, so the step is
-    about the decision rather than about finding the control.
+    The reason is that it used to open nothing: numbered triangles appeared
+    among the streets and the reader had to work out that one of them was
+    the thing to press. Silence also looks like a layer that did not load.
 
-    Where there are no places it opens the address card instead, which is
-    where the *none near this address* sentence is. An address with nothing to
-    check is a result and has to look like one; silence looks like a layer
-    that did not load.
+    **What it opens is the address card, and only that** (11 October). It
+    opened the first place's card where there were places, and the address
+    card where there were none, so a reader who searched an address with the
+    layer on got both at once, overlapping. The address card is the right
+    one either way: with nothing near the address it carries the *none near
+    this address* sentence (Figma A8), and with places near it, it carries
+    *Check before heavy rain (3)*, which is the press the plan and Place 1
+    belong to.
 
-    Once per address and per switch-on: `opened` is the key it has already
-    done, so a reader who closes the card is not handed it again on the next
-    render.
+    Once per address and per switch-on: `openedFor` is the key it has
+    already done, so a reader who closes the card is not handed it again on
+    the next render.
   */
   const openedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -627,14 +636,15 @@ export function MapView({
     if (openedFor.current === key) return;
     openedFor.current = key;
     /*
-      Nothing near the address: the address card is the answer (Figma A8), so
-      it is opened rather than left for the reader to find the pin.
+      The address card, whatever the count.
+
+      With nothing near the address it is the answer (Figma A8). With places
+      near it, it is the thing that *has* the way in: *Check before heavy
+      rain (3)*. It used to open Place 1 here instead, and the two cards
+      then sat on the map at once -- reported on 11 October with a
+      screenshot of one over the other.
     */
-    if (places.length === 0) {
-      setAddressCardOpen(true);
-      return;
-    }
-    setOpenPlace((current) => current ?? places[0]?.number ?? null);
+    setAddressCardOpen(true);
   }, [guided, layers.beforeRain, address, places]);
 
   /*
@@ -699,46 +709,63 @@ export function MapView({
   */
   const placesFit = useMemo((): MapCanvasProps['fit'] => {
     if (!layers.beforeRain || address === null) return null;
-    const here: Local = [address.eastingM, address.northingM];
+    /*
+      The box the ring sits in, which is the box everything this view is
+      about sits in.
+
+      **It fitted the places themselves until 12 October**, which put every
+      sign on screen as large as the frame allowed and left the 200 m the
+      panel keeps talking about mostly outside it. Now that the ring is
+      drawn (item 7, `NEAR_RING`), a view that cuts it in half is a view of
+      an arc going nowhere, and the design draws the whole circle with room
+      around it (Figma S1).
+
+      Fitting the box still puts every place on screen -- they are all
+      within `PLACE_RADIUS_M` by definition, which is what the box is -- so
+      nothing the place fit guaranteed is given up. The signs do not shrink
+      with it: `drawWarnings` draws them at a fixed pixel size, and
+      `warningsVisible` stopped holding them to a zoom floor at the same
+      time, which together were the 9 and 10 October fix for *press before
+      rain check and nothing happens*.
+    */
     const r = PLACE_RADIUS_M;
-    const points: readonly Local[] =
-      places.length === 0
-        ? [
-            [address.eastingM - r, address.northingM - r],
-            [address.eastingM + r, address.northingM + r],
-          ]
-        : [here, ...places.map((place) => place.at)];
+    const points: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
     return { key: `places:${address.label}:${String(checksOpened)}`, points, reservePanel: false };
-  }, [layers.beforeRain, address, places, checksOpened]);
+  }, [layers.beforeRain, address, checksOpened]);
 
   /*
-    The first place's card, opened when the reader turns the checks on
-    (team, 10 October).
+    A card when the reader turns the checks on (team, 10 October), and it is
+    the address card.
 
     *And a popup*, in their words. Turning the checks on is asking what to
     check, and a map of numbered triangles answers that only for somebody who
-    already knows to press one. The first is the nearest, which `placesNear`
-    orders them by.
+    already knows to press one.
 
-    **On the press, not on the state, and not inside a guide.** Both
+    **It put up Place 1 until 11 October, and that was the wrong card.** The
+    report came with a screenshot: the address card and Place 1 open
+    together, overlapping, neither of them asked for. The order the team
+    wants is the one the screens are built for -- the address card, then
+    *Check before heavy rain*, and the plan and Place 1 on that press -- so
+    this opens the card that carries the button and the press does the rest.
+
+    **On the change, not on the state, and not inside a guide.** Both
     qualifications were found by driving it. Epic 5's guide opens with this
     layer already on (`opensWith`) and its first step is *Click Check before
-    heavy rain*, whose hint is *Place 1 opens straight away*: an effect
-    reading the state rather than the change put Place 1 up before the
-    reader had pressed anything, and the step then asked them to do a thing
-    that appeared already done. Inside a guide the cards are the guide's to
-    open.
-
-    With no places there is nothing to put up, and the street drains panel
-    opens there instead.
+    heavy rain*: an effect reading the state rather than the change put a
+    card up before the reader had pressed anything, and the step then asked
+    them to do a thing that appeared already done. Inside a guide the cards
+    are the guide's to open.
   */
   const checksWere = useRef(beforeRainOn);
   useEffect(() => {
     const turnedOn = beforeRainOn && !checksWere.current;
     checksWere.current = beforeRainOn;
     if (!turnedOn || guided) return;
-    setOpenPlace((was) => was ?? places[0]?.number ?? null);
-  }, [beforeRainOn, guided, places]);
+    setAddressCardOpen(true);
+  }, [beforeRainOn, guided]);
 
   /*
     The plan and an open place card are no longer exclusive.
@@ -883,6 +910,37 @@ export function MapView({
   const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
 
   /*
+    How far *near this address* reaches, for the two views that are about a
+    radius (team, 11 October, item 7).
+
+    Both say it in words already -- *within 200 m of 46 Gatehouse Drive*, and
+    *No places to check were found within 200 m of this address* -- and
+    neither drew it, so the reader could see eleven markers and not what had
+    been counted. Figma S1 draws the ring; `NEAR_RING` in `draw.ts` draws it
+    here.
+
+    The two constants are the same number and are still read separately: one
+    is how far the places were looked for, the other how far the drains were,
+    and a ring drawn from the wrong one would be a line in the wrong place
+    the day they stop agreeing.
+
+    Not while the map is being used as an input: a press during picking
+    answers a question about one drain, and a ring around the address is
+    about something else.
+  */
+  /** A guide's map is small, so its cards are narrower. See `GUIDE_CARD_WIDTH`. */
+  const noteWidth = guided ? GUIDE_CARD_WIDTH : CARD_WIDTH;
+
+  const nearRadiusM =
+    address === null || picking !== null
+      ? null
+      : drainsOpen
+        ? DRAIN_RADIUS_M
+        : layers.beforeRain
+          ? PLACE_RADIUS_M
+          : null;
+
+  /*
     The box a callout may not leave.
 
     The sidebar is drawn over the canvas rather than beside it -- the map is
@@ -963,6 +1021,7 @@ export function MapView({
       */
       onCheckDrains={openDrains}
       pulseDrains={pulsePress === 'drains'}
+      pulseWhy={pulsePress === 'why'}
       {...(guided
         ? {}
         : {
@@ -1232,6 +1291,7 @@ export function MapView({
         showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
         showPipes={picking === null && layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
+        nearRadiusM={nearRadiusM}
         trace={followed}
         catchment={layers.catchment ? catchmentRings : null}
         warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
@@ -1615,28 +1675,25 @@ export function MapView({
                 onClear={onClearAddress}
               />
             )}
-            <LayerChips
-              collapsible={!guided && !touring}
-              fold={anySidebarOpen}
-              state={layers}
-              onToggle={toggle}
-              unavailableKeys={notYet}
-              layersButton={layersButton}
-              pulse={pulseChip}
-              pulseLayers={highlight === 'layers'}
-              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
-              onPanelChange={panelChanged}
-              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
-            />
-
             {/*
-              Epic 6's guide opens the reporting pathway from here (Figma D1
-              to D3), where the other guides put the layer they teach. It is
-              not a layer, so it is not in `LayerChips` and not in
-              `CHIP_KEYS`; it exists only while a lesson's steps ask for the
-              report, which `usesReport` decides.
+              The way into the reporting pathway, as a chip (Figma D1).
+
+              It is not a layer, so it is not in `LayerChips` and not in
+              `CHIP_KEYS`. Epic 6's guide has opened the pathway from here
+              since the guide was built, and the other guides hide it
+              because a card taller than the guide's frame over a step about
+              something else teaches nothing -- `usesReport` says which
+              lesson is the exception.
+
+              **The full map has it too, from 12 October.** Reporting was
+              reachable there only from inside the *Recorded subcatchment
+              area* card, which is a card about who looks after the pipes:
+              somebody who had come to report a blocked grate had to turn on
+              a boundary layer to find the button. The team's item 3 of
+              11 October is that chip, on the main map, drawn the way the
+              design draws it.
             */}
-            {guided && reportInGuide && (
+            {(guided ? reportInGuide : true) && (
               <PlainChip
                 label={SPOT_A_PROBLEM_CHIP}
                 /*
@@ -1658,6 +1715,20 @@ export function MapView({
                 }}
               />
             )}
+            <LayerChips
+              collapsible={!guided && !touring}
+              fold={anySidebarOpen}
+              state={layers}
+              onToggle={toggle}
+              unavailableKeys={notYet}
+              layersButton={layersButton}
+              pulse={pulseChip}
+              pulseLayers={highlight === 'layers'}
+              pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
+              onPanelChange={panelChanged}
+              {...(chipKeys === undefined ? {} : { keys: chipKeys })}
+            />
+
           </div>
 
           {/*
@@ -2000,13 +2071,27 @@ export function MapView({
           </MapNote>
         )}
 
+        {/*
+          The plan and the drains list, where the window has no room for a
+          sidebar -- which a guide's map frame never has.
+
+          `fill` keeps the heading and scrolls the body: the column scrolls
+          otherwise, and the first thing out of it is the heading, clipped a
+          few pixels under the layer chip above. `noteWidth` is narrower
+          inside a guide so the card stops short of the address pin the map
+          is centred on. Both reported on 11 October, items 5 and 6.
+        */}
         {planInCard && (
-          <MapNote title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+          <MapNote fill width={noteWidth} title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
             {askOpen ? askPanel : planPanel}
           </MapNote>
         )}
 
-        {drainsInCard && <MapNote title={STREET_DRAINS_HEADING}>{drainsList}</MapNote>}
+        {drainsInCard && (
+          <MapNote fill width={noteWidth} title={STREET_DRAINS_HEADING}>
+            {drainsList}
+          </MapNote>
+        )}
 
         {panel && viewport !== null && layers.catchment && !reportOpen && (
           <MapNote title={DRAINAGE_AREA}>

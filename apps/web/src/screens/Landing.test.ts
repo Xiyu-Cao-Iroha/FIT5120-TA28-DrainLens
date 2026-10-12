@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { COMPARE_COPY, EXPLORE_COPY, landingCopyFor } from './Landing.js';
+import { ADDRESS_STAYS_HERE, COMPARE_COPY, EXPLORE_COPY, landingCopyFor } from './Landing.js';
 import { INITIAL_SESSION, reduce } from '../session.js';
 
 describe('the address screen’s words', () => {
@@ -69,5 +69,47 @@ describe('the address screen’s words', () => {
     expect(landingCopyFor(chosen.pendingTask, chosen.guideSection).lead).toBe(
       'Enter it once. The Get ready for heavy rain guide starts next.',
     );
+  });
+});
+
+/**
+ * The line under the search box, which nothing pinned while it went stale.
+ *
+ * It promised *Your address stays in this browser only* for three weeks after
+ * a submitted search moved to `POST /api/addresses/search` on 9 October --
+ * `DECISIONS-PENDING.md` §14. The privacy panel was rewritten that day
+ * and this line was missed, and the reason it could be missed is that no test
+ * had an opinion about it. This is that opinion: the withdrawn claim cannot
+ * come back by itself, and the part that was never in question stays.
+ */
+describe('what the address screen promises about the address', () => {
+  it('does not claim the search stays in the browser', () => {
+    for (const withdrawn of [
+      /in this browser/i,
+      /in your browser/i,
+      /browser only/i,
+      /never leaves/i,
+      /(is |are )?not sent/i,
+      /on this device/i,
+    ]) {
+      expect(ADDRESS_STAYS_HERE).not.toMatch(withdrawn);
+    }
+  });
+
+  it('says where the address goes and that nothing is kept', () => {
+    // The privacy panel's claim in fewer words; `ui/sources.ts` has the whole
+    // of it. Going silent about the server was the thing not to do here.
+    expect(ADDRESS_STAYS_HERE).toMatch(/searched by DrainLens/);
+    expect(ADDRESS_STAYS_HERE).toMatch(/is not kept/);
+  });
+
+  it('keeps the clause that was never in question', () => {
+    expect(ADDRESS_STAYS_HERE).toContain('You can change it at any time.');
+  });
+
+  it('stays short enough for a line under a search field', () => {
+    // Two sentences. The panel is where a longer version belongs.
+    expect(ADDRESS_STAYS_HERE.split('. ').length).toBe(2);
+    expect(ADDRESS_STAYS_HERE.length).toBeLessThan(100);
   });
 });

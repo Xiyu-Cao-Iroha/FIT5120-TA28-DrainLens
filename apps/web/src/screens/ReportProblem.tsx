@@ -19,6 +19,7 @@
 import { useState } from 'react';
 
 import { plainButton } from '../ui/controls.js';
+import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
 import { printDocument } from '../prepare/printing.js';
 import { type Channel } from '../report/channels.js';
 import {
@@ -88,12 +89,15 @@ export function ReportProblem({
   readonly onForgetPlace?: (() => void) | undefined;
 }) {
   const [copied, setCopied] = useState(false);
+  const ringRef = useRingIntoView<HTMLUListElement>(pulse);
 
   if (chosen === null) {
     return (
       <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>{CHOOSE_PROBLEM}</p>
         <ul
+          ref={ringRef}
+          className={ringClass(pulse)}
           style={{
             margin: 0,
             listStyle: 'none',
@@ -101,8 +105,6 @@ export function ReportProblem({
             // because any of the five satisfies the step.
             padding: pulse ? space(2) : 0,
             borderRadius: radius.base,
-            border: pulse ? `2px solid ${brand.base}` : '2px solid transparent',
-            background: pulse ? brand.wash : 'transparent',
           }}
         >
           {PROBLEM_TYPES.map((problem) => (

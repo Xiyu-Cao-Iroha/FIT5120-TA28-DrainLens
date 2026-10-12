@@ -60,15 +60,21 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     target: 'address',
     /*
-      **The second sentence is gone, and it was true.** It said the search runs
-      in the browser and that nothing about the address is sent anywhere. The
-      address screen says it where an address is actually typed, and the
-      homepage says it again under *Find a street*; here it was the longer half
-      of a coach mark that exists to point at a search box.
+      **The second sentence is gone, and cutting it turned out to be the
+      cheapest of the three copies.** It said the search runs in the browser
+      and that nothing about the address is sent anywhere — one promise written
+      down in three places: here, the address screen where an address is
+      actually typed, and the privacy panel in About the data. Here it was the
+      longer half of a coach mark that exists to point at a search box.
 
       A promise repeated in three places is not three times as trusted. It is
-      three copies to keep true, and the two that remain are the ones a person
-      is reading at the moment it matters.
+      three copies to keep true — and on 9 October the first clause stopped
+      being true, when a submitted search moved to
+      `POST /api/addresses/search`. The panel was rewritten that day; the
+      address screen's line was missed and corrected on 11 October
+      (`ADDRESS_STAYS_HERE` in `screens/Landing.tsx`); this copy had been
+      deleted already, and cost nothing to retract.
+      `DECISIONS-PENDING.md` §14 has the decision.
     */
     body: 'Search for an address, then select a result.',
   },

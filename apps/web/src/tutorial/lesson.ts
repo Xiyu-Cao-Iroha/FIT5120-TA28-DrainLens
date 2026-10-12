@@ -418,7 +418,7 @@ export interface Lesson {
  *
  * Null for every step that waits on a chip, or on nothing a reader presses.
  */
-export type Press = 'report' | 'problem' | 'drains';
+export type Press = 'report' | 'problem' | 'drains' | 'why';
 
 export function pressFor(requires: Requirement): Press | null {
   switch (requires) {
@@ -426,6 +426,15 @@ export function pressFor(requires: Requirement): Press | null {
       return 'report';
     case 'problem-chosen':
       return 'problem';
+    /*
+      The fold under the reminder (Figma G4).
+
+      It had nothing: step four said *Open Why this place?* beside a small
+      triangle among the reminder's own three lines, which is the 9 October
+      report in a second place and the team's item 2 of 11 October.
+    */
+    case 'why-opened':
+      return 'why';
     // Figma G6 rings it too, and the plan it sits in scrolls: the button is
     // under the places, the general actions and a heading.
     case 'drains-opened':

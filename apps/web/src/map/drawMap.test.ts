@@ -71,6 +71,7 @@ function recorder() {
     fillText: note('fillText'),
     strokeText: note('strokeText'),
     rotate: note('rotate'),
+    setLineDash: note('setLineDash'),
     measureText: (text: string) => ({ width: text.length * 6 }),
   };
   return context as typeof context & CanvasRenderingContext2D;
@@ -540,5 +541,58 @@ describe('the pits while the comparison asks for a drain', () => {
     drawMap(context, THREE, view(), { comparablePits: new Set(['222']) });
     expect(arcsAt(context, 400)).toHaveLength(1);
     expect(arcsAt(context, 500)).toHaveLength(2);
+  });
+});
+
+/**
+ * The ring that says how far *near this address* reached (Figma S1).
+ *
+ * What can go wrong is where it sits in the order and how big it is. Drawn
+ * over the drains it is about, it hides them behind a translucent disc; drawn
+ * at the wrong radius it is a confident line in the wrong place, which is
+ * worse than no line at all, because the panel beside it says *within 200 m*
+ * and a reader would believe the map over the sentence.
+ */
+describe('the ring around the address', () => {
+  const HERE: readonly [number, number] = [500, 500];
+
+  it('draws nothing unless it is asked for', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { address: [...HERE] });
+    expect(context.calls.some((call) => call.op === 'setLineDash')).toBe(false);
+  });
+
+  it('is a dashed circle at the radius it was given, in pixels', () => {
+    const context = recorder();
+    const viewport = view();
+    drawMap(context, FULL, viewport, { near: { at: [...HERE], radiusM: 200 } });
+
+    const dashed = context.calls.findIndex((call) => call.op === 'setLineDash');
+    expect(dashed).toBeGreaterThan(-1);
+    // The arc just before it is the ring: centred on the point, and as many
+    // pixels across as the viewport makes 200 metres.
+    const arc = context.calls.slice(0, dashed).reverse().find((call) => call.op === 'arc');
+    const [x, y] = toScreen(viewport, [...HERE]);
+    expect(arc?.args[0]).toBeCloseTo(x, 6);
+    expect(arc?.args[1]).toBeCloseTo(y, 6);
+    expect(arc?.args[2]).toBeCloseTo(200 * viewport.scale, 6);
+  });
+
+  it('goes under the network, so the drains it is about stay on top of it', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { near: { at: [...HERE], radiusM: 200 } });
+
+    const ring = context.calls.findIndex((call) => call.op === 'setLineDash');
+    const ground = context.calls.findIndex((call) => call.op === 'fillRect');
+    // The last `arc` is the pit, which is drawn after the pipes.
+    const pit = context.calls.map((call) => call.op).lastIndexOf('arc');
+    expect(ring).toBeGreaterThan(ground);
+    expect(ring).toBeLessThan(pit);
+  });
+
+  it('draws nothing at all at a radius of nothing', () => {
+    const context = recorder();
+    drawMap(context, FULL, view(), { near: { at: [...HERE], radiusM: 0 } });
+    expect(context.calls.some((call) => call.op === 'setLineDash')).toBe(false);
   });
 });

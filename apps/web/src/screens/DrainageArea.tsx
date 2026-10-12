@@ -47,6 +47,7 @@ import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchmen
 import { WHY_ORGANISATIONS } from '../catchment/wording.js';
 import { REPORT_HEADING } from '../report/problems.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
+import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /**
@@ -104,6 +105,7 @@ export function DrainageArea({
   const [moreOpen, setMoreOpen] = useState(false);
   const rolesId = useId();
   const [rolesOpen, setRolesOpen] = useState(false);
+  const reportRing = useRingIntoView<HTMLButtonElement>(pulseReport);
 
   const back =
     onBack === undefined ? null : (
@@ -252,6 +254,8 @@ export function DrainageArea({
       {onReport !== undefined && (
         <button
           type="button"
+          ref={reportRing}
+          className={ringClass(pulseReport)}
           onClick={onReport}
           style={{
             display: 'block',
@@ -259,16 +263,14 @@ export function DrainageArea({
             marginBottom: space(3),
             borderRadius: radius.base,
             /*
-              Two pixels of brand edge while a step is waiting on it, which
-              is what the layer chips do and what this had no equivalent of.
-              The extra pixel comes out of the padding, so the button is the
-              same size either way and the card below it does not shift.
+              The ring while a step waits on it is the amber one the map
+              chips use (`ui/GuideRing.tsx`). It was two pixels of brand
+              green, which on a card already edged in green said *button*
+              rather than *press this now* (team, 11 October).
             */
-            border: pulseReport
-              ? `2px solid ${brand.base}`
-              : `1px solid ${line.strong}`,
-            padding: pulseReport ? `${String(space(3) - 1)}px` : space(3),
-            background: pulseReport ? brand.wash : surface.raised,
+            border: `1px solid ${line.strong}`,
+            padding: space(3),
+            background: surface.raised,
             color: ink.strong,
             font: type(text.label, { weight: weight.semibold }),
             cursor: 'pointer',
@@ -410,19 +412,52 @@ export const openLinkStyle = {
 /** How wide a corner card is. The map reads it to know what they cover. */
 export const CARD_WIDTH = 300;
 
-export function MapNote({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+/**
+ * And how wide it is inside a guide, where the map is a small frame.
+ *
+ * A guide's map is about 555 pixels across; a 300-wide card takes 57% of it
+ * and the address pin, which the map centres, ends up behind the card's
+ * right-hand edge. Reported on 11 October: *目前默认遮盖住地图中间部分了*, and
+ * with it that the last step has to show the address. At 248 the card ends
+ * clear of the centre, which is where the pin is.
+ */
+export const GUIDE_CARD_WIDTH = 248;
+
+export function MapNote({
+  title,
+  children,
+  fill = false,
+  width = CARD_WIDTH,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+  /**
+   * Scroll the body and keep the heading, for a card taller than the map.
+   *
+   * Without it the whole card scrolls inside the column, and the first
+   * thing to go is the heading -- which on a guide's map is clipped a few
+   * pixels under the layer chip above it, so the two read as one widget
+   * sitting on top of the other (reported 11 October, item 5). The heading
+   * says what the card is; it is the last thing that should scroll away.
+   */
+  readonly fill?: boolean;
+  readonly width?: number;
+}) {
   return (
     <section
       aria-label={title}
       style={{
         pointerEvents: 'auto',
-        width: CARD_WIDTH,
+        width,
         maxWidth: '100%',
         padding: space(3),
         background: surface.raised,
         border: `1px solid ${line.base}`,
         borderRadius: radius.base,
         boxShadow: '0 6px 20px rgba(16, 32, 40, 0.10)',
+        // `minHeight: 0` is what lets it shrink inside the column, which is
+        // what makes the body the thing that scrolls rather than the card.
+        ...(fill ? { display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' } : {}),
       }}
     >
       <h2
@@ -430,11 +465,16 @@ export function MapNote({ title, children }: { readonly title: string; readonly 
           margin: `0 0 ${String(space(2))}px`,
           font: type(text.label, { weight: weight.semibold }),
           color: ink.strong,
+          flexShrink: 0,
         }}
       >
         {title}
       </h2>
-      {children}
+      {fill ? (
+        <div style={{ minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>{children}</div>
+      ) : (
+        children
+      )}
     </section>
   );
 }

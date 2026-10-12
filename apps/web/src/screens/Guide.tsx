@@ -642,6 +642,7 @@ function Coach({
               <Done
                 copy={finishedCopy}
                 onFinish={onFinish}
+                onPrevious={onPrevious}
                 {...(noPipeShown ? { note: NO_PIPE_NOTE } : {})}
                 next={nextGuide(section, learned, guided)}
                 learned={learned}
@@ -1075,6 +1076,7 @@ function GuideEnd({
 function Done({
   copy,
   onFinish,
+  onPrevious,
   note,
   next,
   learned,
@@ -1084,6 +1086,8 @@ function Done({
 }: {
   readonly copy: Finished;
   readonly onFinish: () => void;
+  /** Back to the last step, which every finish page now has (team, 11 October). */
+  readonly onPrevious: () => void;
   readonly note?: string;
   readonly next: SectionId | null;
   readonly learned: Learned;
@@ -1091,6 +1095,12 @@ function Done({
   readonly onStartSection: (section: SectionId) => void;
   readonly onFullMap: () => void;
 }) {
+  const back = (
+    <button type="button" onClick={onPrevious} style={secondary}>
+      ← Previous
+    </button>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(4) }}>
       <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
@@ -1117,10 +1127,25 @@ function Done({
       >
         {copy.unlocked}
       </div>
-      {next !== null && <NextGuide id={next} onStart={onStartSection} />}
-      <button type="button" onClick={onFinish} style={primary}>
-        Back to guidance page →
-      </button>
+      {next !== null && <NextGuide id={next} onStart={onStartSection} back={back} />}
+      {/*
+        With no next guide there is no card to carry the way back, so it
+        goes here, on the left of the way out, in the same order.
+      */}
+      <div
+        style={{
+          display: 'flex',
+          gap: space(3),
+          alignItems: 'center',
+          justifyContent: next === null ? 'space-between' : 'flex-start',
+          flexWrap: 'wrap',
+        }}
+      >
+        {next === null && back}
+        <button type="button" onClick={onFinish} style={{ ...primary, alignSelf: 'auto' }}>
+          Back to guidance page →
+        </button>
+      </div>
       <ExploreFullMap learned={learned} guided={guided} onOpen={onFullMap} />
     </div>
   );

@@ -50,7 +50,7 @@ import {
   type SupportedAddress,
   reduce,
 } from './session.js';
-import { Shell } from './ui/Shell.js';
+import { Shell, type ShellProps } from './ui/Shell.js';
 import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
@@ -138,11 +138,13 @@ async function load(): Promise<Loaded> {
       onFallback: note,
     }),
     // **Never from a server, and not routed through `fetchArtefact` so that no
-    // later edit there can change that.** The landing page tells a resident the
-    // search runs in their browser and that nothing about the address is sent
-    // anywhere; an address index fetched from an API would still keep that
-    // promise, and an index fetched *per query* would not. Bundled is the shape
-    // that cannot drift into the second.
+    // later edit there can change that.** The reason is no longer a sentence on
+    // the landing page: that promise was withdrawn on 9 October, when a
+    // submitted search moved to `POST /api/addresses/search`. What survived it
+    // is the red line in `packages/address` -- suggestions are ranked over this
+    // index on every keystroke, and an index fetched *per query* would send a
+    // home address to a server one letter at a time. Bundled is the shape that
+    // cannot drift into that. `DECISIONS-PENDING.md` §14.
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
@@ -287,16 +289,16 @@ export function App() {
 
   if (problem !== null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <p style={{ padding: 24 }}>{problem}</p>
-      </Shell>
+      </AppShell>
     );
   }
   if (loaded === null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <Spinner label="Loading the map…" />
-      </Shell>
+      </AppShell>
     );
   }
 
@@ -335,7 +337,8 @@ export function App() {
   switch (session.screen) {
     case 'home':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -386,7 +389,7 @@ export function App() {
               dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'flood-map': {
@@ -394,7 +397,8 @@ export function App() {
         dispatch({ type: 'back' });
       };
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={
             areas.data === null
@@ -441,13 +445,14 @@ export function App() {
               onBack={back}
             />
           )}
-        </Shell>
+        </AppShell>
       );
     }
 
     case 'history':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={creditsForSources([
             loaded.history.source,
@@ -484,14 +489,18 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'address':
     case 'unsupported':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName}>
+        <AppShell
+          dispatch={dispatch}
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+        >
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
@@ -521,12 +530,13 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'choose':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -561,12 +571,13 @@ export function App() {
               dispatch({ type: 'back' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'locked':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -600,12 +611,13 @@ export function App() {
               dispatch({ type: 'leave-map' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'guide':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -648,6 +660,21 @@ export function App() {
         >
           {session.address === null || session.guideSection === null ? null : (
             <Guide
+              /*
+                A new guide starts from nothing.
+
+                Without this key, starting the next guide from the end of
+                one keeps everything the last one left behind: the layers
+                it turned on, the panel it opened, the steps already
+                acknowledged. Pressing *Start next guide* at the end of the
+                heavy rain guide opened Recorded drainage at *3 of 6*, with
+                the drains list still over the map and the first two steps
+                already satisfied, which the team reported on 11 October as
+                the guide being in a 割裂 state. A guide reads the map to
+                decide where the reader is, so the map has to be a map this
+                guide has not already been driven across.
+              */
+              key={session.guideSection}
               map={loaded.map}
               derived={loaded.derived}
               trace={loaded.trace}
@@ -682,12 +709,13 @@ export function App() {
               }}
             />
           )}
-        </Shell>
+        </AppShell>
       );
 
     case 'task':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -710,7 +738,7 @@ export function App() {
             onChoose={(task) => dispatch({ type: 'task-chosen', task })}
             onChangeAddress={() => dispatch({ type: 'change-address' })}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'drain':
@@ -923,7 +951,8 @@ export function App() {
       );
 
       const shell = (children: React.ReactNode) => (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -942,7 +971,7 @@ export function App() {
           crumbs={crumbs}
         >
           {children}
-        </Shell>
+        </AppShell>
       );
 
       const fullMap = () => {
@@ -1111,7 +1140,8 @@ function MapScreen({
   }, []);
 
   return (
-    <Shell
+    <AppShell
+      dispatch={dispatch}
       at={session.screen}
       credits={credits}
           extentName={loaded.extentName}
@@ -1210,7 +1240,7 @@ function MapScreen({
           }}
         />
       )}
-    </Shell>
+    </AppShell>
   );
 }
 
@@ -1366,6 +1396,31 @@ export interface SiteNavProps {
  * breadcrumb row's contents and that row is the landmark. Everywhere else
  * `SiteNav` wraps these in one.
  */
+/**
+ * Every `Shell` on this screen, with the way home already in it.
+ *
+ * The team asked for the masthead's logo to go home from anywhere
+ * (11 October). There are a dozen `Shell`s in this file and a thirteenth is
+ * one feature away, so the handler is injected once here rather than passed
+ * at each of them: a screen cannot be given a logo that does nothing by
+ * somebody forgetting a prop.
+ *
+ * `go-home` is the same event the *Home page* link dispatches.
+ */
+function AppShell({
+  dispatch,
+  ...rest
+}: ShellProps & { readonly dispatch: (event: SessionEvent) => void }) {
+  return (
+    <Shell
+      {...rest}
+      onHome={() => {
+        dispatch({ type: 'go-home' });
+      }}
+    />
+  );
+}
+
 function SiteNavItems({
   current,
   onOpenHome,
