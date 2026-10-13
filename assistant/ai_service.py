@@ -53,7 +53,7 @@ EMERGENCY_TERMS = [
     "water is coming into my home",
     "water coming into my home",
     "floodwater coming into my house",
-    "floodwater coming into my home",    
+    "floodwater coming into my home",
 ]
 
 OUT_OF_SCOPE_TERMS = [
@@ -133,8 +133,10 @@ def is_prediction_question(question):
         for pattern in prediction_patterns
     )
 
+
+
 def is_current_warning_question(question):
-    q = question.lower()
+    q = question.lower().strip()
 
     warning_terms = [
         "current flood warnings",
@@ -144,12 +146,16 @@ def is_current_warning_question(question):
         "where can i check current flood warnings",
         "official flood warnings",
         "vicemergency warnings",
+        "flood alerts",
+        "flood alert",
+        "active flood warnings",
+        "active flood alerts",
     ]
 
     return any(term in q for term in warning_terms)
 
 
-    
+
 def get_prediction_subject(question):
     q = question.lower()
 
@@ -167,7 +173,27 @@ def get_prediction_subject(question):
 # Check whether the user's question contains an emergency phrase
 def is_emergency(question):
     q = question.lower().strip()
+        # A question about current alerts is not itself an emergency.
+    # Keep genuine danger and requests for emergency help prioritised.
+    asking_about_alerts = bool(
+        re.search(r"\b(?:flood|storm)\s+(?:alerts?|warnings?)\b", q)
+    )
 
+
+    immediate_danger = bool(
+        re.search(
+            r"\b(?:trapped|stuck|stranded|cannot get out|can't get out|"
+            r"water is rising|water is entering|water is coming into|"
+            r"emergency assistance|"
+            r"(?:my|our)\s+(?:house|home|property)\s+is\s+flooding|"
+            r"flood(?:ing|water)?\s+(?:right now|currently))\b",
+            q,
+        )
+    )
+
+
+    if asking_about_alerts and not immediate_danger:
+        return False
     # Explicit requests for flood/storm emergency assistance
     # should not be suppressed by "no immediate danger".
     if re.search(
@@ -208,6 +234,9 @@ def is_emergency(question):
     additional_emergency_patterns = [
         r"\b(?:flood|storm)\b.{0,60}\bemergency assistance\b|(?:flood|storm) emergency assistance|flood and storm emergency assistance",
         r"\b(?:switchboard|electrical panel)\b.{0,80}\b(?:safe|safety)\b",
+
+        # Questions about touching or using flooded electrical equipment.
+        r"\b(?:touch|operate|use|handle)\b.{0,100}\b(?:switchboard|electrical panel|electrical equipment)\b.{0,100}\b(?:flooded|floodwater|water)\b",
     ]
 
     if any(re.search(pattern, q) for pattern in additional_emergency_patterns):
@@ -327,7 +356,7 @@ Document text:
         )
 
     return "\n\n".join(sections)
-    
+
 # Send the user's question and retrieved evidence to local Llama 3.2
 def generate_answer(question, documents):
     context = build_context(documents)
@@ -345,10 +374,19 @@ Rules:
 - Give clear and practical guidance.
 - Answer the user's question directly.
 - Answer only the specific question that was asked.
+- Start directly with the answer or first actionable point.
+- Do not add introductory sentences such as "Here are some steps" or "Here's what you should know".
+- Do not add a heading before a bullet list unless the user explicitly requests one.
 - Use the retrieved documents only as evidence to generate the answer.
 - Do not invent information missing from the documents.
 - If the available guidance does not provide enough information to answer the overall question, say that the available official guidance does not provide that information.
 - Do not assume or guess the user's location.
+- For questions about returning home after flooding, prioritise
+  official clearance and current emergency guidance.
+- Never suggest that checking gutters, drains, or property maintenance
+  alone makes it safe to return home.
+- If retrieved documents do not establish when returning is safe,
+  say that the available guidance does not establish it.
 - Do not mention the supplied extracts, retrieved context, or whether a specific detail was found in the extracts.
 - If a detail is not clearly supported by the retrieved documents, leave it out.
 - Do not combine unsupported advice with supported advice.
@@ -468,7 +506,7 @@ advise calling VICSES on 132 500.
             answer = f"{intro}\n\n{bullet_text}"
         elif bullet_text:
             answer = bullet_text
-    
+
     # Belongings cleanup
     if "protect important belongings" in question.lower():
         lines = answer.splitlines()

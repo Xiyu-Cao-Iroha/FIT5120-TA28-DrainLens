@@ -1,7 +1,20 @@
 from fastapi.testclient import TestClient
-
+import pytest
 from assistant.api import app
+@pytest.fixture(autouse=True)
+def mock_ai06_grounding_for_existing_tests(request, monkeypatch):
+    if request.node.name == "test_ai06_rejects_unsupported_generated_answer":
+        return
 
+    monkeypatch.setattr(
+        "assistant.api.get_llm",
+        lambda: object(),
+    )
+
+    monkeypatch.setattr(
+        "assistant.api.validate_answer_against_chunks",
+        lambda documents, answer, llm: answer,
+    )
 
 client = TestClient(app)
 
@@ -855,3 +868,239 @@ def test_ai06_retrieval_distance_filter(distance, expected_count, monkeypatch):
     documents = ai_service.retrieve("How can I prepare for flooding?")
 
     assert len(documents) == expected_count
+
+
+# ==========================================
+# AI-05: Additional safety-routing tests
+# ==========================================
+
+@pytest.mark.parametrize("question", [
+    "Im traped upstairs and water is rising",
+    "Water is coming into my house and I cannot get out",
+])
+def test_ai05_additional_emergencies(question):
+    from assistant.ai_service import is_emergency
+
+    assert is_emergency(question)
+
+
+@pytest.mark.parametrize("question", [
+    "Any flood alerts around Melbourne right now?",
+    "Are there any active flood warnings near me?",
+])
+def test_ai05_current_warning_paraphrases(question):
+    from assistant.ai_service import is_current_warning_question
+
+    assert is_current_warning_question(question)
+
+
+@pytest.mark.parametrize("question", [
+    "Will my house flood in tomorrow's storm?",
+    "Is my property going to flood next weekend?",
+])
+def test_ai05_additional_predictions(question):
+    from assistant.ai_service import is_prediction_question
+
+    assert is_prediction_question(question)
+
+
+@pytest.mark.parametrize("question", [
+    "My street flooded last year.",
+    "Last year floodwater entered my home.",
+])
+def test_ai05_historical_questions(question):
+    from assistant.ai_service import is_emergency
+
+    assert not is_emergency(question)
+
+
+def test_ai05_flood_alert_bypasses_rag(monkeypatch):
+    def unexpected_retrieval(_question):
+        raise AssertionError("Flood alert reached RAG")
+
+    def unexpected_generation(_question, _documents):
+        raise AssertionError("Flood alert reached Llama")
+
+    monkeypatch.setattr("assistant.api.retrieve", unexpected_retrieval)
+    monkeypatch.setattr("assistant.api.generate_answer", unexpected_generation)
+
+    response = client.post(
+        "/chat",
+        json={"message": "Any flood alerts around Melbourne right now?"},
+    )
+
+    assert response.status_code == 200
+    assert "emergency.vic.gov.au" in response.json()["answer"]
+    assert response.json()["sources"] == []
+
+
+def test_ai05_real_emergency_with_alert_question(monkeypatch):
+    def unexpected_retrieval(_question):
+        raise AssertionError("Emergency reached RAG")
+
+    def unexpected_generation(_question, _documents):
+        raise AssertionError("Emergency reached Llama")
+
+    monkeypatch.setattr("assistant.api.retrieve", unexpected_retrieval)
+    monkeypatch.setattr("assistant.api.generate_answer", unexpected_generation)
+
+    response = client.post(
+        "/chat",
+        json={
+            "message": (
+                "My house is flooding right now. "
+                "Are there any flood alerts?"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert "132 500" in response.json()["answer"]
+    assert "000" in response.json()["answer"]
+    assert response.json()["sources"] == []
+
+def test_ai06_rejects_unsupported_generated_answer(monkeypatch):
+    from assistant import api
+    from assistant.grounding import GroundingError
+
+    monkeypatch.setattr(
+        api,
+        "retrieve",
+        lambda question: [
+            {
+                "text": "Move important belongings to higher ground.",
+                "metadata": {
+                    "title": "Flood preparation",
+                    "organisation": "VICSES",
+                    "page": 1,
+                },
+            }
+        ],
+    )
+
+    monkeypatch.setattr(
+        api,
+        "generate_answer",
+        lambda question, documents: (
+            "Paint your house blue to reduce flood damage."
+        ),
+    )
+
+    monkeypatch.setattr(api, "get_llm", lambda: object())
+
+    def reject_grounding(documents, answer, llm):
+        raise GroundingError("Unsupported claim")
+
+    monkeypatch.setattr(
+        api,
+        "validate_answer_against_chunks",
+        reject_grounding,
+    )
+
+    response = client.post(
+        "/chat",
+        json={"message": "How can I prepare my home for flooding?"},
+    )
+
+    assert response.status_code == 200
+    assert "couldn't verify" in response.json()["answer"].lower()
+    assert response.json()["sources"] == []
+
+def test_ai06_accepts_supported_generated_answer(monkeypatch):
+    from assistant import api
+
+    monkeypatch.setattr(
+        api,
+        "retrieve",
+        lambda question: [
+            {
+                "text": "Move important belongings to higher ground.",
+                "metadata": {
+                    "title": "Flood preparation",
+                    "organisation": "VICSES",
+                    "page": 1,
+                },
+            }
+        ],
+    )
+
+    monkeypatch.setattr(
+        api,
+        "generate_answer",
+        lambda question, documents: (
+            "Move important belongings to higher ground."
+        ),
+    )
+
+    monkeypatch.setattr(api, "get_llm", lambda: object())
+
+    def accept_grounding(documents, answer, llm):
+        assert any(
+            "Move important belongings" in doc["text"]
+            for doc in documents
+        )
+        return answer
+
+    monkeypatch.setattr(
+        api,
+        "validate_answer_against_chunks",
+        accept_grounding,
+    )
+
+    response = client.post(
+        "/chat",
+        json={"message": "How can I prepare my home for flooding?"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == (
+        "Move important belongings to higher ground."
+    )
+
+@pytest.mark.parametrize("question, expected", [
+    (
+        "I am trapped in my house because of flooding.",
+        "call Triple Zero (000) now",
+    ),
+    (
+        "Can I drive through floodwater if the road looks shallow?",
+        "Never drive through floodwater",
+    ),
+    (
+        "Water is around electrical equipment in my home.",
+        "Do not touch or operate electrical equipment",
+    ),
+    (
+        "Someone in my household is in immediate danger from flooding.",
+        "call Triple Zero (000) now",
+    ),
+])
+def test_ai11_specific_emergency_responses(question, expected):
+    response = client.post(
+        "/chat",
+        json={"message": question},
+    )
+
+    assert response.status_code == 200
+    assert expected.lower() in response.json()["answer"].lower()
+    assert response.json()["sources"] == []
+
+
+def test_ai11_flooded_switchboard_touch_warning():
+    response = client.post(
+        "/chat",
+        json={
+            "message": (
+                "Can I touch an electrical switchboard "
+                "after it has been flooded?"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+
+    answer = response.json()["answer"].lower()
+
+    assert "do not touch" in answer
+    assert "electrical" in answer
+    assert response.json()["sources"] == []

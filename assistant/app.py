@@ -1,5 +1,6 @@
 import streamlit as st
-
+from assistant.api import approved_source_url
+from html import escape
 from assistant.ai_service import (
     retrieve,
     generate_answer,
@@ -205,7 +206,7 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     if message["role"] == "user":
         st.markdown(
-            f'<div class="user-bubble">{message["content"]}</div>',
+            f'<div class="user-bubble">{escape(message["content"])}</div>',
             unsafe_allow_html=True,
         )
     else:
@@ -218,7 +219,7 @@ if question:
         "content": question
     })
     st.markdown(
-        f'<div class="user-bubble">{question}</div>',
+        f'<div class="user-bubble">{escape(question)}</div>',
         unsafe_allow_html=True,
     )
 
@@ -229,7 +230,7 @@ if question:
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": EMERGENCY_RESPONSE
-                })    
+                })
             elif is_out_of_scope(question):
                 answer = (
                     "The available DrainLens official guidance does not provide "
@@ -241,7 +242,7 @@ if question:
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": answer
-                })   
+                })
 
             elif is_prediction_question(question):
                 q = question.lower()
@@ -268,7 +269,7 @@ if question:
                 )
 
                 st.markdown(answer)
-                
+
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": answer
@@ -302,7 +303,7 @@ if question:
                         )
 
                         st.markdown(answer)
-                        
+
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": answer
@@ -351,18 +352,20 @@ if question:
                                 ""
                             )
 
-                            if url.startswith(
-                                ("https://", "http://")
-                            ):
+                            safe_url = approved_source_url(url)
+
+                            if safe_url:
                                 st.markdown(
-                                    f"[Open official document]({url})"
+                                    f"[Open official document]({safe_url})"
                                 )
+
 
                             source_number += 1
                             if source_number > 2:
                                 break
         # Handle any other unexpected program error
-        except Exception as error:
+        except Exception:
             st.error(
-                f"An error occurred: {error}"
+                "The chat assistant is temporarily unavailable. "
+                "Please try again later."
             )

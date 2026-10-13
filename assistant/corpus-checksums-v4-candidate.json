@@ -1,0 +1,27 @@
+[
+  {
+    "path": "chroma.sqlite3",
+    "size_bytes": 5771264,
+    "sha256": "5d3ee2193374d502639bc37573b871a0738003d815bfe4ff9e3593b9fa3cb45e"
+  },
+  {
+    "path": "f5344d71-27bb-4e2e-a9da-6a8c580f3fc7/data_level0.bin",
+    "size_bytes": 167600,
+    "sha256": "8b4ca30b16f0128c5bdadba914e74ad562caf480005c4386eb949db9ebf8288a"
+  },
+  {
+    "path": "f5344d71-27bb-4e2e-a9da-6a8c580f3fc7/header.bin",
+    "size_bytes": 100,
+    "sha256": "a0e81c3b22454233bc12d0762f06dcca48261a75231cf87c79b75e69a6c00150"
+  },
+  {
+    "path": "f5344d71-27bb-4e2e-a9da-6a8c580f3fc7/length.bin",
+    "size_bytes": 400,
+    "sha256": "a0d0d38ae263b67fdae4324f43633a88c63cd17263eb081c5330c9a11f5e42e5"
+  },
+  {
+    "path": "f5344d71-27bb-4e2e-a9da-6a8c580f3fc7/link_lists.bin",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

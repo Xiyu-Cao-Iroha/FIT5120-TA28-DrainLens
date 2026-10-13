@@ -18,6 +18,7 @@ from assistant.ai_service import (
     get_prediction_subject,
     EMERGENCY_RESPONSE,
 )
+from assistant.grounding import GroundingError, validate_answer_against_chunks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,7 +52,18 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Unsafe AI runtime corpus path")
 
     # Verify immutable artifacts before AI initialization.
-    verify_artifacts(model_path, release_corpus)
+    manifest_path = Path(
+        os.environ.get(
+            "DRAINLENS_RELEASE_MANIFEST",
+            str(base / "release-manifest.json"),
+        )
+    ).resolve()
+
+    verify_artifacts(
+        model_path,
+        release_corpus,
+        manifest_path=manifest_path,
+    )
 
     # Never trust an existing writable runtime corpus; only a fresh snapshot copy.
     runtime_corpus.parent.mkdir(parents=True, exist_ok=True)
@@ -74,7 +86,14 @@ def ai_version():
     import json
     from pathlib import Path
 
-    manifest_path = Path(__file__).resolve().parent / "release-manifest.json"
+    import os
+
+    manifest_path = Path(
+        os.environ.get(
+            "DRAINLENS_RELEASE_MANIFEST",
+            str(Path(__file__).resolve().parent / "release-manifest.json"),
+        )
+    ).resolve()
 
     with manifest_path.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
@@ -265,7 +284,14 @@ def chat(request: ChatRequest):
 
         if (
             ("switchboard" in q or "electrical panel" in q)
-            and ("safe" in q or "safety" in q)
+            and (
+                "safe" in q
+                or "safety" in q
+                or "touch" in q
+                or "operate" in q
+                or "use" in q
+                or "handle" in q
+            )
             and ("flood" in q or "water" in q)
         ):
             return {
@@ -275,6 +301,52 @@ def chat(request: ChatRequest):
                     "operate flooded electrical equipment. Keep away "
                     "from the affected area and seek advice from a "
                     "licensed electrician when it is safe to do so. "
+                    + EMERGENCY_RESPONSE
+                ),
+                "sources": []
+            }
+
+        if (
+            "drive through" in q
+            or "driving through" in q
+            or ("floodwater" in q and "road" in q)
+        ):
+            return {
+                "answer": (
+                    "Never drive through floodwater, even if it "
+                    "looks shallow. Turn around and find a safe "
+                    "alternative route. " + EMERGENCY_RESPONSE
+                ),
+                "sources": []
+            }
+
+        if (
+            "electrical equipment" in q
+            or "power outlets" in q
+            or "electrical appliances" in q
+        ):
+            return {
+                "answer": (
+                    "Do not touch or operate electrical equipment "
+                    "affected by floodwater. Keep away from the "
+                    "affected area and seek qualified assistance "
+                    "when it is safe. " + EMERGENCY_RESPONSE
+                ),
+                "sources": []
+            }
+
+        if (
+            "immediate danger" in q
+            or "life-threatening" in q
+            or "trapped" in q
+            or "stuck" in q
+            or "cannot get out" in q
+        ):
+            return {
+                "answer": (
+                    "If anyone is in immediate danger, call "
+                    "Triple Zero (000) now. Do not enter "
+                    "floodwater or attempt unsafe evacuation. "
                     + EMERGENCY_RESPONSE
                 ),
                 "sources": []
@@ -356,10 +428,25 @@ def chat(request: ChatRequest):
     from assistant.safety import UnsafeAIAnswer, validate_generated_safety
 
     try:
-        answer = validate_generated_safety(generate_answer(question, documents))
-    except UnsafeAIAnswer:
-        raise HTTPException(status_code=502, detail="The chat assistant is temporarily unavailable.")
+        answer = validate_generated_safety(
+            generate_answer(question, documents)
+        )
 
+        answer = validate_answer_against_chunks(
+            documents,
+            answer,
+            get_llm(),
+        )
+
+    except (UnsafeAIAnswer, GroundingError):
+        return {
+            "answer": (
+                "I couldn't verify an answer using the available "
+                "official guidance. Please refer to official "
+                "flood-preparation information."
+            ),
+            "sources": [],
+        }
     sources = []
     seen_sources = set()
 

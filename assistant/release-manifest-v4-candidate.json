@@ -1,0 +1,27 @@
+{
+  "manifest_version": 1,
+  "release_id": "drainlens-ai-v4-candidate",
+  "status": "draft",
+  "repository_commit": "9e1c5f5b815512ce2145c4b11e8e5c7b4d83105b",
+  "model": {
+    "name": "Llama 3.2 3B Instruct",
+    "filename": "llama-3.2-3b-instruct-q4_k_m.gguf",
+    "quantization": "Q4_K_M",
+    "size_bytes": 2019373920,
+    "sha256": "c55a83bfb6396799337853ca69918a0b9bbb2917621078c34570bc17d20fd7a1",
+    "download_url": null,
+    "gguf_publisher": null,
+    "license_verification": "pending"
+  },
+  "corpus": {
+    "version": "v3",
+    "collection_name": "drainlens_guidance_v3",
+    "document_chunks": 469,
+    "source_documents": 9,
+    "snapshot_checksums_file": "corpus-checksums-v4-candidate.json",
+    "source_checksums_file": "source-pdf-checksums.json",
+    "source_metadata_file": "sources.csv",
+    "ingestion_script": "ingest.py",
+    "ingestion_commit": "a80ddd7f20494614c690fdeeb4daa30157f4b031"
+  }
+}
