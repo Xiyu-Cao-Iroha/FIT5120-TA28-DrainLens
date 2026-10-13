@@ -228,6 +228,8 @@ jobs:
 
       - name: Run assistant tests
         run: pytest test_api.py test_verify_artifacts.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
 
   # The tests that need a database, in a job of their own.
   #
