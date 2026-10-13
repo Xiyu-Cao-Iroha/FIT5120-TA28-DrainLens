@@ -33,7 +33,7 @@ import { DrainsUnavailable, FindingDrains, NoMatch } from './screens/NoMatch.js'
 import { TaskSelect } from './screens/TaskSelect.js';
 import { type DifferenceArea, footprintCorners, intoMapFrame } from './map/difference.js';
 import type { Local } from './map/viewport.js';
-import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
+import { COMPARISON_RADIUS_M, NO_COMPARABLE_ADDRESS, comparableNear } from './scenario/eligibility.js';
 import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
 import { loadCatchments } from './catchment/artefact.js';
 import { brand, ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
@@ -269,6 +269,36 @@ export function App() {
           ),
     [loaded, session.address, scenario.ready, scenario.supported, differing],
   );
+  /*
+    Which addresses the comparison's own search box may offer (team,
+    12 October: *comparison 地址搜索栏当中，只放可以做 comparison 的*).
+
+    The comparison cannot answer for every supported address: it needs a
+    drain within `COMPARISON_RADIUS_M` that the scene tiles can calculate,
+    and 0.5% of the council's addresses have none. Those addresses were
+    offered, accepted, and then met *no drain near this address* two
+    screens later.
+
+    **Undefined until the worker's list is in**, so a slow start offers
+    every address rather than none: a search box that answers nothing while
+    something loads is worse than one that occasionally leads to the honest
+    refusal this removes.
+
+    The supported pits are taken out of the map once here rather than per
+    keystroke, because the predicate runs over them for each match the
+    search returns. `comparableNear` still decides what comparable means;
+    pre-filtering only saves it the walk.
+  */
+  const comparableAddress = useMemo(() => {
+    if (loaded === null || !scenario.ready) return undefined;
+    const supported = scenario.supported;
+    const pits = (loaded.map.layers.pit ?? []).filter(
+      (pit) => pit.asset_number !== undefined && supported.has(String(pit.asset_number)),
+    );
+    return (address: { readonly e: number; readonly n: number }) =>
+      comparableNear([address.e, address.n], pits, supported, COMPARISON_RADIUS_M).nearest !== null;
+  }, [loaded, scenario.ready, scenario.supported]);
+
   // No match: the reducer decides what that may do, and only step 1 stops.
   useEffect(() => {
     if (session.screen === 'drain' && eligibility !== null && eligibility.nearest === null) {
@@ -507,6 +537,9 @@ export function App() {
             recent={session.recent}
             // The comparison's own words when it is the task waiting.
             task={session.pendingTask}
+            {...(session.pendingTask === 'compare' && comparableAddress !== undefined
+              ? { usable: comparableAddress, usableNote: NO_COMPARABLE_ADDRESS }
+              : {})}
             // The title follows the guide card that was pressed (copy audit v2, #16).
             section={session.guideSection}
             onFound={(address) =>
@@ -697,7 +730,26 @@ export function App() {
               }}
               learned={session.learned}
               guided={GUIDED_SECTIONS}
+              /*
+                *Start next guide* is on the finish page, so the guide it
+                leaves was finished.
+
+                It dispatched only `guide-chosen`, which sets the new
+                section and nothing else, so a reader who followed the
+                design's own chain (Figma G5 puts the next guide at the end
+                of each one) never had a single guide recorded: the chooser
+                showed none of them done, the count stayed at 0 of 7, and
+                `nextGuide` kept offering the one just finished. Pressing
+                *Back to guidance page* instead recorded it, which is what
+                made it look like the guides were not being counted at all
+                rather than like this one path was missing a step.
+
+                Found by the self test of 12 October: finish the heavy rain
+                guide, press *Start next guide*, and `drainlens.learned` is
+                still six zeroes.
+              */
               onStartSection={(next) => {
+                dispatch({ type: 'guide-finished' });
                 dispatch({ type: 'guide-chosen', section: next });
               }}
               onFullMap={() => {

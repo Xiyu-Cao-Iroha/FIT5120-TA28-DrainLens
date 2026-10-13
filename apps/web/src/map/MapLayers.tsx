@@ -192,6 +192,7 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
 function Chip({
   label,
   swatch,
+  icon,
   on,
   disabled,
   title,
@@ -201,6 +202,11 @@ function Chip({
 }: {
   readonly label: string;
   readonly swatch: Swatch;
+  /**
+   * A mark to draw instead of the swatch, where a chip has been given a
+   * different face. See `faces` on `LayerChips`.
+   */
+  readonly icon?: ReactNode;
   readonly on: boolean;
   readonly disabled: boolean;
   readonly title: string;
@@ -245,7 +251,7 @@ function Chip({
           padding: on ? '1px 2px' : 0,
         }}
       >
-        <SwatchMark kind={swatch} />
+        {icon ?? <SwatchMark kind={swatch} />}
       </span>
       {label}
     </button>
@@ -365,6 +371,23 @@ export interface LayerChipsProps {
    * whose whole purpose is to hide that chip is noise at best.
    */
   readonly collapsible?: boolean;
+  /**
+   * A different face for a chip: the words on it, and the mark before them.
+   *
+   * One chip uses it. *Recorded subcatchment area* is the name of a council
+   * dataset, and on the full map it is the door to the card that says who
+   * looks after which pipe and how to tell them -- which is what a resident
+   * is at that chip for. The team asked on 12 October for the door to be
+   * called what it is for: *Spot a problem?*, with the design's own icon
+   * (Figma D1).
+   *
+   * **The face, and nothing else.** It still toggles the same layer, still
+   * draws the same boundary, still opens the same card, and the layer keeps
+   * its real name in the legend, in the Layers panel, on the card and in the
+   * chip's own tooltip -- so nothing here renames the dataset, which would
+   * be a claim about what was recorded rather than about where to press.
+   */
+  readonly faces?: Readonly<Partial<Record<LayerKey, { readonly label: string; readonly icon: ReactNode }>>>;
 }
 
 /**
@@ -405,6 +428,7 @@ export function LayerChips({
   onPanelChange,
   fold = false,
   collapsible = false,
+  faces = {},
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
   /*
@@ -501,14 +525,29 @@ export function LayerChips({
         keys.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
+        const face = faces[key];
         return (
           <Chip
             key={key}
-            label={spec.chip}
+            label={face?.label ?? spec.chip}
             swatch={spec.swatch}
+            {...(face === undefined ? {} : { icon: face.icon })}
             on={state[key]}
             disabled={disabled}
-            title={disabled ? `${spec.label} is still loading` : spec.label}
+            /*
+              The tooltip names the layer, so a chip wearing a different
+              face still says what it draws. It leads with the words on the
+              chip: an accessible name that does not contain the visible
+              label is WCAG 2.5.3, and a speech user saying *spot a
+              problem* has to reach the thing that says it.
+            */
+            title={
+              disabled
+                ? `${spec.label} is still loading`
+                : face === undefined
+                  ? spec.label
+                  : `${face.label} · ${spec.label}`
+            }
             tour={`chip-${key}`}
             pulse={pulse === key && !state[key]}
             onToggle={() => {

@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ADDRESS_STAYS_HERE, COMPARE_COPY, EXPLORE_COPY, landingCopyFor } from './Landing.js';
+import { ADDRESS_STAYS_HERE, COMPARE_COPY, EXPLORE_COPY, landingCopyFor, usableMatches } from './Landing.js';
+import { NO_COMPARABLE_ADDRESS } from '../scenario/eligibility.js';
 import { INITIAL_SESSION, reduce } from '../session.js';
 
 describe('the address screen’s words', () => {
@@ -111,5 +112,55 @@ describe('what the address screen promises about the address', () => {
     // Two sentences. The panel is where a longer version belongs.
     expect(ADDRESS_STAYS_HERE.split('. ').length).toBe(2);
     expect(ADDRESS_STAYS_HERE.length).toBeLessThan(100);
+  });
+});
+
+/**
+ * Which matches the box is allowed to offer.
+ *
+ * The comparison cannot answer for every supported address: it needs a drain
+ * within `COMPARISON_RADIUS_M` that the scene tiles can calculate. Offering
+ * one it cannot is offering a door onto *no drain near this address* two
+ * screens later, which the team reported on 12 October.
+ */
+describe('the addresses a task is allowed to offer', () => {
+  const at = (id: string): { readonly address: { readonly id: string }; readonly score: number } => ({
+    address: { id },
+    score: 1,
+  });
+  const matches = ['a', 'b', 'c', 'd', 'e', 'f'].map(at) as never[];
+
+  it('offers everything, up to the limit, when the task has no opinion', () => {
+    expect(usableMatches(matches, undefined, 3).map((m) => m.address.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('leaves out what the task cannot use', () => {
+    const usable = (address: { readonly id: string }) => address.id !== 'b' && address.id !== 'c';
+    expect(usableMatches(matches, usable as never, 3).map((m) => m.address.id)).toEqual(['a', 'd', 'e']);
+  });
+
+  it('stops asking as soon as it has enough', () => {
+    /*
+      The predicate walks the pits near each address, so the count matters:
+      filtering the whole list and slicing would ask about every match the
+      search returned on every keystroke.
+    */
+    const asked: string[] = [];
+    const usable = (address: { readonly id: string }) => {
+      asked.push(address.id);
+      return true;
+    };
+    usableMatches(matches, usable as never, 2);
+    expect(asked).toEqual(['a', 'b']);
+  });
+
+  it('gives an empty list rather than an unusable one', () => {
+    expect(usableMatches(matches, (() => false) as never, 3)).toEqual([]);
+  });
+
+  it('has a sentence to show when it comes back empty', () => {
+    // Said by the screen when something matched and none of it is usable.
+    expect(NO_COMPARABLE_ADDRESS).toMatch(/200 m/);
+    expect(NO_COMPARABLE_ADDRESS).not.toMatch(/[–—]/);
   });
 });

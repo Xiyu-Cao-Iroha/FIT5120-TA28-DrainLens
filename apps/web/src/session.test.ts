@@ -338,6 +338,42 @@ describe('going back', () => {
     const chosen = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
   });
+
+  it('records a guide on finishing it, and never on merely choosing another', () => {
+    /*
+      Where the marking lives, and why it lives there.
+
+      `guide-chosen` arrives from three places: the chooser, the homepage's
+      cards, and *Start next guide* at the end of a guide. Only the third
+      follows a guide that was finished, so marking cannot be moved into
+      `guide-chosen` without also marking a guide somebody walked out of.
+
+      That is also the defect this pins. *Start next guide* dispatched
+      `guide-chosen` alone, so the one path the design encourages recorded
+      nothing: self test of 12 October, `drainlens.learned` still six zeroes
+      after finishing the heavy rain guide. `App` now sends the pair, in
+      this order.
+    */
+    const inGuide = play([
+      { type: 'explore-chosen' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(inGuide.learned.drainage).toBe(false);
+
+    // Choosing another while one is open marks nothing: nothing was finished.
+    expect(reduce(inGuide, { type: 'guide-chosen', section: 'water-flow' }).learned.drainage).toBe(false);
+
+    // The pair *Start next guide* sends does.
+    const onward = reduce(
+      reduce(inGuide, { type: 'guide-finished' }),
+      { type: 'guide-chosen', section: 'water-flow' },
+    );
+    expect(onward.learned.drainage).toBe(true);
+    expect(onward.learned['water-flow']).toBe(false);
+    expect(onward.guideSection).toBe('water-flow');
+    expect(onward.screen).toBe('guide');
+  });
 });
 
 describe('the insufficient-information outcome', () => {

@@ -314,6 +314,17 @@ export interface MapViewProps {
   readonly onCompare?: ((pitId: string) => void) | undefined;
 }
 
+/**
+ * The four doors into the reporting pathway.
+ *
+ * `area` is the *Recorded subcatchment area* card, which the full map's
+ * *Spot a problem?* chip draws; `plan` is the before-rain plan's own
+ * *Report a drainage problem*; `drain` is *Report this drain* on a drain
+ * picked from the street-drains list; `chip` is Epic 6's guide, whose own
+ * chip opens the report directly.
+ */
+type ReportFrom = 'area' | 'plan' | 'drain' | 'chip';
+
 export function MapView({
   map,
   derived,
@@ -499,18 +510,31 @@ export function MapView({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
   /*
-    Where a report was opened from, so it has somewhere to go back to (bug 4).
+    Which control opened the report, so the one that opened it can take it
+    away again.
 
-    Reported on 9 October: the only way back to the plan after a report was
-    report → Close → press a warning sign → *Applies to me*, which is four
-    presses and two of them accidental. `Close` dismisses the pathway and
-    leaves the map; a report opened from the plan now also offers the plan.
+    It was a boolean, `reportFromPlan`, for one reason (bug 4, 9 October):
+    the only way back to the plan after a report was report → Close → press
+    a warning sign → *Applies to me*, four presses and two of them
+    accidental, so a report opened from the plan offers the plan.
+
+    **It needs the other three now** (team, 12 October). *Spot a problem?*
+    on the full map is the subcatchment chip, and its card is where the
+    report is opened from; turning the chip off left the report standing
+    there with nothing lit that would close it. The chip should take the
+    pathway with it, the way Drain pits takes its pit card and Low areas
+    takes its sign. But only the pathway it opened: the plan's own route
+    in (*Report a drainage problem*) runs with that chip off and must not
+    be closed by a chip the reader never pressed. A boolean cannot tell
+    those two apart, so this says which door was used.
   */
-  const [reportFromPlan, setReportFromPlan] = useState(false);
+  const [reportFrom, setReportFrom] = useState<ReportFrom | null>(null);
+  /** Whether the report offers a way back to the plan. */
+  const reportFromPlan = reportFrom === 'plan';
 
-  const openReport = (place: ReportPlace, fromPlan = false) => {
+  const openReport = (place: ReportPlace, from: ReportFrom) => {
     setReportPlace(place);
-    setReportFromPlan(fromPlan);
+    setReportFrom(from);
     setReportOpen(true);
   };
   /*
@@ -931,6 +955,30 @@ export function MapView({
   /** A guide's map is small, so its cards are narrower. See `GUIDE_CARD_WIDTH`. */
   const noteWidth = guided ? GUIDE_CARD_WIDTH : CARD_WIDTH;
 
+  /*
+    What the subcatchment chip says on the full map (team, 12 October).
+
+    *Recorded subcatchment area* is the name of a council dataset, and on
+    this map it is the door to the card that says which organisation looks
+    after which part and how to tell them. That is what somebody is at this
+    chip for, so it is called what it is for.
+
+    **Only the face changes.** The same layer, the same boundary, the same
+    card, and the layer keeps its real name in the legend, in the Layers
+    panel, on the card itself and in this chip's tooltip. The dataset is not
+    renamed; the door is labelled.
+
+    Not inside a guide, where no lesson offers this chip today anyway
+    (Epic 6's is three steps about reporting and offers no layer chip at
+    all). It is held to the full map rather than made global because a
+    guide that did offer it would be teaching the layer, and a lesson that
+    says *press Recorded subcatchment area* beside a chip saying something
+    else is the defect this whole list opened with.
+  */
+  const chipFaces = guided
+    ? undefined
+    : { catchment: { label: SPOT_A_PROBLEM_CHIP, icon: <ReportGlyph size={16} /> } };
+
   const nearRadiusM =
     address === null || picking !== null
       ? null
@@ -1027,7 +1075,7 @@ export function MapView({
         : {
             onReport: () => {
               setPlanOpen(false);
-              openReport(null, true);
+              openReport(null, 'plan');
             },
 
             
@@ -1132,6 +1180,22 @@ export function MapView({
     }
     // The sign goes with the layer it belongs to, for the same reason.
     if (key === 'lowPoint' && layers.lowPoint) setWarning(null);
+    /*
+      And the report goes with the chip that opened it (team, 12 October).
+
+      On the full map this chip is *Spot a problem?*, and the card it draws
+      is where *Report a problem* is pressed. Turning the chip off used to
+      leave the report standing with nothing lit that would close it.
+
+      **Only the report this chip opened.** The plan's route in runs with
+      this chip off, and closing somebody's report because they pressed a
+      chip they never used to open it would be the worse bug of the two.
+      `reportFrom` is what tells them apart.
+    */
+    if (key === 'catchment' && layers.catchment && reportFrom === 'area') {
+      setReportOpen(false);
+      setReportProblem(null);
+    }
     if (key === 'pipe' && layers.pipe) {
       // The trace is drawn as pipes, so it goes with them even when what is
       // selected is the pit at the top of it.
@@ -1679,21 +1743,18 @@ export function MapView({
               The way into the reporting pathway, as a chip (Figma D1).
 
               It is not a layer, so it is not in `LayerChips` and not in
-              `CHIP_KEYS`. Epic 6's guide has opened the pathway from here
-              since the guide was built, and the other guides hide it
-              because a card taller than the guide's frame over a step about
-              something else teaches nothing -- `usesReport` says which
-              lesson is the exception.
+              `CHIP_KEYS`. Epic 6's guide opens the pathway from here, and
+              the other guides hide it because a card taller than the
+              guide's frame over a step about something else teaches
+              nothing -- `usesReport` says which lesson is the exception.
 
-              **The full map has it too, from 12 October.** Reporting was
-              reachable there only from inside the *Recorded subcatchment
-              area* card, which is a card about who looks after the pipes:
-              somebody who had come to report a blocked grate had to turn on
-              a boundary layer to find the button. The team's item 3 of
-              11 October is that chip, on the main map, drawn the way the
-              design draws it.
+              **Only inside a guide.** The full map had one of these beside
+              the layer chips for a day; it now reaches the same pathway
+              through the chip that was already there, renamed. See
+              `chipFaces`. Two chips with the same words in one row is
+              worse than either of them alone.
             */}
-            {(guided ? reportInGuide : true) && (
+            {guided && reportInGuide && (
               <PlainChip
                 label={SPOT_A_PROBLEM_CHIP}
                 /*
@@ -1710,7 +1771,7 @@ export function MapView({
                     setReportOpen(false);
                     setReportProblem(null);
                   } else {
-                    openReport(null);
+                    openReport(null, 'chip');
                   }
                 }}
               />
@@ -1726,6 +1787,7 @@ export function MapView({
               pulseLayers={highlight === 'layers'}
               pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
               onPanelChange={panelChanged}
+              {...(chipFaces === undefined ? {} : { faces: chipFaces })}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
 
@@ -2120,7 +2182,7 @@ export function MapView({
                       says which lesson that is, from its steps.
                     */
                     onReport: () => {
-                      openReport(null);
+                      openReport(null, 'area');
                     },
                   })}
               pulseReport={pulsePress === 'report'}
@@ -2337,16 +2399,19 @@ export function MapView({
             <button
               type="button"
               onClick={() => {
-                openReport({
-                  kind: 'drain',
-                  drains: [
-                    {
-                      assetNumber: drainPicked.id,
-                      street: drainPicked.street,
-                      distanceM: Math.round(drainPicked.distanceM),
-                    },
-                  ],
-                });
+                openReport(
+                  {
+                    kind: 'drain',
+                    drains: [
+                      {
+                        assetNumber: drainPicked.id,
+                        street: drainPicked.street,
+                        distanceM: Math.round(drainPicked.distanceM),
+                      },
+                    ],
+                  },
+                  'drain',
+                );
               }}
               style={primaryCardButton}
             >
