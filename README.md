@@ -1,10 +1,32 @@
+<div align="center">
+
 # DrainLens
 
-Stormwater flood risk for residents of Greater Melbourne communities that flood repeatedly.
+**Stormwater flood risk for residents of Greater Melbourne communities that flood repeatedly.**
 
-**Live:** https://drainlens-205559161217.australia-southeast1.run.app — Cloud Run, behind a password gate since 3 September 2026.
+[Live site](https://drainlens-205559161217.australia-southeast1.run.app) &nbsp;·&nbsp; [API health](https://drainlens-api-205559161217.australia-southeast1.run.app/health) &nbsp;·&nbsp; [Every iteration URL](#which-url-shows-which-iteration) &nbsp;·&nbsp; [Development](docs/DEVELOPMENT.md)
 
-**API:** https://drainlens-api-205559161217.australia-southeast1.run.app/health — a second Cloud Run service over Cloud SQL, live since 5 September 2026, serving the same artefacts rebuilt from rows. **The site reads four artefacts from it** — the map, the derived layers, the trace and the flood history — falling back to the copies in its own container when it cannot answer. The Iteration 1 footer names which source answered; on `develop` since 14 September it speaks only when the map is the smaller Kensington copy. Everything else it draws ships only in its own container: the address index, which must never come from a server, and the terrain tiles, the scenario tiles and the flood map's areas and events, which the API has no route for.
+</div>
+
+---
+
+|  | Address | Live since | What it is |
+|---|---|---|---|
+| **Site** | [drainlens](https://drainlens-205559161217.australia-southeast1.run.app) | 3&nbsp;September&nbsp;2026 | Cloud Run, behind a password gate |
+| **API** | [drainlens&#8209;api](https://drainlens-api-205559161217.australia-southeast1.run.app/health) | 5&nbsp;September&nbsp;2026 | A second Cloud Run service over Cloud SQL, serving the same artefacts rebuilt from rows |
+
+**The site reads four artefacts from the API:** the map, the derived layers, the
+trace and the flood history. When the API cannot answer, it falls back to the
+copies in its own container. The Iteration 1 footer names which source
+answered; on `develop`, since 14 September, it speaks only when the map is the
+smaller Kensington copy.
+
+**Everything else it draws ships only in its own container:**
+
+| What | Why it is never fetched |
+|---|---|
+| The address index | It must never come from a server |
+| The terrain tiles, the scenario tiles, the flood map's areas and events | The API has no route for them |
 
 ### Which URL shows which iteration
 
