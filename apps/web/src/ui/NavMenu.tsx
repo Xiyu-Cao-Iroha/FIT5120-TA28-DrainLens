@@ -14,6 +14,19 @@
  * includes the label's own destination, because a menu that leaves out the
  * page you are on cannot tell you what the section contains.
  *
+ * **It opens on hover, and not only on hover** (team, 15 October). A pointer
+ * resting on the item is the quickest way in and is what the team asked for.
+ * It cannot be the only way in: hover does not exist on a touch screen and
+ * cannot be reached from a keyboard, so the caret still toggles on a press
+ * and still opens on Down, and the caret stays visible as the one sign that
+ * a menu is there at all for the readers who cannot hover to find out.
+ *
+ * **The menu touches the item it hangs from**, with no gap, and leaving is
+ * given `LEAVE_MS` before it closes. Both are about the same thing: a gap or
+ * an instant close makes the menu shut while the pointer is on its way to
+ * it, which reads as the menu refusing to be used. The delay is cancelled
+ * the moment the pointer comes back.
+ *
  * **The menu is positioned `fixed`.** Under 560 px the navigation row
  * scrolls sideways (`.shell__actions` in `base.css`), and a menu positioned
  * against a scrolling box is a menu with its bottom cut off. Fixed takes it
@@ -37,6 +50,15 @@ export const navItem = {
   font: type(text.label, { weight: weight.medium, leading: 1.4 }),
   whiteSpace: 'nowrap',
 } as const;
+
+/**
+ * How long the pointer may be off the item before the menu closes.
+ *
+ * Long enough to cross from the label to the first row without the menu
+ * going out from under the pointer, short enough that leaving on purpose
+ * does not feel like the menu is hanging about.
+ */
+const LEAVE_MS = 160;
 
 /**
  * Bring the item the reader is on into view, where the row scrolls.
@@ -95,8 +117,20 @@ export function NavMenu({
   const caret = useRef<HTMLButtonElement | null>(null);
   const list = useRef<HTMLDivElement | null>(null);
   const self = useShowWhenCurrent<HTMLSpanElement>(here);
+  const leaving = useRef<number | null>(null);
+
+  /** Any pending close is off: the pointer is back, or a press has decided. */
+  const stay = () => {
+    if (leaving.current === null) return;
+    window.clearTimeout(leaving.current);
+    leaving.current = null;
+  };
+
+  // A timer outliving the component would set state on nothing.
+  useEffect(() => stay, []);
 
   const shut = (toCaret: boolean) => {
+    stay();
     setOpen(false);
     if (toCaret) caret.current?.focus();
   };
@@ -133,8 +167,10 @@ export function NavMenu({
 
   /** Under the whole item, left edges lined up. */
   const show = (focusFirst: boolean) => {
+    stay();
     const box = caret.current?.parentElement?.getBoundingClientRect();
-    if (box !== undefined) setAt({ left: box.left, top: box.bottom + 4 });
+    // No gap: see `LEAVE_MS` above. The menu hangs off the item's own edge.
+    if (box !== undefined) setAt({ left: box.left, top: box.bottom });
     setOpen(true);
     if (!focusFirst) return;
     // After the menu exists. One frame is enough and needs no timer.
@@ -153,6 +189,16 @@ export function NavMenu({
   return (
     <span
       ref={self}
+      onMouseEnter={() => {
+        show(false);
+      }}
+      onMouseLeave={() => {
+        stay();
+        leaving.current = window.setTimeout(() => {
+          leaving.current = null;
+          setOpen(false);
+        }, LEAVE_MS);
+      }}
       style={{
         position: 'relative',
         display: 'inline-flex',
