@@ -359,10 +359,23 @@ export function Landing({
   }, [index, recent, usable]);
 
   /*
-    **The recent list replaces the examples rather than stacking above them.**
-    *Not sure? Try one of these* is for somebody who does not know what to
-    type; somebody with their own addresses to go back to is not that person,
-    and two lists of addresses under one field is a choice nobody asked for.
+    **The recent list sits above the examples rather than replacing them**,
+    and this reverses a decision.
+
+    It used to replace them, on the reasoning that *Not sure? Try one of
+    these* is for somebody who does not know what to type, that somebody
+    with their own addresses to go back to is not that person, and that two
+    lists of addresses under one field is a choice nobody asked for.
+
+    The team asked for it on 15 October: *不要让历史记录覆盖掉推荐的地址*.
+    What the old reasoning missed is that one search is enough to take the
+    examples away for the rest of the tab, and the examples are not only a
+    hint about what to type: they are the three addresses this product can
+    actually show something interesting at. A reader who has searched their
+    own street once still wants them, and on the comparison's screen they
+    are the two addresses a difference can be computed for.
+
+    Recent goes first, because it is the more specific of the two.
   */
   const showingRecent = typed.trim() === '' && problem === null && recalled.length > 0;
 
@@ -375,7 +388,18 @@ export function Landing({
   // The examples are chosen to be usable, and are filtered anyway: the day
   // one of them stops being usable, it should leave the list rather than
   // become the one suggestion that leads nowhere.
-  const examples = usable === undefined ? offered : offered.filter((address) => usable(address));
+  const offeredUsable = usable === undefined ? offered : offered.filter((address) => usable(address));
+  /*
+    And an example already in the recent list is dropped from this one.
+    The two lists mean different things, but the same address under both of
+    them, one above the other, reads as a mistake rather than as a
+    coincidence. Searching every example empties this list, which is the
+    one case where somebody plainly does not need it.
+  */
+  const recalledIds = new Set(recalled.map((address) => address.id));
+  const examples = showingRecent
+    ? offeredUsable.filter((address) => !recalledIds.has(address.id))
+    : offeredUsable;
   const suburbs = suburbsOf(index);
 
   /*
@@ -665,7 +689,7 @@ export function Landing({
           </div>
         )}
 
-        {!showingRecent && suggestions.length === 0 && problem === null && examples.length > 0 && (
+        {suggestions.length === 0 && problem === null && examples.length > 0 && (
           <div
             style={{
               margin: `${String(space(3))}px 0 0`,
