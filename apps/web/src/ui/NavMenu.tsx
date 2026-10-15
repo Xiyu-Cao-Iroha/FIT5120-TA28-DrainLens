@@ -38,6 +38,34 @@ export const navItem = {
   whiteSpace: 'nowrap',
 } as const;
 
+/**
+ * Bring the item the reader is on into view, where the row scrolls.
+ *
+ * Under 560 px the navigation does not wrap or hide behind a menu: it
+ * scrolls sideways, which was the right call and is untouched. What it
+ * costs is that the row starts at its left end, so an item far enough along
+ * it begins off screen, and the reader is given no sign of where they are.
+ * Four items were already wider than a 375 px phone; *Comparison* made it
+ * five on 15 October.
+ *
+ * `inline: 'nearest'` moves the row by the least that shows the item, and
+ * `block: 'nearest'` keeps it from scrolling the page underneath: the
+ * header is at the top and already in view, so there is nothing to do
+ * vertically and nothing is done.
+ */
+export function useShowWhenCurrent<T extends HTMLElement>(current: boolean) {
+  const self = useRef<T | null>(null);
+
+  useEffect(() => {
+    if (!current) return;
+    const node = self.current;
+    if (node === null || typeof node.scrollIntoView !== 'function') return;
+    node.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [current]);
+
+  return self;
+}
+
 /** One destination under a navigation item. */
 export interface NavMenuItem {
   readonly label: string;
@@ -66,6 +94,7 @@ export function NavMenu({
   const [at, setAt] = useState<{ readonly left: number; readonly top: number } | null>(null);
   const caret = useRef<HTMLButtonElement | null>(null);
   const list = useRef<HTMLDivElement | null>(null);
+  const self = useShowWhenCurrent<HTMLSpanElement>(here);
 
   const shut = (toCaret: boolean) => {
     setOpen(false);
@@ -123,6 +152,7 @@ export function NavMenu({
 
   return (
     <span
+      ref={self}
       style={{
         position: 'relative',
         display: 'inline-flex',
