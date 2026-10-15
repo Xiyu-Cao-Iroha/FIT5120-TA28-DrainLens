@@ -572,11 +572,20 @@ export function PathThumb({
   /**
    * Cover the slot rather than sit inside it at its own height.
    *
-   * The five cards in the first group give a thumbnail a box 208 wide and
-   * 104 tall, which is the shape these are drawn in, so they very nearly
-   * fill it. The two wide cards below give it 40% of a card whose height
-   * comes from the words beside it -- 222 by 171 -- and a 104-tall picture
-   * in it left 67 pixels of white under the drawing and eleven down each
+   * The cards in the first group drew their picture 104 tall whatever
+   * width the card happened to be, which was near enough right while a
+   * card was 208 wide and wrong as soon as it was not: three to a row
+   * (15 October) makes a card about 330, and covering a 200 by 104 frame
+   * at 330 by 104 scales the drawing by 1.65 and shows 104 of the 172 it
+   * then stands, so two fifths of it is cut away. What went was the top
+   * of the heavy-rain markers and the head of the report card. The box
+   * now keeps the drawing's own proportions at whatever width the card
+   * is, so nothing is cropped at any size and the pictures are the shape
+   * they were drawn in. Reported 15 October.
+   *
+   * The two wide cards below give it 40% of a card whose height comes
+   * from the words beside it -- 222 by 171 -- and a 104-tall picture in
+   * it left 67 pixels of white under the drawing and eleven down each
    * side, so the marks read as a few pale boxes floating in a corner
    * rather than as a picture of a street. Reported 12 October.
    *
@@ -588,7 +597,7 @@ export function PathThumb({
 }) {
   const frame = fill
     ? ({ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' } as const)
-    : ({ width: '100%', height: 104, display: 'block' } as const);
+    : ({ width: '100%', aspectRatio: '200 / 104', height: 'auto', display: 'block' } as const);
   /*
     Two frames, because the two cards are two shapes.
 
