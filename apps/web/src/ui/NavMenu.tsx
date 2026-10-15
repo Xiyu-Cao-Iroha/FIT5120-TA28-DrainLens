@@ -17,9 +17,19 @@
  * **It opens on hover, and not only on hover** (team, 15 October). A pointer
  * resting on the item is the quickest way in and is what the team asked for.
  * It cannot be the only way in: hover does not exist on a touch screen and
- * cannot be reached from a keyboard, so the caret still toggles on a press
- * and still opens on Down, and the caret stays visible as the one sign that
- * a menu is there at all for the readers who cannot hover to find out.
+ * cannot be reached from a keyboard, so the caret still opens on a press and
+ * on Down, and the caret stays visible as the one sign that a menu is there
+ * at all for the readers who cannot hover to find out.
+ *
+ * **Which is why the menu remembers what opened it.** A press used to
+ * toggle, which was right while hover did nothing and wrong the moment it
+ * did something: a browser sends `mouseenter` before `click`, so a tap on
+ * the caret opened the menu and then closed it again, and on a touch screen,
+ * where there is no hover to fall back on, that left no way to open it at
+ * all. A press on a menu the pointer merely opened now takes it over rather
+ * than closing it, and only a press on a menu a press opened closes it.
+ * Leaving with the pointer closes what the pointer opened and nothing
+ * else.
  *
  * **The menu touches the item it hangs from**, with no gap, and leaving is
  * given `LEAVE_MS` before it closes. Both are about the same thing: a gap or
@@ -112,12 +122,20 @@ export function NavMenu({
   readonly items: readonly NavMenuItem[];
 }) {
   const id = useId();
-  const [open, setOpen] = useState(false);
+  /**
+   * What opened the menu, or null for shut.
+   *
+   * Not a boolean, because closing has to know: see the note above.
+   */
+  const [opener, setOpener] = useState<'hover' | 'press' | null>(null);
+  const open = opener !== null;
   const [at, setAt] = useState<{ readonly left: number; readonly top: number } | null>(null);
   const caret = useRef<HTMLButtonElement | null>(null);
   const list = useRef<HTMLDivElement | null>(null);
   const self = useShowWhenCurrent<HTMLSpanElement>(here);
   const leaving = useRef<number | null>(null);
+  /** The menu was opened from the keyboard, so the first row wants focus. */
+  const wantFirst = useRef(false);
 
   /** Any pending close is off: the pointer is back, or a press has decided. */
   const stay = () => {
@@ -131,7 +149,7 @@ export function NavMenu({
 
   const shut = (toCaret: boolean) => {
     stay();
-    setOpen(false);
+    setOpener(null);
     if (toCaret) caret.current?.focus();
   };
 
@@ -149,10 +167,10 @@ export function NavMenu({
       if (target === null) return;
       if (list.current?.contains(target) === true) return;
       if (caret.current?.contains(target) === true) return;
-      setOpen(false);
+      setOpener(null);
     };
     const away = () => {
-      setOpen(false);
+      setOpener(null);
     };
 
     document.addEventListener('mousedown', elsewhere);
@@ -166,18 +184,29 @@ export function NavMenu({
   }, [open]);
 
   /** Under the whole item, left edges lined up. */
-  const show = (focusFirst: boolean) => {
+  const show = (by: 'hover' | 'press', focusFirst = false) => {
     stay();
     const box = caret.current?.parentElement?.getBoundingClientRect();
     // No gap: see `LEAVE_MS` above. The menu hangs off the item's own edge.
     if (box !== undefined) setAt({ left: box.left, top: box.bottom });
-    setOpen(true);
-    if (!focusFirst) return;
-    // After the menu exists. One frame is enough and needs no timer.
-    requestAnimationFrame(() => {
-      list.current?.querySelector('button')?.focus();
-    });
+    if (focusFirst) wantFirst.current = true;
+    setOpener(by);
   };
+
+  /*
+    Down puts the reader in the menu, and an effect is what can do it. The
+    focus was asked for in the frame after the press, which is a race React
+    wins as often as not: the menu is rendered by the scheduler, and the
+    frame can come first, in which case there is nothing to focus and the
+    press leaves the reader on the caret with the menu open underneath and
+    Escape, which the menu listens for, going nowhere. An effect runs after
+    the rows exist and their ref is attached, every time.
+  */
+  useEffect(() => {
+    if (!open || !wantFirst.current) return;
+    wantFirst.current = false;
+    list.current?.querySelector('button')?.focus();
+  }, [open]);
 
   const step = (from: HTMLElement, by: 1 | -1) => {
     const all = [...(list.current?.querySelectorAll('button') ?? [])];
@@ -190,13 +219,23 @@ export function NavMenu({
     <span
       ref={self}
       onMouseEnter={() => {
-        show(false);
+        /*
+          Coming back cancels a close that is counting down, and that has
+          to happen before the guard below: without it, leaving and
+          returning inside `LEAVE_MS` armed a timer that nothing stopped,
+          so the menu shut a sixth of a second after the pointer was back
+          on it.
+        */
+        stay();
+        // A menu a press opened is the reader's, not the pointer's.
+        if (opener === null) show('hover');
       }}
       onMouseLeave={() => {
+        if (opener !== 'hover') return;
         stay();
         leaving.current = window.setTimeout(() => {
           leaving.current = null;
-          setOpen(false);
+          setOpener(null);
         }, LEAVE_MS);
       }}
       style={{
@@ -232,13 +271,14 @@ export function NavMenu({
         aria-controls={id}
         aria-label={`${label}: choose a page`}
         onClick={() => {
-          if (open) shut(false);
-          else show(false);
+          // A press on what the pointer opened takes it over; see above.
+          if (opener === 'press') shut(false);
+          else show('press');
         }}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return;
           event.preventDefault();
-          show(true);
+          show('press', true);
         }}
         style={{
           ...navItem,
@@ -275,38 +315,51 @@ export function NavMenu({
               event.preventDefault();
               step(on, -1);
             } else if (event.key === 'Tab') {
-              setOpen(false);
+              setOpener(null);
             }
           }}
+          /*
+            **A box with a rule between its rows** (team, 15 October,
+            with a sketch). It was a hairline and a shadow, which reads as
+            a card floating near the bar rather than as a list hanging off
+            it; the edge is the stronger one now and the rows are divided,
+            so the two destinations are two things rather than one block
+            of text. The corners keep the product's own radius: square
+            ones would make this the only square box on the site.
+          */
           style={{
             position: 'fixed',
             left: at.left,
             top: at.top,
             zIndex: 40,
             minWidth: 184,
-            padding: space(1),
+            padding: 0,
+            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            border: `1px solid ${line.base}`,
+            border: `1px solid ${line.strong}`,
             borderRadius: radius.base,
             background: surface.raised,
             boxShadow: shadow.lifted,
           }}
         >
-          {items.map((item) => (
+          {items.map((item, at_) => (
             <button
               key={item.label}
               type="button"
               role="menuitem"
               {...(item.current ? { 'aria-current': 'page' as const } : {})}
               onClick={() => {
-                setOpen(false);
+                setOpener(null);
                 if (!item.current) item.onOpen();
               }}
               style={{
                 ...navItem,
                 textAlign: 'left',
                 border: 'none',
+                // The rule goes between the rows, so the last one has none.
+                borderTop: at_ === 0 ? 'none' : `1px solid ${line.base}`,
+                borderRadius: 0,
                 background: item.current ? brand.wash : 'none',
                 color: item.current ? ink.strong : ink.base,
                 fontWeight: item.current ? weight.semibold : weight.medium,
