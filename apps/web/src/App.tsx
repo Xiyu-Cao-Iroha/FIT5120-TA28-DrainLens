@@ -6,7 +6,7 @@
  * than at every screen that happens to touch it.
  */
 
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 
 import { type AddressIndex, type PackedIndex, unpack } from '@drainlens/address';
 import { demonstrationAddress } from './address/demonstration.js';
@@ -51,6 +51,7 @@ import {
   reduce,
 } from './session.js';
 import { Shell, type ShellProps } from './ui/Shell.js';
+import { NavMenu, navItem } from './ui/NavMenu.js';
 import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
@@ -441,7 +442,7 @@ export function App() {
             the reader got here and nothing saying where else they could go.
             It is the board's map, so the board is the page it belongs to.
           */
-          actions={<SiteNav {...siteNavProps(dispatch, 'history', 'history')} />}
+          actions={<SiteNav {...siteNavProps(dispatch, 'flood-map', 'history')} />}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -1226,6 +1227,9 @@ function MapScreen({
           onOpenHistory={() => {
             dispatch({ type: 'history-opened' });
           }}
+          onOpenFloodMap={() => {
+            dispatch({ type: 'flood-map-opened' });
+          }}
           onOpenFullMap={() => {
             // Where they already are. `NavLink` draws it as the current page
             // and gives it no handler, so this is never reached.
@@ -1411,6 +1415,11 @@ function siteNavProps(
     onOpenHistory: () => {
       dispatch({ type: 'history-opened' });
     },
+    // The same event the board's *Open the area map* and the homepage's
+    // card dispatch, so all three ways in open one screen.
+    onOpenFloodMap: () => {
+      dispatch({ type: 'flood-map-opened' });
+    },
     onOpenFullMap: () => {
       dispatch({ type: 'map-opened', from });
     },
@@ -1433,11 +1442,19 @@ function siteNavProps(
  * the same list.
  */
 export interface SiteNavProps {
-  /** Which of the four this screen is, so it is marked rather than linked. */
-  readonly current: 'home' | 'tutorial' | 'history' | 'map';
+  /**
+   * Which of the four this screen is, so it is marked rather than linked.
+   *
+   * `flood-map` is the fifth value and the fourth item: it is one of
+   * *Flood history*'s two screens, so it marks that item rather than one of
+   * its own. See `NavMenu`.
+   */
+  readonly current: 'home' | 'tutorial' | 'history' | 'flood-map' | 'map';
   readonly onOpenHome: () => void;
   readonly onOpenGuides: () => void;
   readonly onOpenHistory: () => void;
+  /** The ranked areas drawn as a map. The second thing under *Flood history*. */
+  readonly onOpenFloodMap: () => void;
   readonly onOpenFullMap: () => void;
 }
 
@@ -1478,13 +1495,23 @@ function SiteNavItems({
   onOpenHome,
   onOpenGuides,
   onOpenHistory,
+  onOpenFloodMap,
   onOpenFullMap,
 }: SiteNavProps) {
   return (
     <>
       <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
       <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
-      <NavLink label="Flood history" current={current === 'history'} onOpen={onOpenHistory} />
+      <NavMenu
+        label="Flood history"
+        here={current === 'history' || current === 'flood-map'}
+        onOpen={onOpenHistory}
+        onHere={current === 'history'}
+        items={[
+          { label: 'Flood history', current: current === 'history', onOpen: onOpenHistory },
+          { label: 'Area map', current: current === 'flood-map', onOpen: onOpenFloodMap },
+        ]}
+      />
       <NavLink label={FULL_MAP} current={current === 'map'} onOpen={onOpenFullMap} />
     </>
   );
@@ -1497,13 +1524,6 @@ function SiteNav(props: SiteNavProps) {
     </nav>
   );
 }
-
-const navItem = {
-  padding: `${String(space(2))}px ${String(space(3))}px`,
-  borderRadius: radius.base,
-  font: type(text.label, { weight: weight.medium, leading: 1.4 }),
-  whiteSpace: 'nowrap',
-} as const;
 
 function NavLink({
   label,
