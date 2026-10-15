@@ -51,7 +51,7 @@ import {
   reduce,
 } from './session.js';
 import { Shell, type ShellProps } from './ui/Shell.js';
-import { NavMenu, navItem } from './ui/NavMenu.js';
+import { NavMenu, navItem, useShowWhenCurrent } from './ui/NavMenu.js';
 import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
@@ -1011,16 +1011,25 @@ export function App() {
           extentName={loaded.extentName}
           {...(leave === undefined ? {} : { back: leave })}
           /*
-            **Marked as the tutorial, and given no link of its own.**
+            **It has a link of its own now, and this reverses a decision.**
 
-            The team's note of 10 October: *this page shows under the
-            tutorial branch, no separate navigation button for it.* The
-            comparison is reached from the guide chooser and from the
-            homepage's own band, and a fifth item in a four-item bar for a
-            screen nobody navigates to directly would be a destination the
-            bar invents.
+            The team's note of 10 October was the opposite: *this page shows
+            under the tutorial branch, no separate navigation button for
+            it.* The argument then was that a fifth item in a four-item bar,
+            for a screen nobody navigates to directly, would be a
+            destination the bar invented; the comparison was reached from
+            the guide chooser and from the homepage's own band, and from
+            nowhere else.
+
+            On 15 October the team asked for it in the bar, between
+            *Flood history* and *Full map*. What changed is the reading of
+            "nobody navigates to it directly": being reachable only from two
+            cards is the reason somebody would not, rather than evidence
+            that they do not want to. So the screen marks its own item
+            rather than the tutorial's, and a reader in the middle of a
+            comparison is no longer told they are in the guides.
           */
-          actions={<SiteNav {...siteNavProps(dispatch, 'tutorial')} />}
+          actions={<SiteNav {...siteNavProps(dispatch, 'comparison')} />}
           crumbs={crumbs}
         >
           {children}
@@ -1230,6 +1239,9 @@ function MapScreen({
           onOpenFloodMap={() => {
             dispatch({ type: 'flood-map-opened' });
           }}
+          onOpenComparison={() => {
+            dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
+          }}
           onOpenFullMap={() => {
             // Where they already are. `NavLink` draws it as the current page
             // and gives it no handler, so this is never reached.
@@ -1420,6 +1432,19 @@ function siteNavProps(
     onOpenFloodMap: () => {
       dispatch({ type: 'flood-map-opened' });
     },
+    /*
+      The same event the homepage's card and the chooser's card dispatch,
+      so the comparison has one way in however it was asked for: with an
+      address in hand it goes to step one, and without one it asks and
+      remembers what the address was for.
+
+      `from: 'home'` rather than this screen's own origin, because it says
+      where backing out of the address screen lands, and from a link in
+      the masthead the answer that holds on every screen is the homepage.
+    */
+    onOpenComparison: () => {
+      dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
+    },
     onOpenFullMap: () => {
       dispatch({ type: 'map-opened', from });
     },
@@ -1449,12 +1474,14 @@ export interface SiteNavProps {
    * *Flood history*'s two screens, so it marks that item rather than one of
    * its own. See `NavMenu`.
    */
-  readonly current: 'home' | 'tutorial' | 'history' | 'flood-map' | 'map';
+  readonly current: 'home' | 'tutorial' | 'history' | 'flood-map' | 'comparison' | 'map';
   readonly onOpenHome: () => void;
   readonly onOpenGuides: () => void;
   readonly onOpenHistory: () => void;
   /** The ranked areas drawn as a map. The second thing under *Flood history*. */
   readonly onOpenFloodMap: () => void;
+  /** The blocked-drain comparison, which asks for an address on the way. */
+  readonly onOpenComparison: () => void;
   readonly onOpenFullMap: () => void;
 }
 
@@ -1496,6 +1523,7 @@ function SiteNavItems({
   onOpenGuides,
   onOpenHistory,
   onOpenFloodMap,
+  onOpenComparison,
   onOpenFullMap,
 }: SiteNavProps) {
   return (
@@ -1512,6 +1540,7 @@ function SiteNavItems({
           { label: 'Area map', current: current === 'flood-map', onOpen: onOpenFloodMap },
         ]}
       />
+      <NavLink label="Comparison" current={current === 'comparison'} onOpen={onOpenComparison} />
       <NavLink label={FULL_MAP} current={current === 'map'} onOpen={onOpenFullMap} />
     </>
   );
@@ -1534,9 +1563,12 @@ function NavLink({
   readonly current: boolean;
   readonly onOpen: () => void;
 }) {
+  const self = useShowWhenCurrent<HTMLButtonElement>(current);
+
   return (
     <button
       type="button"
+      ref={self}
       onClick={current ? undefined : onOpen}
       {...(current ? { 'aria-current': 'page' as const } : {})}
       style={{
