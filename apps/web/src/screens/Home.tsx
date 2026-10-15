@@ -1156,11 +1156,25 @@ function Paths({
         title="Six ways to understand your area"
         body="Choose a topic to open the map. You can change layers at any time."
       />
+      {/*
+        Three across, so the six are two even rows (team, 15 October).
+
+        `auto-fit` with a flat 230 px minimum fitted as many columns as the
+        width allowed, which at this page's width is four: the six came out
+        four and two, and the short row read as the last two having been
+        left over rather than as the pair they are.
+
+        The minimum is now a third of the row, less the two gaps between
+        three columns, and never below the 230 px the cards were drawn for.
+        So it is three while a third is wide enough and falls to two and
+        then one when it is not, which is the responsive behaviour the flat
+        minimum was there for in the first place.
+      */}
       <div
         style={{
           display: 'grid',
           gap: space(5),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gridTemplateColumns: `repeat(auto-fit, minmax(max(230px, (100% - ${String(space(5) * 2)}px) / 3), 1fr))`,
         }}
       >
         {PATHS.map((path) => (
