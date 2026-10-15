@@ -257,6 +257,176 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 
 ### Iteration 3, in build
 
+> **The entries from 1.17.1 to 1.42.0 were written on 16 October**, from the
+> pull requests they describe, after this history had gone twelve days and 84
+> merges without one. They are grouped by theme rather than written one per
+> merge, and they are shorter than the entries written at the time, because a
+> record reconstructed afterwards cannot honestly claim the detail of one kept
+> the same day. The assistant service in `assistant/` is built by another
+> member of the team and its releases are not recorded here.
+
+<details>
+<summary><b>1.42.0</b> &nbsp;·&nbsp; 16 Oct 2026 &nbsp;·&nbsp; The README given a shape</summary>
+
+The README's own two changes, presentation only, and nothing below them touched (#274, #275). The header is a title, a tagline and the four links a reader wants, with the two services and what is fetched from which as tables. The version history is collapsible entries rather than 77 paragraphs inside table cells, grouped by iteration. The quality gate post mortems are folded behind their own first sentences. The layout list is a table, since it was always a path and a description. No fact changed and no URL changed, which a word-level comparison against `develop` was used to show.
+
+</details>
+<details>
+<summary><b>1.41.0</b> &nbsp;·&nbsp; 15 Oct 2026 &nbsp;·&nbsp; Examples under the recent ones, three cards across, and pictures in proportion</summary>
+
+Three things from the team, all about the home page and the screens either side of it (#270, #271, #273). The recent addresses used to **replace** the examples; they sit above them now, with duplicates filtered, which reverses a decision the code had written down and the comment says so. The six cards were `auto-fit` with a flat 230 px minimum, which at this width fitted four and left a short row of two; the minimum is a third of the row now, so they are two rows of three. And the card pictures had been given a box 104 tall whatever width the card was, so widening the cards cropped two fifths off every drawing: the box keeps the artwork's proportions at any width.
+
+</details>
+<details>
+<summary><b>1.40.0</b> &nbsp;·&nbsp; 15 Oct 2026 &nbsp;·&nbsp; The header carries the whole site</summary>
+
+*Flood history* is two screens, the ranked areas and the same areas as a map, and the map could be reached only from a button half way down the ranked page (#267). It is a menu now: the label still goes to the ranking, the caret beside it opens both destinations, and the menu opens on hover as the team asked, without hover being the only way in (#269). *Comparison* joins the bar between it and the full map (#268), which reverses the team's note of 10 October that the comparison shows under the tutorial branch; that reversal is recorded where the decision is. Making the menu read as a box turned up three defects in the hover work, the worst of which left a touch screen no way to open it at all (#272).
+
+</details>
+<details>
+<summary><b>1.39.0</b> &nbsp;·&nbsp; 13 Oct 2026 &nbsp;·&nbsp; What the frontend does and what the backend does, in two languages</summary>
+
+Asked for on 13 October: a document saying which part does what (#264). It leads with the honest summary rather than an even three-tier picture, because this product is mostly frontend: the map, the layers, the water paths, the comparison, the plan and the report are all computed in the browser. A Chinese companion followed (#265), written for the person who has to demonstrate the product and work out where to look when something is wrong, rather than translated for the mentor.
+
+</details>
+<details>
+<summary><b>1.38.0</b> &nbsp;·&nbsp; 12 Oct 2026 &nbsp;·&nbsp; One table of every criterion, and the defect that running it found</summary>
+
+The acceptance criteria of all three iterations in one table, a self test that reaches every requirement, and an order to hand a peer mentor (#260): 67 rows, 19 from Iteration 1, 23 from Iteration 2 and 25 from Iteration 3. Running section 2 end to end immediately found one (#261): finishing a guide and pressing *Start next guide* never recorded the guide just left, so `drainlens.learned` stayed at `000000` and the chooser went on saying *0 of 7 guides done*.
+
+</details>
+<details>
+<summary><b>1.37.0</b> &nbsp;·&nbsp; 12 Oct 2026 &nbsp;·&nbsp; Six from the 12 October list, one of them reverted the same day</summary>
+
+The *Recorded subcatchment area* chip is named for what somebody is at it for, *Spot a problem?*, with the layer, the boundary, the card and the toggle all unchanged (#256). The two wide cards get a picture composed at their own proportions rather than one cropped from the short frame (#257). The report panel now closes with the chip that opened it, the way the pit card follows Drain pits (#262). The comparison's drain drawings left the `<legend>` they were illegally nested in, which is what caused the blank space after the information fold, and it offers only addresses it can actually answer (#263). The before-rain checks were made to stay on the map at every zoom (#258) and reverted the same day at the team's request (#259), which puts the behaviour that prompted it back as well.
+
+</details>
+<details>
+<summary><b>1.36.0</b> &nbsp;·&nbsp; 12 Oct 2026 &nbsp;·&nbsp; The team's bug list of 11 October</summary>
+
+Items 1 to 8 of `bugg.docx`. One ring, in the amber the map chips already pulse in, instead of each card growing its own two pixels of brand green, and it scrolls the thing it points at into view, because step five was saying *Click Check the street drains near you* beside a panel that was not showing it (#253). The sweep note reads as one sentence folded or open, and the stray green box around it was the card's own ring (#254). The 200 m ring both before-rain views have always described in words is drawn (#255), along with the report chip and cards that keep their heading when the chip row scrolls over them.
+
+</details>
+<details>
+<summary><b>1.35.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; A street under the address screen, and the team's logo</summary>
+
+The team's image on the address screen, AI generated and recorded in `IMAGE-CREDITS.md` under a new *Generated images* heading with what it is not: not Kensington, not the reader's street, not anything this product has measured (#242). It took two more tries to make it read, both wrong in opposite directions, before the chooser's own full-bleed treatment was used instead of a third invention (#250). The logo from `Logo.zip` replaces the stand-in square in the masthead and fills a gap nobody had noticed: the site had no favicon at all (#252).
+
+</details>
+<details>
+<summary><b>1.34.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; Recent addresses, one way to the area map, and one card at a time</summary>
+
+Searching a second address and wanting the first one back meant typing it again; both search fields now offer what was looked up earlier in this tab, held on the session object and written nowhere else (#249). The area map had two ways in, a quiet line under the lead and a panel at the foot of the page; the panel is deleted and the button is in the header where the mock-up draws it (#247). And two effects were opening Place 1 without anybody pressing anything, so an address searched with the checks on came up with two cards stacked; both open the address card now, which is the one that has the way in (#244).
+
+</details>
+<details>
+<summary><b>1.33.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; The map's search asks the API too, and the line under it catches up</summary>
+
+The 9 October decision moved a submitted address search to the API and it had been wired into the first screen alone, so the full map's box, the one a returning reader starts at, went on answering from the index in the browser (#245). The grey line under the address field still read *Your address stays in this browser only*, which had stopped being true on 9 October (#246). Three more labels still said *test* where the team's wording says compare (#239).
+
+</details>
+<details>
+<summary><b>1.32.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; The Iteration 3 Figma as it stands today</summary>
+
+Everything an 11 October comparison against the Figma file turned up, built (#240). The file changed during the comparison: two readings an hour apart, with Epic 6's guide rewritten between them, so Epic 6's card became *Spot a drainage problem?* and its guide three steps about reporting rather than five about a boundary. The heavy rain guide's fifth step was missing for the 58.6% of addresses that have no published marker within 200 m (#238). The printed plan says what each general action means, in the team's own confirmed words (#241), and the report card and its chip are drawn from the frames rather than from what the card used to be about (#243).
+
+</details>
+<details>
+<summary><b>1.31.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; An architecture figure, generated rather than drawn</summary>
+
+A diagram of what is actually deployed, drawn after the AI service landed so it is the deployed shape and not the planned one (#235). Two of the three numbers in it were wrong, put there from memory: 30 pipeline modules for 32, 17 tables for 18. Iteration 1 had hit the same problem and answered it with a generator, so the generator is back, in that figure's layout with Iteration 3's content (#237).
+
+</details>
+<details>
+<summary><b>1.30.0</b> &nbsp;·&nbsp; 11 Oct 2026 &nbsp;·&nbsp; The review that rewrote the audit, and the error it caught</summary>
+
+A teammate reviewed the previous day's audit and rewrote most of its proposed text, fifteen replacements, their file added beside the original rather than over it (#236). They caught a real error in the proposal: it had said that a result showing no difference means the water near you has somewhere else to go. The model establishes no such thing. It compares accumulated water between two assumptions, and the absence of a difference is not a statement about where the water went.
+
+</details>
+<details>
+<summary><b>1.29.0</b> &nbsp;·&nbsp; 10 Oct 2026 &nbsp;·&nbsp; A plain English audit, and no changes to go with it</summary>
+
+`docs/PLAIN-ENGLISH-AUDIT.md`, one file, and no product changes to go with it (#230). It opens by admitting what it cannot be: the harness asks the auditor not to fill gaps from their knowledge of the project, and the person running it had written most of the wording being audited, so a confidence score from them is a reconstruction of ignorance rather than the real thing. The report says so in its second sentence.
+
+</details>
+<details>
+<summary><b>1.28.0</b> &nbsp;·&nbsp; 10 Oct 2026 &nbsp;·&nbsp; The comparison band in the team's words, and a parser error on screen</summary>
+
+The comparison band's heading, description and note replaced verbatim with the block the team sent on 10 October (#234). And the chat panel read the response body before it checked the status, so every failure that answered with something other than JSON threw out of the parser and put the parser's own message on screen: a resident asking how to get ready for heavy rain would have read *Unexpected non-whitespace character* (#233).
+
+</details>
+<details>
+<summary><b>1.27.0</b> &nbsp;·&nbsp; 10 Oct 2026 &nbsp;·&nbsp; A phone layout, decided rather than transcribed</summary>
+
+There is no mobile frame in Figma, so this is a set of decisions and each one says in the file what it gave up (#231). Targets of 375 x 667 and 390 x 844, and a breakpoint of 560, which is not a new number: `fitBounds` has called it `NARROW_FRAME_PX` since Iteration 2.
+
+</details>
+<details>
+<summary><b>1.26.0</b> &nbsp;·&nbsp; 10 Oct 2026 &nbsp;·&nbsp; The map remembers the address, and the bar reaches the last two screens</summary>
+
+The full map used to clear the address on every visit, on a team decision of 16 September. Half of that is reversed and separating the halves is the point: no route to this map invents an address, but one carried there is kept (#228). The before-rain checks also stopped needing to be zoomed into before their card would appear. The flood area map and the comparison get the navigation bar, each marked with the section it belongs to (#229).
+
+</details>
+<details>
+<summary><b>1.25.0</b> &nbsp;·&nbsp; 10 Oct 2026 &nbsp;·&nbsp; Epic 6's guide from the frames, and a report that stops printing a house number</summary>
+
+Three of Epic 6's four guide steps were invented and the design has four others about reporting, so the guide was rebuilt from D3 and D4 rather than from memory (#226). The report summary opened with *46 Gatehouse Drive, Kensington* and now reads *Gatehouse Drive, Kensington*: the page goes to a council officer about a drain in a public street, and the street locates the problem without the reporter's house number leaving the device (#227). Six more sentences were replaced with the team's exact wording rather than paraphrased (#225).
+
+</details>
+<details>
+<summary><b>1.24.0</b> &nbsp;·&nbsp; 9 Oct 2026 &nbsp;·&nbsp; The address search goes to the API, and the promise it withdrew</summary>
+
+The tech mentor observed that the address had no API, which was correct: no route, no table, 62,397 council addresses shipped as a 1.33 MB file and searched in the browser. A submitted search now goes to `POST /api/addresses/search` over the same Postgres, with the bundled index still answering suggestions and still answering what the database cannot (#223). What made it a decision rather than a task is that the product promised otherwise on screen in two places, and those two sentences were withdrawn in the same change rather than left to go stale. The first deploy of it failed its health check, because the API image shipped the shared package's manifest and not its build output (#224).
+
+</details>
+<details>
+<summary><b>1.23.0</b> &nbsp;·&nbsp; 9 Oct 2026 &nbsp;·&nbsp; The twelve bugs of 9 October</summary>
+
+All twelve from `Bugs.docx`, in five changes. A control is drawn as a control, rather than as an underlined word used for things that are not links (#216). The before-rain checks open at a view their marks are actually drawn at, since a sign over a street nobody can see is a claim about that street (#217). The sidebar folds to a rail instead of only closing, and a report knows which screen it came from (#218). A report can name more than one drain, because one blocked street floods at the two or three inlets that take it (#219). And the chooser says where to start, marking the first card rather than numbering all six (#220).
+
+</details>
+<details>
+<summary><b>1.22.0</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; The address card, the street drains list and the design's four actions</summary>
+
+Figma A9 and A8, read from the file rather than from a screenshot: the address card and a place card are open at once, as the frames draw them (#210), and the card's body is the design's two sentences rather than the compass figure the product had drawn (#211). The plan's third step is the list of drains the frames show, not a layer of circles switched on behind the reader (#212). The four general actions are the design's four, with the team's photographs, where the product had shipped a different three (#213); the three new ones were approved on 8 October and the register says so (#214).
+
+</details>
+<details>
+<summary><b>1.21.0</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; The 8 October list, and the hold in front of the full map</summary>
+
+Nine items. The report's list stopped looking like a form nobody can submit (#203). Three map fixes: the plan opens when the last place is answered, and a card and the plan are no longer mutually exclusive (#204). The navigation bar reaches all four pages (#205). The chooser offers an address instead of promising one (#207). Every tip carries a drawing and the printed page honours what was ticked, both of which overturn something the code had recorded as deliberate (#208). The comparison has a way out that goes where it says (#209). And the hold in front of the full map stays, which is a choice between two reviews that asked for opposite things in the same week (#190).
+
+</details>
+<details>
+<summary><b>1.20.0</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; Five places the product and the design had drifted apart</summary>
+
+Found by walking the deployed site against the Figma frames (#200). The homepage heading said *Four ways* over six cards. The plan had no *How this plan works* fold and no speech bubble on its Ask row. The area card's rows named *Local streets* and *Main drains* where the design names what they are.
+
+</details>
+<details>
+<summary><b>1.19.0</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; Both of Cloud Run's URLs, and the variable that silently undid the fix</summary>
+
+The dev site said the full council map was not available while `curl` against the same API returned 6.9 MB. Cloud Run publishes a service at two origins and the API allowed only the old form of each (#199). The fix was deployed at the right commit and the API went on refusing the new URLs, because an `ALLOWED_ORIGINS` set at some earlier deploy **replaced** the list in code rather than adding to it, and was still naming the five old origins (#201). It adds now, and the environment can no longer quietly undo a fix.
+
+</details>
+<details>
+<summary><b>1.18.1</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; Four fixes to the map's cards and chips</summary>
+
+Out of a guide goes back to the chooser rather than to the search box, which is where the reader picked the guide (#195). The place card hides with its marker, the rule every other anchored card on this map already had (#196). The fold control sits at the start of the chip row, so the row collapses towards the button and expands away from it instead of the two controls being at opposite ends (#197). And the corner cards are a column with a measured offset rather than each guessing `top: 64`, which had two of them exactly on top of each other (#198).
+
+</details>
+<details>
+<summary><b>1.18.0</b> &nbsp;·&nbsp; 8 Oct 2026 &nbsp;·&nbsp; Ask about getting ready, built from a register and then handed over</summary>
+
+Epic 5's assistant panel, from the Figma page of 7 October: ten answers in a register with the pages each was written from under it, a state for questions no official guide can answer, and a state for an emergency (#194). It was then withdrawn, because it was a second implementation of the same frames and the retrieval prototype in `assistant/` is somebody else's work; what stays is the slot, with the design's wording and position and `Coming soon` in it (#202). The decision underneath that was recorded separately, since a resident's typed question now leaves the browser for the first time in this product's life (#221).
+
+</details>
+<details>
+<summary><b>1.17.1</b> &nbsp;·&nbsp; 4 Oct 2026 &nbsp;·&nbsp; One "and" in the list of searchable suburbs</summary>
+
+Spotted while walking the deployed build: the no-match line read *Docklands and East Melbourne, and 10 more*. Counting the remainder as the last item keeps the sentence to one conjunction whether or not there is a remainder (#189).
+
+</details>
 <details>
 <summary><b>1.17.0</b> &nbsp;·&nbsp; 4 Oct 2026 &nbsp;·&nbsp; Get started asks which of the two things you are here for</summary>
 
