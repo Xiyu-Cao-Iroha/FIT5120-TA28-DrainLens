@@ -2273,6 +2273,8 @@ export function MapView({
           >
             <button
               type="button"
+              // Epic 5's first step points here (frame E5/01).
+              {...ringProps(pulsePress === 'check-button')}
               onClick={() => {
                 setPlanOpen(true);
                 setOpenPlace(places[0]?.number ?? null);
