@@ -1354,6 +1354,13 @@ export function MapView({
           *选的 drain 在地图上没有高亮，找不到是哪个* (9 October).
         */
         suggestedPit={pitsDrawn ? (pickedPitNumber ?? highlightPit) : null}
+        /*
+          The arrow on the mark the canvas draws, for the guide steps that
+          ask for a press on one: the teaching pit in Recorded drainage, and
+          the offered drain in the comparison.
+        */
+        pulseSuggested={pulsePress === 'pit' || pulsePress === 'drain'}
+        pulseZoomIn={pulsePress === 'zoom-in'}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
@@ -1912,6 +1919,8 @@ export function MapView({
           at={toScreen(viewport, hit.feature.c)}
           within={calloutWithin}
           title={publicLabelOf(hit.feature)}
+          // The guide's sixth step asks for the button this card carries.
+          pulseAction={pulsePress === 'trace' && followed === null}
           // A grey source line at the foot, not a badge (copy audit v4, #30).
           source="recorded"
           action={

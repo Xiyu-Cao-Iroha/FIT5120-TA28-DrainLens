@@ -31,6 +31,7 @@ import { LAYER } from '../ui/terms.js';
 import { narrowNow } from '../ui/narrow.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
 import { WARNING_EDGE, WARNING_FILL } from './warnings.js';
+import { ringProps } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -219,7 +220,7 @@ function Chip({
   return (
     <button
       type="button"
-      className={pulse ? 'chip--pulse' : undefined}
+      {...ringProps(pulse)}
       data-tour={tour}
       onClick={onToggle}
       disabled={disabled}
@@ -294,7 +295,7 @@ export function PlainChip({
   return (
     <button
       type="button"
-      className={pulse ? 'chip--pulse' : undefined}
+      {...ringProps(pulse)}
       onClick={onPress}
       aria-expanded={on}
       style={{
@@ -562,7 +563,7 @@ export function LayerChips({
         <button
           type="button"
           data-tour="layers"
-          className={pulseLayers ? 'chip--pulse' : undefined}
+          {...ringProps(pulseLayers)}
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -625,7 +626,7 @@ export function LayerChips({
                 <label
                   key={key}
                   title={disabled ? `${spec.label} is still loading` : spec.label}
-                  className={pulsePanelKey === key ? 'chip--pulse' : undefined}
+                  {...ringProps(pulsePanelKey === key)}
                   style={{
                     display: 'flex',
                     gap: space(3),
@@ -770,7 +771,7 @@ export function MapLegend({
             setOpen((v) => !v);
           }}
           aria-expanded={open}
-          className={pulseTerrain && !open && state.terrain ? 'chip--pulse' : undefined}
+          {...ringProps(pulseTerrain && !open && state.terrain)}
           style={{
             marginLeft: 'auto',
             background: 'none',
@@ -868,7 +869,7 @@ function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly puls
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
     <div
-      className={pulse ? 'chip--pulse' : undefined}
+      {...ringProps(pulse)}
       style={{
         marginTop: space(3),
         // Room for the outline without moving the scale: padded by as much as

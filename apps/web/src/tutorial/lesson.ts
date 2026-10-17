@@ -462,7 +462,19 @@ export type Press =
   | 'pick-banner'
   | 'use-drain'
   /** Epic 6's last step, which points at the row the answer landed in. */
-  | 'which-drain';
+  | 'which-drain'
+  /*
+    And the three outside Epic 5 and 6, from the same note's arrow pass.
+
+    `pit` and `drain` are marks on the canvas rather than controls, so what
+    carries them is an empty span the map puts at the mark's own projected
+    position: there is no element to measure otherwise, and a fixed
+    coordinate would be wrong the moment the map moved.
+  */
+  | 'trace'
+  | 'zoom-in'
+  | 'pit'
+  | 'drain';
 
 export function pressFor(requires: Requirement): Press | null {
   switch (requires) {
@@ -482,6 +494,18 @@ export function pressFor(requires: Requirement): Press | null {
       return 'pick-banner';
     case 'drain-chosen':
       return 'use-drain';
+    /*
+      The ringed pit itself, and then the button on the card it opens.
+
+      Both were listed as *answered by something the reader is already
+      looking at* until 17 October, when the team asked for an arrow on
+      every map control a step asks to be pressed. A ring around a dot
+      among forty dots is exactly the ambiguity the mentor reported.
+    */
+    case 'pit-selected':
+      return 'pit';
+    case 'trace-following':
+      return 'trace';
     /*
       The pair of answers on the place card, not either one of them.
 

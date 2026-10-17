@@ -462,10 +462,6 @@ describe('what the ground height guide added to every lesson', () => {
 describe('every step has something to point at', () => {
   /** Waits whose target is the thing the step is already about. */
   const ANSWERED_ELSEWHERE: Readonly<Record<string, string>> = {
-    // The guide rings the teaching pit on the map itself.
-    'pit-selected': 'the ringed pit',
-    // The button is on the card the press before it opened.
-    'trace-following': 'the open pit card',
     // The button is the address card's one filled control.
     'plan-opened': 'the address card',
   };
@@ -483,6 +479,18 @@ describe('every step has something to point at', () => {
         step.requires in ANSWERED_ELSEWHERE;
       expect(marked, `${step.id} waits on ${step.requires} with nothing marked`).toBe(true);
     }
+  });
+
+  it('marks the pit and the button on its card, which were exempt until 17 October', () => {
+    /*
+      Both were listed above as answered by what the reader is already
+      looking at: a ring round the teaching pit, and a card with one button
+      on it. The team's arrow pass says every map control a step asks to be
+      pressed gets an arrow, and a ring round one dot among forty is the
+      ambiguity the mentor reported.
+    */
+    expect(pressFor('pit-selected')).toBe('pit');
+    expect(pressFor('trace-following')).toBe('trace');
   });
 
   it('marks the four things Epic 6 asks for, none of them a map marker', () => {

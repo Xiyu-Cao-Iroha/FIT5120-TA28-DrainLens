@@ -15,6 +15,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 import { ink, line, radius, shadow, space, surface, text, type, weight } from '../ui/theme.js';
+import { ringProps } from '../ui/GuideRing.js';
 
 /** One press of + or −. Gentler than a wheel notch, which is a whole gesture. */
 export const STEP = 1.55;
@@ -62,11 +63,13 @@ function ControlButton({
   glyph,
   onPress,
   disabled = false,
+  pulse = false,
 }: {
   readonly label: string;
   readonly glyph: ReactNode;
   readonly onPress: () => void;
   readonly disabled?: boolean;
+  readonly pulse?: boolean;
 }) {
   return (
     <button
@@ -75,6 +78,7 @@ function ControlButton({
       disabled={disabled}
       aria-label={label}
       title={label}
+      {...ringProps(pulse)}
       style={{
         width: 34,
         height: 34,
@@ -117,6 +121,8 @@ const Crosshair = (
 
 export interface MapControlsProps {
   readonly onZoomIn: () => void;
+  /** The low areas guide's third step says *zoom in* (17 October). */
+  readonly pulseZoomIn?: boolean | undefined;
   readonly onZoomOut: () => void;
   readonly canZoomIn: boolean;
   readonly canZoomOut: boolean;
@@ -136,6 +142,7 @@ export interface MapControlsProps {
 
 export function MapControls({
   onZoomIn,
+  pulseZoomIn = false,
   onZoomOut,
   canZoomIn,
   canZoomOut,
@@ -197,7 +204,13 @@ export function MapControls({
       )}
 
       <div style={{ ...SURFACE, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <ControlButton label="Zoom in" glyph={Plus} onPress={onZoomIn} disabled={!canZoomIn} />
+        <ControlButton
+          label="Zoom in"
+          glyph={Plus}
+          onPress={onZoomIn}
+          disabled={!canZoomIn}
+          pulse={pulseZoomIn}
+        />
         <span aria-hidden style={{ height: 1, background: line.hair }} />
         <ControlButton label="Zoom out" glyph={Minus} onPress={onZoomOut} disabled={!canZoomOut} />
       </div>

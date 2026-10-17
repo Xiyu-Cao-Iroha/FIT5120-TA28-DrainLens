@@ -127,7 +127,14 @@ export interface PitDetailProps {
   readonly onClear: () => void;
 }
 
-export function PitDetail({ pit, map, artefact, trace, onFollow, onClear }: PitDetailProps) {
+export function PitDetail({
+  pit,
+  map,
+  artefact,
+  trace,
+  onFollow,
+  onClear,
+}: PitDetailProps) {
   const [sectionOpen, setSectionOpen] = useState(false);
   const asset = pit.asset_number === undefined ? null : String(pit.asset_number);
   const links = asset === null ? undefined : artefact.links[asset];
