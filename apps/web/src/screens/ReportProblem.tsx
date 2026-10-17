@@ -18,7 +18,7 @@
 
 import { useState } from 'react';
 
-import { plainButton } from '../ui/controls.js';
+import { plainButton, quietBrandButton } from '../ui/controls.js';
 import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
 import { printDocument } from '../prepare/printing.js';
 import { type Channel } from '../report/channels.js';
@@ -257,10 +257,22 @@ export function ReportProblem({
               <li key={item.id} style={{ marginBottom: space(2) }}>
                 <Include title={item.label} detail={item.value} note={item.note} />
                 {item.id === 'drain' && (
-                  <span style={{ display: 'block', marginLeft: 26 }}>
+                  <span style={{ display: 'block', marginLeft: 26, marginTop: space(1) }}>
                     {place === null
                       ? onPick !== undefined && (
-                          <button type="button" onClick={onPick} style={{ ...linkStyle, font: type(text.micro) }}>
+                          /*
+                            **Drawn as a button, and the green one** (team,
+                            17 October). Every other field in this list is
+                            something the report already knows; this is the
+                            one line asking the reader to go and do
+                            something, and it was the quietest thing on the
+                            screen: borderless, in the smallest type the
+                            product has, under a grey line saying nothing is
+                            chosen. `quietBrandButton` is the shape this
+                            product gives a way on, so it is that rather
+                            than a fourth kind of control.
+                          */
+                          <button type="button" onClick={onPick} style={quietBrandButton}>
                             {PICK_ON_MAP} ›
                           </button>
                         )
