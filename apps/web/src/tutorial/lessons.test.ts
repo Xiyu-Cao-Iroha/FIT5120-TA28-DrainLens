@@ -203,7 +203,21 @@ describe.each(written)('%s', (_label, lesson, id) => {
       expect(step.body ?? '').not.toContain('—');
       if (step.kind === 'do') {
         expect(words(step.prompt)).toBeLessThanOrEqual(16);
-        expect(step.prompt).not.toMatch(/^Select\b/);
+        /*
+          **`Select` was banned here on 15 September and is not banned now.**
+          The copy audit made `Click` the house verb and this line enforced
+          it. The team's 17 October frames write Epic 5's first instruction
+          as *Select Check before heavy rain* and Epic 6's as *Select Spot a
+          problem*, and the same note says to leave the other guides'
+          wording alone, so the two verbs now stand side by side.
+
+          Nothing replaces the rule. A per-guide version was tried and is
+          wrong: only the steps that name a control open with either verb,
+          and the rest say *Choose*, *Decide*, or state a fact. One verb per
+          guide is not a rule this copy follows, and asserting it would be
+          inventing one. The split is for the wording audit the team has
+          asked for.
+        */
       } else if (isPressFeedback(lesson.steps[at - 1])) {
         expect(words(step.prompt)).toBeLessThanOrEqual(13);
         // Feedback states what happened. A question here is a step still
@@ -302,16 +316,18 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, terrain: true });
     case 'plan-opened':
       return latch(state, { ...state, planOpen: true, planOpened: true });
-    case 'place-reviewed':
-      return latch(state, { ...state, placesReviewed: state.placesReviewed + 1 });
-    case 'why-opened':
-      return latch(state, { ...state, whyOpen: true });
+    case 'places-reviewed':
+      /*
+        Every place answered, which is what the requirement now means. The
+        count is set rather than incremented: a step satisfied by one answer
+        out of three was the defect the team reported on 17 October, and a
+        harness that walked there one at a time would not have caught it.
+      */
+      return latch(state, { ...state, placeCount: 3, placesReviewed: 3 });
     case 'report-opened':
       return latch(state, { ...state, reportOpened: true });
     case 'problem-chosen':
       return latch(state, { ...state, problemChosen: true });
-    case 'drains-opened':
-      return latch(state, { ...state, drainsOpened: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'terrain-off':
@@ -440,8 +456,6 @@ describe('every step has something to point at', () => {
     'pit-selected': 'the ringed pit',
     // The button is on the card the press before it opened.
     'trace-following': 'the open pit card',
-    // The two answers are the only controls on the place card.
-    'place-reviewed': 'the place card',
     // The button is the address card's one filled control.
     'plan-opened': 'the address card',
   };
@@ -461,9 +475,14 @@ describe('every step has something to point at', () => {
     }
   });
 
-  it('rings the fold under the reminder, and the button under the plan', () => {
-    expect(pressFor('why-opened')).toBe('why');
-    expect(pressFor('drains-opened')).toBe('drains');
+  it('rings the controls that live inside a card', () => {
+    /*
+      It rang the fold under the reminder and the button under the plan
+      until 17 October, when the two steps that asked for those presses were
+      removed from Epic 5. What is left is the pair of answers on the place
+      card, and Epic 6's two.
+    */
+    expect(pressFor('places-reviewed')).toBe('place');
     expect(pressFor('report-opened')).toBe('report');
     expect(pressFor('problem-chosen')).toBe('problem');
   });

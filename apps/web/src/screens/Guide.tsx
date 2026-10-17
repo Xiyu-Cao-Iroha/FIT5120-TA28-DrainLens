@@ -347,7 +347,15 @@ export function Guide({
     was one small triangle among three, with nothing to say which. A chip
     pulses; these had no equivalent and now do.
   */
-  const pulsePress = waiting && step.kind === 'do' ? pressFor(step.requires) : null;
+  /*
+    What this step marks: what it waits for, or what it says to read.
+
+    A `do` step marks the control it is waiting for and stops marking it the
+    moment it is done. A step with `points` marks that for as long as it is
+    shown, which is what a reading step needs -- there is no press to end it.
+  */
+  const pulsePress =
+    step?.points ?? (waiting && step?.kind === 'do' ? pressFor(step.requires) : null);
   const highlight =
     intro === null && step !== undefined && (step.kind !== 'do' || waiting) ? highlightFor(step, now) : null;
 

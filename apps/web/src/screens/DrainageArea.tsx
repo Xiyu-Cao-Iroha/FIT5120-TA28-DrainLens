@@ -428,9 +428,21 @@ export function MapNote({
   children,
   fill = false,
   width = CARD_WIDTH,
+  pulse = false,
 }: {
   readonly title: string;
   readonly children: ReactNode;
+  /**
+   * The guide is pointing at this whole card.
+   *
+   * On the card rather than on what is inside it, which is the shape of a
+   * defect worth keeping: Epic 5's review step first marked the plan's own
+   * root, and a `fill` card scrolls its body, so the outline was drawn
+   * round a box several times taller than the card and clipped to a line
+   * across the top. The arrow aimed at the middle of that box, which was
+   * off the bottom of the window.
+   */
+  readonly pulse?: boolean;
   /**
    * Scroll the body and keep the heading, for a card taller than the map.
    *
@@ -443,9 +455,13 @@ export function MapNote({
   readonly fill?: boolean;
   readonly width?: number;
 }) {
+  const ref = useRingIntoView<HTMLElement>(pulse);
+
   return (
     <section
+      ref={ref}
       aria-label={title}
+      {...ringProps(pulse)}
       style={{
         pointerEvents: 'auto',
         width,

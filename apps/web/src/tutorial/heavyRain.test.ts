@@ -1,11 +1,17 @@
 /**
  * The before-rain guide's shape, which the screens are built around.
  *
- * The order of the steps is the design's order (Figma G1 to G6), and it is
- * the one thing about this lesson that the screen cannot keep by itself: the
- * place card closes on an answer, so a step that asked about the card *after*
- * the answer would be pointing at something that had gone. The test is here
- * because that mistake was made once and read perfectly well in the source.
+ * The order of the steps is the design's order (the REVISED E5 frames of
+ * 17 October), and it is the one thing about this lesson that the screen
+ * cannot keep by itself: the place card closes on an answer, so a step that
+ * asked about the card *after* the answer would be pointing at something
+ * that had gone. The test is here because that mistake was made once and
+ * read perfectly well in the source.
+ *
+ * **It was six steps until 17 October.** What went, and what the tests for
+ * those steps were holding, is in `heavyRain.ts`. Three of the removals are
+ * only removals from the guide: the fold and the street drain list are
+ * still in the product and still tested by the screens that draw them.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -18,87 +24,63 @@ import {
 } from './heavyRain.js';
 import { type MapNow, NOTHING_ON_MAP, finished, satisfied } from './lesson.js';
 import { NOTHING_ON } from '../map/modes.js';
-import { CHECK_STREET_DRAINS, checkButton } from '../prepare/places.js';
+import { checkButton } from '../prepare/places.js';
 
 describe('the order of the steps', () => {
-  it('follows the design: press, decide, read the plan, open why, check the drains', () => {
-    // Figma G1 to G6. The order was once rearranged to put *Why this place?*
-    // on the place's card at step two, which is not what the design does: the
-    // explanation is step four and it is opened in the plan, under the
-    // reminder the answer has just created.
+  it('follows the design: open the plan, answer, read the plan', () => {
     expect(HEAVY_RAIN_STEPS.map((step) => step.id)).toEqual([
       'plan-opened',
-      'place-reviewed',
-      'plan-updated',
-      'why-shown',
-      'drains-shown',
-      'drains-read',
+      'places-reviewed',
+      'plan-reviewed',
     ]);
   });
 
-  it('waits on a press for the four steps that are presses', () => {
+  it('waits on a press for the two steps that are presses', () => {
     const waits = HEAVY_RAIN_STEPS.filter((step) => step.kind === 'do');
-    expect(waits.map((step) => step.requires)).toEqual([
-      'plan-opened',
-      'place-reviewed',
-      'why-opened',
-      'drains-opened',
-    ]);
+    expect(waits.map((step) => step.requires)).toEqual(['plan-opened', 'places-reviewed']);
+  });
+
+  it('ends on a reading step, which is the one that has Next', () => {
+    // *Next is the only required action* on the review step, and a `read`
+    // step is the kind that has one. A `do` step there would be waiting for
+    // something the design says not to ask for.
+    const last = HEAVY_RAIN_STEPS.at(-1);
+    expect(last?.kind).toBe('read');
+    expect(last?.kind === 'read' ? last.note : '').toMatch(/No checkbox or other choice/);
   });
 
   it('gives the decision its own feedback, so the step after it can instruct', () => {
     // Without it the guides' own rule would require *Great! …* where the
-    // design writes *Review the reminder added to your plan*.
-    const decide = HEAVY_RAIN_STEPS.find((step) => step.id === 'place-reviewed');
+    // design writes *Review the reminder, then select Next*.
+    const decide = HEAVY_RAIN_STEPS.find((step) => step.id === 'places-reviewed');
     expect(decide?.kind === 'do' ? decide.done : undefined).toBeDefined();
   });
 
   it('counts either answer as the decision it asked for', () => {
     // AC 5.4.1: *doesn't apply to me* is a review.
-    expect(satisfied('place-reviewed', { ...NOTHING_ON_MAP, placesReviewed: 1 }, null)).toBe(true);
-    expect(satisfied('place-reviewed', NOTHING_ON_MAP, null)).toBe(false);
-  });
-});
-
-/**
- * The street drain check, which was drawn and never built.
- *
- * Figma G6 and G6b are the guide's fifth step, and until 11 October the
- * lesson stopped at step four. The plan's button was also passed only when no
- * guide was running, so the step could not have been finished if it had
- * existed.
- */
-describe('the street drain check', () => {
-  it('is the last thing both versions do', () => {
-    // The press has different words in the two versions, G6 against G2z, and
-    // waits on the same thing. What the list shows afterwards is the one
-    // reading, shared, so it cannot be changed in one and not the other.
-    for (const steps of [HEAVY_RAIN_STEPS, HEAVY_RAIN_NO_PLACES_STEPS]) {
-      const press = steps.at(-2);
-      expect(press?.kind === 'do' ? press.requires : null).toBe('drains-opened');
-      expect(steps.at(-1)?.id).toBe('drains-read');
-    }
-    expect(HEAVY_RAIN_STEPS.at(-1)).toBe(HEAVY_RAIN_NO_PLACES_STEPS.at(-1));
+    const one = { ...NOTHING_ON_MAP, placeCount: 1 };
+    expect(satisfied('places-reviewed', { ...one, placesReviewed: 1 }, null)).toBe(true);
+    expect(satisfied('places-reviewed', one, null)).toBe(false);
   });
 
-  it('names the button the plan actually draws', () => {
-    const press = HEAVY_RAIN_STEPS.find((step) => step.id === 'drains-shown');
-    expect(press?.prompt).toBe(`Click ${CHECK_STREET_DRAINS}.`);
+  it('waits for every place, not for the first one', () => {
+    /*
+      The team's 17 October note: *save each relevant place decision; show
+      review after the last one is saved*, and the review frame says *3 of 3
+      reviewed*. Until then one answer out of three satisfied this step, and
+      the reader reached a plan that was still asking them something.
+    */
+    const three = { ...NOTHING_ON_MAP, placeCount: 3 };
+    expect(satisfied('places-reviewed', { ...three, placesReviewed: 1 }, null)).toBe(false);
+    expect(satisfied('places-reviewed', { ...three, placesReviewed: 2 }, null)).toBe(false);
+    expect(satisfied('places-reviewed', { ...three, placesReviewed: 3 }, null)).toBe(true);
   });
 
-  it('survives the list being closed again', () => {
-    // Latched, like the report guide's two presses: closing the panel does
-    // not undo the press the step was waiting for.
-    expect(satisfied('drains-opened', { ...NOTHING_ON_MAP, drainsOpened: true }, null)).toBe(true);
-    expect(satisfied('drains-opened', NOTHING_ON_MAP, null)).toBe(false);
-  });
-
-  it('reads what the list shows, which the press state could not say', () => {
-    // G6b is a heading and a paragraph. A `do` step's `done` is one line, so
-    // the frame becomes the read step after the press.
-    const read = HEAVY_RAIN_STEPS.find((step) => step.id === 'drains-read');
-    expect(read?.kind).toBe('read');
-    expect(read?.kind === 'read' ? read.note : '').toMatch(/footpath/);
+  it('is not satisfied while the markers are still loading', () => {
+    // A null count is *not known yet*. Zero answers out of an unknown number
+    // is not an answered guide, and reading it as one would walk a reader
+    // past the step for as long as the file takes to arrive.
+    expect(satisfied('places-reviewed', { ...NOTHING_ON_MAP, placesReviewed: 0 }, null)).toBe(false);
   });
 });
 
@@ -121,18 +103,26 @@ describe('an address with no places', () => {
 
   it('can be finished, which at this address the full guide cannot', () => {
     const { steps } = heavyRainFor(0);
-    const walked: MapNow = { ...emptyAddress, drainsOpened: true };
-    expect(finished(steps, walked, null, steps.length)).toBe(true);
+    expect(finished(steps, emptyAddress, null, steps.length)).toBe(true);
 
-    // The bug, kept as the comparison: every read acknowledged, the plan
-    // open and the drain list opened, and the full guide is still waiting on
-    // a decision about a place that was never drawn.
-    expect(finished(HEAVY_RAIN_STEPS, walked, null, HEAVY_RAIN_STEPS.length)).toBe(false);
+    // The bug, kept as the comparison: the plan open, every reading
+    // acknowledged, and the full guide still waiting on a decision about a
+    // place that was never drawn.
+    expect(finished(HEAVY_RAIN_STEPS, emptyAddress, null, HEAVY_RAIN_STEPS.length)).toBe(false);
   });
 
-  it('goes to the street drain check instead of deciding about a place', () => {
+  it('asks for one press only, because the rest has nothing to act on', () => {
     const waits = HEAVY_RAIN_NO_PLACES_STEPS.filter((step) => step.kind === 'do');
-    expect(waits.map((step) => step.requires)).toEqual(['plan-opened', 'drains-opened']);
+    expect(waits.map((step) => step.requires)).toEqual(['plan-opened']);
+  });
+
+  it('keeps the three steps the other version has', () => {
+    // The team's note is three steps, written for an address with places.
+    // The design draws no empty-address version of them, and a branch that
+    // was two steps long would make the progress bar mean something
+    // different at one address than at another.
+    expect(HEAVY_RAIN_NO_PLACES_STEPS).toHaveLength(HEAVY_RAIN_STEPS.length);
+    expect(HEAVY_RAIN_NO_PLACES_STEPS.at(-1)?.id).toBe(HEAVY_RAIN_STEPS.at(-1)?.id);
   });
 
   it('keeps the first step, so the answer arriving late cannot move the reader', () => {
@@ -151,7 +141,9 @@ describe('an address with no places', () => {
   it('says the absence in the words the design gives it', () => {
     const says = HEAVY_RAIN_NO_PLACES_STEPS[1];
     expect(says?.prompt).toBe('No places to check near this address.');
-    expect(says?.kind === 'do' ? says.hint : '').toMatch(/street drain check/);
+    // It pointed at the street drain check until that step was removed; what
+    // is left is the statement, which is what G2z leads with.
+    expect(says?.kind === 'read' ? says.note : '').toMatch(/published markers/);
   });
 
   it('does not promise answers that this address had nothing to give', () => {
@@ -182,8 +174,8 @@ describe('which version an address gets', () => {
     // plan is the callout on the address, which `checkButton` labels. The
     // first attempt at the empty version's step one said *See what every
     // home can do*, which is on the card and so was nowhere on screen.
-    expect(HEAVY_RAIN_NO_PLACES_STEPS[0]?.prompt).toBe(`Click ${checkButton([])}.`);
-    expect(HEAVY_RAIN_STEPS[0]?.prompt).toBe(`Click ${checkButton([])}.`);
+    expect(HEAVY_RAIN_NO_PLACES_STEPS[0]?.prompt).toBe(`Select ${checkButton([])}.`);
+    expect(HEAVY_RAIN_STEPS[0]?.prompt).toBe(`Select ${checkButton([])}.`);
   });
 });
 

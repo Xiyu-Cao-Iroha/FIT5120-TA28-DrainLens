@@ -1,33 +1,40 @@
 /**
- * Get ready for heavy rain, step by step — Epic 5's guide.
+ * Get ready for heavy rain, step by step - Epic 5's guide.
  *
- * From the team's Figma (file `atD5fleOrhvMjJ5m0pXYGt`): G1 to G5 for the
- * guide, G3-no to G4b-no for the *doesn't apply* branch, G6 and G6b for the
- * street drain check, and G1z and G2z for an address with nothing marked near
- * it. The guide turns a map layer into a reminder the reader has agreed to,
- * and every step is about that agreement rather than about the map.
+ * From the team's Figma (file `atD5fleOrhvMjJ5m0pXYGt`): the REVISED E5
+ * frames of 17 October, which replaced G1 to G6. The guide turns a map layer
+ * into a reminder the reader has agreed to, and every step is about that
+ * agreement rather than about the map.
  *
- * **Five steps and a finish page, in the design's order**: press the button,
- * decide, read what the decision put in the plan, open *Why this place?* on
- * it, check the street drains, finish. The fourth is a press rather than a
- * sentence because the fold is the one part of the plan a reader would
- * otherwise never see, and AC 5.3.1 is about what it says.
+ * **Three steps and a finish page**: open the plan, answer for every place,
+ * read what the answers put in the plan. It had six, and the team removed
+ * three of them on 17 October with a reason written on each:
  *
- * **The press states are steps of their own here, not in the design.** G4b
- * and G6b carry the same step number as G4 and G6 and show what the press
- * revealed. A `do` step's `done` line is one sentence, and both of those
- * frames carry a heading and a paragraph worth keeping, so each becomes the
- * read step that follows its press. That is already the guides' own rule for
- * what comes after a press.
+ * | Removed | Because |
+ * |---|---|
+ * | *Why this place?* | the place card already explains why it matters |
+ * | the street drain check | it is outside this heavy-rain task |
+ * | the drain list reading | the list may stay; pressing Next to acknowledge it may not |
+ *
+ * **None of those three left the product**, which is the distinction the
+ * decision cards draw: the fold is still under every reminder, and the plan
+ * still opens the street drains. What went is the guide stopping a reader
+ * on them.
+ *
+ * **The second step waits for every place, not the first one.** It was
+ * satisfied by Place 1 until 17 October, which let a reader reach a plan
+ * that was still asking them about Place 2; the design's review frame says
+ * *3 of 3 reviewed*, so now it means that.
  *
  * **The applies branch is not a branch in the steps.** The design draws two
- * sets of screens, one for *Applies to me* and one for *Doesn't apply to me*,
- * and the difference between them is what the plan shows — a reminder, or a
- * place listed with its status. The steps are the same either way. A guide
- * that forked would be telling the reader their answer was the wrong one.
+ * sets of screens, one for *Applies to me* and one for *Doesn't apply to
+ * me*, and the difference between them is what the plan shows: a reminder,
+ * or a place listed with its status. The steps are the same either way. A
+ * guide that forked would be telling the reader their answer was the wrong
+ * one.
  *
- * **An address with no places is a branch in the steps**, because two of
- * these have nothing to point at there. See `HEAVY_RAIN_NO_PLACES_STEPS`.
+ * **An address with no places is a branch in the steps**, because the second
+ * one has nothing to ask about there. See `HEAVY_RAIN_NO_PLACES_STEPS`.
  *
  * **Step one asks for a press that opens the plan**, not for a layer: the
  * before-rain markers are already drawn when the guide opens, because the
@@ -36,79 +43,45 @@
  */
 
 import { type LayerKey, NOTHING_ON } from '../map/modes.js';
-import {
-  CHECK_STREET_DRAINS,
-  NO_PLACES_MEANS,
-  PLACE_RADIUS_M,
-  checkButton,
-} from '../prepare/places.js';
-import { type Lesson, type Step } from './lesson.js';
-
-/**
- * The street drain check, which every address gets (Figma G6 and G6b).
- *
- * Shared by both versions of the guide, and the reason the empty address
- * still has somewhere to go: the slide the team marked this up on says it in
- * as many words, *no places nearby, the guide still ends with the street
- * drain check*.
- */
-const STREET_DRAIN_STEPS: readonly Step[] = [
-  {
-    kind: 'do',
-    id: 'drains-shown',
-    prompt: `Click ${CHECK_STREET_DRAINS}.`,
-    hint: 'Every address gets this check, even when no places are found nearby.',
-    requires: 'drains-opened',
-  },
-  {
-    kind: 'read',
-    id: 'drains-read',
-    prompt: 'These are the recorded street drains near you, grouped by street.',
-    note: 'Your street comes first. Look from the footpath before heavy rain, and report any drain that looks blocked.',
-  },
-];
+import { NO_PLACES_MEANS, PLACE_RADIUS_M, checkButton } from '../prepare/places.js';
+import { type Lesson } from './lesson.js';
 
 export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
     id: 'plan-opened',
-    prompt: `Click ${checkButton([])}.`,
-    hint: 'Place 1 opens straight away. The other places are numbered on the map.',
+    prompt: `Select ${checkButton([])}.`,
+    hint: 'The plan opens with the places found near this address.',
     requires: 'plan-opened',
   },
   {
     kind: 'do',
-    id: 'place-reviewed',
-    prompt: 'Decide whether Place 1 applies to you.',
-    hint: 'If you never park or leave bins here, choose Doesn’t apply to me.',
-    requires: 'place-reviewed',
+    id: 'places-reviewed',
+    prompt: 'Choose whether this place applies to you.',
+    hint: 'Choose the answer that matches how you use this place.',
+    requires: 'places-reviewed',
     /*
       Its own feedback, so the step after it can be an instruction.
 
       The guides' rule is that a read step straight after a press is praise
-      for that press -- *Great! …* -- and the design's third step is not
-      praise, it is *Review the reminder added to your plan*. The press gets
+      for that press -- *Great! ...* -- and the design's third step is not
+      praise, it is *Review the reminder, then select Next*. The press gets
       its sentence here instead, which is also where it happened.
     */
-    done: 'Your answer is in the plan.',
+    done: 'Your answers are in the plan.',
   },
   {
+    /*
+      A reading step, and the design is explicit that it is only that: *no
+      checkbox or other choice is needed here*. Next is the only action, and
+      a `read` step is the kind that has one.
+    */
     kind: 'read',
-    id: 'plan-updated',
-    prompt: 'Review the reminder added to your plan.',
-    note: 'Only places that apply to you create a reminder. Other places remain listed with their review status.',
+    id: 'plan-reviewed',
+    points: 'plan',
+    prompt: 'Review the reminder, then select Next.',
+    note: 'Read the highlighted plan panel. No checkbox or other choice is needed here.',
   },
-  {
-    kind: 'do',
-    id: 'why-shown',
-    prompt: 'Open Why this place?',
-    hint: 'Each reminder explains why DrainLens picked that place.',
-    requires: 'why-opened',
-    // Figma G4b, the state after the press. It was lost while this was the
-    // last step: the fold opened and the guide went straight to well done.
-    done: 'This is why Place 1 is on your list.',
-  },
-  ...STREET_DRAIN_STEPS,
 ];
 
 /**
@@ -140,34 +113,48 @@ export const HEAVY_RAIN_NO_PLACES_STEPS: Lesson['steps'] = [
       its count rather than its name. The two ways on that the design draws
       for an empty address (Figma A8) are on the card, which is not here.
     */
-    prompt: `Click ${checkButton([])}.`,
-    hint: 'It opens your plan. No places were marked near this address, so the plan starts at what every home can do.',
+    prompt: `Select ${checkButton([])}.`,
+    hint: 'No places were marked near this address, so the plan starts at what every home can do.',
     requires: 'plan-opened',
   },
   {
     /*
-      G2z. A statement for a heading and the instruction under it, which is
-      the design's own shape here: what the reader needs first is why the
-      step they were expecting is not there.
+      G2z, as a reading rather than a press.
+
+      It used to ask for the street drain check, which was the one press an
+      empty address had left. That step is gone from both versions of the
+      guide (17 October), so what stands here is the statement it carried:
+      why the step the reader was expecting is not there.
     */
-    kind: 'do',
+    kind: 'read',
     id: 'no-places',
     prompt: 'No places to check near this address.',
-    hint: `${NO_PLACES_MEANS} None of the published markers fall within ${String(PLACE_RADIUS_M)} m. Every address still gets the street drain check.`,
-    requires: 'drains-opened',
+    note: `${NO_PLACES_MEANS} None of the published markers fall within ${String(PLACE_RADIUS_M)} m.`,
   },
-  // G6b, the same reading as the other version gets.
-  ...STREET_DRAIN_STEPS.slice(1),
+  {
+    /*
+      The same reading step as the other version, about what is actually in
+      this plan: every home's actions, with no place reminders above them.
+      The team's three steps are written for an address with places and the
+      design draws no empty-address version of them, so this keeps their
+      shape and says what is true here.
+    */
+    kind: 'read',
+    id: 'plan-reviewed',
+    points: 'plan',
+    prompt: 'Review the plan, then select Next.',
+    note: 'Read the highlighted plan panel. No checkbox or other choice is needed here.',
+  },
 ];
 
 const FINISHED: Lesson['finished'] = {
-  headline: 'Well done! You finished the heavy rain guide.',
+  headline: 'Well done! You finished the heavy rain preparation guide.',
   unlocked:
     'Your before-rain checks and your plan are on the full map, and your answers last until you close this tab.',
 };
 
 const FINISHED_NO_PLACES: Lesson['finished'] = {
-  headline: 'Well done! You finished the heavy rain guide.',
+  headline: 'Well done! You finished the heavy rain preparation guide.',
   // Not "your answers": at this address there was nothing to answer. The plan
   // and the drain list are still there, and they are what the reader leaves
   // with.
@@ -199,8 +186,6 @@ export const HEAVY_RAIN: Lesson = {
     address is chosen, and the first step asks for the button that opens the
     plan. The chip stays offered so the layer can be taken off again.
 
-    The street drain step turns the recorded pits on and offers no chip for
-    them, which is what G6b draws: one chip, and the drains under it.
   */
   chips: (): readonly LayerKey[] => ['beforeRain'],
   // The markers are there from the start, which is what the first step's

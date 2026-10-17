@@ -49,17 +49,18 @@ export type Requirement =
   | 'terrain-off'
   /* Epic 6's chip (Figma, *Your drainage area* D1). */
   | 'catchment-on'
-  /* Epic 5's four (Figma, *Get ready for heavy rain*, G1, G2, G4 and G6). */
-  | 'plan-opened'
-  | 'place-reviewed'
-  | 'why-opened'
   /*
-    The street drain check, Figma G6.
+    Epic 5's two.
 
-    Latched, like the report guide's two: the list can be closed again, and
-    closing it does not undo the press the step was waiting for.
+    It had four, for the design's G1, G2, G4 and G6. The team cut the guide
+    to three steps on 17 October: *Why this place?* went because the place
+    card already explains the reason, and the street drain check because it
+    is outside the heavy-rain task. The fold and the drain list both stay in
+    the product; it is the steps that asked a reader to press them that are
+    gone, and these are the requirements those steps were waiting for.
   */
-  | 'drains-opened'
+  | 'plan-opened'
+  | 'places-reviewed'
   /*
     Epic 6's last two, from Figma D3 and D4.
 
@@ -133,6 +134,17 @@ interface StepExtras {
   readonly mark?: GuideMark;
   /** Outlined on the map while this step is shown. `do` steps derive theirs. */
   readonly highlight?: Highlight;
+  /**
+   * A control or panel inside a card to mark, where the step is not a press.
+   *
+   * A `do` step derives its mark from what it is waiting for (`pressFor`),
+   * which is the right answer for a step that waits. Epic 5's review step
+   * waits for nothing and still has a subject: the team's 17 October note
+   * is to *outline the entire plan panel and point an arrow to it*, and the
+   * reason the panel is not a press is the point of the step -- *no
+   * checkbox or other choice is needed here*.
+   */
+  readonly points?: Press;
 }
 
 export type Step =
@@ -235,10 +247,6 @@ export interface MapNow {
   readonly placeCount: number | null;
   /** How many numbered places the reader has answered for. */
   readonly placesReviewed: number;
-  /** *Why this place?* opened on a reminder in the plan (Figma G4). */
-  readonly whyOpen: boolean;
-  /** Latched: the street drains list has been opened (Figma G6). */
-  readonly drainsOpened: boolean;
   /** Latched: the report panel has been opened (Figma D3). */
   readonly reportOpened: boolean;
   /** Latched: a problem type has been chosen in it (Figma D4). */
@@ -263,8 +271,6 @@ export const NOTHING_ON_MAP: MapNow = {
   planOpened: false,
   placeCount: null,
   placesReviewed: 0,
-  whyOpen: false,
-  drainsOpened: false,
   reportOpened: false,
   problemChosen: false,
 };
@@ -283,7 +289,6 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
   reportOpened: before.reportOpened || next.reportOpened,
   problemChosen: before.problemChosen || next.problemChosen,
-  drainsOpened: before.drainsOpened || next.drainsOpened,
   planOpened: before.planOpened || next.planOpened || next.planOpen,
 });
 
@@ -418,7 +423,7 @@ export interface Lesson {
  *
  * Null for every step that waits on a chip, or on nothing a reader presses.
  */
-export type Press = 'report' | 'problem' | 'drains' | 'why';
+export type Press = 'report' | 'problem' | 'place' | 'plan';
 
 export function pressFor(requires: Requirement): Press | null {
   switch (requires) {
@@ -427,18 +432,15 @@ export function pressFor(requires: Requirement): Press | null {
     case 'problem-chosen':
       return 'problem';
     /*
-      The fold under the reminder (Figma G4).
+      The pair of answers on the place card, not either one of them.
 
-      It had nothing: step four said *Open Why this place?* beside a small
-      triangle among the reminder's own three lines, which is the 9 October
-      report in a second place and the team's item 2 of 11 October.
+      Ringing *Applies to me* alone would be the guide answering the
+      question it is asking. The step is satisfied by either, so the mark
+      goes round both (the team's 17 October frame calls it *Target ·
+      Choice*).
     */
-    case 'why-opened':
-      return 'why';
-    // Figma G6 rings it too, and the plan it sits in scrolls: the button is
-    // under the places, the general actions and a heading.
-    case 'drains-opened':
-      return 'drains';
+    case 'places-reviewed':
+      return 'place';
     default:
       return null;
   }
@@ -469,15 +471,13 @@ export function chipFor(requires: Requirement): LayerKey | null {
     case 'catchment-on':
       return 'catchment';
     case 'plan-opened':
-    case 'place-reviewed':
-    case 'why-opened':
+    case 'places-reviewed':
     case 'report-opened':
     case 'problem-chosen':
-    case 'drains-opened':
       /*
-        None is a chip: the address card's button, a choice on a place's own
-        card, a fold under a reminder in the plan, and two controls inside
-        the card the boundary chip has already drawn.
+        None is a chip: the address card's button, the two answers on a
+        place's own card, and two controls inside the card the boundary chip
+        has already drawn.
 
         **A reader still has to be able to find them**, which is the
         9 October report that the guide said *Now open Why are there
@@ -537,14 +537,21 @@ export function satisfied(
   switch (requires) {
     case 'plan-opened':
       return now.planOpened;
-    case 'place-reviewed':
-      // Any answer counts, including *doesn't apply to me*: the step asks for
-      // a decision, and both are decisions (AC 5.4.1).
-      return now.placesReviewed > 0;
-    case 'why-opened':
-      return now.whyOpen;
-    case 'drains-opened':
-      return now.drainsOpened;
+    case 'places-reviewed':
+      /*
+        Every place, not the first one.
+
+        Any answer counts for each, including *doesn't apply to me*: the step
+        asks for a decision and both are decisions (AC 5.4.1). What changed
+        on 17 October is how many it asks for. The step used to be satisfied
+        by Place 1 and the design's review frame says *3 of 3 reviewed*, so a
+        reader could reach a plan that was still asking them something.
+
+        `placeCount` is null while the markers load, which is not zero: an
+        unanswerable step is better than a step that passes itself the moment
+        the data is late.
+      */
+      return now.placeCount !== null && now.placeCount > 0 && now.placesReviewed >= now.placeCount;
     case 'report-opened':
       return now.reportOpened;
     case 'problem-chosen':

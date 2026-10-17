@@ -63,6 +63,7 @@ import { advisory, alert, brand, ink, line, radius, space, surface, text, type, 
 
 /** One numbered place, as the map's card shows it (Figma G2). */
 export function PlaceCard({
+  pulse = false,
   place,
   relevance,
   onReview,
@@ -71,6 +72,8 @@ export function PlaceCard({
 }: {
   readonly place: Place;
   readonly relevance: Relevance;
+  /** The guide is waiting for an answer here (Epic 5's second step). */
+  readonly pulse?: boolean | undefined;
   /** The reader's answer. Changing it is allowed and expected (AC 5.4.1). */
   readonly onReview: (relevance: Relevance) => void;
   /** Only where another numbered place is waiting (AC 5.1.2). */
@@ -83,6 +86,8 @@ export function PlaceCard({
   readonly onPrevious?: (() => void) | undefined;
   readonly onNext?: (() => void) | undefined;
 }) {
+  const answersRef = useRingIntoView<HTMLDivElement>(pulse);
+
   return (
     <div style={{ font: type(text.small, { leading: 1.5 }), color: ink.base }}>
       {/*
@@ -102,7 +107,26 @@ export function PlaceCard({
         {PLACE_QUESTION}
       </p>
 
-      <div style={{ display: 'flex', gap: space(2), flexWrap: 'wrap', marginBottom: space(2) }}>
+      {/*
+        The ring and the arrow go round the pair, not round either answer.
+
+        Marking *Applies to me* alone would be the guide answering its own
+        question; the step is satisfied by either (AC 5.4.1). The team's
+        17 October frame calls the pair *Target · Choice*.
+      */}
+      <div
+        ref={answersRef}
+        {...ringProps(pulse)}
+        style={{
+          display: 'flex',
+          gap: space(2),
+          flexWrap: 'wrap',
+          marginBottom: space(2),
+          // Room for the ring, which is a box-shadow and so draws outside.
+          padding: pulse ? space(1) : 0,
+          borderRadius: radius.base,
+        }}
+      >
         <Answer
           label="Applies to me"
           chosen={relevance === 'applies'}
@@ -150,8 +174,6 @@ export function PreparePlan({
   onWhyOpen,
   onAsk,
   onCheckDrains,
-  pulseDrains = false,
-  pulseWhy = false,
 }: {
   /** As the reader chose it. It is on the printed page and nowhere else. */
   readonly address: string;
@@ -166,17 +188,6 @@ export function PreparePlan({
   readonly onAsk?: ((actionId?: string) => void) | undefined;
   /** Step 3's first button: show the recorded drains near the address. */
   readonly onCheckDrains?: (() => void) | undefined;
-  /**
-   * Ring that button, while a guide's step is waiting on it (Figma G6).
-   *
-   * The plan scrolls, and the button sits under the places, the general
-   * actions and a heading. A step that says *Click Check the street drains
-   * near you* beside a panel not showing it is the 9 October report again,
-   * which is what `pressFor` exists to answer.
-   */
-  readonly pulseDrains?: boolean | undefined;
-  /** Ring the reminder's *Why this place?*, for the guide's step 4 (Figma G4). */
-  readonly pulseWhy?: boolean | undefined;
 }) {
   const reminders = applying(places, relevance);
 
@@ -261,7 +272,6 @@ export function PreparePlan({
                         design puts the explanation where the reminder is.
                       */}
                       <WhyThisPlace
-                        pulse={pulseWhy}
                         {...(onWhyOpen === undefined ? {} : { onOpen: onWhyOpen })}
                       />
                     </span>
@@ -350,7 +360,7 @@ export function PreparePlan({
         <section aria-label={STREET_DRAINS_NEAR_YOU} style={{ marginBottom: space(4) }}>
           <StepHeading step={3} label={STREET_DRAINS_NEAR_YOU} />
           {onCheckDrains !== undefined && (
-            <CheckDrainsButton pulse={pulseDrains} onPress={onCheckDrains} />
+            <CheckDrainsButton onPress={onCheckDrains} />
           )}
           {onReport !== undefined && (
             <button type="button" onClick={onReport} style={warningButton}>
@@ -661,28 +671,17 @@ function StepHeading({
 }
 
 /**
- * Step 3's button, which the guide rings and scrolls to (Figma G6).
+ * Step 3's button, which opens the street drains near the address.
  *
- * Its own component only because the ring needs a ref and a hook, and the
- * plan it sits in is not a component that may hold one per control.
+ * **It carried the guide's ring until 17 October**, when the step that
+ * asked for it was removed: the check is outside the heavy-rain task, and
+ * the team took it out of the tutorial rather than out of the plan. The
+ * button stays exactly where the design puts it, and nothing points at it
+ * any more.
  */
-function CheckDrainsButton({
-  pulse,
-  onPress,
-}: {
-  readonly pulse: boolean;
-  readonly onPress: () => void;
-}) {
-  const ref = useRingIntoView<HTMLButtonElement>(pulse);
-
+function CheckDrainsButton({ onPress }: { readonly onPress: () => void }) {
   return (
-    <button
-      type="button"
-      ref={ref}
-      {...ringProps(pulse)}
-      onClick={onPress}
-      style={primaryButton}
-    >
+    <button type="button" onClick={onPress} style={primaryButton}>
       {CHECK_STREET_DRAINS} ›
     </button>
   );
@@ -695,24 +694,17 @@ const SAFETY_HEADING = 'Before you rely on this';
  * *Why this place?*, folded, wherever a place is explained (AC 5.3.1).
  *
  * On the place's card and again under the reminder in the plan, because the
- * design puts it in both and a reader who has moved on to the plan has no way
- * back to the card. `onOpen` is how the guide's fourth step knows it happened.
+ * design puts it in both and a reader who has moved on to the plan has no
+ * way back to the card.
+ *
+ * **The guide no longer stops anybody here.** Its fourth step asked for this
+ * press and was removed on 17 October, because the place card already
+ * explains the reason; `onOpen` is what told that step the press had
+ * happened, and it stays for the map's own state.
  */
-function WhyThisPlace({
-  onOpen,
-  pulse = false,
-}: {
-  readonly onOpen?: (() => void) | undefined;
-  /** Ringed while the guide's step 4 waits on it. */
-  readonly pulse?: boolean;
-}) {
+function WhyThisPlace({ onOpen }: { readonly onOpen?: (() => void) | undefined }) {
   const whyId = useId();
   const [open, setOpen] = useState(false);
-  /*
-    The ring goes on the summary rather than on a wrapper: a `details` with
-    anything between it and its `summary` stops being a disclosure.
-  */
-  const ref = useRingIntoView<HTMLElement>(pulse && !open);
 
   return (
     <details
@@ -724,8 +716,6 @@ function WhyThisPlace({
       }}
     >
       <summary
-        ref={ref}
-        {...ringProps(pulse && !open)}
         aria-controls={whyId}
         style={{ cursor: 'pointer', color: brand.ink, borderRadius: radius.small }}
       >
