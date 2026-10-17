@@ -473,6 +473,8 @@ export type Press =
   */
   | 'trace'
   | 'zoom-in'
+  /** Epic 5's first step: the button on the address card. */
+  | 'check-button'
   | 'pit'
   | 'drain';
 
@@ -506,6 +508,14 @@ export function pressFor(requires: Requirement): Press | null {
       return 'pit';
     case 'trace-following':
       return 'trace';
+    /*
+      The button on the address card, which was exempt as *the card's one
+      filled control* and is not exempt now: frame E5/01 draws an arrow on
+      it, and the card is a third of the map with the button a third of
+      the card.
+    */
+    case 'plan-opened':
+      return 'check-button';
     /*
       The pair of answers on the place card, not either one of them.
 

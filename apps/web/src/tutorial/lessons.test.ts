@@ -461,10 +461,14 @@ describe('what the ground height guide added to every lesson', () => {
  */
 describe('every step has something to point at', () => {
   /** Waits whose target is the thing the step is already about. */
-  const ANSWERED_ELSEWHERE: Readonly<Record<string, string>> = {
-    // The button is the address card's one filled control.
-    'plan-opened': 'the address card',
-  };
+  /*
+    Empty since 17 October, and kept so the next exemption has to be written
+    down. Every `do` step that waits on something now marks it: the teaching
+    pit, the button on its card and the one on the address card were all
+    exempt as *answered by what the reader is already looking at*, which the
+    team's arrow pass overturned.
+  */
+  const ANSWERED_ELSEWHERE: Readonly<Record<string, string>> = {};
 
   it.each(GUIDED_SECTIONS)('%s', (id) => {
     const lesson = lessonFor(id);
@@ -491,6 +495,7 @@ describe('every step has something to point at', () => {
     */
     expect(pressFor('pit-selected')).toBe('pit');
     expect(pressFor('trace-following')).toBe('trace');
+    expect(pressFor('plan-opened')).toBe('check-button');
   });
 
   it('marks the four things Epic 6 asks for, none of them a map marker', () => {
