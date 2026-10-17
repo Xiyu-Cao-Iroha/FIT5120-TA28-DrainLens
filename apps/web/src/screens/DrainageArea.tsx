@@ -47,7 +47,7 @@ import { AREA_ROW_LABEL, DRAINAGE_LEVELS, GENERAL_ROLES_ONLY } from '../catchmen
 import { WHY_ORGANISATIONS } from '../catchment/wording.js';
 import { REPORT_HEADING } from '../report/problems.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
+import { ringProps, useRingIntoView } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, space, surface, text, type, weight } from '../ui/theme.js';
 
 /**
@@ -255,7 +255,7 @@ export function DrainageArea({
         <button
           type="button"
           ref={reportRing}
-          className={ringClass(pulseReport)}
+          {...ringProps(pulseReport)}
           onClick={onReport}
           style={{
             display: 'block',

@@ -19,7 +19,7 @@
 import { useState } from 'react';
 
 import { plainButton, quietBrandButton } from '../ui/controls.js';
-import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
+import { ringProps, useRingIntoView } from '../ui/GuideRing.js';
 import { printDocument } from '../prepare/printing.js';
 import { type Channel } from '../report/channels.js';
 import {
@@ -97,7 +97,7 @@ export function ReportProblem({
         <p style={{ margin: `0 0 ${String(space(2))}px` }}>{CHOOSE_PROBLEM}</p>
         <ul
           ref={ringRef}
-          className={ringClass(pulse)}
+          {...ringProps(pulse)}
           style={{
             margin: 0,
             listStyle: 'none',

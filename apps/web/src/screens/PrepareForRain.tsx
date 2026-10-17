@@ -25,7 +25,7 @@ import { type ReactNode, useId, useState } from 'react';
 
 import { ASK_LINK, ASK_PROMPT } from '../ask/answers.js';
 import { quietButton } from '../ui/controls.js';
-import { ringClass, useRingIntoView } from '../ui/GuideRing.js';
+import { ringProps, useRingIntoView } from '../ui/GuideRing.js';
 
 import {
   EMERGENCY_STRIP,
@@ -679,7 +679,7 @@ function CheckDrainsButton({
     <button
       type="button"
       ref={ref}
-      className={ringClass(pulse)}
+      {...ringProps(pulse)}
       onClick={onPress}
       style={primaryButton}
     >
@@ -725,7 +725,7 @@ function WhyThisPlace({
     >
       <summary
         ref={ref}
-        className={ringClass(pulse && !open)}
+        {...ringProps(pulse && !open)}
         aria-controls={whyId}
         style={{ cursor: 'pointer', color: brand.ink, borderRadius: radius.small }}
       >

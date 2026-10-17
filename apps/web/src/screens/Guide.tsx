@@ -25,6 +25,7 @@
  */
 
 import { AddressMark } from '../ui/AddressMark.js';
+import { GUIDE_SOURCE, GuideArrow } from '../ui/GuideArrow.js';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AddressIndex } from '@drainlens/address';
@@ -383,6 +384,15 @@ export function Guide({
         overflowY: 'auto',
       }}
     >
+      {/*
+        The arrow from the instruction to whatever the step is waiting for.
+
+        Mounted once, here, rather than wherever a target happens to be: it
+        is positioned against the window and there is one of them, so a
+        second mount would be a second arrow. It draws nothing until a step
+        rings something. See `GuideArrow`.
+      */}
+      <GuideArrow />
       <div
         style={{
           position: 'relative',
@@ -667,6 +677,11 @@ function Coach({
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: space(2) }}>
                   <p
+                    /*
+                      Where the arrow sets off from, which is the sentence
+                      that sent the reader looking. See `GuideArrow`.
+                    */
+                    {...{ [GUIDE_SOURCE]: '' }}
                     style={{
                       margin: 0,
                       font: type(text.display, { weight: weight.semibold, leading: 1.25 }),
