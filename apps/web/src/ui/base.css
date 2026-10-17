@@ -774,9 +774,17 @@ button:disabled {
  * The guide's "press this" on a map chip.
  *
  * It replaced the line *Waiting for you to try it* under every step that waits
- * for a press (copy audit v2, #21). An outline in the amber of the teaching
- * pit's ring on the map (`palette.suggested`), with a ring
- * that swells and fades around it. The outline is a box-shadow rather than the
+ * for a press (copy audit v2, #21). An outline with a ring that swells and
+ * fades around it.
+ *
+ * **The orange is the design's, `#EA6B1A`, and the arrow beside it uses the
+ * same one** (team, 17 October, with the mentor's finding that a ring on its
+ * own is too ambiguous: see `arrowGeometry.ts`). It was `#b4690e` until then,
+ * which is also the colour of the teaching pit on the map
+ * (`palette.suggested`) and of a trace that stops for want of a record
+ * (`stopIncomplete`). Those two are data and this is instruction, so sharing
+ * a hex was a coincidence worth losing rather than a rule worth keeping.
+ * Both of them keep `#b4690e`. The outline is a box-shadow rather than the
  * border, because the chip's border is an inline style and a class cannot
  * override it.
  *
@@ -787,25 +795,25 @@ button:disabled {
  */
 @keyframes drainlens-chip-pulse {
   0% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 2px rgba(180, 105, 14, 0.45);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 2px rgba(234, 107, 26, 0.45);
   }
   70% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 9px rgba(234, 107, 26, 0);
   }
   100% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 9px rgba(234, 107, 26, 0);
   }
 }
 
 .chip--pulse {
   animation: drainlens-chip-pulse 1.6s ease-out infinite;
-  box-shadow: 0 0 0 2px #b4690e;
+  box-shadow: 0 0 0 2px #EA6B1A;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chip--pulse {
     animation: none !important;
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 5px rgba(180, 105, 14, 0.3);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 5px rgba(234, 107, 26, 0.3);
   }
 }
 

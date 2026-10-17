@@ -27,11 +27,26 @@
 
 import { useEffect, useRef } from 'react';
 
+import { targetProps } from './GuideArrow.js';
+
 /** The class that draws it. Shared with the map chips rather than copied. */
 export const GUIDE_RING = 'chip--pulse';
 
 /** `className` for something that is ringed only while a step waits on it. */
 export const ringClass = (on: boolean): string | undefined => (on ? GUIDE_RING : undefined);
+
+/**
+ * The ring and the arrow's anchor together, which is how they stay together.
+ *
+ * The team's 17 October note is that a ring on its own is ambiguous and every
+ * press step needs an arrow as well. Two call sites, one for each mark, is
+ * two call sites that can disagree; this is one, and `GuideArrow` finds its
+ * target by the attribute it sets.
+ */
+export const ringProps = (on: boolean): Record<string, string> => ({
+  ...(on ? { className: GUIDE_RING } : {}),
+  ...targetProps(on),
+});
 
 /**
  * A ref to put on the ringed element, which scrolls itself into view.
