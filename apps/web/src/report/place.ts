@@ -90,9 +90,17 @@ export const distanceLine = (place: PickedDrain, address: string | null): string
 export const drainTitle = (place: PickedDrain): string =>
   place.street === null ? `Drain ${place.assetNumber}` : `Drain on ${place.street}`;
 
-/** One drain, as the row names it. */
-const drainLine = (drain: PickedDrain): string =>
-  drain.street === null ? drain.assetNumber : `${drain.assetNumber} · ${drainTitle(drain)}`;
+/**
+ * One drain, as the row names it.
+ *
+ * **The asset number alone, since 17 October.** It was `1145039 · Drain on
+ * Gatehouse Drive`, and the team's review frame is *Selected recorded drain:
+ * 1145039*: the street is already on the row above as the report's location,
+ * and the frame that showed both is the one they marked as older mock copy
+ * to remove. The street still names the drain while it is being confirmed,
+ * which is where it tells the reader something they do not have.
+ */
+const drainLine = (drain: PickedDrain): string => drain.assetNumber;
 
 /** The row's own line, whichever way the reader answered. */
 export function placeLine(place: ReportPlace): string {
@@ -105,8 +113,15 @@ export function placeLine(place: ReportPlace): string {
 /** Said where the reader has named no place, so an empty row is not a gap. */
 export const NO_PLACE = 'Not chosen. Nothing is chosen for you';
 
-/** The way into picking one, and the way to change it afterwards. */
-export const PICK_ON_MAP = 'Pick the drain on the map';
+/**
+ * The way into picking one, and the way to change it afterwards.
+ *
+ * *Pick the drain on the map* until 17 October, when the team's frames
+ * renamed it. The verb is the one the guide's step uses beside it, which is
+ * the whole of the change: *Choose the drain to report* / *Choose a drain on
+ * the map*.
+ */
+export const PICK_ON_MAP = 'Choose a drain on the map';
 export const CHANGE_PLACE = 'Change';
 
 /** Said under the two buttons once a pin carries coordinates (Figma B4d). */

@@ -53,6 +53,8 @@ export function ReportProblem({
   chosen,
   onChoose,
   pulse = false,
+  pulsePick = false,
+  pulseWhich = false,
   onPick,
   onForgetPlace,
 }: {
@@ -72,6 +74,10 @@ export function ReportProblem({
    * street drain* because the frame does, and any of the five answers it.
    */
   readonly pulse?: boolean | undefined;
+  /** Epic 6's third step waits on the button that hands the map over. */
+  readonly pulsePick?: boolean | undefined;
+  /** And its sixth points at the row the answer landed in. */
+  readonly pulseWhich?: boolean | undefined;
   /**
    * The street, the suburb and the drainage area. Never the house number.
    *
@@ -90,6 +96,8 @@ export function ReportProblem({
 }) {
   const [copied, setCopied] = useState(false);
   const ringRef = useRingIntoView<HTMLUListElement>(pulse);
+  const pickRef = useRingIntoView<HTMLButtonElement>(pulsePick);
+  const whichRef = useRingIntoView<HTMLLIElement>(pulseWhich);
 
   if (chosen === null) {
     return (
@@ -254,7 +262,17 @@ export function ReportProblem({
           */}
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {summary.fields.map((item) => (
-              <li key={item.id} style={{ marginBottom: space(2) }}>
+              <li
+                key={item.id}
+                {...(item.id === 'drain' ? { ref: whichRef } : {})}
+                {...ringProps(item.id === 'drain' && pulseWhich)}
+                style={{
+                  marginBottom: space(2),
+                  // Room for the ring, which draws outside the box.
+                  padding: item.id === 'drain' && pulseWhich ? space(2) : 0,
+                  borderRadius: radius.base,
+                }}
+              >
                 <Include title={item.label} detail={item.value} note={item.note} />
                 {item.id === 'drain' && (
                   <span style={{ display: 'block', marginLeft: 26, marginTop: space(1) }}>
@@ -272,7 +290,13 @@ export function ReportProblem({
                             product gives a way on, so it is that rather
                             than a fourth kind of control.
                           */
-                          <button type="button" onClick={onPick} style={quietBrandButton}>
+                          <button
+                            type="button"
+                            onClick={onPick}
+                            ref={pickRef}
+                            {...ringProps(pulsePick)}
+                            style={quietBrandButton}
+                          >
                             {PICK_ON_MAP} ›
                           </button>
                         )

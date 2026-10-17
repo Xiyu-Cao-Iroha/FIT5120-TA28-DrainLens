@@ -93,6 +93,7 @@ import {
 import { StreetDrains } from './StreetDrains.js';
 import { plainButton, quietButton } from '../ui/controls.js';
 import { SIDEBAR_RAIL, Sidebar, sidebarWidth } from './Sidebar.js';
+import { ringProps } from '../ui/GuideRing.js';
 import { PlaceCard, PreparePlan } from './PrepareForRain.js';
 import { ReportProblem } from './ReportProblem.js';
 import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
@@ -1295,6 +1296,11 @@ export function MapView({
       placesReviewed,
 
       reportOpened: reportOpen,
+      // Epic 6's three. The map says what is true now and the guide latches
+      // them: each of these is undone by the step after it being satisfied.
+      drainPicking: picking !== null,
+      drainCandidate: candidate !== null || pinAt !== null,
+      drainChosen: reportPlace !== null,
       problemChosen: reportProblem !== null,
     });
   }, [
@@ -1316,6 +1322,10 @@ export function MapView({
     placesReviewed,
 
     reportOpen,
+    picking,
+    candidate,
+    pinAt,
+    reportPlace,
     reportProblem,
     onMapNow,
   ]);
@@ -1443,6 +1453,15 @@ export function MapView({
       {picking !== null && (
         <>
           <div
+            /*
+              The step that asks for a drain marks this, not a marker.
+
+              The drains are drawn on the canvas, so there is no element to
+              ring and nothing for the arrow to measure. The banner is the
+              one thing on screen that is about the tap being asked for, and
+              it sits over the map the markers are in.
+            */
+            {...ringProps(pulsePress === 'pick-banner')}
             style={{
               position: 'absolute',
               top: space(4),
@@ -1516,6 +1535,7 @@ export function MapView({
 
           {picking === 'drain' && candidate !== null && (
             <div
+              {...ringProps(pulsePress === 'use-drain')}
               style={{
                 position: 'absolute',
                 bottom: space(4),
@@ -2084,6 +2104,8 @@ export function MapView({
               chosen={reportProblem}
               onChoose={setReportProblem}
               pulse={pulsePress === 'problem'}
+              pulsePick={pulsePress === 'pick-drain'}
+              pulseWhich={pulsePress === 'which-drain'}
               onPick={() => {
                 // The map takes over. The report card is still open behind it
                 // and comes back with whatever was picked.

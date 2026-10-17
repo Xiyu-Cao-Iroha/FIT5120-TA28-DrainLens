@@ -30,33 +30,79 @@
  */
 
 import { type Lesson } from './lesson.js';
-import { NOT_SENT_YET_SHORT, SPOT_A_PROBLEM } from '../report/problems.js';
+import { placeTitle } from '../report/place.js';
+import { SPOT_A_PROBLEM } from '../report/problems.js';
 
 export const REPORT_PROBLEM_STEPS: Lesson['steps'] = [
   {
     kind: 'do',
-    // Figma D1. No line under the heading there, and none here: the chip is
-    // ringed and the panel it opens is the next step's subject.
+    // Figma D1, and the 17 October frame that renumbers it 1 of 6. No line
+    // under the heading there, and none here: the chip is ringed and the
+    // panel it opens is the next step's subject.
     id: 'report-open',
-    prompt: `Click ${SPOT_A_PROBLEM}.`,
+    prompt: `Select ${SPOT_A_PROBLEM}.`,
     requires: 'report-opened',
   },
   {
     kind: 'do',
-    // Figma D2, which rings *Blocked or flooded street drain* and names no
-    // problem in the step. Any of the five finishes it: the step asks the
-    // reader to choose what they can see, and the frame rings an example.
+    // D2, which rings *Blocked or flooded street drain* and names no problem
+    // in the step. Any of the five finishes it: the step asks the reader to
+    // choose what they can see, and the frame rings an example -- which the
+    // 17 October hint now says in as many words, because a ringed example
+    // read as the answer.
     id: 'problem-choose',
     prompt: 'Choose the problem you can see.',
-    hint: 'Each problem shows who to contact.',
+    hint: 'This is one example. Choose the category that matches what you see.',
     requires: 'problem-chosen',
   },
   {
+    /*
+      The three steps from here are new on 17 October.
+
+      The product has been able to do all of this since the report flow was
+      built: the button hands the map over, a tap offers the drain, and a
+      confirm saves it. What it never did was walk anybody through it, so a
+      reader reached *Which drain* and a line saying nothing was chosen,
+      with the guide already finished.
+    */
+    kind: 'do',
+    id: 'drain-pick',
+    prompt: 'Choose the drain to report.',
+    hint: 'Select the button, choose a drain on the map, then confirm it.',
+    requires: 'drain-picking',
+  },
+  {
+    kind: 'do',
+    id: 'drain-tap',
+    prompt: 'Choose a drain on this map.',
+    // *The highlighted dot is only an example* is the design's line and it
+    // is about the prototype's own ring, which this product does not draw;
+    // what it guards against is a reader looking for the one dot the mock
+    // marks. The rest is the instruction.
+    hint: 'Tap the drain marker that matches the problem.',
+    requires: 'drain-candidate',
+  },
+  {
+    kind: 'do',
+    id: 'drain-confirm',
+    prompt: 'Confirm the selected drain.',
+    hint: 'Check the street and distance, then select Use this drain.',
+    requires: 'drain-chosen',
+    // Its own feedback, so the reading step after it can be an instruction
+    // rather than praise. See the same note in Epic 5.
+    done: 'That drain is in your report.',
+  },
+  {
+    /*
+      The reading the three new steps were for: the row that was empty now
+      names the drain the reader chose. It points at that row rather than
+      at the map, which is the team's own instruction.
+    */
     kind: 'read',
-    // Figma D3.
-    id: 'contact-shown',
-    prompt: 'This is who to contact and what to tell them.',
-    note: `Copy or print the details. ${NOT_SENT_YET_SHORT}`,
+    id: 'drain-reviewed',
+    points: 'which-drain',
+    prompt: 'Review the recorded drain.',
+    note: `${placeTitle(null)} now shows your selection. Select Next to finish.`,
   },
 ];
 
@@ -64,14 +110,15 @@ export const REPORT_PROBLEM: Lesson = {
   steps: REPORT_PROBLEM_STEPS,
   finished: {
     /*
-      Figma D5, word for word, including the claim about all seven.
+      The 17 October frame, which says what this guide finished rather than
+      how many guides there are.
 
-      It is the last guide in `SECTION_ORDER`, and the chooser counts seven,
-      so a reader who reaches this page by working through the list has in
-      fact finished them all. A reader who jumps straight here has not, which
-      the design accepts and the chooser corrects the moment they go back.
+      It was D5's *Well done! You finished all 7 guides.*, word for word,
+      with a note here that the claim is true of a reader who worked through
+      the list and not of one who jumped straight here. The new frame
+      removes the question by not counting.
     */
-    headline: 'Well done! You finished all 7 guides.',
+    headline: 'You finished the report guide.',
     unlocked:
       'Your address and plan are set up there. Report a drainage problem from the full map at any time.',
   },

@@ -10,6 +10,10 @@
  * Rebuilt again on 11 October, when the frames themselves changed: D1 to D5
  * are now *Report guide*, and the subcatchment boundary they used to open on
  * is in none of them.
+ *
+ * And again on 17 October, when the team added three steps in the middle:
+ * the guide now walks the reader through choosing the drain the report is
+ * about, which the product could always do and the guide never mentioned.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -20,12 +24,33 @@ import { NOTHING_ON_MAP, latch, satisfied, stepIndex, usesReport } from './lesso
 
 const ids = REPORT_PROBLEM_STEPS.map((step) => step.id);
 
-describe('the steps are the design’s three frames', () => {
-  it('asks for the chip, then a problem type, then reads who to contact', () => {
+describe('the steps are the design’s six frames', () => {
+  it('asks for the chip, a problem, a drain, and then reads the row it landed in', () => {
     expect(ids).toEqual([
-      'report-open', // D1
-      'problem-choose', // D2
-      'contact-shown', // D3
+      'report-open', // E6 / 01
+      'problem-choose', // E6 / 02
+      'drain-pick', // E6 / 03
+      'drain-tap', // E6 / 04
+      'drain-confirm', // E6 / 05
+      'drain-reviewed', // E6 / 06
+    ]);
+  });
+
+  it('keeps the whole drain choice on the guide’s own map', () => {
+    /*
+      The team's note is explicit that none of these steps may open the full
+      map, and nothing here does: the three new waits are on state the map
+      reports about itself (`drain-picking`, `drain-candidate`,
+      `drain-chosen`), and the map they are about is whichever one the
+      reader is looking at. In a guide that is the frame beside the step.
+    */
+    const waits = REPORT_PROBLEM_STEPS.filter((step) => step.kind === 'do');
+    expect(waits.map((step) => step.requires)).toEqual([
+      'report-opened',
+      'problem-chosen',
+      'drain-picking',
+      'drain-candidate',
+      'drain-chosen',
     ]);
   });
 
@@ -38,8 +63,8 @@ describe('the steps are the design’s three frames', () => {
 
   it('names the control by the same constant the map renders', () => {
     // A prompt that spells a label out by hand goes stale the day the label
-    // changes, and says *click X* about something called Y.
-    expect(REPORT_PROBLEM_STEPS[0]?.prompt).toBe(`Click ${SPOT_A_PROBLEM}.`);
+    // changes, and says *select X* about something called Y.
+    expect(REPORT_PROBLEM_STEPS[0]?.prompt).toBe(`Select ${SPOT_A_PROBLEM}.`);
   });
 
   it('names no problem type, because the reader picks what they can see', () => {
@@ -50,15 +75,19 @@ describe('the steps are the design’s three frames', () => {
     for (const problem of PROBLEM_TYPES) expect(prompts).not.toContain(problem.label);
   });
 
-  it('ends on the sentence D3 puts under its heading', () => {
-    const last = REPORT_PROBLEM_STEPS[2];
-    expect(last?.kind === 'read' ? last.note : undefined).toBe(
-      'Copy or print the details. DrainLens does not send the report for you.',
-    );
+  it('ends by pointing at the row the answer landed in, not at the map', () => {
+    // The team's note: *orange outline encloses the complete Which drain
+    // information*, and not the whole map or a Full Map button.
+    const last = REPORT_PROBLEM_STEPS.at(-1);
+    expect(last?.kind).toBe('read');
+    expect(last?.points).toBe('which-drain');
+    expect(last?.kind === 'read' ? last.note : '').toMatch(/^Which drain now shows your selection/);
   });
 
-  it('finishes with D5, which claims all seven rather than naming itself', () => {
-    expect(REPORT_PROBLEM.finished.headline).toBe('Well done! You finished all 7 guides.');
+  it('names what this guide finished, rather than counting all of them', () => {
+    // It was D5's *Well done! You finished all 7 guides.*, which is true of
+    // a reader who worked through the list and not of one who jumped here.
+    expect(REPORT_PROBLEM.finished.headline).toBe('You finished the report guide.');
   });
 });
 
@@ -72,10 +101,28 @@ describe('what the guide waits for', () => {
     expect(walk(opened)).toBe(1);
   });
 
-  it('then waits on a problem type, and finishes on the reading', () => {
+  it('then waits on a problem type before it asks about a drain', () => {
     const opened = latch(NOTHING_ON_MAP, { ...NOTHING_ON_MAP, reportOpened: true });
     const chosen = latch(opened, { ...opened, problemChosen: true });
-    expect(walk(chosen)).toBe(3);
+    expect(walk(chosen)).toBe(2);
+  });
+
+  it('walks the drain choice in order, and does not go back when it is done', () => {
+    /*
+      Each of the three undoes the state the one before it read: confirming
+      leaves the picker and clears the tapped drain. Latched, they hold, and
+      a reader who finishes the guide stays finished. Unlatched, pressing
+      *Use this drain* would have sent them back two steps.
+    */
+    let now = latch(NOTHING_ON_MAP, { ...NOTHING_ON_MAP, reportOpened: true, problemChosen: true });
+    now = latch(now, { ...now, drainPicking: true });
+    expect(walk(now)).toBe(3);
+    now = latch(now, { ...now, drainCandidate: true });
+    expect(walk(now)).toBe(4);
+    now = latch(now, { ...now, drainChosen: true, drainPicking: false, drainCandidate: false });
+    // Past the last step, because this walk acknowledges every reading: the
+    // point is that it is forward of where it was, not back at step three.
+    expect(walk(now)).toBe(REPORT_PROBLEM_STEPS.length);
   });
 
   it('latches both, so closing the panel does not send the reader back', () => {
