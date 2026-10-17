@@ -230,14 +230,18 @@ describe.each(written)('%s', (_label, lesson, id) => {
 
       The ground height guide's finish page is a *Guide complete* chip and a
       heading (Figma Terrain Tutorial, frame 10), which is what `badge` is
-      for. Epic 6's is *Well done! You finished all 7 guides* (Figma D5):
-      it is the last guide in the order, and the design says so rather than
-      naming itself.
+      for. Epic 6's was *Well done! You finished all 7 guides* (Figma D5)
+      and is *You finished the report guide* in the 17 October frame: the
+      count is gone, and so is the praise that opened it. The house sentence
+      is still the house sentence for the four guides nothing has rewritten.
+
+      What is checked of all of them is what the rule was for: the finish
+      page says the guide is finished, in one sentence, and does not go on
+      to retell it (`body`).
     */
     if (lesson.finished.badge === undefined) {
-      expect(lesson.finished.headline).toMatch(
-        /^Well done! You finished (the .+ guide|all 7 guides)\.$/,
-      );
+      expect(lesson.finished.headline).toMatch(/^(Well done! )?You finished .+\.$/);
+      expect(words(lesson.finished.headline)).toBeLessThanOrEqual(12);
     }
     expect(lesson.finished.body).toBeUndefined();
   });
@@ -328,6 +332,12 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, reportOpened: true });
     case 'problem-chosen':
       return latch(state, { ...state, problemChosen: true });
+    case 'drain-picking':
+      return latch(state, { ...state, drainPicking: true });
+    case 'drain-candidate':
+      return latch(state, { ...state, drainCandidate: true });
+    case 'drain-chosen':
+      return latch(state, { ...state, drainChosen: true });
     case 'catchment-on':
       return latch(state, { ...state, catchment: true });
     case 'terrain-off':
@@ -473,6 +483,17 @@ describe('every step has something to point at', () => {
         step.requires in ANSWERED_ELSEWHERE;
       expect(marked, `${step.id} waits on ${step.requires} with nothing marked`).toBe(true);
     }
+  });
+
+  it('marks the four things Epic 6 asks for, none of them a map marker', () => {
+    /*
+      The drains are drawn on the canvas, so the step that asks for one is
+      marked by the picker's banner: there is no element to ring and nothing
+      for the arrow to measure.
+    */
+    expect(pressFor('drain-picking')).toBe('pick-drain');
+    expect(pressFor('drain-candidate')).toBe('pick-banner');
+    expect(pressFor('drain-chosen')).toBe('use-drain');
   });
 
   it('rings the controls that live inside a card', () => {

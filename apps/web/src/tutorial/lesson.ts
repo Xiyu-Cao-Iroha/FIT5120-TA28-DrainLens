@@ -78,7 +78,24 @@ export type Requirement =
     step was waiting for.
   */
   | 'report-opened'
-  | 'problem-chosen';
+  | 'problem-chosen'
+  /*
+    Epic 6's three new ones, from the team's 17 October frames.
+
+    The guide went from three steps to six, and the three it gained walk
+    the reader through picking the drain the report is about: enter the
+    picker, tap a drain, confirm it. The map has done all of this since
+    the report flow was built (Figma R1 to R3); what it had never done is
+    say so to a guide.
+
+    All three are latched. Each one undoes the state the one before it
+    read: confirming a drain leaves the picker, which would put an
+    unlatched step three back to waiting, and a reader who had finished
+    the guide's fourth step would find themselves on its third.
+  */
+  | 'drain-picking'
+  | 'drain-candidate'
+  | 'drain-chosen';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -251,6 +268,12 @@ export interface MapNow {
   readonly reportOpened: boolean;
   /** Latched: a problem type has been chosen in it (Figma D4). */
   readonly problemChosen: boolean;
+  /** Latched: the map is being used to pick the drain, or a pin for it. */
+  readonly drainPicking: boolean;
+  /** Latched: a drain has been tapped, or a pin put down. */
+  readonly drainCandidate: boolean;
+  /** Latched: the report carries a place, whichever way it was named. */
+  readonly drainChosen: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -273,6 +296,9 @@ export const NOTHING_ON_MAP: MapNow = {
   placesReviewed: 0,
   reportOpened: false,
   problemChosen: false,
+  drainPicking: false,
+  drainCandidate: false,
+  drainChosen: false,
 };
 
 /**
@@ -289,6 +315,9 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
   reportOpened: before.reportOpened || next.reportOpened,
   problemChosen: before.problemChosen || next.problemChosen,
+  drainPicking: before.drainPicking || next.drainPicking,
+  drainCandidate: before.drainCandidate || next.drainCandidate,
+  drainChosen: before.drainChosen || next.drainChosen,
   planOpened: before.planOpened || next.planOpened || next.planOpen,
 });
 
@@ -423,7 +452,17 @@ export interface Lesson {
  *
  * Null for every step that waits on a chip, or on nothing a reader presses.
  */
-export type Press = 'report' | 'problem' | 'place' | 'plan';
+export type Press =
+  | 'report'
+  | 'problem'
+  | 'place'
+  | 'plan'
+  /** Epic 6: the report's button, the picker's banner, and its confirm card. */
+  | 'pick-drain'
+  | 'pick-banner'
+  | 'use-drain'
+  /** Epic 6's last step, which points at the row the answer landed in. */
+  | 'which-drain';
 
 export function pressFor(requires: Requirement): Press | null {
   switch (requires) {
@@ -431,6 +470,18 @@ export function pressFor(requires: Requirement): Press | null {
       return 'report';
     case 'problem-chosen':
       return 'problem';
+    /*
+      The button in the report that hands the map over, and then the card
+      the map puts up when a drain is tapped. The drain markers themselves
+      are drawn on the canvas, so the step that asks for one is marked by
+      the picker's own banner rather than by a ring on a dot.
+    */
+    case 'drain-picking':
+      return 'pick-drain';
+    case 'drain-candidate':
+      return 'pick-banner';
+    case 'drain-chosen':
+      return 'use-drain';
     /*
       The pair of answers on the place card, not either one of them.
 
@@ -474,6 +525,9 @@ export function chipFor(requires: Requirement): LayerKey | null {
     case 'places-reviewed':
     case 'report-opened':
     case 'problem-chosen':
+    case 'drain-picking':
+    case 'drain-candidate':
+    case 'drain-chosen':
       /*
         None is a chip: the address card's button, the two answers on a
         place's own card, and two controls inside the card the boundary chip
@@ -556,6 +610,12 @@ export function satisfied(
       return now.reportOpened;
     case 'problem-chosen':
       return now.problemChosen;
+    case 'drain-picking':
+      return now.drainPicking;
+    case 'drain-candidate':
+      return now.drainCandidate;
+    case 'drain-chosen':
+      return now.drainChosen;
     case 'catchment-on':
       return now.catchment;
     case 'pits-on':
