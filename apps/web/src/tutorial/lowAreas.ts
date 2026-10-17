@@ -61,6 +61,13 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
   },
   {
     kind: 'read',
+    /*
+      It says *zoom in* and Next is still what moves the guide on, which is
+      the team's instruction for this step on 17 October: add the arrow,
+      keep the behaviour. Zooming is not a requirement here and is not
+      being made one.
+    */
+    points: 'zoom-in',
     id: 'deep-hollow-sign',
     prompt: 'Warning signs mark the deepest spots. Zoom in to find one.',
   },

@@ -27,6 +27,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
 import { type Box, caretAt, placeCard, spotlightFor } from '../ui/callout.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
+import { ringProps, useRingIntoView } from '../ui/GuideRing.js';
 import {
   brand,
   ink,
@@ -81,6 +82,8 @@ export interface MapCalloutProps {
   readonly children: ReactNode;
   /** The relevant next action, where there is one — AC 1.1.7.e. */
   readonly action?: { readonly label: string; readonly onPress: () => void };
+  /** A guide step is waiting on that action (17 October's arrow pass). */
+  readonly pulseAction?: boolean;
   /** The rest of what is recorded, opened in place rather than elsewhere. */
   readonly more?: ReactNode;
   /**
@@ -121,6 +124,7 @@ export function MapCallout({
   source,
   children,
   action,
+  pulseAction = false,
   more,
   onMinimise,
   prefer,
@@ -158,6 +162,8 @@ export function MapCallout({
   );
   const card: Box = { x: 0, y: 0, width: WIDTH, height };
   const placement = placeCard(spot, card, within, prefer);
+
+  const actionRef = useRingIntoView<HTMLButtonElement>(pulseAction);
 
   return (
     <div
@@ -290,6 +296,8 @@ export function MapCallout({
       {action && (
         <button
           type="button"
+          ref={actionRef}
+          {...ringProps(pulseAction)}
           onClick={action.onPress}
           style={{
             display: 'block',

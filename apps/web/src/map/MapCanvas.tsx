@@ -40,8 +40,12 @@ import { type TerrainTiles, drawTerrainColour, drawTerrainShade, marksInView } f
 import { MapControls, STEP } from './MapControls.js';
 import { type WarningPoint, drawWarnings, pickWarning, warningsVisible } from './warnings.js';
 import type { Trace } from '../trace/graph.js';
+import { targetProps } from '../ui/GuideArrow.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
+/** How big the anchor over a drawn mark is, which is the mark's own size. */
+const ANCHOR = 22;
+
 const DRAG_SLOP_PX = 4;
 
 export interface MapCanvasProps {
@@ -51,6 +55,18 @@ export interface MapCanvasProps {
   readonly selectedPit?: number | null;
   /** Offered but not confirmed — drawn as a ring, not a fill. */
   readonly suggestedPit?: number | null;
+  /**
+   * Put the guide's arrow on the suggested pit, wherever it is drawn.
+   *
+   * The pits are painted on the canvas, so there is no element to measure
+   * and no ring to put a class on. This renders an empty span over the
+   * mark instead: it costs one div, it moves with the map because it is
+   * positioned from the same projection the paint uses, and it leaves the
+   * canvas's own hit testing alone (`pointer-events: none`).
+   */
+  readonly pulseSuggested?: boolean;
+  /** The low areas guide's third step points at Zoom in (17 October). */
+  readonly pulseZoomIn?: boolean;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
   /**
@@ -215,6 +231,8 @@ export function MapCanvas({
   show,
   selectedPit = null,
   suggestedPit = null,
+  pulseSuggested = false,
+  pulseZoomIn = false,
   comparablePits = null,
   comparison = null,
   fit: fitTo = null,
@@ -552,6 +570,23 @@ export function MapCanvas({
   */
   const minScale = viewport === null ? 0 : floorOf(viewport);
 
+  /*
+    Where the suggested pit is on screen, for the guide's arrow to land on.
+
+    Measured from the artefact and the viewport rather than remembered: the
+    map pans and zooms under its own animation, and an anchor that moved
+    only when something told it to would be behind the mark it is about.
+  */
+  const suggestedAt =
+    viewport === null || suggestedPit === null
+      ? null
+      : (() => {
+          const pit = (artefact.layers.pit ?? []).find(
+            (one) => one.asset_number === suggestedPit,
+          );
+          return pit === undefined ? null : toScreen(viewport, pit.c);
+        })();
+
   return (
     <div
       ref={frameRef}
@@ -571,9 +606,24 @@ export function MapCanvas({
         }}
         style={{ display: 'block', cursor }}
       />
+      {viewport !== null && pulseSuggested && suggestedAt !== null && (
+        <span
+          aria-hidden
+          {...targetProps(true)}
+          style={{
+            position: 'absolute',
+            left: suggestedAt[0] - ANCHOR / 2,
+            top: suggestedAt[1] - ANCHOR / 2,
+            width: ANCHOR,
+            height: ANCHOR,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {viewport && (
           <MapControls
             inset={controlsInset}
+            pulseZoomIn={pulseZoomIn}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}
