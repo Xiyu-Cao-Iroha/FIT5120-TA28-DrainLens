@@ -1068,8 +1068,6 @@ export function MapView({
         while a guide was running, so neither step could be finished.
       */
       onCheckDrains={openDrains}
-      pulseDrains={pulsePress === 'drains'}
-      pulseWhy={pulsePress === 'why'}
       {...(guided
         ? {}
         : {
@@ -1295,8 +1293,7 @@ export function MapView({
       planOpened: planOpen,
       placeCount,
       placesReviewed,
-      whyOpen,
-      drainsOpened: drainsOpen,
+
       reportOpened: reportOpen,
       problemChosen: reportProblem !== null,
     });
@@ -1317,8 +1314,7 @@ export function MapView({
     planOpen,
     placeCount,
     placesReviewed,
-    whyOpen,
-    drainsOpen,
+
     reportOpen,
     reportProblem,
     onMapNow,
@@ -2144,7 +2140,17 @@ export function MapView({
           is centred on. Both reported on 11 October, items 5 and 6.
         */}
         {planInCard && (
-          <MapNote fill width={noteWidth} title={askOpen ? ASK_HEADING : PREPARE_HEADING}>
+          <MapNote
+            fill
+            width={noteWidth}
+            title={askOpen ? ASK_HEADING : PREPARE_HEADING}
+            /*
+              Epic 5's review step points at the plan, and the card is what a
+              reader sees of it: the body scrolls inside this, so marking
+              what is in it marks a box taller than the window.
+            */
+            pulse={!askOpen && pulsePress === 'plan'}
+          >
             {askOpen ? askPanel : planPanel}
           </MapNote>
         )}
@@ -2307,6 +2313,7 @@ export function MapView({
             }}
           >
             <PlaceCard
+              pulse={pulsePress === 'place'}
               place={place}
               relevance={relevance[place.number] ?? null}
               onReview={(answer) => {
