@@ -60,16 +60,22 @@ export const LOW_AREAS_STEPS: Lesson['steps'] = [
     prompt: 'Great! Blue areas are dips where rainwater may pool.',
   },
   {
-    kind: 'read',
     /*
-      It says *zoom in* and Next is still what moves the guide on, which is
-      the team's instruction for this step on 17 October: add the arrow,
-      keep the behaviour. Zooming is not a requirement here and is not
-      being made one.
+      **The sign is in the sentence, because it is not always on the map**
+      (team, 18 October).
+
+      It said *Warning signs mark the deepest spots. Zoom in to find one.*
+      and pointed an arrow at the zoom button. Both go: at an address whose
+      deepest hollow has no published marker there is nothing to find, and
+      a guide that asks a reader to hunt for something that is not there is
+      worse than one that shows them what it would look like. So the sign
+      itself is printed in the step, which is the team's own fix, and the
+      arrow is gone with the hunt.
     */
-    points: 'zoom-in',
+    kind: 'read',
     id: 'deep-hollow-sign',
-    prompt: 'Warning signs mark the deepest spots. Zoom in to find one.',
+    prompt: 'If you find a warning sign \u26a0\ufe0f on the map, it means the deepest area.',
+    note: 'Avoid parking your car before heavy rain.',
   },
   {
     kind: 'do',

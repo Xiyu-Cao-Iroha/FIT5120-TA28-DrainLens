@@ -35,6 +35,8 @@ import { RECENT_LABEL, recall } from '../address/recent.js';
 import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
 import { MAX_SUGGESTIONS, search } from '@drainlens/address';
 import { noMatch } from '../address/noMatch.js';
+import { EDGE_PADDING_PX, NARROW_FRAME_PX, NARROW_PADDING_PX } from '../map/fitBounds.js';
+import { ICON_MIN_SCALE } from '../map/pitIcon.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
@@ -1234,6 +1236,63 @@ export function MapView({
         Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM) <= PICK_RADIUS_M,
     );
   }, [map, address]);
+  /**
+   * The drain the picker's step points at, which is the closest one.
+   *
+   * Closest rather than any, so the arrow lands near the address the
+   * reader is thinking about and the same address always marks the same
+   * drain. It is an example and the step says so: the product reports
+   * whichever drain they actually tap.
+   */
+  const nearestPickable = useMemo(() => {
+    if (address === null || pickable.length === 0) return null;
+    let best = pickable[0]!;
+    let bestAway = Infinity;
+    for (const pit of pickable) {
+      const away = Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM);
+      if (away < bestAway) {
+        bestAway = away;
+        best = pit;
+      }
+    }
+    return best.asset_number ?? null;
+  }, [pickable, address]);
+
+  /**
+   * Close enough to see a grate, as soon as the picker opens.
+   *
+   * The step says *tap the drain marker* and the canvas draws a marker
+   * rather than a dot only from `ICON_MIN_SCALE` (`pitIcon.ts`). A frame
+   * fitted to the whole 150 m pick radius sits under that at every size
+   * this map is drawn in, so the reader was asked to tap an icon the map
+   * had not drawn yet (team, 18 October).
+   *
+   * The radius is whatever puts the scale over that threshold in this
+   * frame, and never more than the radius the banner promises.
+   *
+   * **Measured against the shorter side, less the padding `fitPoints`
+   * leaves.** The first try used the width alone and landed at 1.81 px/m
+   * in a 558 by 480 frame, which is under the threshold and was still
+   * drawing dots: a fit is bound by whichever side runs out first, and in
+   * a guide's map that is the height. The frame's own size does not change
+   * with the zoom, so this does not chase its own tail.
+   */
+  const pickFit = useMemo((): MapCanvasProps['fit'] => {
+    if (picking !== 'drain' || address === null || viewport === null) return null;
+    const shorter = Math.min(viewport.widthPx, viewport.heightPx);
+    const pad = 2 * (shorter < NARROW_FRAME_PX ? NARROW_PADDING_PX : EDGE_PADDING_PX);
+    const widest = Math.max(shorter - pad, 1) / (2 * ICON_MIN_SCALE);
+    const r = Math.min(PICK_RADIUS_M, widest * 0.95);
+    const points: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
+    return { key: `pick:${address.label}`, points, reservePanel: false };
+    // The width is the frame's, so it is left out: it does not change with
+    // the view, and listing it would refit on every pan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picking, address]);
+
   const pickingMap = useMemo(
     () => ({ ...map, layers: { ...map.layers, pit: pickable, pipe: [] } }),
     [map, pickable],
@@ -1355,14 +1414,25 @@ export function MapView({
         */
         suggestedPit={pitsDrawn ? (pickedPitNumber ?? highlightPit) : null}
         /*
-          The arrow on the mark the canvas draws, for the guide steps that
-          ask for a press on one: the teaching pit in Recorded drainage, and
-          the offered drain in the comparison.
+          The mark on a pit the canvas draws, for the three steps that ask
+          for a press on one: the teaching pit in Recorded drainage, the
+          offered drain in the comparison, and a drain to tap in the
+          report's picker.
+
+          The first two are already ringed by the canvas itself, so they
+          take the arrow and nothing else. The picker's drains are drawn
+          plain, so that one takes the box as well.
         */
-        pulseSuggested={pulsePress === 'pit' || pulsePress === 'drain'}
-        pulseZoomIn={pulsePress === 'zoom-in'}
+        anchorPit={
+          pulsePress === 'pick-banner'
+            ? nearestPickable
+            : pulsePress === 'pit' || pulsePress === 'drain'
+              ? (pitsDrawn ? (pickedPitNumber ?? highlightPit) : null)
+              : null
+        }
+        anchorRing={pulsePress === 'pick-banner'}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
-        fit={placesFit ?? fit}
+        fit={pickFit ?? placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
         showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
@@ -1460,15 +1530,6 @@ export function MapView({
       {picking !== null && (
         <>
           <div
-            /*
-              The step that asks for a drain marks this, not a marker.
-
-              The drains are drawn on the canvas, so there is no element to
-              ring and nothing for the arrow to measure. The banner is the
-              one thing on screen that is about the tap being asked for, and
-              it sits over the map the markers are in.
-            */
-            {...ringProps(pulsePress === 'pick-banner')}
             style={{
               position: 'absolute',
               top: space(4),

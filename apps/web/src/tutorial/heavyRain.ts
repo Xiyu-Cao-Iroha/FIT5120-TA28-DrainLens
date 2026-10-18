@@ -65,7 +65,7 @@ export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
 
       The guides' rule is that a read step straight after a press is praise
       for that press -- *Great! ...* -- and the design's third step is not
-      praise, it is *Review the reminder, then select Next*. The press gets
+      praise, it is *Review the reminder*. The press gets
       its sentence here instead, which is also where it happened.
     */
     done: 'Your answers are in the plan.',
@@ -79,7 +79,13 @@ export const HEAVY_RAIN_STEPS: Lesson['steps'] = [
     kind: 'read',
     id: 'plan-reviewed',
     points: 'plan',
-    prompt: 'Review the reminder, then select Next.',
+    /*
+      **It said *Review the reminder, then select Next* for a day.** That is
+      the team's own wording of 17 October and they cut the second half on
+      18 October: Next is a button in this panel and the sentence is read
+      beside a map, so *select Next* sent people looking for it there.
+    */
+    prompt: 'Review the reminder.',
     note: 'Read the highlighted plan panel. No checkbox or other choice is needed here.',
   },
 ];
@@ -142,7 +148,7 @@ export const HEAVY_RAIN_NO_PLACES_STEPS: Lesson['steps'] = [
     kind: 'read',
     id: 'plan-reviewed',
     points: 'plan',
-    prompt: 'Review the plan, then select Next.',
+    prompt: 'Review the plan.',
     note: 'Read the highlighted plan panel. No checkbox or other choice is needed here.',
   },
 ];

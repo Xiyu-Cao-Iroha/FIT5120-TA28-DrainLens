@@ -41,6 +41,7 @@ import { MapControls, STEP } from './MapControls.js';
 import { type WarningPoint, drawWarnings, pickWarning, warningsVisible } from './warnings.js';
 import type { Trace } from '../trace/graph.js';
 import { targetProps } from '../ui/GuideArrow.js';
+import { ringProps } from '../ui/GuideRing.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
 /** How big the anchor over a drawn mark is, which is the mark's own size. */
@@ -56,7 +57,7 @@ export interface MapCanvasProps {
   /** Offered but not confirmed — drawn as a ring, not a fill. */
   readonly suggestedPit?: number | null;
   /**
-   * Put the guide's arrow on the suggested pit, wherever it is drawn.
+   * The pit the guide is pointing at, by asset number.
    *
    * The pits are painted on the canvas, so there is no element to measure
    * and no ring to put a class on. This renders an empty span over the
@@ -64,9 +65,17 @@ export interface MapCanvasProps {
    * positioned from the same projection the paint uses, and it leaves the
    * canvas's own hit testing alone (`pointer-events: none`).
    */
-  readonly pulseSuggested?: boolean;
-  /** The low areas guide's third step points at Zoom in (17 October). */
-  readonly pulseZoomIn?: boolean;
+  readonly anchorPit?: number | null;
+  /**
+   * Draw the orange box on it as well, rather than only pointing.
+   *
+   * Off where the canvas already marks the pit itself, which is the
+   * teaching pit's own amber ring: two marks on one dot is one too many.
+   * On where nothing else marks it, which is the report's picker (team,
+   * 18 October: *the orange box is in the wrong place, it should be on a
+   * pit icon*).
+   */
+  readonly anchorRing?: boolean;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
   /**
@@ -231,8 +240,8 @@ export function MapCanvas({
   show,
   selectedPit = null,
   suggestedPit = null,
-  pulseSuggested = false,
-  pulseZoomIn = false,
+  anchorPit = null,
+  anchorRing = false,
   comparablePits = null,
   comparison = null,
   fit: fitTo = null,
@@ -577,13 +586,11 @@ export function MapCanvas({
     map pans and zooms under its own animation, and an anchor that moved
     only when something told it to would be behind the mark it is about.
   */
-  const suggestedAt =
-    viewport === null || suggestedPit === null
+  const anchorAt =
+    viewport === null || anchorPit === null
       ? null
       : (() => {
-          const pit = (artefact.layers.pit ?? []).find(
-            (one) => one.asset_number === suggestedPit,
-          );
+          const pit = (artefact.layers.pit ?? []).find((one) => one.asset_number === anchorPit);
           return pit === undefined ? null : toScreen(viewport, pit.c);
         })();
 
@@ -606,16 +613,17 @@ export function MapCanvas({
         }}
         style={{ display: 'block', cursor }}
       />
-      {viewport !== null && pulseSuggested && suggestedAt !== null && (
+      {viewport !== null && anchorAt !== null && (
         <span
           aria-hidden
-          {...targetProps(true)}
+          {...(anchorRing ? ringProps(true) : targetProps(true))}
           style={{
             position: 'absolute',
-            left: suggestedAt[0] - ANCHOR / 2,
-            top: suggestedAt[1] - ANCHOR / 2,
+            left: anchorAt[0] - ANCHOR / 2,
+            top: anchorAt[1] - ANCHOR / 2,
             width: ANCHOR,
             height: ANCHOR,
+            borderRadius: '50%',
             pointerEvents: 'none',
           }}
         />
@@ -623,7 +631,6 @@ export function MapCanvas({
       {viewport && (
           <MapControls
             inset={controlsInset}
-            pulseZoomIn={pulseZoomIn}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}
