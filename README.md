@@ -59,10 +59,11 @@ smaller Kensington copy.
 
 | | URL | Built from | Showing |
 |---|---|---|---|
-| **The live site** | https://drainlens-205559161217.australia-southeast1.run.app | `main` | the latest **completed** iteration — **Iteration 2** since 28 September 2026 |
+| **The live site** | https://drainlens-205559161217.australia-southeast1.run.app | `main` | the latest **completed** iteration — **Iteration 3** since 19 October 2026 |
 | **Iteration 1, preserved** | https://drainlens-iteration1-205559161217.australia-southeast1.run.app | tag `iteration-1-frozen` (`138a002`) | Iteration 1, permanently — live since 11 September 2026 |
 | **Iteration 2, preserved** | https://drainlens-iteration2-205559161217.australia-southeast1.run.app | tag `iteration-2-frozen` | Iteration 2, permanently — deployed at the freeze |
-| **Iteration 3, in build** | https://drainlens-dev-205559161217.australia-southeast1.run.app | `develop` | Iteration 3 as it is written — live since 11 September 2026 |
+| **Iteration 3, preserved** | https://drainlens-iteration3-205559161217.australia-southeast1.run.app | tag `iteration-3-frozen` | Iteration 3, permanently — deployed at the freeze |
+| **In build** | https://drainlens-dev-205559161217.australia-southeast1.run.app | `develop` | whatever is being written — live since 11 September 2026 |
 
 **The live URL never changes and never goes away.** It is the one address to give
 anybody, and what it serves moves forward one iteration at a time: Iteration 1
@@ -255,7 +256,7 @@ The runner's figure is read from the workflow's own step timing, not from a stop
 
 Maintained from the first commit, per KPI 2.2. Architecture and data-model documents carry their own version tables.
 
-### Iteration 3, in build
+### Iteration 3
 
 > **The entries from 1.17.1 to 1.42.0 were written on 16 October**, from the
 > pull requests they describe, after this history had gone twelve days and 84
@@ -265,6 +266,54 @@ Maintained from the first commit, per KPI 2.2. Architecture and data-model docum
 > the same day. The assistant service in `assistant/` is built by another
 > member of the team and its releases are not recorded here.
 
+<details>
+<summary><b>2.0.0</b> &nbsp;·&nbsp; 19 Oct 2026 &nbsp;·&nbsp; Iteration 3 frozen</summary>
+
+`develop` merged into `main`, tagged `iteration-3-frozen`, and deployed to the root and to an archive service of its own. The live URL shows Iteration 3 from today; Iteration 2 keeps its own address and is not touched.
+
+**Every gate re-run rather than cited**, which is what the freeze is for: 1,822 Node tests across 103 files at 95.27% statements, 713 Python across 32 at 92.26%, the 62 database tests in CI on the freeze pull request, `tsc --build --force` clean, `tools/docs/check.mjs` clean over 38 markdown and 864 text files, and all nine `tools/data/check-*.mjs` clean. The runbook said seven of those; there are nine, and it says nine now.
+
+Iteration 3 built Epic 5 and Epic 6: the before-rain checks and the preparation plan, the drainage area and reporting a problem, the address search moved to the API, a phone layout, and the tutorial rebuilt twice from the team's frames.
+
+</details>
+<details>
+<summary><b>1.48.0</b> &nbsp;·&nbsp; 18 Oct 2026 &nbsp;·&nbsp; Four fixes from the team, and one found by walking the deployed site</summary>
+
+The review step stops naming Next, which read as a button on the map. The report's picker opens zoomed in far enough that the canvas draws grates rather than dots, and the orange box moves off the banner onto the drain nearest the address. The warning sign is printed in the low areas step, because at an address with no published marker there was nothing to go and find. The ground height question keeps its outline and loses its arrow: nobody is being asked to press a colour scale.
+
+Before that, the first step of Epic 5 got the mark the frames draw on it. It had been exempt as *the address card's one filled control*, which was the last entry in a list of steps exempt from being marked; the list is empty now (#282, #283).
+
+</details>
+<details>
+<summary><b>1.47.0</b> &nbsp;·&nbsp; 17 Oct 2026 &nbsp;·&nbsp; An arrow on every map control a step asks for</summary>
+
+The arrow pass outside Epic 5 and 6, with no step count, wording or map behaviour changed. Every control that already pulsed carries the arrow's anchor, which covers the layer chips, the Layers button and the Ground height checkbox. Three had no mark at all: the drain on the canvas, which gets an empty span over it positioned from the same projection the paint uses, so it follows a pan; the button on the pit's card, which is the callout's action rather than the one in its fold; and the zoom pair (#281).
+
+</details>
+<details>
+<summary><b>1.46.0</b> &nbsp;·&nbsp; 17 Oct 2026 &nbsp;·&nbsp; Epic 6 is six steps, and they stay on the guide’s own map</summary>
+
+Three steps become six: the guide walks the reader through choosing the drain the report is about, which the product could always do and the guide never mentioned. The three new waits are latched, because each is undone by the next being satisfied. The control is *Choose a drain on the map* and the row reads *Selected recorded drain: 1144904* without the street the frames marked as older mock copy (#280).
+
+</details>
+<details>
+<summary><b>1.45.0</b> &nbsp;·&nbsp; 17 Oct 2026 &nbsp;·&nbsp; Epic 5 is three steps</summary>
+
+Six steps become three. *Why this place?*, the street drain check and the drain list reading are removed from the guide with a reason written on each, and none of the three left the product: the fold is still under every reminder and the plan still opens the drains. The second step waits for every place rather than the first, which had let a reader reach a plan that was still asking them about Place 2 (#279).
+
+</details>
+<details>
+<summary><b>1.44.0</b> &nbsp;·&nbsp; 17 Oct 2026 &nbsp;·&nbsp; The guide points as well as rings</summary>
+
+The mentor found a ring on its own too ambiguous: a circle says *something here matters* and leaves the reader to work out which of the things under it to press. Every step that asks for a press now draws an arrow as well, in the design's `#EA6B1A`, which the ring takes too. The arrow finds its own ends from one attribute, and re-measures on DOM changes as well as frames, because a browser runs no frames while its window is hidden (#278).
+
+</details>
+<details>
+<summary><b>1.43.0</b> &nbsp;·&nbsp; 17 Oct 2026 &nbsp;·&nbsp; Pick the drain on the map is a button</summary>
+
+Every other field in the report's list is something the report already knows; this is the one line asking the reader to go and do something, and it was the quietest thing on the screen (#277). The version history itself was caught up the day before, after twelve days and 84 merges without an entry (#276).
+
+</details>
 <details>
 <summary><b>1.42.0</b> &nbsp;·&nbsp; 16 Oct 2026 &nbsp;·&nbsp; The README given a shape</summary>
 

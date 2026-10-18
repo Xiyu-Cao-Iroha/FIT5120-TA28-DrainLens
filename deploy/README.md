@@ -383,12 +383,40 @@ that rule is what produced the second one rather than a rewrite of the first.
 |---|---|---|
 | `iteration-1-final` | `0a0a4d6` | the **5 September** deployment, `drainlens-00011-pzw`, bundle `index-etSUqsfy.js` |
 | `iteration-1-frozen` | `main` at the freeze | the **7 September** deployment, `drainlens-00015-lxc`, bundle `index-DFGygy6v.js` |
-| `iteration-2-frozen` | `main` at the freeze | the **28 September** freeze, bundle `index-B4AIZ7xS.js` -- what is live |
+| `iteration-2-frozen` | `main` at the freeze | the **28 September** freeze, bundle `index-B4AIZ7xS.js` |
+| `iteration-3-frozen` | `main` at the freeze | the **19 October** freeze, bundle `index-tB9N8qF0.js` -- what is live |
 
 ```bash
 git tag -a iteration-1-frozen <commit> -m "Iteration 1 frozen, 8 September 2026"
 git push origin iteration-1-frozen
 ```
+
+**Deploying a freeze** is the root and the archive, from the tag, and the
+archive service is created by the same command that deploys to it:
+
+```bash
+git checkout iteration-3-frozen
+gcloud run deploy drainlens --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
+gcloud run deploy drainlens-iteration3 --project=fit5120-504507 --source=. --region=australia-southeast1 --allow-unauthenticated --port=8080 --memory=512Mi --max-instances=1
+```
+
+> **The gate is two environment variables the root already has and a new
+> service does not.** `gcloud run deploy` inherits the variables of the
+> service it is deploying to, so the root keeps its password without the apr1
+> hash being quoted a second time. A service being created for the first time
+> has nothing to inherit, and `entrypoint.sh` **refuses to start** without
+> both of them: *FATAL: BASIC_AUTH_USER and BASIC_AUTH_HASH must both be set*,
+> in the container log, and the revision never passes its health check. So a
+> new archive fails loudly rather than publishing an iteration unprotected,
+> and the fix is to pass them on the create:
+>
+> ```bash
+> gcloud run deploy drainlens-iteration3 --project=fit5120-504507 --source=. >   --region=australia-southeast1 --allow-unauthenticated --port=8080 >   --memory=512Mi --max-instances=1 >   --set-env-vars=BASIC_AUTH_USER=...,BASIC_AUTH_HASH='...'
+> ```
+>
+> Check for a **401** before telling anybody the URL either way. The hash
+> contains `$` and must be quoted for the shell; `deploy/README.md`'s gate
+> section has the trap written out.
 
 > **`iteration-1-final` was not moved onto the newer commit, and the reason is
 > not sentiment.** Its annotation carries that deployment's measured figures --
@@ -399,6 +427,22 @@ git push origin iteration-1-frozen
 > dated, never adjusted by hand to look current.** Two tags with two dates say
 > what happened. One tag pointed at the newer commit would say the 5 September
 > deployment never had its own figures.
+
+**What the Iteration 3 freeze verified, 19 October 2026.** The same pass, run
+again rather than cited: **1,822 Node tests across 103 files at 95.27%
+statements**, **713 Python across 32 at 92.26%**, the **62 database tests** in
+CI on the freeze pull request, `tsc --build --force` clean,
+`tools/docs/check.mjs` clean over 38 markdown and 864 text files, and **all
+nine** `tools/data/check-*.mjs` clean. A local build with `VITE_API_BASE` set
+produces `index-tB9N8qF0.js`, which is the check that the tag and the running
+service are the same code, made against the deployed URL after the tag is
+deployed.
+
+> **The line above said seven data checks and there are nine.** `check-guide`
+> and `check-warnings` were written after the Iteration 2 freeze and the
+> sentence was not re-counted, which is the same failure this file keeps
+> recording in other people's numbers. Counted at the freeze, from the
+> directory rather than from memory.
 
 **What the Iteration 2 freeze verified, 28 September 2026.** The same pass,
 run again rather than cited: 1,447 Node tests across 78 files at 95.53%, 636
@@ -434,9 +478,9 @@ role is the closest thing available to the subdomain pattern the studio draws:
 
 | Role | The studio's shape | Service | Built from | Holds |
 |---|---|---|---|---|
-| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | the iteration being built -- Iteration 3 from 28 September |
-| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 2** since 28 September 2026 |
-| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1`, `drainlens-iteration2` | tags `iteration-1-frozen`, `iteration-2-frozen` | deployed once, then left alone |
+| **Dev** | `dev.example.com` -- the iteration being built | `drainlens-dev` | `develop` | the iteration being built -- whatever follows Iteration 3 from 19 October |
+| **Live root** | `example.com` -- the latest **completed** iteration | `drainlens` | `main` | **Iteration 3** since 19 October 2026 |
+| **Archive** | `iteration1.example.com`, `iteration2.…` -- each completed iteration | `drainlens-iteration1`, `drainlens-iteration2`, `drainlens-iteration3` | tags `iteration-1-frozen`, `iteration-2-frozen`, `iteration-3-frozen` | deployed once, then left alone |
 
 > **`drainlens` filled two of those roles at once until 10 September, and the
 > freeze is what stopped that being safe.** It had been redeployed eight times
