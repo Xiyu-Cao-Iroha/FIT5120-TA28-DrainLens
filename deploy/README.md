@@ -428,6 +428,42 @@ gcloud run deploy drainlens-iteration3 --project=fit5120-504507 --source=. --reg
 > what happened. One tag pointed at the newer commit would say the 5 September
 > deployment never had its own figures.
 
+**What the Iteration 3 freeze deployment measured, 19 October 2026.** 100 samples of
+every resource a first visit fetches, against the live URL through the gate:
+
+| Root, after the freeze | |
+|---|---|
+| Revision | `drainlens-00017-pzt`, serving 100% |
+| Image | `sha256:7d37ee44…5112`, built from `iteration-3-frozen` |
+| Bundle | `index-tB9N8qF0.js`, matching a local build of the tag with `VITE_API_BASE` set |
+| Gate | **401** on `/`, on a hashed asset and on a path that does not exist |
+| First visit | **p95 364.9 ms** · p50 304.8 ms · max 588.8 ms |
+| Transfer | **1.50 MB over the wire**, expanding to 3.24 MB (46%) |
+| Fetch failures | **0 of 1,100** (0.00%) |
+| Slowest resource | `/data/addresses.json` — p95 221.4 ms, 501 KB on the wire |
+
+> **The wire figure went up and the decoded figure went down**, against 1.03 MB and
+> 3.51 MB on 5 September, and both are the same cause: what a visit fetches has changed.
+> `/data/addresses.json` is the council's 62,397 addresses at 501 KB, the two terrain
+> overview images are 770 KB between them and cannot compress further -- which is also why
+> the ratio moved from 29% to 46% -- and `elevation.bin` is no longer fetched at all.
+>
+> **The p95 is reported and not interpreted.** 217.5 ms on 5 September and 364.9 ms now
+> are a month and an application apart, and this file already records the same link moving
+> 185 ms between two runs on consecutive days with nothing deployed in between. The
+> transfer figure is the one that carries information; the latency is a reading, not a
+> finding.
+>
+> **There was no *before* to pair this with.** The root had not been deployed since the
+> Iteration 2 freeze on 28 September, so the thing it replaced is a month old. A freeze is
+> the one deployment where *before and after* cannot mean what the KPI intends, and the
+> useful form is a baseline per freeze -- which this is, for the next one.
+
+**The archive was not measured**, and that is deliberate rather than an omission:
+`drainlens-iteration3` serves the same image from the same build as the root, and a second
+latency reading of the same bytes over the same link would be a number with nothing in it.
+It was checked for what can differ: its own revision, its own digest, and a **401**.
+
 **What the Iteration 3 freeze verified, 19 October 2026.** The same pass, run
 again rather than cited: **1,822 Node tests across 103 files at 95.27%
 statements**, **713 Python across 32 at 92.26%**, the **62 database tests** in
