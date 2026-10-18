@@ -14,7 +14,7 @@ This document exists for one purpose: help any member of the team, asked to open
 >
 > | Section | What it says | Now |
 > |---|---|---|
-> | 2, 8 | There is no request; `apps/api` and `models/` are empty | `apps/api` is a service over Postgres since 5 September, and the map, derived layers, trace and flood board are asked of it first — see [deploy/API-DEPLOYMENT.md](../deploy/API-DEPLOYMENT.md). There is no `models/` directory at all. The address index still never leaves the browser |
+> | 2, 8 | There is no request; `apps/api` and `models/` are empty | `apps/api` is a service over Postgres since 5 September, and the map, derived layers, trace and flood board are asked of it first — see [deploy/API-DEPLOYMENT.md](../deploy/API-DEPLOYMENT.md). There is no `models/` directory at all. The address index is in Postgres since 9 October and a submitted search is a `POST` to the API, with the bundled index answering the suggestions and any search the database cannot — DECISIONS-PENDING.md §14 |
 > | 5 | The browser loads `scene.json` and the `*.bin` arrays | The map's ground is pre-coloured 500 m terrain tiles with contours and spot heights (`map/terrainTiles.ts`), and the comparison reads `data/scene-tiles/`. Nothing reads `data/scene/` |
 > | 5 | Tiling is not needed and has not been built | Built for the whole City of Melbourne: 211 terrain tiles and 211 scenario tiles, under `data/terrain-tiles/` and `data/scene-tiles/` |
 > | 4.8 | *No clear change*, *Higher than baseline* | On screen, *No clear difference* and *More water than with a clear drain*. The identifiers `no-clear-change` and `higher-than-baseline` are unchanged |
@@ -92,7 +92,7 @@ packages/scenario/           The engine. Pure TypeScript, no DOM, no fetch.
 
 apps/web/                    React + Vite. The only thing deployed.
   session.ts                        state machine
-  address/search.ts                 in-memory address search
+  packages/address                  the matcher, shared with the API
   map/                              canvas renderer
   trace/                            downstream traversal and its rendering
   scenario/                         worker, scene loading, wording
@@ -115,9 +115,9 @@ Eight features. Each gives the click, the files in order, and the thing worth un
 |---|---|---|
 | 1 | `App.tsx` · `load()` | On mount, fetches `/data/addresses.json` and checks it carries an `addresses` array |
 | 2 | `screens/Landing.tsx` | Each keystroke calls `search()` — no debounce needed, it is an array scan |
-| 3 | `address/search.ts` · `normalise()` | Lower-cases, strips punctuation, expands `st`→`street`, `rd`→`road` |
-| 4 | `address/search.ts` · `scoreOne()` | Scores each candidate; a whole-query prefix beats everything |
-| 5 | `address/search.ts` · `resolve()` | Returns one of four results: `found`, `ambiguous`, `outside-pilot`, `not-an-address` |
+| 3 | `packages/address` · `normalise()` | Lower-cases, strips punctuation, expands `st`→`street`, `rd`→`road` |
+| 4 | `packages/address` · `scoreOne()` | Scores each candidate; a whole-query prefix beats everything |
+| 5 | `packages/address` · `resolve()` | Returns one of four results: `found`, `ambiguous`, `outside-pilot`, `not-an-address` |
 | 6 | `session.ts` · `reduce()` | `address-accepted` or `address-rejected`, moving the screen |
 
 **The thing worth understanding.** `resolve()` returns four outcomes, not two, because "this is not an address" and "this is an address outside the pilot area" need different screens. Telling somebody in Footscray that their address does not exist is wrong; telling them it is outside the pilot is true.
@@ -361,7 +361,7 @@ point-cloud archive    council open data
                ▼   plain GET, gzipped, no query about the person
       apps/web  ──► App.tsx load()  ──► assertUsable / assertDerived
                │
-               ├──► address/search.ts    (in memory, never fetches)
+               ├──► packages/address     (the matcher; never fetches)
                ├──► trace/graph.ts       (downstream traversal, cycle-guarded)
                ├──► map/draw.ts          (canvas, one affine transform)
                └──► scenario/worker.ts   ──► packages/scenario/engine.ts

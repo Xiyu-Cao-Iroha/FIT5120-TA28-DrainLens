@@ -27,19 +27,26 @@ import {
   scaleForAddress,
   scaleToContain,
   scaleToCover,
+  toLocal,
   toScreen,
   zoomAt,
 } from './viewport.js';
 import { drawTrace } from '../trace/draw.js';
 import { type DifferenceArea, drawDifference } from './difference.js';
+import { drawCatchmentBoundary } from './catchmentBoundary.js';
 import { ROAD_OVER_TERRAIN } from './terrain.js';
 import { drawTerrainMarks } from './terrainMarks.js';
 import { type TerrainTiles, drawTerrainColour, drawTerrainShade, marksInView } from './terrainTiles.js';
 import { MapControls, STEP } from './MapControls.js';
 import { type WarningPoint, drawWarnings, pickWarning, warningsVisible } from './warnings.js';
 import type { Trace } from '../trace/graph.js';
+import { targetProps } from '../ui/GuideArrow.js';
+import { ringProps } from '../ui/GuideRing.js';
 
 /** Beyond this the pointer was dragging the map, not tapping something on it. */
+/** How big the anchor over a drawn mark is, which is the mark's own size. */
+const ANCHOR = 22;
+
 const DRAG_SLOP_PX = 4;
 
 export interface MapCanvasProps {
@@ -49,6 +56,26 @@ export interface MapCanvasProps {
   readonly selectedPit?: number | null;
   /** Offered but not confirmed — drawn as a ring, not a fill. */
   readonly suggestedPit?: number | null;
+  /**
+   * The pit the guide is pointing at, by asset number.
+   *
+   * The pits are painted on the canvas, so there is no element to measure
+   * and no ring to put a class on. This renders an empty span over the
+   * mark instead: it costs one div, it moves with the map because it is
+   * positioned from the same projection the paint uses, and it leaves the
+   * canvas's own hit testing alone (`pointer-events: none`).
+   */
+  readonly anchorPit?: number | null;
+  /**
+   * Draw the orange box on it as well, rather than only pointing.
+   *
+   * Off where the canvas already marks the pit itself, which is the
+   * teaching pit's own amber ring: two marks on one dot is one too many.
+   * On where nothing else marks it, which is the report's picker (team,
+   * 18 October: *the orange box is in the wrong place, it should be on a
+   * pit icon*).
+   */
+  readonly anchorRing?: boolean;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
   /**
@@ -113,6 +140,14 @@ export interface MapCanvasProps {
    */
   readonly address?: Local | null;
   /**
+   * How far *near this address* reaches, in metres, or null for no ring.
+   *
+   * A number rather than a circle, because the centre is always the address
+   * and two ways of saying where it is would be one too many. See
+   * `NEAR_RING` in `draw.ts` for what it is and why it is dashed.
+   */
+  readonly nearRadiusM?: number | null;
+  /**
    * Where to open when there is no address, in local metres.
    *
    * The comparison opened on a drain from the map has a drain and no address;
@@ -131,6 +166,14 @@ export interface MapCanvasProps {
    */
   readonly difference?: DifferenceArea | null;
   /**
+   * The drainage area's boundary, when its card is open.
+   *
+   * Under everything else and not pressable: the card is already open when
+   * this is drawn, and an area the size of the view would otherwise swallow
+   * presses meant for the pits inside it.
+   */
+  readonly catchment?: readonly Local[][] | null;
+  /**
    * The signs on especially deep low areas, or null when Low areas is off.
    *
    * Drawn only from `WARNING_MIN_SCALE` in, and the zoom is the canvas's to
@@ -138,6 +181,19 @@ export interface MapCanvasProps {
    * it is about to draw at. See `map/warnings.ts`.
    */
   readonly warnings?: readonly WarningPoint[] | null;
+  /**
+   * These signs are the before-rain checks near a chosen address, so they
+   * are drawn at any zoom. See `warningsVisible`.
+   */
+  readonly warningsNearAddress?: boolean | undefined;
+  /**
+   * Which warning markers are numbered before-rain checks, and what number.
+   *
+   * Passed as a function rather than a list so the canvas asks about the
+   * markers it is already drawing. Returning null everywhere is the map as it
+   * was before Epic 5.
+   */
+  readonly numberOfWarning?: (point: WarningPoint) => number | null;
   /** A sign was pressed. Tested before the pits, and only where a sign is drawn. */
   readonly onWarningPress?: (point: WarningPoint) => void;
   readonly onSelect?: (hit: Hit | null) => void;
@@ -152,6 +208,14 @@ export interface MapCanvasProps {
    */
   readonly onAddressPress?: () => void;
   /**
+   * The map is being used to point at a place, not to read one.
+   *
+   * Set while a report is asking where the problem is (Figma R1 and R3): a
+   * press reports the ground it landed on and nothing else happens -- no pit
+   * is selected, no card opens, the pin is not pressed. The map is the input.
+   */
+  readonly onGround?: ((point: Local) => void) | undefined;
+  /**
    * The current viewport, whenever it changes.
    *
    * The map owns its own pan and zoom — that is view state and nothing above
@@ -161,6 +225,13 @@ export interface MapCanvasProps {
    * So the viewport is reported rather than lifted.
    */
   readonly onViewport?: (viewport: Viewport | null) => void;
+  /**
+   * How far in from the right edge the zoom and scale controls should sit.
+   *
+   * Set to the sidebar's width while one is open, so the controls are beside
+   * it rather than underneath it.
+   */
+  readonly controlsInset?: number | undefined;
 }
 
 export function MapCanvas({
@@ -169,6 +240,8 @@ export function MapCanvas({
   show,
   selectedPit = null,
   suggestedPit = null,
+  anchorPit = null,
+  anchorRing = false,
   comparablePits = null,
   comparison = null,
   fit: fitTo = null,
@@ -180,14 +253,20 @@ export function MapCanvas({
   showPipes = true,
   showPits = true,
   address = null,
+  nearRadiusM = null,
   openAt = null,
   trace = null,
   difference = null,
+  catchment = null,
   warnings = null,
+  warningsNearAddress = false,
+  numberOfWarning,
   onWarningPress,
   onSelect,
   onAddressPress,
+  onGround,
   onViewport,
+  controlsInset = 0,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -278,6 +357,9 @@ export function MapCanvas({
       address,
       showPipes,
       showPits,
+      ...(address && nearRadiusM !== null && nearRadiusM > 0
+        ? { near: { at: address, radiusM: nearRadiusM } }
+        : {}),
       ...(terrain
         ? {
             palette: { ...DAY, road: ROAD_OVER_TERRAIN },
@@ -293,10 +375,14 @@ export function MapCanvas({
           }
         : {}),
     });
+    // First of the overlays: it is the area everything else sits inside.
+    if (catchment) drawCatchmentBoundary(context, catchment, viewport);
     if (derived) drawDerived(context, derived, viewport, show ? { show } : {});
     // Over the low areas they mark and the pits beside them: a press on a sign
     // goes to the sign, so the sign has to be the thing on top.
-    if (warnings && warningsVisible(true, viewport.scale)) drawWarnings(context, warnings, viewport);
+    if (warnings && warningsVisible(true, viewport.scale, warningsNearAddress)) {
+      drawWarnings(context, warnings, viewport, numberOfWarning);
+    }
     // Over the derived layers, under the followed path. The difference is the
     // answer to the question that was just asked, so nothing calculated
     // beforehand should cover it — but a trace the person is actively
@@ -307,7 +393,8 @@ export function MapCanvas({
     // would bury the thing they are looking for.
     if (trace) drawTrace(context, artefact, trace, viewport);
   }, [artefact, derived, show, viewport, selectedPit, suggestedPit, comparablePits, comparison, address, trace,
-      terrain, terrainVersion, showPipes, showPits, difference, warnings]);
+      terrain, terrainVersion, showPipes, showPits, difference, catchment, warnings, warningsNearAddress,
+      numberOfWarning, nearRadiusM]);
 
   const at = useCallback((event: React.PointerEvent | React.WheelEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -382,6 +469,14 @@ export function MapCanvas({
       // network cannot steal a press from a pit -- and testing it after would
       // let a pipe running under the pin's head take one from the pin.
       const press = at(event);
+
+      // Pointing at a place takes every press, including one that lands on a
+      // pit or on the pin: the reader was asked where, not what.
+      if (onGround) {
+        onGround(toLocal(viewport, press));
+        return;
+      }
+
       // Only where pressing the pin does something: on the comparison map it
       // does nothing, and its head can stand over a drain a few metres north.
       if (address && onAddressPress && pressedThePin(press, toScreen(viewport, address))) {
@@ -391,7 +486,7 @@ export function MapCanvas({
 
       // Then a warning sign, which is painted over the pits. Its target is its
       // own triangle and no wider, so a pit beside it keeps its presses.
-      if (warnings && onWarningPress && warningsVisible(true, viewport.scale)) {
+      if (warnings && onWarningPress && warningsVisible(true, viewport.scale, warningsNearAddress)) {
         const sign = pickWarning(press, viewport, warnings);
         if (sign !== null) {
           onWarningPress(sign);
@@ -417,7 +512,7 @@ export function MapCanvas({
         ),
       );
     },
-    [viewport, artefact, onSelect, at, address, onAddressPress, showPits, showPipes, warnings, onWarningPress, pickPits],
+    [viewport, artefact, onSelect, at, address, onAddressPress, onGround, showPits, showPipes, warnings, warningsNearAddress, onWarningPress, pickPits],
   );
 
   // Reported, not lifted: the caller is told where the transform ended up and
@@ -484,6 +579,21 @@ export function MapCanvas({
   */
   const minScale = viewport === null ? 0 : floorOf(viewport);
 
+  /*
+    Where the suggested pit is on screen, for the guide's arrow to land on.
+
+    Measured from the artefact and the viewport rather than remembered: the
+    map pans and zooms under its own animation, and an anchor that moved
+    only when something told it to would be behind the mark it is about.
+  */
+  const anchorAt =
+    viewport === null || anchorPit === null
+      ? null
+      : (() => {
+          const pit = (artefact.layers.pit ?? []).find((one) => one.asset_number === anchorPit);
+          return pit === undefined ? null : toScreen(viewport, pit.c);
+        })();
+
   return (
     <div
       ref={frameRef}
@@ -503,8 +613,24 @@ export function MapCanvas({
         }}
         style={{ display: 'block', cursor }}
       />
+      {viewport !== null && anchorAt !== null && (
+        <span
+          aria-hidden
+          {...(anchorRing ? ringProps(true) : targetProps(true))}
+          style={{
+            position: 'absolute',
+            left: anchorAt[0] - ANCHOR / 2,
+            top: anchorAt[1] - ANCHOR / 2,
+            width: ANCHOR,
+            height: ANCHOR,
+            borderRadius: '50%',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {viewport && (
           <MapControls
+            inset={controlsInset}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}

@@ -37,7 +37,13 @@
  * the area map, and the picture opens that map; the comparison is a feature
  * with a figure, like the hero, and its button goes straight to the address
  * search. The street photograph behind the hero now stays behind the page
- * down to *How to use the map* — see `.home__backdrop` in `ui/base.css`.
+ * down to the limits note at the foot of the page, see `.home__backdrop`
+ * in `ui/base.css`.
+ *
+ * > **The page used to end with a *How to use the map* block of three steps,
+ * > removed on 10 October**: the navigation bar says where everything is, and
+ * > a numbered list telling somebody to open the map sat below the four
+ * > sections that each open it.
  */
 
 import { useState } from 'react';
@@ -52,12 +58,15 @@ import { HATCH_ON_LIGHT, RAMPS } from '../history/drawAreas.js';
 import { ACTIVITY_BREAKS } from '../history/severity.js';
 import { BlockedDrainFigure } from './BlockedDrain.js';
 import { DAY } from '../map/draw.js';
+import { BOUNDARY_FILL, BOUNDARY_STROKE } from '../map/catchmentBoundary.js';
+import { WARNING_EDGE, WARNING_FILL } from '../map/warnings.js';
+import { ReportGlyph } from '../ui/ReportGlyph.js';
 import { FramedMap } from '../map/FramedMap.js';
 import type { MapMode } from '../map/modes.js';
 import { RAMP } from '../map/terrain.js';
 import { CoverageBadge } from '../ui/Shell.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { FLOOD, FULL_MAP, TOTAL_RAINFALL } from '../ui/terms.js';
+import { FLOOD, FULL_MAP } from '../ui/terms.js';
 import {
   basis as basisTone,
   brand,
@@ -77,7 +86,6 @@ export const SECTIONS = {
   paths: 'home-paths',
   flood: 'home-flood',
   compare: 'home-compare',
-  flow: 'home-flow',
   limits: 'home-limits',
 } as const;
 
@@ -115,13 +123,20 @@ export const PATHS: readonly {
 }[] = [
   {
     mode: 'drainage',
+    /*
+      **The title says what the reader will see, not what the record is.**
+      *Recorded drainage* led with the hedge, and a reader who has not yet
+      met an estimated layer has nothing to contrast it with; they had to
+      read the line underneath to find out it was about drains and pipes.
+      The hedge moves into that line, where it still does its work.
+    */
     title: 'Recorded drainage',
     body: 'Street drains near you and the pipes that join them.',
     accent: DAY.pit,
   },
   {
     mode: 'water-flow',
-    title: 'Where rainwater may move',
+    title: 'Water paths',
     body: 'Arrows show which way rain may flow downhill.',
     accent: DERIVED_DAY.channel,
   },
@@ -139,21 +154,47 @@ export const PATHS: readonly {
     body: 'Dips in the ground where rainwater may pool.',
     accent: DERIVED_DAY.lowPointEdge,
   },
+  {
+    // Iteration 3, Epic 5 (Figma, *Get ready for heavy rain*). Before the
+    // drainage area, because it is the one that asks the reader to do
+    // something rather than to understand something.
+    mode: 'heavy-rain',
+    title: 'Get ready for heavy rain',
+    body: 'Check places near your address and make a short plan.',
+    accent: WARNING_FILL,
+  },
+  {
+    /*
+      Iteration 3, Epic 6 (Figma, *Your drainage area*). Last, because it is
+      about where the street's water goes rather than about the street.
+
+      **The card says what the reader gets to do, not what the layer is
+      called** (team, 10 October). *Recorded subcatchment area* is the name
+      of a boundary; it was the title of a card whose whole purpose is
+      reporting a problem to the right organisation, and a first-time reader
+      had to already know what a subcatchment was to guess that. The chip on
+      the map keeps the layer's name, because there it names a layer.
+    */
+    mode: 'drainage-area',
+    // Figma T1 of 11 October. The card asks the question the guide
+    // answers; what the product does and does not do is the body's job.
+    title: 'Spot a drainage problem?',
+    body:
+      /*
+        **`to send yourself` was two readings and one of them was wrong.**
+        It can mean *for you to send* or *email them to yourself*, and the
+        product does neither by itself. The revised audit split it into what
+        the reader does and what DrainLens does not, which is the same
+        promise the report screen already makes above its buttons.
+      */
+      // Figma T1's own line. *DrainLens does not send the report for you*
+      // was here as well and is not on the card in the design; it is still
+      // said twice inside the pathway, where the reader is about to act.
+      'Find out who to contact and what to tell them.',
+    accent: BOUNDARY_STROKE,
+  },
 ];
 
-/**
- * Three steps, one short action each (copy audit v2, #10).
- *
- * The third step used to say where each layer's data comes from, which is not
- * something to do; the map legend's source groups say that now. The privacy promise stays
- * in the second step because the code keeps it: the address index is searched
- * on the device and the address is written nowhere.
- */
-const STEPS: readonly { readonly title: string; readonly body?: string }[] = [
-  { title: 'Open the map' },
-  { title: 'Search your address', body: 'Your address stays on your device.' },
-  { title: 'Turn on the layers you want to see' },
-];
 
 
 export interface HomeProps {
@@ -218,7 +259,6 @@ export function Home({
         />
         <CompareSection onCompare={onCompare} />
       </div>
-      <Flow />
       <Limits />
     </div>
   );
@@ -450,7 +490,7 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
             className="home__title"
             style={{ margin: `0 0 ${String(space(4))}px`, color: ON_PHOTO.title }}
           >
-            Understand how water moves through your neighbourhood.
+            Explore your street. Prepare for heavy rain.
           </h1>
           <p
             style={{
@@ -460,8 +500,9 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Search your address to see nearby street drains, how the ground slopes and where rain
-            may flow.
+            See recorded drains, connected pipes and possible rainwater paths together on one
+            map. Review a before-rain plan for your address. If you spot a drainage problem,
+            gather the details and find the right contact to report it.
           </p>
 
           {/*
@@ -520,9 +561,254 @@ function Hero({ onOpenMap }: { readonly onOpenMap: () => void }) {
  * No external images, and none fetched: this product loads nothing from a
  * third party, and four thumbnails are not the place to start.
  */
-export function PathThumb({ mode }: { readonly mode: MapMode }) {
-  const frame = { width: '100%', height: 104, display: 'block' } as const;
-  const common = { viewBox: '0 0 200 104', role: 'presentation', style: frame } as const;
+/** The near-black the report panel's own bars are drawn in (Figma T1). */
+const REPORT_INK = '#17242e';
+
+export function PathThumb({
+  mode,
+  fill = false,
+}: {
+  readonly mode: MapMode;
+  /**
+   * Cover the slot rather than sit inside it at its own height.
+   *
+   * The cards in the first group drew their picture 104 tall whatever
+   * width the card happened to be, which was near enough right while a
+   * card was 208 wide and wrong as soon as it was not: three to a row
+   * (15 October) makes a card about 330, and covering a 200 by 104 frame
+   * at 330 by 104 scales the drawing by 1.65 and shows 104 of the 172 it
+   * then stands, so two fifths of it is cut away. What went was the top
+   * of the heavy-rain markers and the head of the report card. The box
+   * now keeps the drawing's own proportions at whatever width the card
+   * is, so nothing is cropped at any size and the pictures are the shape
+   * they were drawn in. Reported 15 October.
+   *
+   * The two wide cards below give it 40% of a card whose height comes
+   * from the words beside it -- 222 by 171 -- and a 104-tall picture in
+   * it left 67 pixels of white under the drawing and eleven down each
+   * side, so the marks read as a few pale boxes floating in a corner
+   * rather than as a picture of a street. Reported 12 October.
+   *
+   * `slice` rather than stretching: these are maps, and a map with its
+   * aspect pulled about is a map of somewhere else. It crops instead,
+   * which is what a thumbnail does.
+   */
+  readonly fill?: boolean;
+}) {
+  const frame = fill
+    ? ({ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' } as const)
+    : ({ width: '100%', aspectRatio: '200 / 104', height: 'auto', display: 'block' } as const);
+  /*
+    Two frames, because the two cards are two shapes.
+
+    A card in the first group gives its picture 208 by 104, which is what
+    these are drawn in. The two wide cards give it 40% of a card as tall as
+    the words beside it, near enough 222 by 170, and a 104-tall drawing in
+    that left 67 pixels of white underneath: the marks read as a few pale
+    boxes in a corner rather than as a picture of a street. Reported
+    12 October.
+
+    Cropping the wide frame out of the short one was the first try and was
+    worse -- at that difference in shape it cuts a third off each side, and
+    the first marker went with it. So the two modes that appear in a wide
+    card are composed again at the design's own proportions (Figma T1's
+    cards are 212 by 170), rather than scaled or cropped from the short one.
+
+    **Both frames cover rather than fit**, which means both crop, because
+    the slot's shape is not fixed: the two wide cards hand their picture
+    anything from 143 by 196 at 800 px to 222 by 171 at 1400, as the words
+    beside it wrap or do not. Covering a 200 by 170 frame across that range
+    leaves x 47 to 153 and y 8 to 162 always on screen -- measured at
+    375, 800 and 1400 -- so the tall compositions keep their marks inside
+    that, and what the crop takes is ground and road.
+  */
+  const common = {
+    viewBox: fill ? '0 0 200 170' : '0 0 200 104',
+    role: 'presentation',
+    style: frame,
+    preserveAspectRatio: 'xMidYMid slice',
+  } as const;
+
+  if (mode === 'heavy-rain' && fill) {
+    /*
+      The design's card: a crossroads, the address where they cross, and two
+      numbered checks in the blocks either side (Figma T1, *Get ready for
+      heavy rain*).
+
+      **The design draws the checks as orange pills and this draws the
+      triangles the map draws.** The rule these pictures follow is that the
+      mark here is the mark you meet when the map opens, and the map's
+      numbered warning signs are triangles. A pill would be a promise about
+      a symbol that does not exist.
+    */
+    return (
+      <svg {...common}>
+        <rect width="200" height="170" fill={DAY.ground} />
+        <path d="M-8 86h216M100 -8v186" stroke={DAY.road} strokeWidth="21" fill="none" />
+        {([
+          [70, 46],
+          [128, 124],
+        ] as const).map(([cx, cy], index) => (
+          <g key={index}>
+            <path
+              d={`M${String(cx)} ${String(cy - 13)}l14 25H${String(cx - 14)}Z`}
+              fill={WARNING_FILL}
+              stroke={WARNING_EDGE}
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <circle cx={cx + 13} cy={cy - 12} r="8" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1.5" />
+            <text
+              x={cx + 13}
+              y={cy - 8}
+              fontSize="10"
+              fontWeight="600"
+              textAnchor="middle"
+              fill={WARNING_EDGE}
+            >
+              {index + 1}
+            </text>
+          </g>
+        ))}
+        {/*
+          The address, at the crossing, in the warm colour no layer uses --
+          the same reason `drawAddress` keeps it: this is the person's own
+          place, not a recorded asset.
+        */}
+        <g transform="translate(100 94)">
+          <path
+            d="M0 0C-6.5-9.5-9.5-13-9.5-18.5A9.5 9.5 0 1 1 9.5-18.5C9.5-13 6.5-9.5 0 0Z"
+            fill={DAY.address}
+            stroke={DAY.addressHalo}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <circle cx="0" cy="-18.5" r="3.4" fill={DAY.addressHalo} />
+        </g>
+      </svg>
+    );
+  }
+
+  if (mode === 'drainage-area' && fill) {
+    /* The same report panel as the short frame, laid out for the tall one. */
+    const row = (y: number, w: number, bar: string, h = 3) => (
+      <rect key={`${String(y)}-${String(w)}`} x="68" y={y} width={w} height={h} rx={h / 2} fill={bar} />
+    );
+    return (
+      <svg {...common}>
+        <defs>
+          <filter id="report-card-lift-tall" x="-20%" y="-20%" width="140%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodOpacity="0.14" />
+          </filter>
+        </defs>
+        <rect width="200" height="170" fill={DAY.ground} />
+        {/* One road, behind the panel, which is why it looks like two. */}
+        <path d="M-6 132 206 34" stroke={DAY.road} strokeWidth="21" fill="none" />
+
+        <g filter="url(#report-card-lift-tall)">
+          <rect x="50" y="32" width="102" height="108" rx="10" fill="#ffffff" />
+        </g>
+        {/* The heading. */}
+        <rect x="62" y="46" width="52" height="6" rx="3" fill={REPORT_INK} />
+        {/* A problem not chosen, one chosen, and who to contact. */}
+        <rect x="62" y="60" width="78" height="18" rx="5" fill="#ffffff" stroke="#d9dfdd" />
+        {row(66, 44, '#bfc7c4')}
+        <rect x="62" y="82" width="78" height="18" rx="5" fill="#ffffff" stroke="#b8731f" strokeWidth="1.5" />
+        {row(88, 50, REPORT_INK)}
+        <rect x="62" y="104" width="78" height="22" rx="5" fill="#e3ede8" />
+        {row(110, 24, '#1f6f5c')}
+        {row(117, 46, REPORT_INK)}
+
+        <ReportGlyph x={48} y={18} size={28} />
+      </svg>
+    );
+  }
+
+  if (mode === 'heavy-rain') {
+    // Three numbered checks on a street corner: what the guide's first step
+    // puts on the map.
+    return (
+      <svg {...common}>
+        <rect width="200" height="104" fill={DAY.ground} />
+        <path d="M-8 72h216M72 -8v120" stroke={DAY.road} strokeWidth="13" fill="none" />
+        {([
+          [44, 40],
+          [120, 30],
+          [150, 78],
+        ] as const).map(([cx, cy], index) => (
+          <g key={index}>
+            <path
+              d={`M${String(cx)} ${String(cy - 11)}l12 21H${String(cx - 12)}Z`}
+              fill={WARNING_FILL}
+              stroke={WARNING_EDGE}
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <circle cx={cx + 11} cy={cy - 10} r="7" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1.4" />
+            <text
+              x={cx + 11}
+              y={cy - 6.5}
+              fontSize="9"
+              fontWeight="600"
+              textAnchor="middle"
+              fill={WARNING_EDGE}
+            >
+              {index + 1}
+            </text>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  if (mode === 'drainage-area') {
+    /*
+      The report panel on a street, from Figma T1's card of 11 October.
+
+      **It was a dashed subcatchment boundary**, which is what the card used
+      to be about. The card is *Spot a drainage problem?* now and the
+      boundary is not in the guide at all, so the picture was advertising
+      something the press no longer does.
+
+      The design's frame is 200x150 and this one is 200x104, so the rows are
+      the frame's own sizes with the gaps tightened rather than everything
+      scaled: a 3 px bar scaled to 2.1 px is a smudge. Bar widths, radii and
+      colours are the design's; the ground and the road are this product's
+      map palette, because the picture sits in a row of seven and the other
+      six are drawn in it.
+    */
+    const row = (y: number, w: number, fill: string, h = 3) => (
+      <rect key={`${String(y)}-${String(w)}`} x="60" y={y} width={w} height={h} rx={h / 2} fill={fill} />
+    );
+    return (
+      <svg {...common}>
+        <defs>
+          <filter id="report-card-lift" x="-20%" y="-20%" width="140%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.14" />
+          </filter>
+        </defs>
+        <rect width="200" height="104" fill={DAY.ground} />
+        {/* One road, behind the panel, which is why it looks like two. */}
+        <path d="M-6 80 206 12" stroke={DAY.road} strokeWidth="16" fill="none" />
+
+        <g filter="url(#report-card-lift)">
+          <rect x="44" y="12" width="112" height="80" rx="8" fill="#ffffff" />
+        </g>
+        {/* The heading. */}
+        <rect x="54" y="21" width="58" height="6" rx="3" fill={REPORT_INK} />
+        {/* A problem not chosen, one chosen, and who to contact. */}
+        <rect x="54" y="33" width="92" height="14" rx="4" fill="#ffffff" stroke="#d9dfdd" />
+        {row(38.5, 50, '#bfc7c4')}
+        <rect x="54" y="51" width="92" height="14" rx="4" fill="#ffffff" stroke="#b8731f" strokeWidth="1.5" />
+        {row(56.5, 58, REPORT_INK)}
+        <rect x="54" y="69" width="92" height="16" rx="4" fill="#e3ede8" />
+        {row(73, 26, '#1f6f5c')}
+        {row(79, 52, REPORT_INK)}
+
+        <ReportGlyph x={20} y={4} size={26} />
+      </svg>
+    );
+  }
 
   if (mode === 'drainage') {
     return (
@@ -876,14 +1162,28 @@ function Paths({
       <SectionHeading
         onPhoto
         eyebrow="What you can explore"
-        title="Four ways to understand your area"
+        title="Six ways to understand your area"
         body="Choose a topic to open the map. You can change layers at any time."
       />
+      {/*
+        Three across, so the six are two even rows (team, 15 October).
+
+        `auto-fit` with a flat 230 px minimum fitted as many columns as the
+        width allowed, which at this page's width is four: the six came out
+        four and two, and the short row read as the last two having been
+        left over rather than as the pair they are.
+
+        The minimum is now a third of the row, less the two gaps between
+        three columns, and never below the 230 px the cards were drawn for.
+        So it is three while a third is wide enough and falls to two and
+        then one when it is not, which is the responsive behaviour the flat
+        minimum was there for in the first place.
+      */}
       <div
         style={{
           display: 'grid',
           gap: space(5),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gridTemplateColumns: `repeat(auto-fit, minmax(max(230px, (100% - ${String(space(5) * 2)}px) / 3), 1fr))`,
         }}
       >
         {PATHS.map((path) => (
@@ -1126,15 +1426,30 @@ function FloodMapCard({
                 background: `repeating-linear-gradient(135deg, ${HATCH_ON_LIGHT} 0 1.5px, ${RAMPS.activity[1] ?? line.base} 1.5px 4px)`,
               }}
             />
-            At least (+)
+            + means at least this many
           </span>
         </span>
+        {/*
+          Reported twice: a text link where the design has a filled button.
+
+          It is drawn as a `span` rather than a `button` on purpose, because
+          the whole card is already the button and nesting one inside another
+          is invalid HTML that browsers silently repair by moving it out. So
+          it takes the filled button's shape without being a control: the
+          card remains the one thing that is pressed, and `aria-hidden` keeps
+          a screen reader from announcing a second target that is not there.
+        */}
         <span
+          aria-hidden
           style={{
-            display: 'block',
+            display: 'inline-flex',
+            alignItems: 'center',
             marginTop: space(4),
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            borderRadius: radius.base,
+            background: brand.base,
             font: type(text.label, { weight: weight.semibold }),
-            color: brand.ink,
+            color: ink.inverse,
           }}
         >
           Open the area map →
@@ -1174,12 +1489,12 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
       <div className="home__feature">
         <BlockedDrainFigure />
         <div>
-          <Eyebrow onPhoto>What-if comparison</Eyebrow>
+          <Eyebrow onPhoto>Clear vs blocked</Eyebrow>
           <h2
             className="home__section-title"
             style={{ margin: `${String(space(3))}px 0`, color: ON_PHOTO.title }}
           >
-            Could one blocked drain change where water collects?
+            If a nearby drain were blocked, would rainwater collect somewhere new?
           </h2>
           <p
             style={{
@@ -1189,9 +1504,11 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.lead,
             }}
           >
-            Compare the same {TOTAL_RAINFALL.toLowerCase()} with a nearby drain clear and blocked.
+            Compare the same rain with the drain clear and blocked. See whether water builds
+            up more, collects somewhere new, or shows no visible difference in this model.
+            Understand what a blockage could change before heavy rain.
           </p>
-          <PrimaryButton label="Check an address →" onPress={onCompare} />
+          <PrimaryButton label="Compare a nearby drain →" onPress={onCompare} />
           <p
             style={{
               margin: `${String(space(3))}px 0 0`,
@@ -1199,64 +1516,11 @@ function CompareSection({ onCompare }: { readonly onCompare: () => void }) {
               color: ON_PHOTO.quiet,
             }}
           >
-            Most drains show no visible change nearby.
+            This is a modelled comparison. It does not check whether the drain is blocked now
+            or predict flooding.
           </p>
         </div>
       </div>
-    </Band>
-  );
-}
-
-function Flow() {
-  return (
-    <Band tone="tint" id={SECTIONS.flow}>
-      <SectionHeading
-        title="How to use the map"
-      />
-      <ol
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'grid',
-          gap: space(8),
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        }}
-      >
-        {STEPS.map((step, index) => (
-          <li key={step.title}>
-            <span
-              aria-hidden
-              style={{
-                display: 'grid',
-                placeItems: 'center',
-                width: 30,
-                height: 30,
-                borderRadius: radius.pill,
-                background: ink.strong,
-                color: ink.inverse,
-                font: type(text.label, { weight: weight.semibold, leading: 1 }),
-              }}
-            >
-              {index + 1}
-            </span>
-            <h3
-              style={{
-                margin: `${String(space(3))}px 0 ${String(space(2))}px`,
-                font: type(text.body, { weight: weight.semibold, leading: 1.35 }),
-                color: ink.strong,
-              }}
-            >
-              {step.title}
-            </h3>
-            {step.body !== undefined && (
-              <p style={{ margin: 0, font: type(text.label, { leading: 1.6 }), color: ink.muted }}>
-                {step.body}
-              </p>
-            )}
-          </li>
-        ))}
-      </ol>
     </Band>
   );
 }

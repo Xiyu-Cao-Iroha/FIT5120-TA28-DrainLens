@@ -93,17 +93,19 @@ describe('joining the three artefacts', () => {
     // 6 dispatches among 3,000 people over the period: 2.00 per 1,000. The
     // arithmetic is the one in docs/SEVERITY-SCORE.md and nothing else here.
     const [area] = joined(scope({}), population([2500, 3000]), points(1));
-    expect(area.rate).toBeCloseTo(2, 6);
-    expect(area.persons).toBe(3000);
-    expect(area.personsByYear).toEqual([2500, 3000]);
-    expect(area.e).toBe(0);
+    expect(area).toBeDefined();
+    expect(area!.rate).toBeCloseTo(2, 6);
+    expect(area!.persons).toBe(3000);
+    expect(area!.personsByYear).toEqual([2500, 3000]);
+    expect(area!.e).toBe(0);
   });
 
   it('divides by the named year rather than the last one', () => {
     // The denominator is the mid-period figure, and a list of years is not an
     // instruction to use the newest. Using 2,500 here would give 2.40.
     const [area] = joined(scope({ total: 6 }), population([2500, 3000]), points(1));
-    expect(area.rate).toBeCloseTo(2, 6);
+    expect(area).toBeDefined();
+    expect(area!.rate).toBeCloseTo(2, 6);
   });
 
   it('gives no score to an area with too few residents, rather than a large one', () => {
@@ -113,9 +115,10 @@ describe('joining the three artefacts', () => {
       it is a crew being sent to an industrial estate.
     */
     const [area] = joined(scope({ total: 1 }), population([15, 15]), points(1));
-    expect(area.rate).toBeNull();
-    expect(area.persons).toBeNull();
-    expect(area.total).toBe(1);
+    expect(area).toBeDefined();
+    expect(area!.rate).toBeNull();
+    expect(area!.persons).toBeNull();
+    expect(area!.total).toBe(1);
   });
 
   it('refuses an area it cannot place or cannot divide, rather than dropping it', () => {
@@ -143,6 +146,10 @@ const area = (over: Partial<MapArea> = {}): MapArea => ({
   personsByYear: [23000, 24000],
   e: 0,
   n: 0,
+  // The boundary. Nothing in these tests draws one; it is here because
+  // `MapArea` requires it, which this builder stopped saying while the tests
+  // were outside the type checker.
+  rings: [],
   ...over,
 });
 
@@ -320,6 +327,7 @@ describe('refusing artefacts the map cannot draw', () => {
     }).toThrow(/no boundary to draw/);
     expect([...decodeRing([10, 20, 5, 0, 0, 5, -5, 0])]).toEqual([10, 20, 15, 20, 15, 25, 10, 25]);
     const [joinedArea] = joinAreas(scope({}), population([1000, 1000]), p);
+    expect(joinedArea).toBeDefined();
     expect([...joinedArea!.rings[0]!]).toEqual([0, 0, 100, 0, 100, 100, 0, 100]);
   });
 
@@ -430,8 +438,9 @@ describe('the numbers on the panel are the artefact’s, not arithmetic', () => 
       areas: [{ ...s.areas[0]!, regions: 46, suppressedRegions: 1, complete: false }],
     };
     const [joinedArea] = joinAreas(withReal, population([1000, 1000]), points(1));
-    expect(joinedArea.regions).toBe(46);
-    expect(joinedArea.suppressedRegions).toBe(1);
+    expect(joinedArea).toBeDefined();
+    expect(joinedArea!.regions).toBe(46);
+    expect(joinedArea!.suppressedRegions).toBe(1);
   });
 });
 

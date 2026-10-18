@@ -83,7 +83,7 @@ export function creditsForSources(sources: readonly (NamedSource | undefined)[])
  * only their data.
  */
 export const CHANGES_NOTICE =
-  'Likely water paths, low areas and ground height are calculated from this data by DrainLens, not published by the source.';
+  'Water paths, low areas and ground height are calculated from this data by DrainLens, not published by the source.';
 
 export interface Credit {
   readonly publisher: string;

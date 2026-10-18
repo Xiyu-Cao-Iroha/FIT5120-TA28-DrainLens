@@ -79,7 +79,15 @@ PIPES = Dataset(
     id="drainpipes",
     kind="pipe",
     modified="2023-02-26",
-    keep=("ref", "upstr_pit", "dnstr_pit", "diameter", "material"),
+    #: `operator` was added on 30 September for Iteration 3's AC 6.2.2, which
+    #: asks a selected pipe who operates it and forbids guessing. The field was
+    #: in the export all along and this list did not keep it, so every pipe
+    #: reached the browser with the question unanswerable. It has three states
+    #: in the published data and the criterion has a sentence for each:
+    #: `City of Melbourne` on 16,302 pipes, empty on 87, and the string `4` on
+    #: 853 — a code the portal does not explain, which is displayed as a code
+    #: not yet identified rather than resolved to an organisation.
+    keep=("ref", "upstr_pit", "dnstr_pit", "diameter", "material", "operator"),
 )
 
 ROADS = Dataset(

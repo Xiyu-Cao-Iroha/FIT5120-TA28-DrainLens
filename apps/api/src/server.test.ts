@@ -10,7 +10,15 @@
 import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ARTEFACT_CACHE, DEFAULT_ORIGINS, REBUILT_FOR_MS, allowedOrigins, createApp, createMemo } from './server.js';
+import {
+  ALLOWED_SERVICES,
+  ARTEFACT_CACHE,
+  DEFAULT_ORIGINS,
+  REBUILT_FOR_MS,
+  allowedOrigins,
+  createApp,
+  createMemo,
+} from './server.js';
 
 describe('who may read this from a browser', () => {
   it('allows the deployed site and the local dev server by default', () => {
@@ -37,10 +45,56 @@ describe('who may read this from a browser', () => {
     );
   });
 
-  it('leaves the archive out, so it cannot depend on a database that moved on', () => {
-    // `drainlens-iteration1` serves the frozen bundle, which asks for an
-    // extent this database no longer holds. Its own copies are the point.
+  it('leaves the Iteration 1 archive out, so it cannot depend on a database that moved on', () => {
+    // It serves the frozen bundle, which asks for an extent this database no
+    // longer holds. Its own copies are the point.
     expect(DEFAULT_ORIGINS.join(' ')).not.toContain('drainlens-iteration1');
+  });
+
+  it('carries the Iteration 2 archive, which asks for the extent this database holds', () => {
+    /*
+     * The same omission as the dev origin, found the same way and a fortnight
+     * later: deployed at the freeze on 28 September, every API response
+     * dropped, the archive URL serving one square kilometre. The team chose
+     * an archive that shows the whole council over one that cannot be
+     * affected by the database (29 September).
+     */
+    expect(DEFAULT_ORIGINS).toContain(
+      'https://drainlens-iteration2-205559161217.australia-southeast1.run.app',
+    );
+  });
+
+  it('carries both of the URLs Cloud Run answers on, for every service it allows', () => {
+    /*
+     * The third time, 8 October, and the one this test exists for.
+     *
+     * Cloud Run publishes a service at two origins -- the old
+     * `<service>-<project-number>.<region>.run.app` and the newer
+     * `<service>-<hash>.a.run.app`. Both resolve; `gcloud run services
+     * describe` and the console report the second; a browser's `Origin` is
+     * whichever one the reader followed. The list held only the first, so the
+     * live root, the dev service and the Iteration 2 archive were *all*
+     * serving one square kilometre of Kensington to anyone who used the URL
+     * the console gives them, and saying so honestly in the footer.
+     *
+     * Checking the count per service rather than the strings is the point: a
+     * service added with one of its two origins fails here, which is the
+     * shape all three outages had.
+     */
+    // The two forms, written out rather than generated, so this says what a
+    // complete entry looks like instead of restating the code that makes one.
+    const bothFormsOf = (service: string) => [
+      `https://${service}-205559161217.australia-southeast1.run.app`,
+      `https://${service}-6et5y2lpgq-ts.a.run.app`,
+    ];
+    for (const service of ALLOWED_SERVICES) {
+      for (const origin of bothFormsOf(service)) {
+        expect(DEFAULT_ORIGINS, service).toContain(origin);
+      }
+    }
+    // And nothing else: a service with one of its two origins would pass the
+    // loop above by having the other one somewhere, and fail here.
+    expect(DEFAULT_ORIGINS).toHaveLength(ALLOWED_SERVICES.length * 2 + 2);
   });
 
   it('is not a wildcard', () => {
@@ -51,11 +105,28 @@ describe('who may read this from a browser', () => {
     expect(allowedOrigins(undefined)).not.toContain('*');
   });
 
-  it('takes an override, for a preview deployment without a code change', () => {
-    expect(allowedOrigins('https://preview.example, https://other.example')).toEqual([
-      'https://preview.example',
-      'https://other.example',
-    ]);
+  it('adds what the variable names, keeping the services that already exist', () => {
+    /*
+     * **It replaced the list until 8 October, and that undid a fix.** The code
+     * had just been changed to carry both of Cloud Run's URL forms for every
+     * service, the image was deployed at the right commit, and the API went
+     * on refusing the new ones -- an `ALLOWED_ORIGINS` set at some earlier
+     * deploy still listed the five old ones and silently won.
+     *
+     * A preview wants its own origin as well as the services that already
+     * exist, which is what the variable was always for.
+     */
+    const widened = allowedOrigins('https://preview.example, https://other.example');
+    expect(widened).toContain('https://preview.example');
+    expect(widened).toContain('https://other.example');
+    for (const origin of DEFAULT_ORIGINS) expect(widened).toContain(origin);
+  });
+
+  it('drops a duplicate rather than sending the same origin twice', () => {
+    const named = DEFAULT_ORIGINS[0];
+    expect(named).toBeDefined();
+    const widened = allowedOrigins(`${String(named)},https://preview.example`);
+    expect(widened.filter((o) => o === named)).toHaveLength(1);
   });
 
   it('reads an empty or blank variable as "not set" rather than "nobody"', () => {
@@ -67,7 +138,7 @@ describe('who may read this from a browser', () => {
   });
 
   it('drops the empty entry a trailing comma leaves behind', () => {
-    expect(allowedOrigins('https://a.example,')).toEqual(['https://a.example']);
+    expect(allowedOrigins('https://a.example,')).toEqual([...DEFAULT_ORIGINS, 'https://a.example']);
   });
 });
 

@@ -35,6 +35,7 @@ WORKDIR /repo
 # `npm ci`, never `npm install`: it installs exactly what the lockfile says and
 # fails when it and package.json have drifted.
 COPY package.json package-lock.json ./
+COPY packages/address/package.json packages/address/
 COPY packages/schema/package.json packages/schema/
 COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/
@@ -51,6 +52,7 @@ WORKDIR /app
 # hundreds the build needs. Resolved from the lockfile rather than re-resolved,
 # so the image cannot quietly get a different `pg` than the tests ran against.
 COPY package.json package-lock.json ./
+COPY packages/address/package.json packages/address/
 COPY packages/schema/package.json packages/schema/
 COPY packages/scenario/package.json packages/scenario/
 COPY apps/web/package.json apps/web/
@@ -72,6 +74,25 @@ RUN apk upgrade --no-cache \
            /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /repo/apps/api/dist apps/api/dist
+
+# **The shared package's build output, which the manifest alone does not
+# bring.** `npm ci --omit=dev` above reads `packages/address/package.json` and
+# links `node_modules/@drainlens/address` to `packages/address`; the manifest
+# points at `dist/`, and nothing had put one there.
+#
+# Found the way these are found. The build succeeded, the image pushed, the
+# deployment failed at the health check, and the revision's log said
+# `ERR_MODULE_NOT_FOUND: /app/node_modules/@drainlens/address/dist/index.js
+# imported from /app/apps/api/dist/server.js`. Cloud Run kept the previous
+# revision serving, which is the only reason this was a failed deploy rather
+# than an outage.
+#
+# **Every workspace package `apps/api` imports needs a line here.** There is
+# one today. `tsc --build` in the build stage follows the project reference
+# and leaves the output at `/repo/packages/address/dist`, so adding a package
+# is two lines: the manifest beside the lockfile, and this.
+COPY --from=build /repo/packages/address/dist packages/address/dist
+
 COPY db/migrations db/migrations
 
 # **The layout below `/app` is load-bearing.** `load.ts` resolves the artefacts
@@ -80,17 +101,24 @@ COPY db/migrations db/migrations
 # `db/migrations` the same way. Flattening this image would break both at run
 # time and neither at build time.
 #
-# Six files, not the directory: `scene/` is 8 MB of terrain the browser reads
-# and the loader never opens, and `addresses.json` is never meant to leave the
-# browser. **A file the loader reads and this list forgets is a load that fails
-# inside a Cloud Run job**, which is the slowest place in this project to find
-# anything out.
+# Seven files, not the directory: `scene/` is 8 MB of terrain the browser
+# reads and the loader never opens. **A file the loader reads and this list
+# forgets is a load that fails inside a Cloud Run job**, which is the slowest
+# place in this project to find anything out.
+#
+# > **`addresses.json` joined this list on 9 October**, and the line it used
+# > to carry here said it was *never meant to leave the browser*. That was
+# > the product's position and the team withdrew it: the address search is
+# > served from Postgres now, with the bundled copy as the fallback, and the
+# > two sentences on screen that promised otherwise were rewritten in the
+# > same change. `db/migrations/006_address.sql` carries the decision.
 COPY apps/web/public/data/map.json \
      apps/web/public/data/derived.json \
      apps/web/public/data/trace.json \
      apps/web/public/data/flood-history.json \
      apps/web/public/data/sa2-areas.json \
      apps/web/public/data/population.json \
+     apps/web/public/data/addresses.json \
      apps/web/public/data/
 
 # The council extent, which is what the migration job loads when it is given

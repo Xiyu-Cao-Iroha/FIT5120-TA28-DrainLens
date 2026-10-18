@@ -243,6 +243,22 @@ difference* (`apps/web/src/scenario/outcome.ts`). The measurements below are
 dated records and use the words of their day: *higher than baseline* is the
 first band and *no clear change* the second.
 
+### 8. Where the extra water went
+
+A reader who sees violet 150 m from the drain they blocked reads it as a bug.
+It is not: the water the blocked pit does not take runs downhill and settles in
+the first hollow that holds it, which can be two streets away.
+
+So the result also draws the way it went. `extraWaterRoute`
+(`apps/web/src/scenario/worker.ts`) starts at the blocked drain's cell and
+follows **the same D8 directions the engine routed with**, not a line drawn
+between two points, stopping at the first cell the difference marked. The map
+draws it as a dashed violet line with an arrowhead (`map/difference.ts`), and
+the map key names it *Where the extra water flows, in the model*.
+
+It explains rather than adds: every cell on it is one the solver already
+visited, and nothing about the result changes if it is not drawn.
+
 ---
 
 ## The three failures that shaped this, measured

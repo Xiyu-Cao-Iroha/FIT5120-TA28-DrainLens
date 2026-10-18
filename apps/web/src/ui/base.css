@@ -102,6 +102,25 @@ button:disabled {
   border-radius: 4px;
 }
 
+/*
+ * The same ring, in the colour of the card it lands on.
+ *
+ * The sweep note is the one warm card in the product -- cream, with brown
+ * ink -- and the brand-green ring on it was reported on 11 October as a
+ * green box nobody could account for or get rid of. It is the keyboard
+ * focus ring, and it stays once the fold has been worked with the keyboard,
+ * which is what it is for; what was wrong is that it was the only green
+ * thing on a card with no green in it, so it read as a stray box rather
+ * than as *this is where you are*.
+ *
+ * Only the colour changes. The ring is the same width, the same offset, and
+ * appears in exactly the same cases. `advisory.ink` against `advisory.fill`
+ * is 6.34:1, measured, where a focus indicator needs 3:1.
+ */
+.sweep-note__toggle:focus-visible {
+  outline-color: #6b5a2b;
+}
+
 ::selection {
   background: #dcece6;
   color: #17242e;
@@ -143,6 +162,75 @@ button:disabled {
 
 .landing__lead {
   font: 400 clamp(15.5px, 1.6vw, 17px) / 1.55 'Kensington Sans', system-ui, sans-serif;
+}
+
+/*
+ * The street behind the address screen.
+ *
+ * A photograph of a Melbourne residential street, team supplied and AI
+ * generated, recorded in `docs/IMAGE-CREDITS.md`. It is decoration: it shows
+ * nothing this product has measured and nothing about the reader's address,
+ * which is why it is a background and not an <img> with a caption.
+ *
+ * **The same shape as `.choose__backdrop`**, which is the screen the reader
+ * arrives from: full bleed, a wash heaviest where the words are and lifting
+ * towards the foot, and an opaque surface under anything the wash cannot
+ * carry. Two earlier versions of this one got it wrong in opposite
+ * directions -- a flat 0.9 wash that erased the street, then a crisp band
+ * below the content that only appeared on a window tall enough to have room
+ * left over, which at 1100x800 meant never.
+ *
+ * **What the wash can and cannot carry**, measured against the picture's
+ * darkest pixel, which is an iron fence 36% down: at 0.9 the heading reads
+ * at 11.8:1 and the body at 7.1:1, and the page's muted grey at 3.9:1
+ * against the 4.5:1 AA asks for. So the lead under the heading is `ink.base`
+ * on this screen rather than `ink.muted`, the search card is opaque already,
+ * and the folded panels get a surface of their own -- they open far enough
+ * down the page for the wash to have thinned to 0.12.
+ */
+.landing__street {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #f5f8f7;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(245, 248, 247, 0.94) 0%,
+      rgba(245, 248, 247, 0.88) 38%,
+      rgba(245, 248, 247, 0.5) 72%,
+      rgba(245, 248, 247, 0.12) 100%
+    ),
+    url('/street.webp');
+  background-repeat: no-repeat;
+  background-size: cover;
+  /*
+    42%, not the centre and not the bottom. The photograph is 2:1 and a
+    window is rarely that shape, so `cover` shows a slice of it; 42% puts
+    the slice through the houses and the tree line, where the picture is
+    legible. Anchored at the bottom it was wet tarmac and nothing else.
+  */
+  background-position: center 42%;
+}
+
+/* The folded panels, where the wash has thinned too far to carry them. */
+.landing__more {
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(247, 250, 249, 0.94);
+}
+
+/*
+ * Nothing but the colour, where the reader has asked for less.
+ *
+ * `prefers-reduced-data` is not widely supported yet and costs one rule: on
+ * a metered connection a 134 KB decoration is the first thing that should
+ * not be fetched.
+ */
+@media (prefers-reduced-data: reduce) {
+  .landing__street {
+    background-image: none;
+  }
 }
 
 /*
@@ -196,8 +284,10 @@ button:disabled {
  *   what stops the picture: a sticky box cannot leave its containing block.
  * - `.home__backdrop-photo` is sticky at the top of `<main>`'s scrollport, one
  *   screen tall. `100vh` is taller than `<main>` by the header and the footer,
- *   so the last ~150 px of the wrapper scroll the picture with it — the edge
- *   meets "How to use the map" rather than floating over it.
+ *   so the last ~150 px of the wrapper scroll the picture with it, and the
+ *   edge meets the section below rather than floating over it. That section
+ *   was "How to use the map" until 10 October and is now the limits note;
+ *   the measurement is of the wrapper, so nothing here depends on which.
  *
  * Nothing moves by itself. Sticky is the browser holding an element still, not
  * an animation, so there is nothing for `prefers-reduced-motion` to switch off.
@@ -684,9 +774,17 @@ button:disabled {
  * The guide's "press this" on a map chip.
  *
  * It replaced the line *Waiting for you to try it* under every step that waits
- * for a press (copy audit v2, #21). An outline in the amber of the teaching
- * pit's ring on the map (`palette.suggested`), with a ring
- * that swells and fades around it. The outline is a box-shadow rather than the
+ * for a press (copy audit v2, #21). An outline with a ring that swells and
+ * fades around it.
+ *
+ * **The orange is the design's, `#EA6B1A`, and the arrow beside it uses the
+ * same one** (team, 17 October, with the mentor's finding that a ring on its
+ * own is too ambiguous: see `arrowGeometry.ts`). It was `#b4690e` until then,
+ * which is also the colour of the teaching pit on the map
+ * (`palette.suggested`) and of a trace that stops for want of a record
+ * (`stopIncomplete`). Those two are data and this is instruction, so sharing
+ * a hex was a coincidence worth losing rather than a rule worth keeping.
+ * Both of them keep `#b4690e`. The outline is a box-shadow rather than the
  * border, because the chip's border is an inline style and a class cannot
  * override it.
  *
@@ -697,24 +795,146 @@ button:disabled {
  */
 @keyframes drainlens-chip-pulse {
   0% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 2px rgba(180, 105, 14, 0.45);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 2px rgba(234, 107, 26, 0.45);
   }
   70% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 9px rgba(234, 107, 26, 0);
   }
   100% {
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 9px rgba(180, 105, 14, 0);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 9px rgba(234, 107, 26, 0);
   }
 }
 
 .chip--pulse {
   animation: drainlens-chip-pulse 1.6s ease-out infinite;
-  box-shadow: 0 0 0 2px #b4690e;
+  box-shadow: 0 0 0 2px #EA6B1A;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chip--pulse {
     animation: none !important;
-    box-shadow: 0 0 0 2px #b4690e, 0 0 0 5px rgba(180, 105, 14, 0.3);
+    box-shadow: 0 0 0 2px #EA6B1A, 0 0 0 5px rgba(234, 107, 26, 0.3);
+  }
+}
+
+/*
+  The phone layout, at and under 560 px.
+
+  **560 is not a new number.** `fitBounds.ts` already calls it
+  `NARROW_FRAME_PX`, the width below which the map stops reserving room for
+  a panel beside it, and a second breakpoint a hundred pixels away would be
+  two rules nobody could hold in their head at once.
+
+  Built against 375 x 667, which is 9:16 and the smallest screen anybody is
+  likely to bring: an iPhone SE. There is no mobile design in Figma, so these
+  are decisions rather than a transcription, and each one says what it gave
+  up.
+*/
+@media (max-width: 560px) {
+  /*
+    Three words of reassurance that wrap to three lines at 375 px and push
+    the navigation off the header.
+  */
+  .shell__tagline {
+    display: none;
+  }
+
+  /*
+    The four site links get a row of their own.
+
+    Measured rather than guessed: the wordmark takes 139 px and the four
+    links about 310, so on one row at 375 px the last of them starts at
+    409 and is off the screen. Until 10 October it simply overflowed and
+    *Full map* could not be reached at all.
+
+    A second row was chosen over the two obvious alternatives. Scrolling
+    the row keeps the header one line tall and leaves a half-cut word
+    sitting at rest, which looks like a rendering fault. A menu hides the
+    four destinations the team spent 8 and 10 October adding, to save the
+    same 40 px. The row costs 40 px once, at the top, and every
+    destination stays visible and one tap away.
+
+    `overflow-x` stays as insurance: a longer label set, or a reader with
+    larger text, scrolls instead of overflowing.
+  */
+  .shell__masthead {
+    flex-wrap: wrap;
+  }
+
+  .shell__actions {
+    margin-left: 0 !important;
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell__actions > nav {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+
+  .shell__actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shell__actions > * {
+    scroll-snap-align: end;
+  }
+
+  /*
+    The map's layer chips: one line that scrolls, not four that wrap.
+
+    Six chips wrap to four rows at 375 px and take the top half of the map.
+    They also start folded there, which the stylesheet cannot do; see
+    `ui/narrow.ts`. This is for when the reader opens them.
+  */
+  .map-chips {
+    /*
+      `!important` because the row sets `flexWrap: 'wrap'` inline, which is
+      the desktop behaviour and the right default. An inline style beats a
+      stylesheet rule, so the phone case has to say so out loud.
+    */
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .map-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Chips must not squash to fit; the row scrolls instead. */
+  .map-chips > * {
+    flex: 0 0 auto;
+  }
+
+  /*
+    The breadcrumb row, which on the map is where the site links live.
+
+    Same problem as the masthead and not the same fix: this row has no
+    wordmark to drop below, and giving it a second line would take 40 px
+    off the map on a screen where the map is already short. It scrolls, and
+    `flex-shrink: 0` on the items stops them squashing into each other
+    rather than queueing.
+  */
+  .shell__crumbs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell__crumbs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shell__crumbs > * {
+    flex: 0 0 auto;
   }
 }

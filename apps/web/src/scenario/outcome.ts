@@ -32,7 +32,7 @@ export type Action =
  * only a comparison opened from the full map returns there.
  */
 export const ACTION_LABELS: Readonly<Record<Action, string>> = {
-  'change-scenario': 'Change the test',
+  'change-scenario': 'Change my choices',
   'choose-another-pit': 'Choose another drain',
   'change-address': 'Try another address',
   'return-to-map': 'Return to the map',
@@ -96,7 +96,14 @@ export const BANDS: Readonly<Record<ComparisonBand, Presentation>> = {
     // What the heading means, in other words. What it does not mean is
     // `NO_CLEAR_CHANGE_MEANS`, which the screen shows beside this.
     body: 'At this total rainfall, the model found no extra surface water nearby large enough to show on the map.',
-    comparison: 'No clear difference',
+    /*
+      **The same words as the heading above it, since 11 October.** The
+      heading read *No visible difference nearby* and this row read *No
+      clear difference*, on one screen, about one result; the audit found
+      readers taking them for two findings. The heading's wording won
+      because it is the one a reader meets first.
+    */
+    comparison: 'No visible difference nearby',
     actions: ['change-scenario', 'return-to-map'],
     showsDifference: false,
   },
@@ -164,7 +171,7 @@ export const presentationFor = (outcome: Outcome): Presentation =>
  * accumulated water between two assumptions and knows nothing about when.
  */
 export const RESULT_DISCLAIMER =
-  'This comparison does not predict flooding. It does not show flood depth or when water may arrive.';
+  'This model does not show whether the drain is blocked now. It does not predict flooding, flood depth or when water may arrive.';
 
 /**
  * The short line under *Run comparison*, before anything has run.
@@ -196,7 +203,7 @@ export const ROUTE_LEGEND = 'Where the extra water flows, in the model';
 
 /** What the purple is not, beside the legend line. */
 export const DIFFERENCE_LEGEND_NOTE =
-  'Purple marks changes large enough to report. It is not water depth, and its edge follows the area the model found rather than a circle around the drain.';
+  'Purple shows where the model estimates more water on the ground than with the drain clear. It is not water depth, and its edge follows the area the model found rather than a circle around the drain.';
 
 /** The three parts of a run, as the progress names them while it waits. */
 export const COMPARING_STEPS: readonly string[] = [
@@ -247,7 +254,7 @@ export const WHY_NO_CLEAR_CHANGE: readonly { readonly title: string; readonly bo
  * one, and this sentence is the only thing standing between the two readings.
  */
 export const RAINFALL_CONTROL_NOTE =
-  'Each button is an amount of total rainfall, not a point in time. A change need not grow steadily with rainfall: it can appear at one amount and not at the next, as low areas fill and overflow.';
+  'Each button is an amount of total rainfall, not a point in time. A change may not grow steadily with rainfall: it can appear at one amount and not at the next, as low areas fill and overflow.';
 
 /**
  * What total rainfall is in this model, where an amount is chosen.
@@ -256,10 +263,10 @@ export const RAINFALL_CONTROL_NOTE =
  * water is added (evenly, from dry ground) is in `HOW_IT_WAS_PRODUCED`.
  */
 export const RAINFALL_EXPLAINED =
-  'The same amount is used for both drain settings. It is not a forecast and does not include rainfall duration or intensity.';
+  'The same total rain is used in both cases. The model does not account for how quickly it falls, and this is not a forecast.';
 
 /**
- * What "No clear difference" means, said outright beside the finding.
+ * What "No visible difference nearby" means, said outright beside the finding.
  *
  * AC 3.3.2.h and 3.1.3.f. This is the sentence that makes a null result honest
  * rather than reassuring, which is why it is not inside a collapsed section:
@@ -283,7 +290,7 @@ export const LIMITATIONS: readonly string[] = [
   'It does not give a flood probability or a risk score.',
   // The full sentence, not `NO_CLEAR_CHANGE_MEANS`: the note beside the finding
   // is the short form, and AC 3.3.2.h still needs saying in full here.
-  'No clear difference means this simplified calculation did not find a clear difference from the clear-drain setting. It does not show whether this drain is blocked now, or that a blockage would have no effect in a real flood.',
+  'No visible difference nearby means this simplified calculation did not separate the two cases. It does not show whether this drain is blocked now, or that a blockage would have no effect in a real flood.',
   'It only shows differences from the clear-drain setting, within the area of ground data around the selected drain.',
 ];
 
@@ -291,7 +298,7 @@ export const LIMITATIONS: readonly string[] = [
  * How strongly to read a result, AC 3.3.3.d.
  */
 export const HOW_STRONGLY_TO_READ_IT =
-  'Read this as a comparison between two drain settings on estimated ground height. More water than with a clear drain says where, in this model, the blockage leaves more water on the ground — not how much, and not that it would flood. No clear difference says the model could not separate the two settings — not that the drain does not matter.';
+  'Read this as a comparison between two drain conditions on estimated ground height. More water than with a clear drain says where, in this model, the blockage leaves more water on the ground: not how much, and not that it would flood. No visible difference nearby says the model could not separate the two cases, not that the drain does not matter.';
 
 /**
  * The three kinds of thing on this screen, and their colours.

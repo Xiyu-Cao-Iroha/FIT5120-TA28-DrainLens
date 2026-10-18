@@ -22,7 +22,7 @@
  * that no longer matches the words beside it.
  */
 
-import type { LayerKey } from '../map/modes.js';
+import type { LayerKey, LayerState } from '../map/modes.js';
 import type { TerrainPoints } from './terrainPoints.js';
 
 
@@ -34,7 +34,6 @@ export type Requirement =
   | 'trace-following'
   | 'water-flow-on'
   | 'low-areas-on'
-  | 'unmeasured-on'
   /*
     The ground height guide's three, Figma Terrain Tutorial, 16 September.
 
@@ -47,7 +46,56 @@ export type Requirement =
   */
   | 'layers-opened'
   | 'terrain-shown'
-  | 'terrain-off';
+  | 'terrain-off'
+  /* Epic 6's chip (Figma, *Your drainage area* D1). */
+  | 'catchment-on'
+  /*
+    Epic 5's two.
+
+    It had four, for the design's G1, G2, G4 and G6. The team cut the guide
+    to three steps on 17 October: *Why this place?* went because the place
+    card already explains the reason, and the street drain check because it
+    is outside the heavy-rain task. The fold and the drain list both stay in
+    the product; it is the steps that asked a reader to press them that are
+    gone, and these are the requirements those steps were waiting for.
+  */
+  | 'plan-opened'
+  | 'places-reviewed'
+  /*
+    Epic 6's last two, from Figma D3 and D4.
+
+    **They replaced a step that was never in the design.** Until 10 October
+    this guide's third step was *Now open Why are there different
+    organisations?*, a fold inside the card, and its fourth was a sentence
+    about who looks after what. The design's third and fourth frames are
+    about reporting a problem: press *Report a problem*, then choose a
+    problem type, and the panel says who to contact and what to have ready.
+    The card still carries the fold and still names the operators inline;
+    the guide no longer sends anybody to it.
+
+    Both are latched, like the ground guide's two: the panel can be closed
+    and a chosen problem can be changed, and neither un-does the press the
+    step was waiting for.
+  */
+  | 'report-opened'
+  | 'problem-chosen'
+  /*
+    Epic 6's three new ones, from the team's 17 October frames.
+
+    The guide went from three steps to six, and the three it gained walk
+    the reader through picking the drain the report is about: enter the
+    picker, tap a drain, confirm it. The map has done all of this since
+    the report flow was built (Figma R1 to R3); what it had never done is
+    say so to a guide.
+
+    All three are latched. Each one undoes the state the one before it
+    read: confirming a drain leaves the picker, which would put an
+    unlatched step three back to waiting, and a reader who had finished
+    the guide's fourth step would find themselves on its third.
+  */
+  | 'drain-picking'
+  | 'drain-candidate'
+  | 'drain-chosen';
 
 /**
  * A control on the map the guide can outline, besides a chip.
@@ -103,6 +151,17 @@ interface StepExtras {
   readonly mark?: GuideMark;
   /** Outlined on the map while this step is shown. `do` steps derive theirs. */
   readonly highlight?: Highlight;
+  /**
+   * A control or panel inside a card to mark, where the step is not a press.
+   *
+   * A `do` step derives its mark from what it is waiting for (`pressFor`),
+   * which is the right answer for a step that waits. Epic 5's review step
+   * waits for nothing and still has a subject: the team's 17 October note
+   * is to *outline the entire plan panel and point an arrow to it*, and the
+   * reason the panel is not a press is the point of the step -- *no
+   * checkbox or other choice is needed here*.
+   */
+  readonly points?: Press;
 }
 
 export type Step =
@@ -181,6 +240,40 @@ export interface MapNow {
   readonly layersOpened: boolean;
   /** Latched: Ground height has been on during this lesson. */
   readonly terrainShown: boolean;
+  /** The drainage area's boundary, drawn now. */
+  readonly catchment: boolean;
+  /** The preparation plan, open now. */
+  readonly planOpen: boolean;
+  /**
+   * Latched: the plan has been open during this lesson.
+   *
+   * The step that asks for it used to read `planOpen` as it is, and the
+   * guide's own fifth step closes the plan: pressing *Check the street
+   * drains near you* puts the list where the plan was, which sent the reader
+   * back to step one with the list open in front of them.
+   */
+  readonly planOpened: boolean;
+  /**
+   * How many numbered places this address has, or null while unknown.
+   *
+   * Null until the warning markers have loaded, which is not the same as
+   * zero: 58.6% of addresses genuinely have none (`prepare/places.ts`), and a
+   * guide that reads *not yet* as *none* would hand the majority case to
+   * whichever arrived first.
+   */
+  readonly placeCount: number | null;
+  /** How many numbered places the reader has answered for. */
+  readonly placesReviewed: number;
+  /** Latched: the report panel has been opened (Figma D3). */
+  readonly reportOpened: boolean;
+  /** Latched: a problem type has been chosen in it (Figma D4). */
+  readonly problemChosen: boolean;
+  /** Latched: the map is being used to pick the drain, or a pin for it. */
+  readonly drainPicking: boolean;
+  /** Latched: a drain has been tapped, or a pin put down. */
+  readonly drainCandidate: boolean;
+  /** Latched: the report carries a place, whichever way it was named. */
+  readonly drainChosen: boolean;
 }
 
 /** Nothing on and nothing selected. The state every lesson opens in. */
@@ -196,6 +289,16 @@ export const NOTHING_ON_MAP: MapNow = {
   layersOpen: false,
   layersOpened: false,
   terrainShown: false,
+  catchment: false,
+  planOpen: false,
+  planOpened: false,
+  placeCount: null,
+  placesReviewed: 0,
+  reportOpened: false,
+  problemChosen: false,
+  drainPicking: false,
+  drainCandidate: false,
+  drainChosen: false,
 };
 
 /**
@@ -210,6 +313,12 @@ export const latch = (before: MapNow, next: MapNow): MapNow => ({
   ...next,
   layersOpened: before.layersOpened || next.layersOpened || next.layersOpen,
   terrainShown: before.terrainShown || next.terrainShown || next.terrain,
+  reportOpened: before.reportOpened || next.reportOpened,
+  problemChosen: before.problemChosen || next.problemChosen,
+  drainPicking: before.drainPicking || next.drainPicking,
+  drainCandidate: before.drainCandidate || next.drainCandidate,
+  drainChosen: before.drainChosen || next.drainChosen,
+  planOpened: before.planOpened || next.planOpened || next.planOpen,
 });
 
 /**
@@ -285,6 +394,15 @@ export interface Lesson {
   readonly previous?: boolean;
   readonly mapChrome?: MapChrome;
   /**
+   * What the map draws when this lesson opens, where it is not an empty map.
+   *
+   * Every lesson but one opens with nothing on and turns something on in its
+   * first step. Epic 5's does not: AC 5.1.1 puts the numbered markers on the
+   * map as soon as an address is chosen, and its first step asks for the
+   * button that comes with them rather than for the layer.
+   */
+  readonly opensWith?: LayerState;
+  /**
    * The steps, given the ground near the address.
    *
    * The ground height guide names real heights, and which it can name depends
@@ -294,6 +412,25 @@ export interface Lesson {
    * the data arriving mid-lesson cannot move the reader.
    */
   readonly withGround?: (points: TerrainPoints | null) => readonly Step[];
+  /**
+   * The steps and the finish page, given how many places this address has.
+   *
+   * Epic 5's guide walks the reader through deciding about Place 1, and
+   * 58.6% of addresses have no Place 1: at one of those the second step asks
+   * for a decision about something that is not on the map and the fourth asks
+   * for a fold that does not exist, so the guide cannot be finished at all.
+   * The plan already has an answer for that address (AC 5.1.3) and these
+   * steps walk the reader to it instead.
+   *
+   * **Unlike `withGround`, the step count does change.** It has to: the
+   * missing steps are missing because there is nothing to do in them, and a
+   * placeholder would be a step that waits forever. What makes that safe is
+   * that the count is a fact about the address rather than a file still
+   * loading, it is known before the first step is satisfied, and both
+   * versions share the first step, so a reader cannot be moved off a step by
+   * the answer arriving.
+   */
+  readonly withPlaces?: (placeCount: number | null) => Pick<Lesson, 'steps' | 'finished'>;
 }
 
 /**
@@ -305,6 +442,106 @@ export interface Lesson {
  * the connected-pipe button are not chips: the pit has its ring, and the
  * button is on the pit's own card.
  */
+/**
+ * The control inside a card that the current step is waiting for.
+ *
+ * `chipFor` answers the same question for the layer chips along the top of
+ * the map, which pulse while a step waits on one. This answers it for the
+ * controls that live inside a card, where there is no chip to pulse and a
+ * reader was left reading *click X* with nothing on screen looking clickable.
+ *
+ * Null for every step that waits on a chip, or on nothing a reader presses.
+ */
+export type Press =
+  | 'report'
+  | 'problem'
+  | 'place'
+  | 'plan'
+  /** Epic 6: the report's button, the picker's banner, and its confirm card. */
+  | 'pick-drain'
+  | 'pick-banner'
+  | 'use-drain'
+  /** Epic 6's last step, which points at the row the answer landed in. */
+  | 'which-drain'
+  /*
+    And the three outside Epic 5 and 6, from the same note's arrow pass.
+
+    `pit` and `drain` are marks on the canvas rather than controls, so what
+    carries them is an empty span the map puts at the mark's own projected
+    position: there is no element to measure otherwise, and a fixed
+    coordinate would be wrong the moment the map moved.
+  */
+  | 'trace'
+  /** Epic 5's first step: the button on the address card. */
+  | 'check-button'
+  | 'pit'
+  | 'drain';
+
+export function pressFor(requires: Requirement): Press | null {
+  switch (requires) {
+    case 'report-opened':
+      return 'report';
+    case 'problem-chosen':
+      return 'problem';
+    /*
+      The button in the report that hands the map over, and then the card
+      the map puts up when a drain is tapped. The drain markers themselves
+      are drawn on the canvas, so the step that asks for one is marked by
+      the picker's own banner rather than by a ring on a dot.
+    */
+    case 'drain-picking':
+      return 'pick-drain';
+    case 'drain-candidate':
+      return 'pick-banner';
+    case 'drain-chosen':
+      return 'use-drain';
+    /*
+      The ringed pit itself, and then the button on the card it opens.
+
+      Both were listed as *answered by something the reader is already
+      looking at* until 17 October, when the team asked for an arrow on
+      every map control a step asks to be pressed. A ring around a dot
+      among forty dots is exactly the ambiguity the mentor reported.
+    */
+    case 'pit-selected':
+      return 'pit';
+    case 'trace-following':
+      return 'trace';
+    /*
+      The button on the address card, which was exempt as *the card's one
+      filled control* and is not exempt now: frame E5/01 draws an arrow on
+      it, and the card is a third of the map with the button a third of
+      the card.
+    */
+    case 'plan-opened':
+      return 'check-button';
+    /*
+      The pair of answers on the place card, not either one of them.
+
+      Ringing *Applies to me* alone would be the guide answering the
+      question it is asking. The step is satisfied by either, so the mark
+      goes round both (the team's 17 October frame calls it *Target ·
+      Choice*).
+    */
+    case 'places-reviewed':
+      return 'place';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether a lesson sends the reader into the report flow.
+ *
+ * The map hides *Report a problem* during a guide, for a reason worth
+ * keeping: it opens a card taller than the guide's map frame, over a step
+ * that was asking about something else. Epic 6's guide is the exception the
+ * design draws (Figma D3 and D4), so the exception is derived from the steps
+ * rather than from the lesson's name.
+ */
+export const usesReport = (steps: Lesson['steps']): boolean =>
+  steps.some((step) => step.kind === 'do' && step.requires === 'report-opened');
+
 export function chipFor(requires: Requirement): LayerKey | null {
   switch (requires) {
     case 'pits-on':
@@ -315,8 +552,27 @@ export function chipFor(requires: Requirement): LayerKey | null {
       return 'channel';
     case 'low-areas-on':
       return 'lowPoint';
-    case 'unmeasured-on':
-      return 'unavailable';
+    case 'catchment-on':
+      return 'catchment';
+    case 'plan-opened':
+    case 'places-reviewed':
+    case 'report-opened':
+    case 'problem-chosen':
+    case 'drain-picking':
+    case 'drain-candidate':
+    case 'drain-chosen':
+      /*
+        None is a chip: the address card's button, the two answers on a
+        place's own card, and two controls inside the card the boundary chip
+        has already drawn.
+
+        **A reader still has to be able to find them**, which is the
+        9 October report that the guide said *Now open Why are there
+        different organisations?* while the fold it meant was a small
+        triangle among three. `pressFor` answers that for the controls this
+        returns null about.
+      */
+      return null;
     case 'pit-selected':
     case 'trace-following':
     case 'layers-opened':
@@ -366,6 +622,35 @@ export function satisfied(
   teachingPit: string | null,
 ): boolean {
   switch (requires) {
+    case 'plan-opened':
+      return now.planOpened;
+    case 'places-reviewed':
+      /*
+        Every place, not the first one.
+
+        Any answer counts for each, including *doesn't apply to me*: the step
+        asks for a decision and both are decisions (AC 5.4.1). What changed
+        on 17 October is how many it asks for. The step used to be satisfied
+        by Place 1 and the design's review frame says *3 of 3 reviewed*, so a
+        reader could reach a plan that was still asking them something.
+
+        `placeCount` is null while the markers load, which is not zero: an
+        unanswerable step is better than a step that passes itself the moment
+        the data is late.
+      */
+      return now.placeCount !== null && now.placeCount > 0 && now.placesReviewed >= now.placeCount;
+    case 'report-opened':
+      return now.reportOpened;
+    case 'problem-chosen':
+      return now.problemChosen;
+    case 'drain-picking':
+      return now.drainPicking;
+    case 'drain-candidate':
+      return now.drainCandidate;
+    case 'drain-chosen':
+      return now.drainChosen;
+    case 'catchment-on':
+      return now.catchment;
     case 'pits-on':
       return now.pits;
     case 'pipes-on':
@@ -377,8 +662,6 @@ export function satisfied(
       return now.channel;
     case 'low-areas-on':
       return now.lowPoints;
-    case 'unmeasured-on':
-      return now.unmeasured;
     case 'pit-selected':
       return now.selectedPit !== null;
     case 'trace-following':

@@ -6,9 +6,9 @@
  * than at every screen that happens to touch it.
  */
 
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 
-import { type AddressIndex, type PackedIndex, unpack } from './address/search.js';
+import { type AddressIndex, type PackedIndex, unpack } from '@drainlens/address';
 import { demonstrationAddress } from './address/demonstration.js';
 import { type MapArtefact, assertUsable } from './map/artefact.js';
 import { type DerivedArtefact, assertDerived } from './map/derived.js';
@@ -33,9 +33,10 @@ import { DrainsUnavailable, FindingDrains, NoMatch } from './screens/NoMatch.js'
 import { TaskSelect } from './screens/TaskSelect.js';
 import { type DifferenceArea, footprintCorners, intoMapFrame } from './map/difference.js';
 import type { Local } from './map/viewport.js';
-import { COMPARISON_RADIUS_M, comparableNear } from './scenario/eligibility.js';
+import { COMPARISON_RADIUS_M, NO_COMPARABLE_ADDRESS, comparableNear } from './scenario/eligibility.js';
 import { type DifferencesArtefact, differenceHint, differingDrains, loadDifferences } from './scenario/differences.js';
-import { ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
+import { loadCatchments } from './catchment/artefact.js';
+import { brand, ink, line, radius, shadow, space, surface, text, type, weight } from './ui/theme.js';
 import type { Action } from './scenario/outcome.js';
 import { useScenario } from './scenario/useScenario.js';
 import { useScenarioSupport } from './scenario/support.js';
@@ -44,11 +45,13 @@ import type { SolvedPosition } from './scenario/worker.js';
 import {
   INITIAL_SESSION,
   type Session,
+  type MapOrigin,
   type SessionEvent,
   type SupportedAddress,
   reduce,
 } from './session.js';
-import { Shell } from './ui/Shell.js';
+import { Shell, type ShellProps } from './ui/Shell.js';
+import { NavMenu, navItem, useShowWhenCurrent } from './ui/NavMenu.js';
 import { FULL_MAP } from './ui/terms.js';
 import { Spinner } from './ui/Spinner.js';
 import { Tour } from './ui/Tour.js';
@@ -136,11 +139,13 @@ async function load(): Promise<Loaded> {
       onFallback: note,
     }),
     // **Never from a server, and not routed through `fetchArtefact` so that no
-    // later edit there can change that.** The landing page tells a resident the
-    // search runs in their browser and that nothing about the address is sent
-    // anywhere; an address index fetched from an API would still keep that
-    // promise, and an index fetched *per query* would not. Bundled is the shape
-    // that cannot drift into the second.
+    // later edit there can change that.** The reason is no longer a sentence on
+    // the landing page: that promise was withdrawn on 9 October, when a
+    // submitted search moved to `POST /api/addresses/search`. What survived it
+    // is the red line in `packages/address` -- suggestions are ranked over this
+    // index on every keystroke, and an index fetched *per query* would send a
+    // home address to a server one letter at a time. Bundled is the shape that
+    // cannot drift into that. `DECISIONS-PENDING.md` §14.
     fetch('/data/addresses.json').then((r) => r.json()),
   ]);
 
@@ -239,6 +244,17 @@ export function App() {
   useEffect(() => {
     void loadDifferences('/data/scenario-differences.json').then(setDifferences);
   }, []);
+
+  /*
+    The drainage areas, for Epic 6. Two files, loaded together because one is
+    useless without the other, and null when either is late or malformed: the
+    map works without them and the address card then offers no drainage area
+    rather than an empty one.
+  */
+  const [catchments, setCatchments] = useState<Awaited<ReturnType<typeof loadCatchments>>>(null);
+  useEffect(() => {
+    void loadCatchments('/data/subcatchments.json', '/data/address-catchments.json').then(setCatchments);
+  }, []);
   const differing = useMemo(() => differingDrains(differences), [differences]);
 
   const eligibility = useMemo(
@@ -254,6 +270,36 @@ export function App() {
           ),
     [loaded, session.address, scenario.ready, scenario.supported, differing],
   );
+  /*
+    Which addresses the comparison's own search box may offer (team,
+    12 October: *comparison 地址搜索栏当中，只放可以做 comparison 的*).
+
+    The comparison cannot answer for every supported address: it needs a
+    drain within `COMPARISON_RADIUS_M` that the scene tiles can calculate,
+    and 0.5% of the council's addresses have none. Those addresses were
+    offered, accepted, and then met *no drain near this address* two
+    screens later.
+
+    **Undefined until the worker's list is in**, so a slow start offers
+    every address rather than none: a search box that answers nothing while
+    something loads is worse than one that occasionally leads to the honest
+    refusal this removes.
+
+    The supported pits are taken out of the map once here rather than per
+    keystroke, because the predicate runs over them for each match the
+    search returns. `comparableNear` still decides what comparable means;
+    pre-filtering only saves it the walk.
+  */
+  const comparableAddress = useMemo(() => {
+    if (loaded === null || !scenario.ready) return undefined;
+    const supported = scenario.supported;
+    const pits = (loaded.map.layers.pit ?? []).filter(
+      (pit) => pit.asset_number !== undefined && supported.has(String(pit.asset_number)),
+    );
+    return (address: { readonly e: number; readonly n: number }) =>
+      comparableNear([address.e, address.n], pits, supported, COMPARISON_RADIUS_M).nearest !== null;
+  }, [loaded, scenario.ready, scenario.supported]);
+
   // No match: the reducer decides what that may do, and only step 1 stops.
   useEffect(() => {
     if (session.screen === 'drain' && eligibility !== null && eligibility.nearest === null) {
@@ -274,16 +320,16 @@ export function App() {
 
   if (problem !== null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <p style={{ padding: 24 }}>{problem}</p>
-      </Shell>
+      </AppShell>
     );
   }
   if (loaded === null) {
     return (
-      <Shell>
+      <AppShell dispatch={dispatch}>
         <Spinner label="Loading the map…" />
-      </Shell>
+      </AppShell>
     );
   }
 
@@ -322,19 +368,13 @@ export function App() {
   switch (session.screen) {
     case 'home':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
           actions={
-            <HomeNav
-              onOpenMap={() => {
-                dispatch({ type: 'get-started' });
-              }}
-              onOpenHistory={() => {
-                dispatch({ type: 'history-opened' });
-              }}
-            />
+            <SiteNav {...siteNavProps(dispatch, 'home')} />
           }
         >
           <Home
@@ -350,7 +390,10 @@ export function App() {
                 dispatch.
               */
               void mode;
-              dispatch({ type: 'get-started' });
+              // Straight to the chooser, not through the fork: these cards are
+              // already about the guides, and asking again which of the two
+              // they meant would be answering a question they just answered.
+              dispatch({ type: 'explore-chosen' });
             }}
             // The chooser's "Skip to Full map", so the link named after the
             // full map opens it -- through the same notice, which the reducer
@@ -377,7 +420,7 @@ export function App() {
               dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'flood-map': {
@@ -385,7 +428,8 @@ export function App() {
         dispatch({ type: 'back' });
       };
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={
             areas.data === null
@@ -393,6 +437,12 @@ export function App() {
               : creditsForSources([areas.data.scope.source, areas.data.scope.geographySource, areas.data.population.source])
           }
           creditNotice={FLOOD_CHANGES_NOTICE}
+          /*
+            Reported on 10 October: this screen had a breadcrumb saying how
+            the reader got here and nothing saying where else they could go.
+            It is the board's map, so the board is the page it belongs to.
+          */
+          actions={<SiteNav {...siteNavProps(dispatch, 'flood-map', 'history')} />}
           crumbs={
             <>
               {crumb('Home', () => {
@@ -426,13 +476,14 @@ export function App() {
               onBack={back}
             />
           )}
-        </Shell>
+        </AppShell>
       );
     }
 
     case 'history':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={creditsForSources([
             loaded.history.source,
@@ -442,6 +493,9 @@ export function App() {
             areas.data === null ? undefined : areas.data.population.source,
           ])}
           creditNotice={BOARD_CHANGES_NOTICE}
+          actions={
+            <SiteNav {...siteNavProps(dispatch, 'history', 'history')} />
+          }
           back={{
             label: 'Home',
             onBack: () => {
@@ -466,19 +520,27 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'address':
     case 'unsupported':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName}>
+        <AppShell
+          dispatch={dispatch}
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+        >
           <Landing
             index={loaded.index}
             fixtureNote={loaded.fixtureNote}
+            recent={session.recent}
             // The comparison's own words when it is the task waiting.
             task={session.pendingTask}
+            {...(session.pendingTask === 'compare' && comparableAddress !== undefined
+              ? { usable: comparableAddress, usableNote: NO_COMPARABLE_ADDRESS }
+              : {})}
             // The title follows the guide card that was pressed (copy audit v2, #16).
             section={session.guideSection}
             onFound={(address) =>
@@ -502,16 +564,30 @@ export function App() {
               dispatch({ type: 'go-home' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'choose':
       return (
-        <Shell at={session.screen} credits={credits}
-          extentName={loaded.extentName} masthead={false}>
+        <AppShell
+          dispatch={dispatch}
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          actions={
+            <SiteNav {...siteNavProps(dispatch, 'tutorial')} />
+          }
+        >
           <Choose
             learned={session.learned}
+            compared={session.compared}
             guided={GUIDED_SECTIONS}
+            address={session.address?.label ?? null}
+            onChangeAddress={() => {
+              // Asked for from here, so it comes back here rather than
+              // handing the reader to the task question they did not ask.
+              dispatch({ type: 'change-address', from: 'choose' });
+            }}
             onStart={(section) => {
               dispatch({ type: 'guide-chosen', section });
             }}
@@ -523,16 +599,19 @@ export function App() {
             onSkip={() => {
               dispatch({ type: 'map-opened', from: 'home' });
             }}
+            // Back to the fork it was reached through since 4 October, which
+            // is one press from the homepage either way.
             onBack={() => {
-              dispatch({ type: 'go-home' });
+              dispatch({ type: 'back' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'locked':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -566,20 +645,25 @@ export function App() {
               dispatch({ type: 'leave-map' });
             }}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'guide':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
           masthead={false}
           back={{
-            label: 'Address',
+            // Where the guide was picked, not where the address was typed.
+            // `guide-left` rather than `back` because it is the same thing
+            // the panel's own control does: it lets the section go, so the
+            // chooser is not still holding a guide nobody is in.
+            label: 'Guides',
             onBack: () => {
-              dispatch({ type: 'back' });
+              dispatch({ type: 'guide-left' });
             },
           }}
           // The guide's own title where it has one: *Ground height guide*
@@ -610,17 +694,67 @@ export function App() {
         >
           {session.address === null || session.guideSection === null ? null : (
             <Guide
+              /*
+                A new guide starts from nothing.
+
+                Without this key, starting the next guide from the end of
+                one keeps everything the last one left behind: the layers
+                it turned on, the panel it opened, the steps already
+                acknowledged. Pressing *Start next guide* at the end of the
+                heavy rain guide opened Recorded drainage at *3 of 6*, with
+                the drains list still over the map and the first two steps
+                already satisfied, which the team reported on 11 October as
+                the guide being in a 割裂 state. A guide reads the map to
+                decide where the reader is, so the map has to be a map this
+                guide has not already been driven across.
+              */
+              key={session.guideSection}
               map={loaded.map}
               derived={loaded.derived}
               trace={loaded.trace}
               index={loaded.index}
               address={session.address}
               section={session.guideSection}
+              catchments={catchments}
+              relevance={session.relevance}
+              onReviewPlace={(place, relevance) => {
+                dispatch({ type: 'place-reviewed', place, relevance });
+              }}
+              onResetPlaces={() => {
+                dispatch({ type: 'places-reset' });
+              }}
               onFinish={() => {
                 dispatch({ type: 'guide-finished' });
               }}
               onLeave={() => {
                 dispatch({ type: 'guide-left' });
+              }}
+              learned={session.learned}
+              guided={GUIDED_SECTIONS}
+              /*
+                *Start next guide* is on the finish page, so the guide it
+                leaves was finished.
+
+                It dispatched only `guide-chosen`, which sets the new
+                section and nothing else, so a reader who followed the
+                design's own chain (Figma G5 puts the next guide at the end
+                of each one) never had a single guide recorded: the chooser
+                showed none of them done, the count stayed at 0 of 7, and
+                `nextGuide` kept offering the one just finished. Pressing
+                *Back to guidance page* instead recorded it, which is what
+                made it look like the guides were not being counted at all
+                rather than like this one path was missing a step.
+
+                Found by the self test of 12 October: finish the heavy rain
+                guide, press *Start next guide*, and `drainlens.learned` is
+                still six zeroes.
+              */
+              onStartSection={(next) => {
+                dispatch({ type: 'guide-finished' });
+                dispatch({ type: 'guide-chosen', section: next });
+              }}
+              onFullMap={() => {
+                dispatch({ type: 'map-opened', from: 'home' });
               }}
               // Back to the address screen, keeping the section chosen.
               onBack={() => {
@@ -628,12 +762,13 @@ export function App() {
               }}
             />
           )}
-        </Shell>
+        </AppShell>
       );
 
     case 'task':
       return (
-        <Shell
+        <AppShell
+          dispatch={dispatch}
           at={session.screen}
           credits={credits}
           extentName={loaded.extentName}
@@ -656,7 +791,7 @@ export function App() {
             onChoose={(task) => dispatch({ type: 'task-chosen', task })}
             onChangeAddress={() => dispatch({ type: 'change-address' })}
           />
-        </Shell>
+        </AppShell>
       );
 
     case 'drain':
@@ -812,11 +947,26 @@ export function App() {
       const step = session.screen;
       const reached = (at: 'drain' | 'scenario' | 'review' | 'result') =>
         ({ drain: 1, scenario: 2, review: 3, result: 3, 'no-match': 0 })[step] >= { drain: 1, scenario: 2, review: 3, result: 3 }[at];
+      /*
+        The way out, as a control rather than as the first crumb (AC 3.1.1).
+
+        Reported on 8 October: *there is nowhere to go back a level.* There
+        was -- the leading crumb was pressable -- and that is the point. A
+        breadcrumb says where you are; somebody looking for the way out does
+        not read a location as an exit, which is the same finding that put a
+        Back button on every other screen in this file.
+
+        Nothing is pressable while a run is in progress: leaving mid-run is
+        Cancel's job, which says what happens to the answer.
+      */
+      const leave = running
+        ? undefined
+        : fromMap
+          ? { label: FULL_MAP, onBack: () => dispatch({ type: 'back' }) }
+          : { label: 'Address search', onBack: () => dispatch({ type: 'another-address-wanted' }) };
+
       const crumbs = (
         <>
-          {fromMap
-            ? crumb(FULL_MAP, running ? undefined : () => dispatch({ type: 'back' }))
-            : crumb('Address search', running ? undefined : () => dispatch({ type: 'another-address-wanted' }))}
           {step === 'no-match' && (
             <>
               {separator}
@@ -825,7 +975,6 @@ export function App() {
           )}
           {!fromMap && reached('drain') && (
             <>
-              {separator}
               {crumb('Choose a drain', running ? undefined : () => dispatch({ type: 'drains-reopened' }), step === 'drain')}
             </>
           )}
@@ -855,9 +1004,36 @@ export function App() {
       );
 
       const shell = (children: React.ReactNode) => (
-        <Shell at={session.screen} credits={credits} extentName={loaded.extentName} crumbs={crumbs}>
+        <AppShell
+          dispatch={dispatch}
+          at={session.screen}
+          credits={credits}
+          extentName={loaded.extentName}
+          {...(leave === undefined ? {} : { back: leave })}
+          /*
+            **It has a link of its own now, and this reverses a decision.**
+
+            The team's note of 10 October was the opposite: *this page shows
+            under the tutorial branch, no separate navigation button for
+            it.* The argument then was that a fifth item in a four-item bar,
+            for a screen nobody navigates to directly, would be a
+            destination the bar invented; the comparison was reached from
+            the guide chooser and from the homepage's own band, and from
+            nowhere else.
+
+            On 15 October the team asked for it in the bar, between
+            *Flood history* and *Full map*. What changed is the reading of
+            "nobody navigates to it directly": being reachable only from two
+            cards is the reason somebody would not, rather than evidence
+            that they do not want to. So the screen marks its own item
+            rather than the tutorial's, and a reader in the middle of a
+            comparison is no longer told they are in the guides.
+          */
+          actions={<SiteNav {...siteNavProps(dispatch, 'comparison')} />}
+          crumbs={crumbs}
+        >
           {children}
-        </Shell>
+        </AppShell>
       );
 
       const fullMap = () => {
@@ -970,6 +1146,7 @@ export function App() {
           loaded={loaded}
           session={session}
           dispatch={dispatch}
+          catchments={catchments}
           crumb={crumb}
         />
       );
@@ -991,9 +1168,11 @@ function MapScreen({
   session,
   dispatch,
   crumb,
+  catchments,
 }: {
   readonly credits: readonly Credit[];
   readonly loaded: Loaded;
+  readonly catchments: Awaited<ReturnType<typeof loadCatchments>>;
   readonly session: Session;
   readonly dispatch: (event: SessionEvent) => void;
   readonly crumb: (label: string, onClick?: () => void, current?: boolean) => React.ReactNode;
@@ -1023,7 +1202,8 @@ function MapScreen({
   }, []);
 
   return (
-    <Shell
+    <AppShell
+      dispatch={dispatch}
       at={session.screen}
       credits={credits}
           extentName={loaded.extentName}
@@ -1031,27 +1211,43 @@ function MapScreen({
       // worked out by arriving. The row below carries the way back out.
       masthead={false}
       /*
-        The Back control names where it goes, because the map has two ways
-        in -- the homepage and the flood board -- and with two possible
-        origins a bare "Back" is a guess.
+        The site's four pages, on the row the breadcrumb used to have.
 
-        The trail beside it is one crumb now. It used to lead with a
-        clickable Home, which was doing two jobs badly: a breadcrumb says
-        where you *are*, and a person looking for the way out does not read
-        a location as an exit. The button is the exit; the crumb says where
-        they are.
+        There was a Back control here naming where it went -- Home, or Flood
+        history where that was the way in -- and one crumb saying *Full map*.
+        The change list of 8 October asks for the design's navigation bar on
+        this screen, and the bar is strictly more than those two were: it
+        names all four destinations rather than the one behind you, and it
+        marks where you are, which is what the crumb was for.
+
+        It is the row's whole contents, so the row is the landmark and these
+        are `SiteNavItems` rather than a second `nav` inside the first.
       */
-      back={{
-        label: session.mapOrigin === 'history' ? 'Flood history' : 'Home',
-        onBack: () => {
-          dispatch({ type: 'leave-map' });
-        },
-      }}
-      crumbs={crumb(
-        session.task === 'full-map' ? FULL_MAP : 'Explore drainage',
-        undefined,
-        true,
-      )}
+      crumbsLabel="Site"
+      crumbs={
+        <SiteNavItems
+          current="map"
+          onOpenHome={() => {
+            dispatch({ type: 'go-home' });
+          }}
+          onOpenGuides={() => {
+            dispatch({ type: 'explore-chosen' });
+          }}
+          onOpenHistory={() => {
+            dispatch({ type: 'history-opened' });
+          }}
+          onOpenFloodMap={() => {
+            dispatch({ type: 'flood-map-opened' });
+          }}
+          onOpenComparison={() => {
+            dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
+          }}
+          onOpenFullMap={() => {
+            // Where they already are. `NavLink` draws it as the current page
+            // and gives it no handler, so this is never reached.
+          }}
+        />
+      }
       trailing={
         <TourButton
           onOpen={() => {
@@ -1061,6 +1257,7 @@ function MapScreen({
       }
     >
       <MapView
+        touring={touring}
         /*
           Remounted on every arrival, so the map cannot open carrying a pit
           card, a traced path or a set of chips from the last visit. It was
@@ -1072,9 +1269,18 @@ function MapScreen({
         derived={loaded.derived}
         trace={loaded.trace}
         address={session.address}
+        recent={session.recent}
         task={session.task}
         mode={session.mapMode}
         index={loaded.index}
+        catchments={catchments}
+        relevance={session.relevance}
+        onReviewPlace={(place, relevance) => {
+          dispatch({ type: 'place-reviewed', place, relevance });
+        }}
+        onResetPlaces={() => {
+          dispatch({ type: 'places-reset' });
+        }}
         onAddress={(picked) =>
           dispatch({
             type: 'address-moved',
@@ -1096,12 +1302,13 @@ function MapScreen({
       />
       {touring && (
         <Tour
+          hasAddress={session.address !== null}
           onClose={() => {
             setTouring(false);
           }}
         />
       )}
-    </Shell>
+    </AppShell>
   );
 }
 
@@ -1155,7 +1362,7 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
         />
         <circle cx="8.4" cy="11.6" r="0.95" fill="currentColor" />
       </svg>
-      Tutorial
+      Map guide
     </button>
   );
 }
@@ -1189,43 +1396,194 @@ function TourButton({ onOpen }: { readonly onOpen: () => void }) {
  * The sections themselves keep their ids — they are named by the acceptance
  * criteria and are still there to scroll to.
  */
-function HomeNav({
-  onOpenMap,
-  onOpenHistory,
-}: {
-  readonly onOpenMap: () => void;
+/**
+ * One control, since 4 October.
+ *
+ * *Flood history* used to sit here beside *Get started*, which gave a page
+ * about the past across Greater Melbourne the same weight as the way into
+ * everything else. It is one of the two choices behind this button now.
+ */
+/**
+ * The four destinations, wired to the reducer.
+ *
+ * **Written once because there are now five screens wearing them**, and four
+ * copies of a `dispatch` is four places for one of them to be wrong. The
+ * caller says which page it is on and where the full map should think it was
+ * opened from; everything else is the same everywhere.
+ */
+function siteNavProps(
+  dispatch: (event: SessionEvent) => void,
+  current: SiteNavProps['current'],
+  from: MapOrigin = 'home',
+): SiteNavProps {
+  return {
+    current,
+    onOpenHome: () => {
+      dispatch({ type: 'go-home' });
+    },
+    onOpenGuides: () => {
+      dispatch({ type: 'explore-chosen' });
+    },
+    onOpenHistory: () => {
+      dispatch({ type: 'history-opened' });
+    },
+    // The same event the board's *Open the area map* and the homepage's
+    // card dispatch, so all three ways in open one screen.
+    onOpenFloodMap: () => {
+      dispatch({ type: 'flood-map-opened' });
+    },
+    /*
+      The same event the homepage's card and the chooser's card dispatch,
+      so the comparison has one way in however it was asked for: with an
+      address in hand it goes to step one, and without one it asks and
+      remembers what the address was for.
+
+      `from: 'home'` rather than this screen's own origin, because it says
+      where backing out of the address screen lands, and from a link in
+      the masthead the answer that holds on every screen is the homepage.
+    */
+    onOpenComparison: () => {
+      dispatch({ type: 'task-wanted', task: 'compare', from: 'home' });
+    },
+    onOpenFullMap: () => {
+      dispatch({ type: 'map-opened', from });
+    },
+  };
+}
+
+/**
+ * The homepage's navigation bar.
+ *
+ * It used to be one *Get started* button. The team's change list of 8 October
+ * asks for the four places the site actually has, and the hero already
+ * carries the call to action a paragraph below this, so the button is not
+ * repeated here: a masthead with one button and no navigation is a masthead
+ * that cannot say what else exists.
+ *
+ * *Home page* is where the reader already is, so it is marked as the current
+ * page rather than drawn as a link to here. The *Tutorial* link goes to the
+ * guide chooser, which is where the guides are; the map's own help control is
+ * called *Map guide* and is a different thing, which is why it was renamed on
+ * the same list.
+ */
+export interface SiteNavProps {
+  /**
+   * Which of the four this screen is, so it is marked rather than linked.
+   *
+   * `flood-map` is the fifth value and the fourth item: it is one of
+   * *Flood history*'s two screens, so it marks that item rather than one of
+   * its own. See `NavMenu`.
+   */
+  readonly current: 'home' | 'tutorial' | 'history' | 'flood-map' | 'comparison' | 'map';
+  readonly onOpenHome: () => void;
+  readonly onOpenGuides: () => void;
   readonly onOpenHistory: () => void;
-}) {
+  /** The ranked areas drawn as a map. The second thing under *Flood history*. */
+  readonly onOpenFloodMap: () => void;
+  /** The blocked-drain comparison, which asks for an address on the way. */
+  readonly onOpenComparison: () => void;
+  readonly onOpenFullMap: () => void;
+}
+
+/**
+ * The four links, without a landmark of their own.
+ *
+ * The map has no masthead to hang them from, so there they are the
+ * breadcrumb row's contents and that row is the landmark. Everywhere else
+ * `SiteNav` wraps these in one.
+ */
+/**
+ * Every `Shell` on this screen, with the way home already in it.
+ *
+ * The team asked for the masthead's logo to go home from anywhere
+ * (11 October). There are a dozen `Shell`s in this file and a thirteenth is
+ * one feature away, so the handler is injected once here rather than passed
+ * at each of them: a screen cannot be given a logo that does nothing by
+ * somebody forgetting a prop.
+ *
+ * `go-home` is the same event the *Home page* link dispatches.
+ */
+function AppShell({
+  dispatch,
+  ...rest
+}: ShellProps & { readonly dispatch: (event: SessionEvent) => void }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: space(5) }}>
-      <button
-        type="button"
-        onClick={onOpenHistory}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          font: type(text.label, { weight: weight.medium }),
-          color: ink.muted,
-        }}
-      >
-        Flood history
-      </button>
-      <button
-        type="button"
-        onClick={onOpenMap}
-        style={{
-          padding: `${String(space(2))}px ${String(space(4))}px`,
-          font: type(text.label, { weight: weight.semibold }),
-          color: ink.inverse,
-          background: ink.strong,
-          border: 'none',
-          borderRadius: radius.base,
-        }}
-      >
-        Get started →
-      </button>
-    </span>
+    <Shell
+      {...rest}
+      onHome={() => {
+        dispatch({ type: 'go-home' });
+      }}
+    />
+  );
+}
+
+function SiteNavItems({
+  current,
+  onOpenHome,
+  onOpenGuides,
+  onOpenHistory,
+  onOpenFloodMap,
+  onOpenComparison,
+  onOpenFullMap,
+}: SiteNavProps) {
+  return (
+    <>
+      <NavLink label="Home page" current={current === 'home'} onOpen={onOpenHome} />
+      <NavLink label="Tutorial" current={current === 'tutorial'} onOpen={onOpenGuides} />
+      <NavMenu
+        label="Flood history"
+        here={current === 'history' || current === 'flood-map'}
+        onOpen={onOpenHistory}
+        onHere={current === 'history'}
+        items={[
+          { label: 'Flood history', current: current === 'history', onOpen: onOpenHistory },
+          { label: 'Area map', current: current === 'flood-map', onOpen: onOpenFloodMap },
+        ]}
+      />
+      <NavLink label="Comparison" current={current === 'comparison'} onOpen={onOpenComparison} />
+      <NavLink label={FULL_MAP} current={current === 'map'} onOpen={onOpenFullMap} />
+    </>
+  );
+}
+
+function SiteNav(props: SiteNavProps) {
+  return (
+    <nav aria-label="Site" style={{ display: 'inline-flex', alignItems: 'center', gap: space(1) }}>
+      <SiteNavItems {...props} />
+    </nav>
+  );
+}
+
+function NavLink({
+  label,
+  current,
+  onOpen,
+}: {
+  readonly label: string;
+  readonly current: boolean;
+  readonly onOpen: () => void;
+}) {
+  const self = useShowWhenCurrent<HTMLButtonElement>(current);
+
+  return (
+    <button
+      type="button"
+      ref={self}
+      onClick={current ? undefined : onOpen}
+      {...(current ? { 'aria-current': 'page' as const } : {})}
+      style={{
+        ...navItem,
+        border: 'none',
+        background: 'none',
+        color: current ? ink.strong : ink.base,
+        fontWeight: current ? weight.semibold : weight.medium,
+        borderBottom: current ? `2px solid ${brand.base}` : '2px solid transparent',
+        borderRadius: 0,
+        cursor: current ? 'default' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

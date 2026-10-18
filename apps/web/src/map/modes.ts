@@ -34,7 +34,28 @@
 
 import type { DerivedVisibility } from './derived.js';
 
-export type LayerKey = 'pit' | 'pipe' | 'terrain' | 'channel' | 'lowPoint' | 'unavailable';
+export type LayerKey =
+  | 'pit'
+  | 'pipe'
+  | 'terrain'
+  | 'channel'
+  | 'lowPoint'
+  | 'unavailable'
+  /*
+    Epic 6's layer, from the team's Figma for Iteration 3 (node 22:566, *Your
+    drainage area*). It is a chip like the rest, and it is offered only inside
+    its own guide: the drainage area is about the address, and a chip for it
+    on a map with no address chosen would draw nothing.
+
+    There were two. *Who can help* was the second, and it was removed on 8
+    October: it drew nothing on the map, it was a second card competing with
+    this one for the same corner -- turning it on made the drainage-area card
+    disappear, which is how it was reported -- and everything it said belongs
+    on the card about the area it is saying it about.
+  */
+  | 'catchment'
+  /* Epic 5's layer: the numbered places to check before heavy rain. */
+  | 'beforeRain';
 
 export type LayerState = Record<LayerKey, boolean>;
 
@@ -44,23 +65,40 @@ export type LayerState = Record<LayerKey, boolean>;
  * The recorded network first, because it is what the product is for, and the
  * two derived layers after it.
  */
-export const CHIP_KEYS: readonly LayerKey[] = ['pit', 'pipe', 'channel', 'lowPoint'];
+export const CHIP_KEYS: readonly LayerKey[] = [
+  'pit',
+  'pipe',
+  'channel',
+  'lowPoint',
+  'catchment',
+  'beforeRain',
+];
 
 /**
- * The switches behind the Layers button.
+ * The switch behind the Layers button.
  *
- * Neither is a lesser layer. The ground surface is background: drawn beneath
- * everything else, and rarely the thing somebody is changing. It was on by
- * default until 11 September and is now on under every homepage card and off
- * on the unguided way in -- see `NOTHING_ON`.
- * "Limited ground data" answers a question about the *evidence* rather
- * than about the ground, and it stays switchable in every view because it is
- * the one mark that says the map is guessing.
+ * The ground surface is background: drawn beneath everything else, and rarely
+ * the thing somebody is changing. It was on by default until 11 September and
+ * is now on under every homepage card and off on the unguided way in -- see
+ * `NOTHING_ON`.
+ *
+ * **"Limited ground data" used to be the second one and is not a switch any
+ * more** (team request, 4 October). It answers a question about the
+ * *evidence* rather than about the ground: the hatch is where this product
+ * has nothing to say, and a reader who turns it off is left with a map that
+ * looks complete where it is not. It is always drawn and lives in the legend,
+ * which is the only place it needed to be.
  */
-export const PANEL_KEYS: readonly LayerKey[] = ['terrain', 'unavailable'];
+export const PANEL_KEYS: readonly LayerKey[] = ['terrain'];
 
 /** The ways in from the homepage. Not the chip row — see the note above. */
-export type MapMode = 'drainage' | 'water-flow' | 'terrain' | 'low-areas';
+export type MapMode =
+  | 'drainage'
+  | 'water-flow'
+  | 'terrain'
+  | 'low-areas'
+  | 'drainage-area'
+  | 'heavy-rain';
 
 export function visibilityOf(state: LayerState): DerivedVisibility {
   return { channel: state.channel, lowPoint: state.lowPoint, unavailable: state.unavailable };
@@ -105,7 +143,11 @@ export const NOTHING_ON: LayerState = {
   terrain: false,
   channel: false,
   lowPoint: false,
-  unavailable: false,
+  // Not a layer any more: the hatch says where the ground was never measured,
+  // and every preset carries it for that reason (4 October).
+  unavailable: true,
+  catchment: false,
+  beforeRain: false,
 };
 
 /** Everything on. Still what the legend and the comparison map mean. */
@@ -116,6 +158,8 @@ export const ALL_ON: LayerState = {
   channel: true,
   lowPoint: true,
   unavailable: true,
+  catchment: true,
+  beforeRain: true,
 };
 
 /** The guided task: what its question needs, without the rest in the way. */
@@ -125,7 +169,9 @@ export const GUIDED_ON: LayerState = {
   terrain: true,
   channel: true,
   lowPoint: false,
-  unavailable: false,
+  unavailable: true,
+  catchment: false,
+  beforeRain: false,
 };
 
 /**
@@ -146,6 +192,13 @@ export function openingLayers(requested: MapMode): LayerState {
     channel: requested === 'water-flow',
     lowPoint: requested === 'low-areas',
     terrain: true,
-    unavailable: false,
+    unavailable: true,
+    // Off even under its own card: the guide's first step is to press the
+    // chip, and a boundary already drawn would make that step a no-op.
+    catchment: false,
+    // On under its own card, and only there: AC 5.1.1 puts the numbered
+    // markers on the map as soon as an address is chosen, and the guide's
+    // first step is the button they come with rather than the layer itself.
+    beforeRain: requested === 'heavy-rain',
   };
 }

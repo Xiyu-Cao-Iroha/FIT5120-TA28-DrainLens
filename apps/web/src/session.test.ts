@@ -29,6 +29,47 @@ const NEALE: SupportedAddress = {
 const play = (events: readonly SessionEvent[], from: Session = INITIAL_SESSION): Session =>
   events.reduce(reduce, from);
 
+describe('the recent addresses', () => {
+  it('records every route to an address, not just the first screen', () => {
+    /*
+      **Three events set an address, and this is why the list is not kept in
+      their branches.** `address-accepted` is the first screen, `address-moved`
+      is the map's own search and `example-address-chosen` is the *Not sure?*
+      row. `reduce` reads the address that came out instead, so a fourth route
+      added later is recorded without anybody remembering to.
+    */
+    expect(play([{ type: 'address-accepted', address: GATEHOUSE }]).recent).toEqual([GATEHOUSE]);
+    expect(play([{ type: 'address-moved', address: NEALE }]).recent).toEqual([NEALE]);
+    expect(play([{ type: 'example-address-chosen', address: NEALE }]).recent).toEqual([NEALE]);
+  });
+
+  it('puts the newest first and holds an address once', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'address-moved', address: NEALE },
+      { type: 'address-moved', address: GATEHOUSE },
+    ]);
+    expect(end.recent).toEqual([GATEHOUSE, NEALE]);
+  });
+
+  it('survives clearing the address, which is not unsearching it', () => {
+    const end = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'address-cleared' },
+    ]);
+    expect(end.address).toBeNull();
+    expect(end.recent).toEqual([GATEHOUSE]);
+  });
+
+  it('is left alone, as the same array, by events that are not about an address', () => {
+    // The reason is in `recent.ts`: a new array per event would invalidate the
+    // memo that resolves these against the index, on every frame of a drag.
+    const one = play([{ type: 'address-accepted', address: GATEHOUSE }]);
+    expect(reduce(one, { type: 'task-chosen', task: 'compare' }).recent).toBe(one.recent);
+    expect(reduce(one, { type: 'rainfall-selected', rainfallMm: 40 }).recent).toBe(one.recent);
+  });
+});
+
 describe('the golden path', () => {
   it('runs address to result without leaving anything unset', () => {
     const end = play([
@@ -225,7 +266,7 @@ describe('going back', () => {
      * for the address, and having the view read that would put the rule in
      * two places.
      */
-    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const chosen = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(chosen.screen).toBe('address');
     expect(reduce(chosen, { type: 'address-abandoned' }).screen).toBe('choose');
   });
@@ -235,13 +276,15 @@ describe('going back', () => {
     expect(reduce(asked, { type: 'address-abandoned' }).screen).toBe('home');
   });
 
-  it('opens every guide on the address screen and asks for the address again', () => {
+  it('asks for an address once and keeps it for the guides after it', () => {
     /*
-     * Team decision, 16 September: the second guide skipped the address
-     * screen and started on the first guide's street. The screen now comes
-     * every time, empty.
+     * Team decision, 4 October, reversing 16 September. The screen used to
+     * come every time, empty, so that a second guide could not quietly start
+     * on the first one's street. With six guides, the full map, a plan and a
+     * reporting pathway, being asked five times reads as the product having
+     * forgotten. Changing it stays possible from the guide itself.
      */
-    const first = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const first = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(first.screen).toBe('address');
 
     const withAddress = reduce(first, { type: 'address-accepted', address: GATEHOUSE });
@@ -251,15 +294,38 @@ describe('going back', () => {
       reduce(withAddress, { type: 'guide-finished' }),
       { type: 'guide-chosen', section: 'water-flow' },
     );
-    expect(second.screen).toBe('address');
+    expect(second.screen).toBe('guide');
     expect(second.guideSection).toBe('water-flow');
-    expect(second.address).toBeNull();
-    expect(reduce(second, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('guide');
+    expect(second.address).toEqual(GATEHOUSE);
+    // And the way to change it is still one press from inside the guide.
+    expect(reduce(second, { type: 'change-address' }).screen).toBe('address');
+  });
+
+  it('leaves a guide for the chooser it was picked from, not for the search box', () => {
+    /*
+     * It went to the address screen until 8 October, from when every guide
+     * asked for its own address. The address is kept across guides now and
+     * the chooser shows it with a Change beside it, so a reader who wanted
+     * out of a guide was being handed a search box instead.
+     */
+    const inGuide = play([
+      { type: 'explore-chosen' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(inGuide.screen).toBe('guide');
+    expect(reduce(inGuide, { type: 'back' }).screen).toBe('choose');
+    // And the way out the panel offers is the same destination.
+    const left = reduce(inGuide, { type: 'guide-left' });
+    expect(left.screen).toBe('choose');
+    expect(left.guideSection).toBeNull();
+    // The address survives either way: it is what the next guide opens on.
+    expect(left.address?.label).toBe(GATEHOUSE.label);
   });
 
   it('goes back from a guide to the address screen with the section still chosen', () => {
     const inGuide = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'guide-chosen', section: 'drainage' },
       { type: 'address-accepted', address: GATEHOUSE },
     ]);
@@ -269,8 +335,44 @@ describe('going back', () => {
   });
 
   it('keeps the chosen section, because Back is not un-choosing it', () => {
-    const chosen = play([{ type: 'get-started' }, { type: 'guide-chosen', section: 'drainage' }]);
+    const chosen = play([{ type: 'explore-chosen' }, { type: 'guide-chosen', section: 'drainage' }]);
     expect(reduce(chosen, { type: 'address-abandoned' }).guideSection).toBe('drainage');
+  });
+
+  it('records a guide on finishing it, and never on merely choosing another', () => {
+    /*
+      Where the marking lives, and why it lives there.
+
+      `guide-chosen` arrives from three places: the chooser, the homepage's
+      cards, and *Start next guide* at the end of a guide. Only the third
+      follows a guide that was finished, so marking cannot be moved into
+      `guide-chosen` without also marking a guide somebody walked out of.
+
+      That is also the defect this pins. *Start next guide* dispatched
+      `guide-chosen` alone, so the one path the design encourages recorded
+      nothing: self test of 12 October, `drainlens.learned` still six zeroes
+      after finishing the heavy rain guide. `App` now sends the pair, in
+      this order.
+    */
+    const inGuide = play([
+      { type: 'explore-chosen' },
+      { type: 'guide-chosen', section: 'drainage' },
+      { type: 'address-accepted', address: GATEHOUSE },
+    ]);
+    expect(inGuide.learned.drainage).toBe(false);
+
+    // Choosing another while one is open marks nothing: nothing was finished.
+    expect(reduce(inGuide, { type: 'guide-chosen', section: 'water-flow' }).learned.drainage).toBe(false);
+
+    // The pair *Start next guide* sends does.
+    const onward = reduce(
+      reduce(inGuide, { type: 'guide-finished' }),
+      { type: 'guide-chosen', section: 'water-flow' },
+    );
+    expect(onward.learned.drainage).toBe(true);
+    expect(onward.learned['water-flow']).toBe(false);
+    expect(onward.guideSection).toBe('water-flow');
+    expect(onward.screen).toBe('guide');
   });
 });
 
@@ -376,6 +478,22 @@ describe('nothing about the person leaves memory', () => {
     const writes = trapStorage();
     globalThis.localStorage.setItem('drainlens-address', GATEHOUSE.label);
     expect(writes).toEqual(['localStorage.setItem(drainlens-address)']);
+  });
+
+  it('holds the recent addresses there too, and starts with none', () => {
+    /*
+      **The list of five is the same promise as the one, and needs saying.**
+      Closing the tab is the whole of the clearing mechanism -- which is why
+      `recent.ts` offers no *Clear history* control -- and that only holds if
+      the list is written nowhere the tab outlives. The trap above covers a
+      session that searches twice, so this reads what it produced.
+    */
+    expect(INITIAL_SESSION.recent).toEqual([]);
+    const writes = trapStorage();
+    const end = play(wholeSession);
+    expect(writes).toEqual([]);
+    expect(end.recent).toEqual([NEALE, GATEHOUSE]);
+    expect(JSON.stringify(INITIAL_SESSION)).not.toContain('Gatehouse');
   });
 
   it('holds the address only on the object the caller can drop', () => {
@@ -725,9 +843,17 @@ describe('opening the map from the homepage', () => {
     expect(reduce(INITIAL_SESSION, { type: 'map-opened' }).task).toBe('full-map');
   });
 
-  it('forgets the address, and keeps the person’s own assumptions', () => {
-    // Team decision, 16 September: the full map asks for an address again on
-    // every visit. The blockage and rainfall are choices, not a place.
+  it('keeps the address the reader already gave, and their assumptions with it', () => {
+    /*
+     * **The opposite of what this asserted until 10 October.** The rule was
+     * a team decision of 16 September, *the full map asks for an address
+     * again on every visit*, and the team reversed it: an address typed a
+     * minute ago in this tab is not a guess, and asking twice is the product
+     * forgetting what it was told.
+     *
+     * The half that did not change is the test above: a map opened with
+     * nothing searched still arrives with nothing selected.
+     */
     const busy = play([
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'blockage-selected', blockage: 'fully-blocked' },
@@ -735,8 +861,7 @@ describe('opening the map from the homepage', () => {
     ]);
     const end = reduce(busy, { type: 'map-opened' });
 
-    expect(end.address).toBeNull();
-    expect(end.scenario.pitId).toBeNull();
+    expect(end.address).toEqual(GATEHOUSE);
     expect(end.scenario.blockage).toBe('fully-blocked');
   });
 
@@ -929,7 +1054,7 @@ describe('a task chosen before there is an address', () => {
       guide instead. The task is the more recent answer.
     */
     const end = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'guide-chosen', section: 'drainage' },
       { type: 'address-abandoned' },
       { type: 'go-home' },
@@ -945,7 +1070,7 @@ describe('a task chosen before there is an address', () => {
     // The chooser offers the comparison as a fifth card. Back from the address
     // screen it sends you to should be the chooser, not the homepage behind it.
     const fromChooser = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'task-wanted', task: 'compare', from: 'choose' },
     ]);
     expect(fromChooser.screen).toBe('address');
@@ -959,13 +1084,13 @@ describe('a task chosen before there is an address', () => {
     // The fifth card is not a lesson. Running the comparison from it must not
     // move the chooser's "N guides completed".
     const end = play([
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
       { type: 'task-wanted', task: 'compare', from: 'choose' },
       { type: 'address-accepted', address: GATEHOUSE },
       { type: 'comparison-started' },
       { type: 'comparison-finished', outcome: { kind: 'comparison', band: 'higher-than-baseline' } },
       { type: 'go-home' },
-      { type: 'get-started' },
+      { type: 'explore-chosen' },
     ]);
     expect(end.screen).toBe('choose');
     expect(end.learned).toEqual(INITIAL_SESSION.learned);
@@ -1302,8 +1427,134 @@ describe('the blocked-drain comparison, step by step', () => {
     expect(reduce(fromMap, { type: 'back' }).screen).toBe('explore');
   });
 
+  it('goes back to the full map from every step, not only from Choices', () => {
+    /*
+      Reported on 8 October: on a result, the control saying *Full map* went
+      to Choices. It was written for the `scenario` step alone and every other
+      step walked the fixed `BACK` chain instead.
+    */
+    const fromMap = play([
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    for (const screen of ['scenario', 'review', 'result'] as const) {
+      expect(reduce({ ...fromMap, screen }, { type: 'back' }).screen).toBe('explore');
+    }
+  });
+
+  it('leaves the map unguided on the way back, so no layer is switched on for the reader', () => {
+    /*
+      `scenario-from-map` sets `task: 'compare'`, and the map reads anything
+      but `full-map` as a guided visit -- which opens with the guided layer
+      set, Ground height included. Reported on 8 October as the ground
+      switching itself on when the reader pressed *Full map*.
+    */
+    const fromMap = play([
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    expect(fromMap.task).toBe('compare');
+    expect(reduce(fromMap, { type: 'back' }).task).toBe('full-map');
+  });
+
+  it('returns to the map from a comparison opened there, address or no address', () => {
+    // `drains-reopened` tested the address rather than where the comparison
+    // came from, so a reader with one went to step 1 of a journey they had
+    // never been on.
+    const fromMap = play([
+      { type: 'address-accepted', address: GATEHOUSE },
+      { type: 'map-opened' },
+      { type: 'lock-passed' },
+      { type: 'scenario-from-map', pitId: '1144908' },
+    ]);
+    const back = reduce({ ...fromMap, address: GATEHOUSE, screen: 'result' }, { type: 'drains-reopened' });
+    expect(back.screen).toBe('explore');
+    expect(back.task).toBe('full-map');
+  });
+
+  it('returns an address asked for by the chooser to the chooser', () => {
+    /*
+      The chooser asks for one with no task waiting -- its guides are the
+      thing being chosen -- and an address given there used to hand the reader
+      to the task question instead, a screen they had not asked for and which
+      does not offer the guides they were looking at.
+    */
+    const asked = reduce({ ...INITIAL_SESSION, screen: 'choose' }, { type: 'change-address', from: 'choose' });
+    expect(asked.screen).toBe('address');
+    expect(asked.addressFrom).toBe('choose');
+    const given = reduce(asked, { type: 'address-accepted', address: GATEHOUSE });
+    expect(given.screen).toBe('choose');
+    expect(given.address).toEqual(GATEHOUSE);
+    expect(given.addressFrom).toBe('task');
+  });
+
+  it('still sends an address asked for on the way to a task to the task question', () => {
+    const asked = reduce({ ...INITIAL_SESSION, screen: 'task' }, { type: 'change-address' });
+    expect(reduce(asked, { type: 'address-accepted', address: GATEHOUSE }).screen).toBe('task');
+  });
+
   it('leaves a pit chosen on the full map where it was', () => {
     const onMap = play([{ type: 'map-opened' }, { type: 'lock-passed' }, { type: 'pit-selected', pitId: '1', suggested: false }]);
     expect(onMap.screen).toBe('explore');
+  });
+});
+
+describe('what the reader says about a place near them', () => {
+  const addressAt = (id: string) => ({ id, label: `${id} Street, Kensington`, eastingM: 500, northingM: 500 });
+
+  it('remembers one answer per place, and lets it be changed', () => {
+    // AC 5.4.1: a selection can be changed, and both answers are selections.
+    let session = reduce(INITIAL_SESSION, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'place-reviewed', place: 2, relevance: 'does-not-apply' });
+    expect(session.relevance).toEqual({ 1: 'applies', 2: 'does-not-apply' });
+
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'does-not-apply' });
+    expect(session.relevance[1]).toBe('does-not-apply');
+  });
+
+  it('resets them all when asked', () => {
+    const reviewed = reduce(INITIAL_SESSION, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    expect(reduce(reviewed, { type: 'places-reset' }).relevance).toEqual({});
+  });
+
+  it('forgets them when the address changes', () => {
+    /*
+     * AC 5.4.2. Place 2 at one address is a different place from Place 2 at
+     * another, so an answer carried across would attach a reminder to a spot
+     * the reader has never seen — and the criterion says no reminder may come
+     * from a selection made for the previous address.
+     */
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'address-moved', address: addressAt('b') });
+    expect(session.relevance).toEqual({});
+  });
+
+  it('keeps them while the same address is re-picked', () => {
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    session = reduce(session, { type: 'address-moved', address: addressAt('a') });
+    expect(session.relevance).toEqual({ 1: 'applies' });
+  });
+
+  it('keeps them while the address does not change, and forgets them when it does', () => {
+    /*
+     * Starting another guide keeps the address (4 October), and so does
+     * opening the full map (10 October), so both keep the answers with it:
+     * they are about places near that address, and the address has not
+     * moved. A different address still clears them (AC 5.4.2), which is the
+     * only thing AC 5.4.2 asks for.
+     */
+    let session = reduce(INITIAL_SESSION, { type: 'address-moved', address: addressAt('a') });
+    session = reduce(session, { type: 'place-reviewed', place: 1, relevance: 'applies' });
+    expect(reduce(session, { type: 'guide-chosen', section: 'low-areas' }).relevance).toEqual({
+      1: 'applies',
+    });
+    expect(reduce(session, { type: 'map-opened' }).relevance).toEqual({ 1: 'applies' });
+    expect(
+      reduce(session, { type: 'address-accepted', address: addressAt('b') }).relevance,
+    ).toEqual({});
   });
 });

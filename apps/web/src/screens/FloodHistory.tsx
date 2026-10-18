@@ -48,6 +48,7 @@
 
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from 'react';
 
+import { quietButton } from '../ui/controls.js';
 import { type FloodHistoryArtefact, barScale, hasMore, yearLabel } from '../history/artefact.js';
 import {
   type Figure,
@@ -121,7 +122,55 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
 
   return (
     <div style={{ maxWidth: 880, margin: '0 auto', padding: `${String(space(8))}px ${String(space(6))}px ${String(space(16))}px` }}>
-      <Heading />
+      {/*
+        The heading, and the way to the map beside it (team, 11 October).
+
+        **One control, in the header.** There were two until today: this one
+        on its own line under the lead, and a panel at the foot of the page
+        repeating it under *See all 281 areas on a map*. A reader who
+        arrived wanting the map had either to notice a line of text or to
+        read past thirty ranked areas and six paragraphs to find the same
+        button twice.
+
+        It sits at the top right of the header rather than under it, so the
+        heading, the lead and the way out of the page are one block. The row
+        wraps on a narrow window and the button goes under the lead, which
+        is where it used to be.
+      */}
+      <div
+        style={{
+          display: 'flex',
+          gap: space(5),
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ flex: '1 1 420px' }}>
+          <Heading />
+        </span>
+        {/*
+          Filled, which is the panel's button rather than the quiet one this
+          line used to carry. There is one way to the map on this page now,
+          and the page's one way on should look like it.
+        */}
+        <button
+          type="button"
+          onClick={onOpenAreas}
+          style={{
+            padding: `${String(space(3))}px ${String(space(5))}px`,
+            border: 'none',
+            borderRadius: radius.base,
+            background: brand.base,
+            color: ink.inverse,
+            font: type(text.label, { weight: weight.semibold }),
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Open the area map →
+        </button>
+      </div>
       <WhenChart artefact={artefact} />
 
       <RankingToggle
@@ -163,58 +212,6 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
         minimum={artefact.areas.some((a) => !a.complete)}
       />
 
-      {/*
-        The map of every area, offered where the ranking ends.
-
-        **This list is thirty of {areasInScope}, and the sentence above says
-        so.** A reader who has just been told that 275 areas recorded an
-        incident and that they are looking at thirty of them has exactly the
-        question this answers.
-      */}
-      <section
-        style={{
-          marginTop: space(6),
-          padding: space(5),
-          background: brand.wash,
-          border: `1px solid ${brand.tint}`,
-          borderRadius: radius.large,
-          display: 'flex',
-          gap: space(5),
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <span style={{ flex: '1 1 320px' }}>
-          <h3
-            style={{
-              margin: `0 0 ${String(space(2))}px`,
-              font: type(text.lead, { weight: weight.semibold, leading: 1.3 }),
-              color: ink.strong,
-            }}
-          >
-            See all {String(artefact.counts.areasInScope)} areas on a map
-          </h3>
-          <span style={{ color: ink.muted, font: type(text.label, { leading: 1.55 }) }}>
-            This page lists the {String(artefact.areas.length)} highest totals. Open the map to see
-            all {artefact.geography.scope} areas and compare incident counts with population.
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={onOpenAreas}
-          style={{
-            padding: `${String(space(3))}px ${String(space(5))}px`,
-            border: 'none',
-            borderRadius: radius.base,
-            background: brand.base,
-            color: ink.inverse,
-            font: type(text.label, { weight: weight.semibold }),
-          }}
-        >
-          Open the area map →
-        </button>
-      </section>
-
       <KeyPoints />
       <ToTheMap onOpenMap={onOpenMap} />
 
@@ -224,20 +221,11 @@ export function FloodHistory({ artefact, areas, onNeedAreas, onOpenMap, onOpenAr
         end of the page, and after six screens of explanation the crumb is a
         long way up.
       */}
-      <button
-        type="button"
-        onClick={onBack}
-        style={{
-          marginTop: space(6),
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          font: type(text.label, { weight: weight.medium }),
-          color: brand.ink,
-        }}
-      >
-        ← Back to the homepage
-      </button>
+      <p style={{ margin: `${String(space(6))}px 0 0` }}>
+        <button type="button" onClick={onBack} style={quietButton}>
+          ← Back to the homepage
+        </button>
+      </p>
     </div>
   );
 }

@@ -19,28 +19,47 @@ import {
   openingLayers,
   visibilityOf,
 } from './modes.js';
+import { LEGEND_GROUPS } from './MapLayers.js';
 
 const ALL_LAYERS: readonly LayerKey[] = [
   'pit',
   'pipe',
   'terrain',
+  // Epic 6's layer, from Iteration 3's Figma: the drainage area's boundary.
+  // Who looks after what is a section of its card, not a layer of its own.
+  'catchment',
+  'beforeRain',
   'channel',
   'lowPoint',
   'unavailable',
 ];
 
 describe('where each control lives', () => {
-  it('gives every layer exactly one control', () => {
+  it('gives every layer a control, except the one that is not a choice', () => {
+    // *Limited ground data* stopped being a switch on 4 October: the hatch
+    // marks where this product has nothing to say, and a reader who turned it
+    // off was left with a map that looked complete where it is not. It is
+    // always drawn and it is in the legend, so it is governed by neither row.
     const governed = [...CHIP_KEYS, ...PANEL_KEYS];
-    expect([...governed].sort()).toEqual([...ALL_LAYERS].sort());
+    expect([...governed].sort()).toEqual(
+      [...ALL_LAYERS].filter((key) => key !== 'unavailable').sort(),
+    );
+    expect(governed).not.toContain('unavailable');
   });
 
   it('puts the recorded network on the chips and the background behind Layers', () => {
     // The departure from AC 1.1.4 and 1.1.5, asserted rather than left to a
     // comment: pits and pipes are chips, terrain is not. See the note at the
     // top of `modes.ts` and the deviation recorded in the acceptance file.
-    expect(CHIP_KEYS).toEqual(['pit', 'pipe', 'channel', 'lowPoint']);
-    expect(PANEL_KEYS).toEqual(['terrain', 'unavailable']);
+    expect(CHIP_KEYS).toEqual([
+      'pit',
+      'pipe',
+      'channel',
+      'lowPoint',
+      'catchment',
+      'beforeRain',
+    ]);
+    expect(PANEL_KEYS).toEqual(['terrain']);
   });
 
   it('keeps pits and pipes separate, which is what both criteria protect', () => {
@@ -56,8 +75,12 @@ describe('the presets', () => {
     expect(Object.values(ALL_ON).every(Boolean)).toBe(true);
   });
 
-  it('opens the unguided map with nothing on at all', () => {
-    expect(Object.values(NOTHING_ON).some(Boolean)).toBe(false);
+  it('opens the unguided map with nothing on but the gaps', () => {
+    // The gaps are not a layer somebody turned on; they are the map saying
+    // where it was never measured, and they are drawn in every preset.
+    const { unavailable, ...chosen } = NOTHING_ON;
+    expect(unavailable).toBe(true);
+    expect(Object.values(chosen).some(Boolean)).toBe(false);
   });
 
   it('covers every layer, so a new one cannot arrive switched on', () => {
@@ -65,7 +88,7 @@ describe('the presets', () => {
     // a layer added to `LayerState` and given a value everywhere except here,
     // which would open the map with one thing on and no reason why.
     for (const key of ALL_LAYERS) {
-      expect(NOTHING_ON[key]).toBe(false);
+      expect(NOTHING_ON[key]).toBe(key === 'unavailable');
     }
     expect(Object.keys(NOTHING_ON).sort()).toEqual([...ALL_LAYERS].sort());
   });
@@ -80,9 +103,10 @@ describe('the presets', () => {
     }
   });
 
-  it('leaves low areas and the hatching out of the guided task, and nothing else', () => {
+  it('leaves low areas out of the guided task, and nothing else', () => {
     expect(GUIDED_ON.lowPoint).toBe(false);
-    expect(GUIDED_ON.unavailable).toBe(false);
+    // The hatching is in it, as it is in everything, since 4 October.
+    expect(GUIDED_ON.unavailable).toBe(true);
     expect(GUIDED_ON.pit && GUIDED_ON.pipe && GUIDED_ON.channel && GUIDED_ON.terrain).toBe(true);
   });
 
@@ -101,7 +125,13 @@ describe('openingLayers', () => {
       channel: false,
       lowPoint: false,
       terrain: true,
-      unavailable: false,
+      // Drawn under every card, like the ground: it is the map saying where
+      // it was never measured (4 October).
+      unavailable: true,
+      // Off even under the drainage-area card: its guide's first step is to
+      // press the chip, and a boundary already drawn makes that a no-op.
+      catchment: false,
+      beforeRain: false,
     });
     expect(openingLayers('water-flow').channel).toBe(true);
     expect(openingLayers('water-flow').pit).toBe(false);
@@ -128,17 +158,48 @@ describe('openingLayers', () => {
       channel: false,
       lowPoint: false,
       terrain: true,
-      unavailable: false,
+      unavailable: true,
+      catchment: false,
+      beforeRain: false,
     });
   });
 
-  it('never opens the hatching from a card', () => {
-    // It is a statement about the evidence and it belongs to the reader, not
-    // to the way they arrived. No card turns it on, and since 10 September no
-    // preset does either — the unguided map opens empty, so it is reached
-    // from the Layers panel or not at all.
+  it('opens the hatching from every card, because it is not a choice', () => {
+    // It was the reader's switch until 4 October, on the reasoning that a
+    // statement about the evidence belongs to them. The team's answer was
+    // that a reader who turns it off is left with a map that looks complete
+    // where it is not, so it is drawn everywhere and explained in the legend.
     for (const way of WAYS_IN) {
-      expect(openingLayers(way).unavailable).toBe(false);
+      expect(openingLayers(way).unavailable).toBe(true);
     }
+  });
+});
+
+describe('the legend against the marks on the map', () => {
+  // A layer that draws on the canvas and is missing from the legend is a map
+  // that disagrees with its own key, and nothing on screen says so: the marks
+  // simply appear unexplained. The before-rain markers shipped that way for a
+  // day, which is why this is a test and not a glance.
+  it('gives every layer that draws marks a line in the legend', () => {
+    const listed = new Set(LEGEND_GROUPS.flatMap((group) => group.keys));
+    for (const key of ['pit', 'pipe', 'channel', 'lowPoint', 'terrain', 'unavailable', 'beforeRain'] as const) {
+      expect(listed.has(key)).toBe(true);
+    }
+  });
+
+  it('leaves out the layer whose source neither group names', () => {
+    // `catchment` draws a boundary, but it is Melbourne Water's record rather
+    // than the council's, and neither of the legend's two groups says that;
+    // its own card carries the source.
+    const listed = new Set(LEGEND_GROUPS.flatMap((group) => group.keys));
+    expect(listed.has('catchment')).toBe(false);
+  });
+
+  it('calls the before-rain markers an estimate, never a record', () => {
+    // AC 5.1.1: they are the lowest street cell of a modelled hollow.
+    const derived = LEGEND_GROUPS.find((group) => group.link === 'derived');
+    expect(derived?.keys).toContain('beforeRain');
+    const recorded = LEGEND_GROUPS.find((group) => group.link === 'recorded');
+    expect(recorded?.keys).not.toContain('beforeRain');
   });
 });

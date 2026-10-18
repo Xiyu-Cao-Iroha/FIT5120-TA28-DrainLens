@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { TOUR_STEPS } from './tourPlan.js';
+import { TOUR_STEPS, tourStepsFor } from './tourPlan.js';
 
 describe('what the steps say', () => {
   it('covers every control the prototype numbered, in that order', () => {
@@ -21,6 +21,25 @@ describe('what the steps say', () => {
       'chip-lowPoint',
       'layers',
     ]);
+  });
+
+  it('drops the search step for a reader who already has an address', () => {
+    /*
+     * The full map keeps the address from 10 October, so somebody can arrive
+     * here having typed one a minute ago. A coach mark saying *search for an
+     * address* is then an instruction already carried out, and a tour whose
+     * first step is already done is one readers learn to dismiss.
+     */
+    expect(tourStepsFor(true).map((s) => s.target)).not.toContain('address');
+    expect(tourStepsFor(true)).toHaveLength(TOUR_STEPS.length - 1);
+    // Everything else stays, in order.
+    expect(tourStepsFor(true).map((s) => s.target)).toEqual(
+      TOUR_STEPS.filter((s) => s.target !== 'address').map((s) => s.target),
+    );
+  });
+
+  it('keeps it for a reader who has not', () => {
+    expect(tourStepsFor(false)).toEqual(TOUR_STEPS);
   });
 
   it('does not promise where water will go', () => {

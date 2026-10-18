@@ -243,6 +243,43 @@ export function describeWaterNearby(derived: DerivedArtefact, at: Local): string
  * path runs towards that low area: they are the nearest of each, found
  * independently, and often lie in different directions.
  */
+/**
+ * The same measurement in the card's own register (Figma A9).
+ *
+ * `describe` is the careful version: it names the layers, says *mapped* about
+ * each of them, and reports the absences as well. It is right where it is --
+ * the follow view, and the figure's accessible name -- and it is four clauses
+ * too long for a card that has three buttons under it.
+ *
+ * This is the design's two sentences, in the words the map's own labels use:
+ * *flow* and *pool*, hedged with *may*, with the distances already rounded by
+ * `report`. Absences are left out rather than stated, because the card only
+ * gets here when `waterNearby` found something; where it found neither, the
+ * card has a sentence of its own.
+ *
+ * The second sentence says *It* where the first one ran, and *Water* where it
+ * did not: *It may pool* with nothing before it has no subject.
+ */
+export function cardSentence(near: WaterNearby): string {
+  const { channel, low } = near;
+  const flow =
+    channel === null
+      ? null
+      : channel.kind === 'direction'
+        ? `Water may flow about ${String(channel.distanceM)} m away.`
+        : 'Water may flow at or near this address.';
+  const subject = flow === null ? 'Water' : 'It';
+  const pool =
+    low === null
+      ? null
+      : low.kind === 'inside'
+        ? `${subject} may pool at this address.`
+        : low.kind === 'very-near'
+          ? `${subject} may pool at or near this address.`
+          : `${subject} may pool about ${String(low.distanceM)} m away.`;
+  return [flow, pool].filter((part): part is string => part !== null).join(' ');
+}
+
 export function describe(near: WaterNearby): string {
   const { channel, low } = near;
   const path =

@@ -37,10 +37,13 @@ export const SOURCE = {
 export const LAYER = {
   pits: 'Drain pits',
   pipes: 'Drain pipes',
-  paths: 'Likely water paths',
+  paths: 'Water paths',
   lowAreas: 'Low areas',
   ground: 'Ground height',
   limited: 'Ground data gaps',
+  /* Epic 6's layer, from Iteration 3's Figma (D1). */
+  catchment: 'Recorded subcatchment area',
+  beforeRain: 'Before-rain checks',
 } as const;
 
 /**
@@ -66,6 +69,7 @@ export const FULL_MAP = 'Full map';
  * history is Greater Melbourne.
  */
 export const COVERAGE = {
+  // Figma T0 and the B frames: *Current map scope*.
   map: 'Current map scope: City of Melbourne',
   addresses: 'Address search covers the City of Melbourne.',
   /** When the map fell back to Kensington, the addresses beyond it went with it. */
@@ -128,4 +132,12 @@ export const RETIRED_TERMS: readonly string[] = [
   'Minimum total',
   'exact count not published',
   'Waiting for you to try it',
+  // Renamed 8 October 2026 on the team's change list: the first was two words
+  // longer than it needed to be on a chip, and the second said *my* about an
+  // area the reader does not own and a record they did not make.
+  'Likely water paths',
+  'My drainage area',
+  // Also 8 October: four empty squares over two buttons read as a form to
+  // fill in, and nothing on that screen is a field or is ever submitted.
+  'What to include',
 ];

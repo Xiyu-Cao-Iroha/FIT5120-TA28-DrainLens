@@ -29,6 +29,7 @@ import {
   isValidatedRainfall,
 } from '@drainlens/schema';
 
+import { remember } from './address/recent.js';
 import type { MapMode } from './map/modes.js';
 import {
   NOTHING_LEARNED,
@@ -36,6 +37,7 @@ import {
   type SectionId,
   allLearned,
 } from './tutorial/sections.js';
+import type { Relevance } from './prepare/places.js';
 
 /**
  * Which screen the person is on.
@@ -78,6 +80,14 @@ export type Screen =
   | 'flood-map'
   /** The guide's way in, and reachable again since 11 September. */
   | 'address'
+  /**
+   * The fork *Get started* opens: your own street, or what has happened before.
+   *
+   * Added 4 October, when *Flood history* came out of the header. The two are
+   * different questions with different records behind them, and a header that
+   * offered one of them beside the way into everything else was giving them
+   * the same weight.
+   */
   /** The task question, reached from the comparison's breadcrumb. */
   | 'task'
   | 'explore'
@@ -190,6 +200,20 @@ export type Outcome =
 export interface Session {
   readonly screen: Screen;
   readonly address: SupportedAddress | null;
+  /**
+   * The addresses looked up in this tab, newest first.
+   *
+   * **Here, because here is the one place an address is allowed to be kept.**
+   * The rule at the top of this file is about storage, not about memory: an
+   * address may live as long as the tab and not a moment longer, and this
+   * list is bounded by exactly the same thing the rest of the session is.
+   * `address/recent.ts` carries the reasoning and the cap.
+   *
+   * It is not a history of what was *done* -- no count, no timestamp, no note
+   * of which guide was opened where. It is the labels in the order they were
+   * chosen, which is the least that answers *take me back to the last one*.
+   */
+  readonly recent: readonly SupportedAddress[];
   /** What they typed that turned out not to be supported, so the screen can say it back. */
   readonly rejectedAddress: string | null;
   readonly task: Task | null;
@@ -229,6 +253,16 @@ export interface Session {
    * finishes the guide, it just starts again next time.
    */
   readonly learned: Learned;
+  /**
+   * Whether a comparison has been run to a result.
+   *
+   * Figma T1 of 11 October draws a *Done ✓* badge on the blocked-drain card
+   * and counts seven guides, so the comparison is one of the things the
+   * chooser tracks. It is still not a `Learned` section: it has no steps and
+   * no lesson, and `allLearned` -- what the full map's notice reads -- is
+   * about the six that do.
+   */
+  readonly compared: boolean;
   /** The section being taught, or null outside the guide. */
   readonly guideSection: SectionId | null;
   /**
@@ -253,11 +287,38 @@ export interface Session {
    */
   readonly pendingTaskFrom: 'home' | 'choose';
   /**
+   * Which screen asked for the address, where no task is waiting.
+   *
+   * `pendingTaskFrom` answers the same question for an address asked for on
+   * the way to a task. The chooser asks for one with no task at all -- its
+   * guides are the thing being chosen -- and without this an address given
+   * there handed the reader to the task question, a screen they had not asked
+   * for and which does not offer the guides they were looking at.
+   */
+  readonly addressFrom: 'task' | 'choose';
+  /**
    * Where the comparison was opened from: the task question, or a drain on the
    * map (AC 3.1.1). Decides where Back goes — a comparison opened from the map
    * has no task question behind it, and may have no address at all.
    */
   readonly scenarioOrigin: 'task' | 'map';
+  /**
+   * What the reader has said about each numbered place near their address.
+   *
+   * Keyed by the place's number, 1 to 3. **In memory and nowhere else**: AC
+   * 5.4.1 says the selections are kept for the current browser session only
+   * and are never sent to a server — nothing here reaches storage, the URL or
+   * a request.
+   *
+   * **The address used to live under this rule and since 9 October does
+   * not**: its search is answered by the API. These selections still do, and
+   * the criterion that says so is their own.
+   *
+   * Cleared whenever the address changes (AC 5.4.2), because the places are
+   * renumbered for the new address and a selection made about Place 2 at one
+   * address says nothing about Place 2 at another.
+   */
+  readonly relevance: Readonly<Record<number, Relevance>>;
   readonly scenario: ScenarioInputs;
   readonly outcome: Outcome | null;
   readonly running: boolean;
@@ -283,22 +344,33 @@ export const EMPTY_SCENARIO: ScenarioInputs = {
 export const INITIAL_SESSION: Session = {
   screen: 'home',
   address: null,
+  recent: [],
   rejectedAddress: null,
   task: null,
   mapMode: null,
   mapOrigin: 'home',
   mapOpenings: 0,
   learned: NOTHING_LEARNED,
+  compared: false,
   guideSection: null,
   pendingTask: null,
   pendingTaskFrom: 'home',
+  addressFrom: 'task',
   scenarioOrigin: 'task',
   scenario: EMPTY_SCENARIO,
   outcome: null,
+  relevance: {},
   running: false,
   run: null,
 };
 
+/**
+ * What the reader said about one numbered place, or that they reset them all.
+ *
+ * AC 5.4.1 asks for a selection that can be changed and for all of them to be
+ * resettable, and forbids *Done* or *Completed* for a future conditional
+ * action: these say whether a place applies, not that work is finished.
+ */
 export type SessionEvent =
   | { readonly type: 'address-accepted'; readonly address: SupportedAddress }
   /**
@@ -311,6 +383,8 @@ export type SessionEvent =
    * that belongs to the old neighbourhood.
    */
   | { readonly type: 'address-moved'; readonly address: SupportedAddress }
+  | { readonly type: 'place-reviewed'; readonly place: number; readonly relevance: Relevance }
+  | { readonly type: 'places-reset' }
   /**
    * The address let go of, from the map's search box.
    *
@@ -419,10 +493,10 @@ export type SessionEvent =
    * the page exists to prevent.
    */
   | { readonly type: 'history-opened' }
+  | { readonly type: 'explore-chosen' }
   /** The board's map, which is the same records drawn rather than ranked. */
   | { readonly type: 'flood-map-opened' }
   /** The homepage's front door: the four cards, not the map. */
-  | { readonly type: 'get-started' }
   /**
    * Start a section of the guide.
    *
@@ -464,7 +538,7 @@ export type SessionEvent =
    * the rule.
    */
   | { readonly type: 'address-abandoned' }
-  | { readonly type: 'change-address' }
+  | { readonly type: 'change-address'; readonly from?: 'choose' }
   | { readonly type: 'change-scenario' }
   | { readonly type: 'reset-choices' };
 
@@ -510,10 +584,27 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   'flood-map': 'history',
   address: 'home',
   task: 'address',
-  // Out of a section is back to the address it was built around, not out of
-  // the guide altogether. The way out of the guide is the Home control.
+  /*
+    Back from the chooser is the homepage.
+
+    It was a fork screen -- *What would you like to look at?*, two cards, the
+    map on one and the flood board on the other -- which stopped being
+    reachable when the navigation bar went on every page on 8 October: both of
+    its cards are links in that bar now. Nothing dispatched its event any
+    more, and this chain was the only way anybody could still arrive at it.
+  */
   choose: 'home',
-  guide: 'address',
+  /*
+    Out of a guide is back to the chooser it was picked from.
+
+    It was the address screen, from when every guide asked for its own
+    address and the one before it was the thing a reader had just left. The
+    address is kept across guides since 4 October and the chooser shows it
+    with a *Change* beside it, so sending somebody who wanted out of a guide
+    to a search box is answering a question they did not ask. Changing the
+    address is `change-address`, which is what that link dispatches.
+  */
+  guide: 'choose',
   locked: 'choose',
   explore: 'task',
   drain: 'address',
@@ -523,6 +614,15 @@ const BACK: Readonly<Record<Screen, Screen>> = {
   'no-match': 'address',
   unsupported: 'address',
 };
+
+/**
+ * The comparison steps a reader can reach from the full map.
+ *
+ * `back` means *out to the map* on these and only these. A comparison opened
+ * from an address starts at `drain` and walks `BACK`; `no-match` is reached
+ * only from an address search.
+ */
+const FROM_MAP_COMPARISON: ReadonlySet<Screen> = new Set<Screen>(['scenario', 'review', 'result']);
 
 /**
  * One rule about arriving at the map, applied to every route into it.
@@ -539,24 +639,50 @@ const BACK: Readonly<Record<Screen, Screen>> = {
  * The same fields `address-cleared` resets. Used where the team asks for the
  * address to be entered again: each guide, and each visit to the full map.
  */
-function forgetAddress(session: Session): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome'> {
+function forgetAddress(
+  session: Session,
+): Pick<Session, 'address' | 'rejectedAddress' | 'scenario' | 'outcome' | 'relevance'> {
   return {
     address: null,
     rejectedAddress: null,
     scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
     outcome: null,
+    // AC 5.4.2: the places are the old address's, and so are the answers.
+    relevance: {},
   };
 }
 
 export function reduce(session: Session, event: SessionEvent): Session {
   const next = step(session, event);
-  return next.screen === 'explore' && session.screen !== 'explore'
-    ? { ...next, mapOpenings: next.mapOpenings + 1 }
-    : next;
+  const counted =
+    next.screen === 'explore' && session.screen !== 'explore'
+      ? { ...next, mapOpenings: next.mapOpenings + 1 }
+      : next;
+
+  /*
+    The recent list is kept here rather than in the branches that set an
+    address, for the reason `mapOpenings` is counted here: there are three
+    ways to arrive at an address -- `address-accepted`, `address-moved` and
+    `example-address-chosen` -- which is three chances to forget one, and a
+    fourth the day somebody adds a route. Reading the address that came out
+    cannot miss a path, because every path produces one.
+
+    `remember` hands back the same array when the front of the list is already
+    this address, so the common case -- every event that is not about an
+    address at all -- costs a comparison and allocates nothing.
+  */
+  const recent = remember(counted.recent, counted.address);
+  return recent === counted.recent ? counted : { ...counted, recent };
 }
 
 function step(session: Session, event: SessionEvent): Session {
   switch (event.type) {
+    case 'place-reviewed':
+      return { ...session, relevance: { ...session.relevance, [event.place]: event.relevance } };
+
+    case 'places-reset':
+      return { ...session, relevance: {} };
+
     case 'address-moved':
       return {
         ...session,
@@ -566,28 +692,38 @@ function step(session: Session, event: SessionEvent): Session {
           ? {
               scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
               outcome: null,
+              // A new address renumbers the places, so answers about the old
+              // ones are answers about different places (AC 5.4.2).
+              relevance: {},
             }
           : {}),
       };
 
-    case 'get-started':
+    /** One of the two on the start screen, and the homepage's guide cards. */
+    case 'explore-chosen':
       return { ...session, screen: 'choose' };
 
     case 'guide-chosen':
       return {
         ...session,
         /*
-          Every guide opens on the address screen, empty (team decision,
-          16 September).
+          A guide opens on the address it was given, and asks only when there
+          is none (team decision, **4 October**, reversing 16 September).
 
-          It skipped straight to the guide once an address was known, so the
-          second guide started on the first guide's street with no moment to
-          choose another. The team's rule is that an address is entered for
-          each guide and each visit to the full map, so the one given before is
-          let go here rather than offered back. See `forgetAddress`.
+          The rule used to be the other way: every guide started on an empty
+          address screen, so that the second guide could not quietly begin on
+          the first one's street. What changed is how much there is to do.
+          With six guides, the full map, a preparation plan and a reporting
+          pathway, being asked for the same address five times reads as the
+          product having forgotten rather than as an invitation -- which is
+          what the team said on reviewing it.
+
+          **Changing it stayed possible everywhere it is shown**, which is the
+          other half of the decision: the guide and the chooser both carry the
+          address with a *Change* beside it, and `forgetAddress` still runs
+          when a different one is chosen.
         */
-        screen: 'address',
-        ...forgetAddress(session),
+        screen: session.address === null ? 'address' : 'guide',
         guideSection: event.section,
         // The map's mode follows the section, so finishing the guide and
         // opening the map shows the thing that was just taught rather than
@@ -641,9 +777,13 @@ function step(session: Session, event: SessionEvent): Session {
         screen:
           session.guideSection !== null
             ? 'guide'
-            : session.pendingTask === null
-              ? 'task'
-              : screenForTask(session.pendingTask),
+            : session.pendingTask !== null
+              ? screenForTask(session.pendingTask)
+              : // The chooser asked, with no task waiting: back to the guides.
+                session.addressFrom === 'choose'
+                ? 'choose'
+                : 'task',
+        addressFrom: 'task',
         ...(session.pendingTask === null ? {} : { task: session.pendingTask }),
         pendingTask: null,
         address: event.address,
@@ -655,6 +795,19 @@ function step(session: Session, event: SessionEvent): Session {
           ? {
               scenario: { ...session.scenario, pitId: null, pitWasSuggested: false },
               outcome: null,
+              /*
+                And the answers about places, for the reason `address-moved`
+                gives: a new address renumbers them, so answers about the old
+                ones are answers about different places (AC 5.4.2).
+
+                This branch did not clear them until 4 October. Nothing showed
+                it, because choosing a guide forgot the address outright and
+                every route to this screen went through that. Keeping the
+                address made this reachable: pick an address, answer a place,
+                go back, pick another, and the first address's answers were
+                still there under the second address's numbers.
+              */
+              relevance: {},
             }
           : {}),
       };
@@ -752,7 +905,7 @@ function step(session: Session, event: SessionEvent): Session {
       // Only the answer being waited for. After Cancel nothing is; after a
       // second start, it is the second run's.
       if (!session.running || (event.run ?? null) !== session.run) return session;
-      return { ...session, running: false, screen: 'result', outcome: event.outcome };
+      return { ...session, running: false, screen: 'result', outcome: event.outcome, compared: true };
 
     case 'comparison-cancelled':
       // The prototype's C5 to C4: back to the review, with every choice intact.
@@ -775,7 +928,15 @@ function step(session: Session, event: SessionEvent): Session {
       return session.screen === 'review' && !session.running ? { ...session, screen: 'scenario' } : session;
 
     case 'drains-reopened':
-      if (session.address === null) {
+      /*
+        *Return to the map* goes to the map the drain was picked on.
+
+        It tested the address, not where the comparison came from -- so a
+        reader who had opened one from the full map and happened to have an
+        address went to step 1 of the address journey instead, a screen they
+        had never been on.
+      */
+      if (session.address === null || session.scenarioOrigin === 'map') {
         return { ...session, screen: 'explore', task: 'full-map', outcome: null, running: false, run: null };
       }
       return atStepOne(session);
@@ -810,8 +971,23 @@ function step(session: Session, event: SessionEvent): Session {
       };
 
     case 'back':
-      if (session.screen === 'scenario' && session.scenarioOrigin === 'map') {
-        return { ...session, screen: 'explore' };
+      /*
+        Out of a comparison that was opened from the map is out to the map,
+        from whichever of its steps (AC 3.1.1).
+
+        Two faults were reported on 8 October and both are here. It was
+        written for the `scenario` step alone, so on a **result** the control
+        saying *Full map* walked `BACK` instead and arrived at Choices. And it
+        left `task` on `compare`, which the map reads as a guided visit: it
+        reopened with the guided layer set, Ground height included, which the
+        reader had not asked for and had to find a panel to switch off.
+
+        `scenarioOrigin` alone is not the test. It survives the comparison it
+        was set for, and `back` is dispatched from screens that have nothing
+        to do with one.
+      */
+      if (session.scenarioOrigin === 'map' && FROM_MAP_COMPARISON.has(session.screen)) {
+        return { ...session, screen: 'explore', task: 'full-map' };
       }
       return { ...session, screen: BACK[session.screen] };
 
@@ -841,9 +1017,31 @@ function step(session: Session, event: SessionEvent): Session {
           was written after a rule spread across three cases.
         */
         screen: allLearned(session.learned) ? 'explore' : 'locked',
-        // The full map starts with no address, whatever was searched before
-        // (team decision, 16 September); the map's own search box asks again.
-        ...forgetAddress(session),
+        /*
+          **The full map keeps the address, since 10 October.**
+
+          It used to clear it: *the full map asks for an address again on
+          every visit*, a team decision of 16 September. The team reversed
+          that half on 10 October, and the reason the rule existed is worth
+          separating from the rule, because only one of the two halves was
+          reversed.
+
+          The half that stays: **no route to this map invents an address.**
+          Opening it with nothing searched still lands with nothing selected
+          and the search box along the top asking, because a guessed address
+          puts a marker on a street nobody named. That is what the test above
+          this one checks and it still passes.
+
+          The half that went: an address the reader typed a minute ago, in
+          this tab, is not a guess. Making them type it again on the way from
+          a guide to the full map was the product forgetting something it had
+          been told, which is the opposite of what the privacy rule is for.
+
+          Nothing is cleared with it. The chosen drain, the answers about
+          numbered places and the comparison all belong to that address, and
+          they are still that address's. `forgetAddress` runs where the
+          address actually changes, which is where AC 5.4.2 wants it.
+        */
         task: 'full-map',
         mapMode: event.mode ?? null,
         mapOrigin: event.from ?? 'home',
@@ -901,7 +1099,7 @@ function step(session: Session, event: SessionEvent): Session {
       return session.address === null ? session : { ...session, screen: 'task' };
 
     case 'change-address':
-      return { ...session, screen: 'address' };
+      return { ...session, screen: 'address', addressFrom: event.from ?? 'task' };
 
     case 'change-scenario':
       // AC 2.2.4 (Aug-27 set): the inputs are still there when they get back.

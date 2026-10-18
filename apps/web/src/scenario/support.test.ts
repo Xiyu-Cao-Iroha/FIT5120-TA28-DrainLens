@@ -23,7 +23,12 @@ describe('which drains support a comparison', () => {
 describe('what an unsupported drain is not', () => {
   it('says every time that it is about the calculation, not a clean bill for the drain', () => {
     for (const text of [...Object.values(UNSUPPORTED_TEXT), SUPPORT_LEGEND]) {
-      expect(text).toMatch(/does not show whether (the|those) pits? works? or whether the area may flood/);
+      // `pits` or `drains`: the map key stopped saying *pit* on 11 October
+      // and these sentences are about the same objects either way. What the
+      // assertion is for is the clause, not the noun.
+      expect(text).toMatch(
+        /does not show whether (the|those) (pits?|drains?) works? or whether the area may flood/,
+      );
     }
   });
 
@@ -44,10 +49,16 @@ describe('the short reason on a grey drain', () => {
   });
 
   it('names the three marks on the key', () => {
+    /*
+      **The key stopped saying *test* on 11 October.** The plain-English
+      audit found four labels in this flow claiming the product examines a
+      physical drain while the home page says in as many words that it does
+      not. This is two of the four.
+    */
     expect(Object.values(MAP_KEY)).toEqual([
       'Your address',
-      'Drain available to test',
-      'Other drains (can’t be tested)',
+      'Drain you can compare',
+      'Other drains (no comparison available)',
     ]);
   });
 });

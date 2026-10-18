@@ -22,6 +22,7 @@ Detailed verification of three of them is in their own files: [FLOOD-HISTORY-DAT
 | 8 | VICSES Incidents Per SA1 ABS Census Areas, 2009 – 2015 | Victoria State Emergency Service (via data.vic) | CC BY 4.0 | `victoria-ses-incidents-per-sa1-abs-census-areas-2009-2015` | Flood history board, flood map counts |
 | 9 | ASGS 2011, Volume 1 — SA1 and SA2 | Australian Bureau of Statistics | CC BY 2.5 AU | 1270.0.55.001 | Area names, SA2 boundaries on the flood map, suburb-name positions on the Full map |
 | 10 | Population Estimates by SA2, 2005 to 2015 | Australian Bureau of Statistics | CC BY 2.5 AU | 3218.0 | Denominator of *Emergency responses per 1,000 people* |
+| 11 | Catchments — Waterways and Drains Subcatchments | Melbourne Water Corporation (via data.vic) | CC BY 4.0 | `catchments-waterways-and-drains-subcatchments` | The drainage area an address is in, and what receives its water |
 
 Licence deeds: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [CC BY 2.5 AU](https://creativecommons.org/licenses/by/2.5/au/). The footer links each credit to its own licence (`apps/web/src/ui/attribution.ts`); the ABS is **not** CC BY 4.0.
 
@@ -125,10 +126,16 @@ Two files from 1270.0.55.001, both the **2011 edition**, which is the edition th
 
 The pages are cited and linked, not copied: summaries are the team's own sentences, and say only what those pages state. An event appears only after a team member fills in `checkedBy` and `checkedOn`. **On 16 September none of the four is checked**: all four were rewritten from these sources that day, so the Maribyrnong check of 14 September was cleared with them. `tools/data/check-events.mjs` holds the file to that rule in CI, refuses a source on a news outlet's site (`NEWS_HOSTS`), and ties every event to an area the map has.
 
+### Official guidance the product quotes
+
+Epic 5 and Epic 6 cite pages rather than datasets: what to do before heavy rain, and who to contact about a drainage problem. Every one is recorded in [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) with the sentence it came from, the publisher, the page and the day it was read — Victoria State Emergency Service, City of Melbourne, Melbourne Water and the Building and Plumbing Commission, read on 2 and 3 October 2026.
+
+They are quoted, not copied: one sentence each, shortened into the product's own words, with the original kept in the register for a reviewer to check. **Two things those pages say are deliberately left out**: their response times, which AC 6.3.2 forbids repeating, and anything about what will be done, for the same reason. The register also records the one action the design asks for that no official page was found to carry.
+
 ### Not data at all
 
 - **The homepage photograph** (`apps/web/public/hero-street.webp`) is illustrative. Nothing is measured from it and it is not of the pilot area. Its origin and licence are not recorded in the repository — **fill this in before submission**.
-- **The guide chooser's landscape** (`apps/web/public/choose-landscape.webp`) is an illustration behind the four cards, added on 14 September. The same applies: nothing is measured from it, and its origin and licence are not recorded — **fill this in too**.
+- **The guide chooser's landscape** (`apps/web/public/choose-landscape.webp`) is an illustration behind the guide cards, added on 14 September. The same applies: nothing is measured from it, and its origin and licence are not recorded — **fill this in too**.
 - **The typeface** is self-hosted with its licence file beside it; the site makes no request to a font or map service.
 
 ---
@@ -144,3 +151,17 @@ Everything below is described as estimated by DrainLens on the site, and is not 
 - the blockage comparison (*No clear difference* / *More water than with a clear drain*);
 - *Emergency responses per 1,000 people* (the Severity Score, in the model's own documents);
 - where each statistical area is drawn, its simplified boundary, and where the suburb names sit.
+
+---
+
+## Melbourne Water Corporation
+
+### 11 · Catchments — Waterways and Drains Subcatchments
+
+The drainage areas Epic 6 is built on: 3,409 subcatchments over Melbourne Water's operating region, of which **35 reach the City of Melbourne extent** and addresses fall inside **20** of them.
+
+- **Portal:** [data.vic](https://discover.data.vic.gov.au/dataset/catchments-waterways-and-drains-subcatchments), which lists the layer's own ArcGIS feature service beside the file downloads. Portal metadata last modified 2025-02-10.
+- **Fetched from the feature service, by bounding box**, in EPSG:28355 both ways: 35 features and 292 KB for the council, against 23 MB for the published GeoJSON of the whole region. **This is the only layer that needs no projection** — the service speaks the frame the pipeline already works in.
+- **Fields kept:** the subcatchment number and name, the major, primary and river-basin names, the recorded area in km², and both dates — `DATE_CAPTURED` and `DATE_LAST_UPDATED`. The record's own date is what AC 6.1.4 shows; the portal's metadata date is a different thing and the criterion forbids presenting one as the other. Every one of the 35 carries a last-updated date, and all of them read 2013-11-20.
+- **Pipeline:** `subcatchments.py`. **Artefact:** `subcatchments.json` (57 KB), published in the council extent's frame and shifted into whichever map the browser has, as the address index is.
+- **Boundaries are published whole** — never clipped to the extent — because AC 6.1.1 asks for the complete boundary, and simplified to **5 m** for drawing. The simplification is a drawing tolerance and not a record: tested over all 62,397 addresses, deciding membership from the published rings instead of the service's geometry would put **287 addresses (0.46%)** in a different area, leave 8 in none and 43 in two. Which area an address is in is therefore decided in the pipeline, against the geometry as fetched.

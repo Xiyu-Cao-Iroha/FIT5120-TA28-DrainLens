@@ -69,6 +69,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The build configs exclude *.test.ts, because they are composite and
+      # emit declarations. That left every test file in the repository outside
+      # the type checker, and fixtures drifted from the types they claim to
+      # build for months without anything saying so.
+      - name: Typecheck the tests
+        run: npm run typecheck:tests
+
       # Stray table rows, ragged tables, unclosed fences, broken relative links
       # -- and any tracked text file carrying a raw NUL byte, which makes it
       # binary to git and invisible to every grep run against this repository.
@@ -133,6 +140,18 @@ jobs:
       # that event is shown nowhere, silently.
       - name: Check the verified flood events against the map's areas
         run: node tools/data/check-events.mjs
+
+      # A pipe operator the mapping cannot explain is a decision, not a
+      # default: AC 6.2.2 names an organisation or calls the value an
+      # unidentified code, and a resident reporting a blockage acts on which.
+      - name: Check the pipe operator values against the mapping
+        run: node tools/data/check-operators.mjs
+
+      # The assignment is keyed to the address index and nothing in the file
+      # system says so: rebuilding one without the other leaves both valid and
+      # tells people about a drainage area belonging to another street.
+      - name: Check the drainage areas against the address index
+        run: node tools/data/check-subcatchments.mjs
 
       # Coverage thresholds live in vitest.config.ts: 88% overall, 90% for
       # packages/schema. A shortfall fails the job.
@@ -229,6 +248,22 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # **The workspace packages have to be built before this suite runs.**
+      #
+      # It was not needed until 9 October, when `apps/api/src/load.ts` began
+      # importing `@drainlens/address`. The suite reaches the API through its
+      # source -- `../src/load.js` -- which vitest transforms, but a workspace
+      # package is resolved through its `package.json`, and that points at
+      # `dist/`. Without this step the whole suite fails to collect with
+      # *Failed to resolve entry for package "@drainlens/address"*, which it
+      # did on the pull request that added the import.
+      #
+      # `check` never hit it because `npm run typecheck` is `tsc --build` and
+      # leaves `dist/` behind. This job does not run that, so it builds the
+      # packages it needs and nothing else.
+      - name: Build the shared packages
+        run: npm run build --workspace packages/address --workspace packages/schema --workspace packages/scenario
 
       # The suite applies the migration itself and loads the published
       # artefacts, so there is no fixture to keep in step with the schema.

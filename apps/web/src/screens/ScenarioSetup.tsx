@@ -18,7 +18,8 @@
  * and the person carries without having agreed to it.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { BlockageInfoButton, BlockagePictures } from './BlockagePictures.js';
 
 import { type BlockageSetting, VALIDATED_RAINFALL_LEVELS_MM } from '@drainlens/schema';
 
@@ -64,14 +65,14 @@ export const BLOCKAGE_OPTIONS: readonly {
   readonly title: string;
   readonly detail: string;
 }[] = [
-  { setting: 'clear', title: 'Clear', detail: 'Uses the model’s normal drain setting' },
+  { setting: 'clear', title: 'Clear', detail: 'This drain works normally in this example' },
   { setting: 'partly-blocked', title: 'Partly blocked', detail: 'Takes half as much water as the clear setting' },
-  { setting: 'fully-blocked', title: 'Fully blocked', detail: 'Takes no surface water at this pit' },
+  { setting: 'fully-blocked', title: 'Fully blocked', detail: 'Takes no surface water at this drain' },
 ];
 
 /** AD13, both statements, as the interface must be able to quote them. */
 export const BLOCKAGE_IS_AN_ASSUMPTION =
-  'These are settings for the comparison, not observations of the drain. DrainLens does not know whether the drain is blocked now or how a blockage formed.';
+  'These are choices for a modelled comparison, not observations of the drain. DrainLens does not know whether the drain is blocked now or how a blockage formed.';
 
 /**
  * The validated levels, labelled. The amounts come from the schema so the
@@ -100,6 +101,13 @@ export function ScenarioChoices({ scenario, distanceM, differenceHint = null, on
   const missing = missingScenarioInput(scenario);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const intake = WHAT_IS_UNCERTAIN[0];
+  /*
+    The ⓘ's panel is rendered here rather than by the button, because the
+    button lives in a `<legend>` and the panel must not. See
+    `BlockageInfoButton`.
+  */
+  const picturesId = useId();
+  const [picturesOpen, setPicturesOpen] = useState(false);
 
   return (
     <div style={panelBody}>
@@ -114,8 +122,17 @@ export function ScenarioChoices({ scenario, distanceM, differenceHint = null, on
 
       <fieldset style={fieldset}>
         <legend style={question}>
-          What drain condition do you want to test? <SettingTag />
+          Imagine this drain is... <SettingTag />
+          {/* Team request, 4 October: show what the three settings look like. */}
+          <BlockageInfoButton
+            open={picturesOpen}
+            panelId={picturesId}
+            onToggle={() => {
+              setPicturesOpen((was) => !was);
+            }}
+          />
         </legend>
+        {picturesOpen && <BlockagePictures id={picturesId} />}
         <div role="radiogroup" aria-label="Drain condition" style={{ display: 'grid', gap: space(2) }}>
           {BLOCKAGE_OPTIONS.map((option) => {
             const chosen = scenario.blockage === option.setting;

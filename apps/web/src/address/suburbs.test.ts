@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AddressIndex, IndexedAddress } from './search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 import { suburbsOf } from './suburbs.js';
 
 const at = (suburb: string, id: string): IndexedAddress => ({
@@ -11,6 +11,7 @@ const at = (suburb: string, id: string): IndexedAddress => ({
   suburb,
   e: 0,
   n: 0,
+  at: 0,
 });
 
 const indexOf = (...addresses: IndexedAddress[]): AddressIndex => ({ area: 'test', addresses });

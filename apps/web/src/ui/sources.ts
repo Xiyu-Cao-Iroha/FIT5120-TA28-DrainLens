@@ -24,10 +24,14 @@
  * score; the site does not use that word (see `RETIRED_TERMS`).
  */
 
+import { MAX_PLACES } from '../prepare/places.js';
+
 export type SourceSectionId =
   | 'drains'
   | 'ground'
   | 'flood-history'
+  | 'preparation-plan'
+  | 'drainage-areas'
   | 'rate'
   | 'events'
   | 'limits'
@@ -78,7 +82,7 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
     points: [
       'They are worked out from the City of Melbourne 3D Point Cloud 2018, a height survey made from aerial photographs. Heights are accurate to about 25 cm.',
       'Heights are in metres above sea level (Australian Height Datum). Colours show higher and lower ground, and lines join places of equal height.',
-      'Likely water paths follow the steepest way downhill. They show where rain would tend to run, not where water has been seen.',
+      'Water paths follow the steepest way downhill. They show where rain would tend to run, not where water has been seen.',
       'Building outlines are used so that water paths go around buildings.',
       'Low areas are dips in the ground. We only show dips at least 25 cm deep, because smaller changes are within the survey’s error.',
       'A warning sign marks an especially deep low area on a street. It appears when you zoom in.',
@@ -142,6 +146,53 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
     ac: ['4.2.1', '4.2.2', '4.2.3', '4.3.4'],
   },
   {
+    /*
+      Epic 5, from Figma A6 of 11 October, where it sits between Flood
+      history and the subcatchment areas and is marked *New in Iteration 3*.
+      
+      **Most of it is what the product does not do**, which is why it had to
+      exist: the numbered signs near an address are the one part of
+      DrainLens a reader is most likely to take for a prediction, and
+      nothing on the page said how a place is chosen or what being near a
+      drain does not mean. Every line is the design's own.
+    */
+    id: 'preparation-plan',
+    title: 'Preparation plan',
+    summary:
+      'The numbered warning signs near your address and the reminders in your plan come from fixed rules, not a prediction.',
+    points: [
+      'Places to check are the deep low areas near your address, the same places marked with a warning sign on the map. Water may pool there in heavy rain.',
+      'You decide whether each place applies to you. Only places that apply become reminders in your plan and on your printout.',
+      'Ground slope is only used to explain a place, not to mark one.',
+      'We do not mark where water may flow. The Water paths layer already shows this, and DrainLens does not suggest routes.',
+      'We do not mark the nearest drain. Being close does not show that it serves your property. If you see a blocked drain, select it on the map and report it.',
+      `Up to ${String(MAX_PLACES)} places are shown within a set distance of your address. Many addresses have none.`,
+      'No place near you does not mean your area cannot flood.',
+      'Your address and choices stay in your browser and are cleared when you close it.',
+    ],
+    source:
+      'Guidance: VICSES, City of Melbourne, Melbourne Water. Places to check: estimated by DrainLens from City of Melbourne open data.',
+    ac: ['5.1.1', '5.1.3', '5.2.2', '5.3.1', '5.4.2'],
+  },
+  {
+    id: 'drainage-areas',
+    title: 'Drainage areas',
+    summary:
+      'The drainage area your address is in is an official Melbourne Water record. What receives its water is not confirmed yet.',
+    points: [
+      'Melbourne Water divides its region into subcatchments. We show the one that contains your address, drawn whole, so most run past the edge of this map.',
+      'Which area an address is in is worked out from Melbourne Water’s own boundary, not from the simplified outline drawn on the map.',
+      'The boundary does not show a flood extent, which pipes connect to what, or who owns an asset.',
+      'Sharing a drainage area does not mean sharing the same flood risk or the same local pipes.',
+      'Recorded pits, pipe length and low areas inside an area come from City of Melbourne data, which covers only part of most areas. The card says how much.',
+      'We do not yet say what kind of drain or waterway receives an area’s water. Our team checks each area against Melbourne Water’s own description before DrainLens names one.',
+      'The record’s own last-updated date and the date the published layer was last edited are different things, and both are shown.',
+    ],
+    source:
+      'Melbourne Water Corporation: Catchments, Waterways and Drains Subcatchments, via data.vic. Licensed CC BY 4.0. Pit, pipe and low-area counts are from City of Melbourne data and DrainLens’s own calculations.',
+    ac: ['6.1.1', '6.1.2', '6.1.3', '6.1.4', '6.1.5'],
+  },
+  {
     id: 'limits',
     title: 'What DrainLens cannot tell you',
     summary: 'DrainLens helps you understand your area. It is not a warning service.',
@@ -157,9 +208,27 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
   {
     id: 'privacy',
     title: 'Your privacy and data licences',
-    summary: 'Your address stays on your device.',
+    summary: 'Your address is not saved or linked to you.',
     points: [
-      'Address search happens in your browser. Your address is not sent or saved, and it is forgotten when you close the tab.',
+      /*
+        **Rewritten on 9 October, when it stopped being true.**
+
+        It used to read *Address search happens in your browser. Your address
+        is not sent or saved, and it is forgotten when you close the tab.* The
+        first clause is now false: the search is answered by DrainLens's own
+        API, against the council's published addresses in a database. The rest
+        still holds, and saying so plainly is the point -- a privacy panel
+        that quietly drops a sentence it can no longer keep is worse than one
+        that never made it.
+
+        What is claimed here is checked and not aspirational: the request
+        carries the query and nothing else, the route writes no row, it
+        answers `no-store` and keeps no cache keyed on what was typed, and
+        Cloud Run's request log is excluded at the sink before entries are
+        written. `apps/api/test-db/address.test.ts` holds the first three.
+      */
+      'Your address is searched by DrainLens and is not kept: no account, no record of the search, and nothing written to our logs.',
+      'The report you print is not sent anywhere. It is made in your browser.',
       'Your progress through the guides is saved on this device only.',
     ],
     // The credits are rendered here from the loaded artefacts, so a replaced
@@ -183,11 +252,12 @@ export const SOURCE_SECTIONS: readonly SourceSection[] = [
 export const SOURCE_LINKS = {
   footer: { label: SOURCES_PAGE.footerLink, section: null, where: 'ui/Shell.tsx footer, every screen', ac: ['2.3.1', '4.3.1'] },
   recorded: { label: 'From council records', section: 'drains', where: 'map/MapLayers.tsx legend group; map/MapCallout.tsx foot of the pit and pipe popups (screens/MapView.tsx)', ac: ['1.1.4', '1.1.7', '1.2.1'] },
-  derived: { label: 'Estimated by DrainLens', section: 'ground', where: 'map/MapLayers.tsx legend group; map/AddressInsight.tsx foot of the address card, and screens/MapView.tsx when the card has no figure', ac: ['1.1.4', '1.1.7', '1.3.1', '1.3.2'] },
+  derived: { label: 'Estimated by DrainLens', section: 'ground', where: 'map/MapLayers.tsx legend group, and screens/MapView.tsx at the foot of the address card', ac: ['1.1.4', '1.1.7', '1.3.1', '1.3.2'] },
   pathEnds: { label: 'Why the line stops', section: 'drains', where: 'screens/PitDetail.tsx followed path', ac: ['1.2.2'] },
   groundLegend: { label: 'More about ground height', section: 'ground', where: 'map/MapLayers.tsx ground height legend', ac: ['1.3.1'] },
   mapNotice: { label: 'More about the map', section: 'drains', where: 'screens/LockedMap.tsx, under the two lines', ac: ['1.1.4'] },
   homeLimits: { label: 'What DrainLens can and cannot show', section: 'limits', where: 'screens/Home.tsx, under the closing "not a live flood warning" line', ac: ['1.1.1'] },
+  drainageArea: { label: 'About drainage areas', section: 'drainage-areas', where: 'screens/DrainageArea.tsx, foot of the card and of More information', ac: ['6.1.1', '6.1.3', '6.1.4'] },
   history: { label: 'About the data', section: 'flood-history', where: 'screens/Home.tsx top 5 note; screens/FloodHistory.tsx under the three notes; screens/FloodMap.tsx empty and selected area panels', ac: ['2.1.1', '2.3.1', '4.1.4'] },
   minimum: { label: 'Why “at least”?', section: 'flood-history', where: 'screens/FloodHistory.tsx under the list; screens/FloodMap.tsx foot of the key, and after an "At least" status in the area panel', ac: ['2.2.1', '4.1.5', '4.1.6'] },
   pastRecords: { label: 'Past records', section: 'flood-history', where: 'history/evidence.ts AREA_KINDS: the counts section of the screens/FloodMap.tsx area panel', ac: ['4.3.4'] },

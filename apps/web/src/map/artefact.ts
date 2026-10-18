@@ -33,6 +33,15 @@ export type Pipe = LineFeature & {
   readonly dnstr_pit?: number;
   readonly diameter?: number;
   readonly material?: string;
+  /**
+   * Who operates this pipe, as the council's record has it.
+   *
+   * Three states, and the interface says a different thing for each (AC
+   * 6.2.2): `City of Melbourne` on 16,302 of the council's pipes, the key
+   * absent on 87, and the string `4` on 853 — a code the published data does
+   * not explain and this product does not resolve to an organisation.
+   */
+  readonly operator?: string;
 };
 
 export type Road = PolygonFeature & {

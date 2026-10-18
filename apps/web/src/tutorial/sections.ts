@@ -26,6 +26,12 @@ export const SECTION_ORDER: readonly SectionId[] = [
   'water-flow',
   'low-areas',
   'terrain',
+  // Iteration 3, Epic 6. Last because it is about the address rather than
+  // about the map, and the four before it are what its wording assumes the
+  // reader has seen.
+  'drainage-area',
+  // Iteration 3, Epic 5.
+  'heavy-rain',
 ];
 
 export interface Section {
@@ -51,17 +57,18 @@ export const guideTitleOf = (id: SectionId): string => SECTIONS[id].guideTitle ?
 export const SECTIONS: Record<SectionId, Section> = {
   drainage: {
     id: 'drainage',
-    label: 'Local drainage pits and pipes',
+    // Figma T1's card titles, all of them, as of 11 October.
+    label: 'Recorded drainage',
     locked: 'Start guide',
   },
   'water-flow': {
     id: 'water-flow',
-    label: 'Where rainwater may move',
+    label: 'Water paths',
     locked: 'Start guide',
   },
   'low-areas': {
     id: 'low-areas',
-    label: 'Low areas where water may collect',
+    label: 'Low areas',
     locked: 'Start guide',
   },
   terrain: {
@@ -70,9 +77,25 @@ export const SECTIONS: Record<SectionId, Section> = {
     locked: 'Start guide',
     guideTitle: `${LAYER.ground} guide`,
   },
+  'drainage-area': {
+    id: 'drainage-area',
+    /*
+      Figma T1, rewritten on 11 October: the card was *Recorded subcatchment
+      area* and the guide behind it was about the boundary. Both are now
+      about reporting a problem. The id stays, because `SectionId` is
+      `MapMode` and the modes are the homepage's ways into the map.
+    */
+    label: 'Spot a drainage problem?',
+    locked: 'Start guide',
+  },
+  'heavy-rain': {
+    id: 'heavy-rain',
+    label: 'Get ready for heavy rain',
+    locked: 'Start guide',
+  },
 };
 
-/** What has been finished. Four booleans and nothing else. */
+/** What has been finished. One boolean per section and nothing else. */
 export type Learned = Readonly<Record<SectionId, boolean>>;
 
 export const NOTHING_LEARNED: Learned = {
@@ -80,6 +103,8 @@ export const NOTHING_LEARNED: Learned = {
   'water-flow': false,
   'low-areas': false,
   terrain: false,
+  'drainage-area': false,
+  'heavy-rain': false,
 };
 
 export const allLearned = (learned: Learned): boolean =>

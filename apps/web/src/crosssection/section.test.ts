@@ -226,6 +226,11 @@ describe('the figure label a screen reader hears', () => {
   const section = {
     kind: 'available' as const,
     assetNumber: '500',
+    // Whether water arrives from the street. The label is about pipes and
+    // depth, so any of the three does; it is set because `CrossSection`
+    // requires it, which this fixture stopped saying while the tests were
+    // outside the type checker.
+    surfaceEntry: 'not-recorded' as const,
     description: null,
     incoming: [{ ref: '1', diameterMm: 300, material: null, direction: 'into-this-pit' as const }],
     outgoing: [],

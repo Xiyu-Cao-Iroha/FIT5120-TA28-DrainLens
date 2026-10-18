@@ -33,17 +33,18 @@ import {
   type IndexedAddress,
   type Match,
   MAX_SUGGESTIONS,
-  resolve,
   search,
-} from '../address/search.js';
+} from '@drainlens/address';
 import {
   COMPARE_DEMONSTRATION_LABELS,
   DEMONSTRATION_LABELS,
   demonstrationAddress,
   demonstrationAddresses,
 } from '../address/demonstration.js';
+import { lookupAddress } from '../address/lookup.js';
+import { RECENT_LABEL, recall } from '../address/recent.js';
 import { suburbsOf } from '../address/suburbs.js';
-import type { Task } from '../session.js';
+import type { SupportedAddress, Task } from '../session.js';
 import type { SectionId } from '../tutorial/sections.js';
 import { CoverageBadge, FixtureNotice } from '../ui/Shell.js';
 import { COVERAGE, LAYER } from '../ui/terms.js';
@@ -82,11 +83,74 @@ const DOES_NOT: readonly string[] = [
   'It does not cover addresses outside the City of Melbourne.',
 ];
 
+/**
+ * How many matches to ask for before filtering, as a multiple of what is
+ * shown.
+ *
+ * Only the comparison filters, and on the bundled square 92% of addresses
+ * pass, so four times is generous. The loop below stops as soon as it has
+ * enough, so the multiple is a ceiling rather than a cost.
+ */
+const SEARCH_OVERSHOOT = 4;
+
+/**
+ * The first `limit` matches this task can use.
+ *
+ * Exported for the test, and written as a loop rather than `filter().slice()`
+ * because `usable` walks the pits near each address: stopping at `limit`
+ * is the difference between asking about five addresses and asking about
+ * twenty on every keystroke.
+ */
+export function usableMatches(
+  matches: readonly Match[],
+  usable: ((address: IndexedAddress) => boolean) | undefined,
+  limit: number = MAX_SUGGESTIONS,
+): Match[] {
+  if (usable === undefined) return matches.slice(0, limit);
+  const kept: Match[] = [];
+  for (const match of matches) {
+    if (!usable(match.address)) continue;
+    kept.push(match);
+    if (kept.length >= limit) break;
+  }
+  return kept;
+}
+
 export interface LandingProps {
   readonly index: AddressIndex;
   /** Present only while the index is a stand-in. */
   readonly fixtureNote?: string | undefined;
   readonly onFound: (address: IndexedAddress) => void;
+  /**
+   * The addresses looked up in this tab, newest first.
+   *
+   * Optional so the screen still renders in isolation, and defaulted to the
+   * empty list rather than to undefined so that nothing downstream has to ask
+   * which kind of nothing it got.
+   */
+  readonly recent?: readonly SupportedAddress[] | undefined;
+  /**
+   * Which addresses this task can actually answer for, or absent for all.
+   *
+   * The comparison is the only task that cannot answer for every supported
+   * address: it needs a drain within `COMPARISON_RADIUS_M` that the scene
+   * tiles can calculate, and 0.5% of the council's addresses have none.
+   * Offering those in the search box is offering a door that opens onto
+   * *no drain near this address* (team, 12 October), so the box stops
+   * offering them.
+   *
+   * A predicate rather than a list, because the caller is the one that
+   * knows what its task needs, and because the list would be 62,397 long.
+   * Absent while the thing it needs is still loading, so a slow worker
+   * shows every address rather than none.
+   */
+  readonly usable?: ((address: IndexedAddress) => boolean) | undefined;
+  /**
+   * One line for when a search matched addresses and this task can use none
+   * of them. Without it the box would simply say nothing, which is how a
+   * working search looks when it is broken.
+   */
+  readonly usableNote?: string | undefined;
   readonly onUnsupported: (typed: string) => void;
   /**
    * Leave without giving an address.
@@ -139,24 +203,83 @@ export interface LandingCopy {
  * Which suburbs that is stays under the input, where it is read while typing.
  */
 export const EXPLORE_COPY: LandingCopy = {
-  title: 'Enter your address',
-  lead: 'Covers the City of Melbourne.',
-  submit: 'Explore this area →',
+  // Figma T0. One title for every way in, and the lead says what happens
+  // next instead; see `landingCopyFor`.
+  title: 'Start with your address',
+  lead: 'Enter it once. Every guide and the full map will use it.',
+  submit: 'Continue →',
 };
 
 /**
- * A title per guide section, so the screen matches the card that was pressed.
- * Terrain has no guide yet and takes the plain title.
+ * What comes after the address, said on the screen that asks for it.
+ *
+ * Figma draws one of these per entry point (T0g, T0d, T0m) and the generic
+ * T0 for everything else. It replaced a title per section, which named the
+ * guide in the heading and left the line underneath saying only which
+ * council the map covers.
  */
-export const SECTION_TITLES: Partial<Record<SectionId, string>> = {
-  drainage: 'Find drains near your address',
-  'water-flow': 'See where rain may flow near your address',
-  'low-areas': 'Find low areas near your address',
+export const NEXT_AFTER_ADDRESS: Partial<Record<SectionId, string>> = {
+  'heavy-rain': 'Enter it once. The Get ready for heavy rain guide starts next.',
+  'drainage-area': 'Enter it once. The drainage problem guide starts next.',
 };
+
+/** T0m, for the way in that opens the map rather than a guide. */
+export const FULL_MAP_LEAD = 'Enter it once. The full map opens next.';
+
+/**
+ * T0's line under the suburbs, which the product did not say anywhere.
+ *
+ * **Rewritten on 11 October, three weeks after it stopped being true.** It
+ * read *Your address stays in this browser only. You can change it at any
+ * time.* The first clause went false on 9 October, when a submitted search
+ * moved to `POST /api/addresses/search`. `DECISIONS-PENDING.md` §14
+ * records that decision as withdrawing the on-screen promise in the same
+ * change, and the privacy panel in `ui/sources.ts` was rewritten that day --
+ * this line was missed, which is how the product spent three weeks making a
+ * promise its own documents said it had withdrawn.
+ *
+ * **It is replaced rather than cut**, for the reason the panel gives: a line
+ * that quietly drops a sentence it can no longer keep is worse than one that
+ * never made it, and going silent here would leave *stays in this browser* as
+ * the last thing a resident read about their address. So it still says where
+ * the address goes and what becomes of it. The second clause is untouched; it
+ * was never in question.
+ *
+ * It is the panel's claim in fewer words, because this sits under a search
+ * field rather than in a panel: *no account, no record of the search, and
+ * nothing written to our logs* is the whole of it, one press away under *Data
+ * sources and limits*. The name stays `ADDRESS_STAYS_HERE` because the rule
+ * it was named for is unchanged -- nothing about the address is written down,
+ * here or at the other end. See *The address is never written down* in
+ * `apps/web/README.md`.
+ */
+export const ADDRESS_STAYS_HERE =
+  'Your address is searched by DrainLens and is not kept. You can change it at any time.';
+
+
+
+/**
+ * What the button says while a search is out.
+ *
+ * It replaces the task's own word rather than sitting beside it, because the
+ * row is already two controls wide on a phone and a third thing appearing
+ * mid-press moves the one being pressed. Both tasks share it: what is
+ * happening is the same either way.
+ */
+export const SEARCHING = 'Searching…';
 
 export const COMPARE_COPY: LandingCopy = {
   title: 'Which address do you want to check?',
-  lead: 'We’ll find a drain near it you can test for a blocked-drain comparison.',
+  /*
+    *Compare*, not *test*.
+
+    This is the first screen of the comparison and it said *a drain near it
+    you can test*, which is the claim the plain-English audit's first
+    finding is about: the product never looks at a drain. The four labels
+    inside the flow were changed and this one, which sets the reader's
+    expectation before any of them, was missed.
+  */
+  lead: 'We’ll find a drain near it to compare clear against blocked.',
   submit: 'Find a drain →',
 };
 
@@ -165,8 +288,9 @@ export const landingCopyFor = (
   section: SectionId | null | undefined = null,
 ): LandingCopy => {
   if (task === 'compare') return COMPARE_COPY;
-  const title = section === null || section === undefined ? undefined : SECTION_TITLES[section];
-  return title === undefined ? EXPLORE_COPY : { ...EXPLORE_COPY, title };
+  if (task === 'full-map') return { ...EXPLORE_COPY, lead: FULL_MAP_LEAD };
+  const lead = section === null || section === undefined ? undefined : NEXT_AFTER_ADDRESS[section];
+  return lead === undefined ? EXPLORE_COPY : { ...EXPLORE_COPY, lead };
 };
 
 type Problem =
@@ -177,12 +301,15 @@ type Problem =
 export function Landing({
   index,
   fixtureNote,
+  recent = [],
   onFound,
   onUnsupported,
   onBack,
   onHome,
   task,
   section,
+  usable,
+  usableNote,
 }: LandingProps) {
   const copy = landingCopyFor(task, section);
   // On the Kensington fallback the search covers less than the lead says.
@@ -190,24 +317,121 @@ export function Landing({
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState<Problem>(null);
   const [focused, setFocused] = useState(false);
-  const examplesId = useId();
+  /*
+    A search is out.
 
-  const suggestions: Match[] = useMemo(
-    () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
-    [index, typed],
+    The API's measured p95 is 85 ms and its cold start is 0.74 s, so this is
+    usually off before anybody could see it -- but `--min-instances=0` means
+    the first search after an idle period waits, and a button that looks
+    unpressed while a request is in flight gets pressed again.
+  */
+  const [asking, setAsking] = useState(false);
+  const examplesId = useId();
+  const recentId = useId();
+
+  /*
+    Every match for what was typed, before the task has had its say. Kept
+    so the screen can tell *nothing matched* from *nothing here is one this
+    task can use*, which are two different things to say.
+  */
+  const matched: Match[] = useMemo(
+    () =>
+      typed.trim().length >= 2
+        ? search(index, typed, usable === undefined ? MAX_SUGGESTIONS : MAX_SUGGESTIONS * SEARCH_OVERSHOOT)
+        : [],
+    [index, typed, usable],
   );
+  const suggestions: Match[] = useMemo(() => usableMatches(matched, usable), [matched, usable]);
+  /** Something matched, and this task can use none of it. */
+  const noneUsable = matched.length > 0 && suggestions.length === 0;
+
+  /*
+    What was searched for earlier in this tab, as rows this screen can offer.
+
+    Resolved against the index rather than carried in the session, for the
+    reason `recent.ts` gives -- and memoised on the list itself, which only
+    changes when an address is chosen, so the pass over the index happens once
+    per search rather than once per keystroke.
+  */
+  const recalled = useMemo(() => {
+    const found = recall(index, recent);
+    return usable === undefined ? found : found.filter((address) => usable(address));
+  }, [index, recent, usable]);
+
+  /*
+    **The recent list sits above the examples rather than replacing them**,
+    and this reverses a decision.
+
+    It used to replace them, on the reasoning that *Not sure? Try one of
+    these* is for somebody who does not know what to type, that somebody
+    with their own addresses to go back to is not that person, and that two
+    lists of addresses under one field is a choice nobody asked for.
+
+    The team asked for it on 15 October: *不要让历史记录覆盖掉推荐的地址*.
+    What the old reasoning missed is that one search is enough to take the
+    examples away for the rest of the tab, and the examples are not only a
+    hint about what to type: they are the three addresses this product can
+    actually show something interesting at. A reader who has searched their
+    own street once still wants them, and on the comparison's screen they
+    are the two addresses a difference can be computed for.
+
+    Recent goes first, because it is the more specific of the two.
+  */
+  const showingRecent = typed.trim() === '' && problem === null && recalled.length > 0;
 
   // Three to choose from (team feedback, 17 September), the comparison's own
   // where it is waiting: each of those is near a drain that shows a difference.
-  const examples = demonstrationAddresses(
+  const offered = demonstrationAddresses(
     index,
     copy === COMPARE_COPY ? COMPARE_DEMONSTRATION_LABELS : DEMONSTRATION_LABELS,
   );
+  // The examples are chosen to be usable, and are filtered anyway: the day
+  // one of them stops being usable, it should leave the list rather than
+  // become the one suggestion that leads nowhere.
+  const offeredUsable = usable === undefined ? offered : offered.filter((address) => usable(address));
+  /*
+    And an example already in the recent list is dropped from this one.
+    The two lists mean different things, but the same address under both of
+    them, one above the other, reads as a mistake rather than as a
+    coincidence. Searching every example empties this list, which is the
+    one case where somebody plainly does not need it.
+  */
+  const recalledIds = new Set(recalled.map((address) => address.id));
+  const examples = showingRecent
+    ? offeredUsable.filter((address) => !recalledIds.has(address.id))
+    : offeredUsable;
   const suburbs = suburbsOf(index);
 
-  function submit(event: FormEvent) {
+  /*
+    Submitted to the API, and answered from the index in memory when it
+    cannot be reached.
+
+    **This is the only request a search makes.** The suggestions above come
+    from the index on every keystroke, which is where they stayed on
+    9 October when the rest of this moved: a request per character would send
+    a home address to a server one letter at a time to be told what the same
+    function over the same rows has already said here. Pressing the button is
+    one question, asked once.
+
+    `lookupAddress` cannot throw and always answers, so there is no error
+    branch -- a database that is down is a search that is answered by the
+    bundled index, which is the same four verdicts by a different route.
+  */
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const answer = resolve(index, typed);
+    if (asking) return;
+    setAsking(true);
+    const { answer } = await lookupAddress({
+      index,
+      typed,
+      onFallback: (reason) => {
+        // To a console, not to the screen. Which of the two answered is not a
+        // thing to put in front of somebody looking for their street, and the
+        // answer is the same either way.
+        console.warn(`the address search fell back to the bundled index: ${reason}`);
+      },
+    });
+    setAsking(false);
 
     if (answer.kind === 'found') {
       onFound(answer.address);
@@ -224,13 +448,26 @@ export function Landing({
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 720,
-        margin: '0 auto',
-        padding: `${String(space(12))}px ${String(space(6))}px ${String(space(16))}px`,
-      }}
-    >
+    /*
+      The street behind it, and the column on top.
+
+      Two elements rather than one: the photograph has to fill the window
+      and the content has to stay in its 720 px column, and a single element
+      cannot do both. `.landing__street` carries the picture and the white
+      veil that keeps the text readable; see `base.css` for the measured
+      contrast.
+    */
+    <div className="landing__street">
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          /* Less room under the column than the other screens keep: the
+             street below it closes the page, so a second block of empty
+             space would only push it off the bottom. */
+          padding: `${String(space(12))}px ${String(space(6))}px ${String(space(8))}px`,
+        }}
+      >
       {/*
         The way out, in the same two places every other screen keeps it: Back
         on the left, Home on the right. `justifyContent` puts Home against the
@@ -267,15 +504,23 @@ export function Landing({
       >
         {copy.title}
       </h1>
+      {/*
+        `ink.base`, not `ink.muted`. This is the one line of text on the
+        screen with the photograph behind it rather than a card: over the
+        picture's darkest pixel under the wash, muted reaches 3.9:1 and base
+        7.1:1, against the 4.5:1 AA asks for. See `.landing__street`.
+      */}
       <p
         className="landing__lead"
-        style={{ margin: `0 0 ${String(space(8))}px`, color: ink.muted, maxWidth: 560 }}
+        style={{ margin: `0 0 ${String(space(8))}px`, color: ink.base, maxWidth: 560 }}
       >
         {lead}
       </p>
 
       <form
-        onSubmit={submit}
+        onSubmit={(event) => {
+          void submit(event);
+        }}
         style={{
           padding: space(5),
           background: surface.raised,
@@ -327,23 +572,24 @@ export function Landing({
           />
           <button
             type="submit"
+            disabled={asking}
             style={{
               padding: `${String(space(3))}px ${String(space(5))}px`,
               font: type(text.body, { weight: weight.semibold }),
               color: ink.inverse,
-              background: brand.base,
+              background: asking ? brand.hover : brand.base,
               border: 'none',
               borderRadius: radius.base,
               transition: 'background-color 120ms ease',
             }}
             onMouseEnter={(event) => {
-              event.currentTarget.style.background = brand.hover;
+              if (!asking) event.currentTarget.style.background = brand.hover;
             }}
             onMouseLeave={(event) => {
-              event.currentTarget.style.background = brand.base;
+              if (!asking) event.currentTarget.style.background = brand.base;
             }}
           >
-            {copy.submit}
+            {asking ? SEARCHING : copy.submit}
           </button>
         </div>
 
@@ -365,6 +611,23 @@ export function Landing({
           </p>
         )}
 
+        {/*
+          T0's last line. What becomes of the address is said on the page that
+          asks for it, rather than only in About the data. It used to say the
+          address never leaves the tab; since 9 October a submitted search is
+          answered by our own API, so what is promised here is the narrower
+          thing the privacy panel promises -- see `ADDRESS_STAYS_HERE`.
+        */}
+        <p
+          style={{
+            margin: `${String(space(2))}px 0 0`,
+            font: type(text.small, { leading: 1.5 }),
+            color: ink.muted,
+          }}
+        >
+          {ADDRESS_STAYS_HERE}
+        </p>
+
         {suggestions.length > 0 && (
           <ul
             aria-label="Matching addresses"
@@ -381,6 +644,49 @@ export function Landing({
               </li>
             ))}
           </ul>
+        )}
+
+        {/*
+          Something matched and this task can use none of it. Said here
+          rather than left as an empty list, because a box that answers
+          nothing is how a broken search looks.
+        */}
+        {noneUsable && usableNote !== undefined && (
+          <p
+            style={{
+              margin: `${String(space(3))}px 0 0`,
+              font: type(text.label, { leading: 1.5 }),
+              color: ink.muted,
+            }}
+          >
+            {usableNote}
+          </p>
+        )}
+
+        {showingRecent && (
+          <div style={{ margin: `${String(space(3))}px 0 0` }}>
+            <p
+              id={recentId}
+              style={{ margin: 0, font: type(text.label), color: ink.subtle }}
+            >
+              {RECENT_LABEL}
+            </p>
+            <ul
+              aria-labelledby={recentId}
+              style={{ listStyle: 'none', margin: `${String(space(2))}px 0 0`, padding: 0 }}
+            >
+              {recalled.map((address) => (
+                <li key={address.id}>
+                  <SuggestionButton
+                    label={address.label}
+                    onPick={() => {
+                      onFound(address);
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {suggestions.length === 0 && problem === null && examples.length > 0 && (
@@ -464,6 +770,7 @@ export function Landing({
           <Claims title="What it does not" items={DOES_NOT} tone="quiet" />
         </div>
       </details>
+      </div>
     </div>
   );
 }

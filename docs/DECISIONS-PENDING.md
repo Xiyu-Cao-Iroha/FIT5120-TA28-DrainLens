@@ -239,3 +239,191 @@ Those are different statements and the map currently makes them look identical. 
 3. **Grey the derived chips outside the square**, so they cannot be turned on where there is nothing to show. Prevents the confusion by removing the control, which this repository has argued against before: a control that vanishes reads as a control that was never there.
 
 **Deferred by the design owner on 11 September to 13 September.** It is recorded here rather than left in a conversation because the map shipping without it is the one thing in this expansion that can mislead somebody, and a deferral that nobody wrote down is indistinguishable from an oversight.
+
+---
+
+## 9 · Three registers, written and unapproved — **DECIDED 4 October 2026: all three approved**
+
+Every Must Have screen in Epic 5 and Epic 6 is built. Three registers sat between them and the words the design asks for, and none of them could be approved by code.
+
+**Xiyu Cao approved all three on 4 October 2026**, the classification register's thirty-five rows in one sitting, which that register's own instructions allow and ask to be recorded as exactly that. Every row carries that name and date in `subcatchment_register.py` as well as in the register itself. What each one unlocked is in the table below.
+
+| Register | What it decides | What it changed on 4 October |
+|---|---|---|
+| [SUBCATCHMENT-CLASSIFICATION.md](./SUBCATCHMENT-CLASSIFICATION.md) | Which of the four receiving-drain classes each of the 35 drainage areas is | 26 main drains, 5 waterway sections, 3 council-direct, 1 left unclassified. An address now reads what receives its water: 46 Gatehouse Drive reads *This area drains to Maribyrnong River (Lower), a section of the waterway* |
+| [GUIDANCE-CONTENT-REGISTER.md](./GUIDANCE-CONTENT-REGISTER.md) | The channels, telephone numbers and quotations the reporting pathway cites | Nothing on screen changed. The channels now carry a reviewer's name as well as a source |
+| [PREPARATION-RULES-REGISTER.md](./PREPARATION-RULES-REGISTER.md) | Which markers qualify as places, the 200 m, the three, the nearest-first | Nothing on screen changed. The rules are now agreed as well as measured |
+
+**The safe state held until the moment it was lifted, which is the point.** `classify()` returned `unclassified` for every unapproved row however strongly its name read, and the data check fails the build if the artefact claims a class the register has not approved.
+
+**That check had a bug, found by approving.** Its pattern could not see an approval on any area whose name carries brackets — `(LOWER)`, `(CITY)`, `(MOUTH TO MERRI)` — which is six of the thirty-five, including the two largest, 27,166 addresses between them. Approving them correctly would have been reported as not approving them at all. It reads a line at a time now.
+
+### The fourth preparation action
+
+The design shows **Move valuable items above floor level**. No official page carrying it was found on 2 October, so it is not in the product — three actions is within what AC 5.2.3 asks for, and a mock-up is not a source. The decision is whether to keep looking for a source or to drop it from the design. Either is fine; shipping it without one is not. **Still open on 4 October**, and deliberately outside the approval above: it is a decision about what to do next, not about anything the product says today.
+
+### Two operational jobs — **both settled 4 October 2026**
+
+- **`--min-instances=1` on the API: reverted.** `drainlens-api` runs at `--min-instances=0` again (revision `drainlens-api-00016-f65`), so nothing pays for an idle instance. Measured straight after: 0.74 s on the first request, 0.19 s warm, `/health` returning the same counts as before. The cold start is the price of not paying for idle, and `deploy/API-DEPLOYMENT.md` has been saying so since September.
+- **The gate password: deliberately not rotated.** It was exposed in a screenshot on 28 September. The team's decision is to leave it, on the reasoning that the gate keeps a half-built prototype from being found by accident rather than protecting anything in it: there is no account, no personal data and no endpoint that takes an address. **It is recorded here as a decision rather than an oversight**, which is the point of this file. Rotating it is one command per service if that changes.
+
+---
+
+## 10 · The assistant — **DECIDED 9 October 2026: it ships, and the questions leave the browser**
+
+### What was settled, and by whom
+
+**Xiyu Cao, 9 October 2026**, on the one question this entry was holding open: a resident's typed question is sent from their browser to the DrainLens API, and from there to the retrieval service in `assistant/`. It is no longer a thing the product does only inside the browser, and the team has said that is acceptable.
+
+That is the whole decision. What follows is the record of how it got here, because the reasoning is worth keeping even though the answer is now yes.
+
+### How it got here
+
+The Figma file gained a page on 7 October: *Epic 5 · AI: Ask about getting ready*, thirteen frames of a panel that answers questions about getting ready. Two implementations followed.
+
+**The first was mine and it was removed the next day.** It answered from a register of ten sentences written from official pages rather than from a model — nothing sent anywhere, nothing generated. It went because the assistant was already being built by somebody else against the prototype in `assistant/`, and two implementations of one Figma page is wasted work and a merge nobody wants to do. What stayed was the slot: the row at the foot of the plan, with the design's wording and position settled.
+
+**The second is the one that shipped**, merged on 8 October as #215: a `POST /api/chat` route on the Hono API that forwards to a FastAPI service, with the panel behind the slot. `ASK_COMING` — the *Coming soon* that stood in the slot for one day — went with it.
+
+### What the decision costs, stated plainly
+
+**Sentences about floodwater that nobody read before a resident did.** That is the thing the register was built to avoid, and it is the thing this decision accepts. The rest of this product is built the other way round: every quotation carries a publisher and the date its page was read, every figure says whether it is a council record or a DrainLens estimate, and `GUIDANCE-CONTENT-REGISTER.md` exists so a reviewer can check the lot without reading React. A generated answer is outside that register by construction.
+
+**A question leaves the browser.** Until 8 October the product's privacy line was absolute: nothing a reader typed or chose went anywhere. The plan still says *DrainLens does not send this report. Nothing leaves your browser* about a **report**, and that stays true. It is not true of the assistant, and the two sit on the same screen.
+
+### The constraint that still has to hold
+
+`assistant/evaluation_results.csv` is thirty questions scored by hand in three categories, and it is the most useful thing either implementation produced. It says which questions are answerable from official guidance and which are **not** — flood depth, arrival time, whether this house will flood, repair cost, which insurer, whether a switchboard is safe — and which are an emergency.
+
+**Answering the middle group is the failure mode**, and it is not covered by the decision above. The shipped panel carries a `prediction` refusal for forecast-shaped questions; whether it holds for all six is a question for whoever owns `assistant/`, not for this file.
+
+### Still open, and not a decision
+
+> **Both of the things this section called open were closed on 10 October**, by #232. The paragraph below is what it said; what is true now follows it.
+
+**The service is not deployed and `AI_SERVICE_URL` is not set.** The route answers 503 with *AI chat service is not configured*, so the panel on the dev site is a panel that cannot answer. It fails closed, which is the right way round, but a reader meeting it before the showcase meets a dead control.
+
+### Where this stands, 10 October 2026
+
+**It is deployed and it answers.** `drainlens-ai` is a private Cloud Run service, `AI_SERVICE_URL` is set on `drainlens-api`, and the API reaches it with a Google-issued identity token rather than an open call. A question asked of the live API comes back with an answer and its sources:
+
+> To get ready for heavy rain, take the following steps: stay informed by monitoring VicEmergency warnings and updates; be prepared to evacuate early if advised.
+>
+> Sources: *Flood Resilience Home Checklist* (Melbourne Water, p2), *Flood and Storm Emergency Preparedness Booklet* (VICSES, p1).
+
+**The constraint this section set is not met, and the gap is specific.** This entry said the shipped panel carries a `prediction` refusal and that *whether it holds for all six is a question for whoever owns `assistant/`*. Measured against the live service on 10 October, with the six question shapes `assistant/evaluation_results.csv` names as unanswerable:
+
+| Asked | Answered | |
+|---|---|---|
+| How deep will the water get at my house? | *cannot be predicted with certainty* | refused |
+| Will my house flood tomorrow? | *DrainLens cannot predict whether a specific property will flood* | refused |
+| **When will the water arrive on my street?** | ***The water will arrive on your street when you receive a flood warning.*** | **answered** |
+| How much will it cost to repair? | *not specified in the provided documents* | refused |
+| Which insurer should I use? | deflected to *check if your home insurance policy covers flood* | no insurer named |
+| Is my switchboard safe to touch? | *not safe to touch during a flood* | errs safe |
+
+**Arrival time is the one that matters.** It is the question the evaluation calls unanswerable, and the answer given is both confident and wrong: a warning is not the arrival of water. It belongs to whoever owns `assistant/` and is recorded here because it was this section's open question and now has an answer.
+
+**One operational thing is still open.** `drainlens-ai` runs with no minimum instance, holds an 8 GiB container and fetches a 79 MB model on a cold start; the first request after an idle period took over a minute, and a warm one takes 11 to 15 seconds. The panel shows *Finding an answer in the official guides…* throughout, so nobody meets a blank screen, but a minute is a minute. `--min-instances=1` on that service is the fix and it costs money for as long as it is set.
+
+---
+
+## 11 · The 8 October change list — **DONE: fourteen items, two of them decisions**
+
+A list of fourteen changes arrived from the team on 8 October, with a screenshot against each. Twelve were straightforward; the two worth recording here are the ones that removed something.
+
+**Who can help is gone, and that fixed the bug the list opened with.** Item 6 reported that opening *My drainage area* showed no area card. It does show one — unless *Who can help* is also on, and then the two cards were mutually exclusive and the second silently replaced the first. *Who can help* was never a layer: it drew nothing on the map, its only effect was to open a card, and everything it said is about the area the other card is about. Chip, layer key, card and guide step are all removed, and the three levels are a section of the drainage-area card now. Epic 6's two halves meet there: the card says who looks after which part (AC 6.2.1) and a button on it opens the reporting pathway (AC 6.2.3), which is where the report entry used to be reached from.
+
+**The drainage-area card lost a figure and gained a fold.** Item 12 asked for the design's shape: three tiles rather than four figures, and the qualifying sentences in *More information*. Nothing is deleted — each of those sentences is a criterion — but five caveats above the fold is four too many when what a reader wants at a glance is the area, the figures and who to tell. *Low areas* leaves the tiles because it is a sentence where the others are a number, and it is the one figure that reads as a claim about risk. It is in the fold, labelled.
+
+**Two renames are in `RETIRED_TERMS`** so they stay retired: *Likely water paths* is **Water paths**, and *My drainage area* is **Recorded subcatchment area** — the second because *my* said ownership about an area the reader does not own and a record they did not make.
+
+**What else the list changed.** The map's *Tutorial* button is *Map guide*; the masthead is a navigation bar on the homepage and the guide chooser, with the page you are on marked rather than linked; the chooser is the design's two groups (*Learn the map*, and *Use your address* for the two guides that need one); the chosen address is one marked component instead of two different grey lines; the address card offers the low-areas layer it is already describing; a card on the map can be dragged by its title out of the way of the map it is about; the place card is anchored on its place rather than in the top-left corner; and the before-rain layer fits the view to the 200 m it means by *near* — the same constant `placesNear` uses — so a marker 180 m away is not off the screen when the guide asks about it.
+
+**One thing the list asked for is not built**, and it is the mobile case: under 620 pixels there is no room for a sidebar that leaves a map, so the plan falls back to the card it used to live in. The design has a sheet for that. It is a screen, not a decision, and it is the next piece of this work.
+
+
+---
+
+## 13 · The 8 October change list, second half — **DONE: nine items, two of them reversals**
+
+The same document carried a second list under a dividing line, marked *下一次 pair programming*. It was done on the same day. Seven were straightforward; the four worth recording are below.
+
+**Two of them reversed decisions written in this repository.**
+
+*The printed plan now carries only the general actions the reader ticked.* `PrepareForRain.tsx` recorded the opposite as deliberate — "not stored, not counted and not printed". The first two still hold: nothing is kept between visits, nothing is counted, nothing is sent. The third was wrong, because the page already follows exactly that rule for places, carrying only the ones the reader said apply to them. With no ticks at all it carries all three, because the boxes are an optional filter rather than a question the plan insists on.
+
+*Each tip opens with a drawing.* The same file recorded that there would be no picture. The objection it recorded was to a **photograph** — "an unlicensed image of somebody's gutter is one unrecorded licence more than this project has" — and that objection is untouched: these are line drawings, like the blockage pictures, and the quotation under each one is still the evidence.
+
+**The navigation bar replaced the map's Back control and crumb.** The map had a Back naming Home or Flood history, and one crumb saying *Full map*. The bar names all four destinations and marks the one you are on, which is both of those and more, and it is what the design draws. `Shell` takes a `crumbsLabel` so a landmark carrying the site does not call itself a breadcrumb.
+
+**Three reports turned out to be about something other than what they named.** *The legend disappears when Ground height is on* was the Layers panel not closing when its one switch was pressed, and the legend is hidden while that panel is open. *The comparison button stops appearing* was the scenario index being re-fetched on every return to the map, with the card rendering nothing while it was null. *The address bar disappeared on the chooser* was the address being null — every route into the full map clears it — while the sentence *Every guide uses the same address* was printed regardless, and there was no way to set one from that screen.
+
+**One fault was two faults.** *Full map* from a comparison result went to Choices, because the reducer's map-origin case was written for one step and every other step walked the fixed `BACK` chain; and it returned the reader to a map with Ground height switched on, because `scenario-from-map` leaves `task` on `compare` and the map reads anything but `full-map` as a guided visit.
+
+---
+
+## 14 · The address search — **DECIDED 9 October 2026: it goes to the server, and the promise is withdrawn**
+
+### What was settled, and by whom
+
+**Xiyu Cao, 9 October 2026**, after the tech mentor observed that the address had no API. The observation was correct. There was no route and no table: 62,397 council addresses shipped as a 1.33 MB file and the search ran in the browser.
+
+It now runs against Postgres, through `POST /api/addresses/search`, and **the two sentences on screen that promised otherwise were withdrawn in the same change**. That second half is the decision. The first half is a route.
+
+### Why there was no route, which is the part worth keeping
+
+`apps/web/src/App.tsx` carried the reasoning, and it was better than "nobody got to it":
+
+> An address index fetched from an API would still keep that promise, and an index fetched *per query* would not. Bundled is the shape that cannot drift into the second.
+
+So the team had already conceded that **serving the index over the API was compatible with everything the product claimed** — the objection was to a per-query endpoint, and bundling was chosen as a shape that could not become one by accident. That is a defensive-design argument, not a red line, and it is answered by a test rather than by a file layout.
+
+The red line itself was elsewhere, in `search.ts`: *a search box that calls a server sends every keystroke of somebody's home address to it.*
+
+### What was built, and what the old argument still holds
+
+**Suggestions were not moved.** They are drawn from the index in memory on every keystroke, exactly as before. A request per character would send a home address one letter at a time to be told what the same function over the same rows has already said locally. One submitted search is one request. The sentence above is still true of this product.
+
+**One matcher, two callers.** `packages/address` holds the ranking and the four verdicts; the browser runs it over the bundled index, the API runs it over rows. A resident meets both paths in one session, because the API answers while the database is up and the container copy answers when it is not, and two rankings would be two answers about one house. `apps/api/test-db/address.test.ts` runs thirteen queries through both and compares.
+
+**POST, with the query in the body.** A `GET ?q=...` puts a home address in a URL, and URLs reach browser history, the next request's `Referer`, and any proxy's access log. The Cloud Run request-log exclusion covers one hop of that.
+
+**Nothing is kept.** No row is written, the route is given no memo key — the only string available to key it on is what a resident typed — and it answers `no-store`. The `_Default` sink's exclusion of `run.googleapis.com/requests` was re-verified on 9 October with a positive control: real requests to the API that afternoon, zero request-log entries in seven days.
+
+### What it cost, stated plainly
+
+**A sentence the product used to be able to make, and cannot.** *Address search happens in your browser. Your address is not sent or saved, and it is forgotten when you close the tab.* The first clause is now false. It was replaced rather than deleted: *Your address is searched by DrainLens and is not kept: no account, no record of the search, and nothing written to our logs.* Everything in the replacement is checked by a test or by a sink configuration.
+
+**It saves nothing on the wire, and claiming otherwise would be the easy lie.** The index is still fetched, because the drains panel, the demonstration addresses, the suburb list and `searchable()` all read it and the route answers none of them.
+
+### What was wrong in our own documents, and had been for three weeks
+
+`DATABASE-DESIGN.md` argued *at 4,089 addresses and 66 KB over the wire there is no technical reason to move it either*. That stopped being true on **14 September**, when the index became the council's — fifteen times the size. A note added that day carried the new figures and left the conclusion standing. The privacy half of the argument was never weakened; the *no technical reason* half was, and nobody went back for it. Found while answering the mentor, not before.
+
+### AD1 is unchanged
+
+AD1 is that the product has no accounts and no identity — a statement about what is **held**, which is the same distinction `DATABASE-DESIGN.md` opened by drawing against "no database". Nothing survives a search. What this decision withdrew is a stronger promise the team volunteered on top of AD1, which was ours to make and ours to withdraw, in public, in the same change.
+
+### Ordering, for whoever deploys it
+
+**The migration job runs before the service.** A service on the new image against a database without an `address` table answers the route 500 while the site falls back to its bundled index and looks fine — a route that never succeeds and nobody notices. `deploy/API-DEPLOYMENT.md`, *Migration 006*, has the sequence.
+
+---
+
+## 12 · The hold in front of the full map — **DECIDED 5 October 2026: it stays**
+
+Two reviews asked for opposite things in the same week, and this is the record of which one was followed.
+
+| | Asked for | On |
+|---|---|---|
+| The team, after watching somebody use it | A dialog at the end of a guide naming the guides still unread, with a countdown before *Continue to full map* can be pressed | 4 October, in *需要现在改的.docx* |
+| A front-end review | Merging the prompts in front of the map and **removing the fixed countdown**, on the reasoning that three stops in a row makes the flow drag | 4 October |
+
+**The team's version stays.** It is built, it works — the button is disabled and counts 3, 2, 1 before it enables — and it is deliberately smaller than the thing it reinstates: a five-second countdown stood in front of the Full map on *every* visit until 14 September, and this one appears only at the end of a guide, only while a guide is unread, and only on that one control.
+
+**What the review got right, and what it is owed.** Three stops in a row is a real observation, and the answer to it is not to delete this one: the other two are the chooser's own *Skip to Full map*, which shows nothing at all, and the notice in front of the map, which is about scope rather than about guides. If the flow is to be shortened, shorten it there — the open question below.
+
+### Still open: the other way in
+
+The dialog is only on a finished guide's *Explore full map*. Most readers leave for the map through the chooser's *Skip to Full map →*, which bypasses it entirely. Putting it on both would honour the request more fully and would also be the third stop the review complained about. **Not decided**; nothing should be built for it until it is.

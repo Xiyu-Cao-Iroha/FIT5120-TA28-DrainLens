@@ -32,6 +32,15 @@ export function supportOf(support: ScenarioSupport, assetNumber: string): PitSup
 }
 
 /** Why a drain cannot be compared, and what that does not mean. */
+/**
+ * While the index behind the comparison is still being fetched.
+ *
+ * It is a small file and this is usually one frame, but a return to the map
+ * fetches it again, and a card that says nothing while it does reads as a
+ * drain that cannot be compared.
+ */
+export const COMPARE_LOADING = 'Checking whether this drain can be compared...';
+
 export const UNSUPPORTED_TEXT: Readonly<Record<Exclude<PitSupport, 'supported'>, string>> = {
   'not-an-inlet':
     'This pit cannot be used in the blockage comparison because the council record does not identify it as a surface inlet. This is a data limitation; it does not show whether the pit works or whether the area may flood.',
@@ -62,13 +71,13 @@ export const TOO_FAR_SHORT = 'Not offered for this address: other drains are nea
 /** The comparison map's key, step 1: three marks, three meanings. */
 export const MAP_KEY = {
   address: 'Your address',
-  comparable: 'Drain available to test',
-  other: 'Other drains (can’t be tested)',
+  comparable: 'Drain you can compare',
+  other: 'Other drains (no comparison available)',
 } as const;
 
 /** The legend line on the comparison map. */
 export const SUPPORT_LEGEND =
-  'Only teal-ringed drains can be tested. Most other pits are underground joins, or the council record does not list them as places where street water goes in. This does not show whether those pits work or whether the area may flood.';
+  'Only teal-ringed drains can be compared. Most other drains are underground joins, or the council record does not list them as places where street water goes in. This does not show whether those drains work or whether the area may flood.';
 
 /** What the map offers on a drain that can be compared. */
 export const COMPARE_HERE = 'Compare a blockage scenario at this drain';

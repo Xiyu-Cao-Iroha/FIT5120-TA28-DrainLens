@@ -104,7 +104,7 @@ describe('reading a worker reply', () => {
      * asked. There is no band and no positions on a `loaded` reply, so the
      * alternative is a result screen rendering `undefined` as an answer.
      */
-    const result = resultOf({ type: 'loaded', id: 9, drains: [], inlets: 0 });
+    const result = resultOf({ type: 'loaded', id: 9, supported: [], withoutGround: [] });
     expect(result.status).toBe('insufficient-information');
   });
 
@@ -114,7 +114,7 @@ describe('reading a worker reply', () => {
     const replies: WorkerReply[] = [
       successful,
       { type: 'failed', id: 1, message: 'x' },
-      { type: 'loaded', id: 1, drains: [], inlets: 0 },
+      { type: 'loaded', id: 1, supported: [], withoutGround: [] },
       { type: 'result', id: 1, status: 'insufficient-information', reason: 'invalid_inlet' } as WorkerReply,
     ];
     for (const reply of replies) {

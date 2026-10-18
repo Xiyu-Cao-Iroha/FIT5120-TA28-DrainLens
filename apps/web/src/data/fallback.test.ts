@@ -57,7 +57,7 @@ describe('one artefact, with a copy to fall back to', () => {
     });
     expect(got.from).toBe('bundled');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl.mock.calls[0]?.[0]).toBe('/data/map.json');
+    expect((fetchImpl.mock.calls as readonly (readonly unknown[])[])[0]?.[0]).toBe('/data/map.json');
   });
 
   it('treats an empty API origin the same as none', async () => {
@@ -139,7 +139,7 @@ describe('one artefact, with a copy to fall back to', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     expect(got.from).toBe('bundled');
-    expect(got.value.n).toBe(6);
+    expect((got.value as { n: number }).n).toBe(6);
   });
 
   it('throws when the container copy fails too, because there is nothing left', async () => {

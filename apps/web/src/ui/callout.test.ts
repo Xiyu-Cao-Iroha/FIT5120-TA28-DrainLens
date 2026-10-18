@@ -113,3 +113,31 @@ describe('the caret', () => {
     expect(caretAt(right, placeCard(right, card, view), card)).toBeLessThanOrEqual(0.9);
   });
 });
+
+describe('two cards open at once', () => {
+  /*
+    The map's place card and address card can both be open since Figma A9, and
+    both hang below their own mark by default -- so a place a few metres from
+    the address put them on top of each other.
+  */
+  const view = { width: 1200, height: 800 };
+  const mark = { x: 400, y: 300, width: 24, height: 24 };
+  const card = { x: 0, y: 0, width: 296, height: 200 };
+
+  it('puts a card above its mark when asked, with the caret under it', () => {
+    const above = placeCard(mark, card, view, 'above');
+    expect(above.top + card.height).toBeLessThan(mark.y);
+    expect(above.caret).toBe('bottom');
+  });
+
+  it('still goes below when there is no room above', () => {
+    const high = { ...mark, y: 10 };
+    const placed = placeCard(high, card, view, 'above');
+    expect(placed.top).toBeGreaterThan(high.y);
+    expect(placed.caret).toBe('top');
+  });
+
+  it('is unchanged for every caller that does not ask', () => {
+    expect(placeCard(mark, card, view)).toEqual(placeCard(mark, card, view, 'below'));
+  });
+});

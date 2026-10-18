@@ -24,9 +24,13 @@
  * older lessons set none of them and render as they did.
  */
 
+import { AddressMark } from '../ui/AddressMark.js';
+import { GUIDE_SOURCE, GuideArrow } from '../ui/GuideArrow.js';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { AddressIndex } from '../address/search.js';
+import type { AddressIndex } from '@drainlens/address';
+import type { AddressCatchmentsArtefact, SubcatchmentsArtefact } from '../catchment/artefact.js';
+import type { Relevance } from '../prepare/places.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import { NOTHING_ON } from '../map/modes.js';
@@ -45,6 +49,8 @@ import {
   type Step,
   type StepCard,
   chipFor,
+  pressFor,
+  usesReport,
   finished,
   highlightFor,
   latch,
@@ -54,7 +60,7 @@ import {
   stepIndex,
 } from '../tutorial/lesson.js';
 import { lessonFor } from '../tutorial/lessons.js';
-import { SECTIONS, type SectionId } from '../tutorial/sections.js';
+import { SECTIONS, type Learned, type SectionId } from '../tutorial/sections.js';
 import { marksFor } from '../tutorial/terrain.js';
 import {
   MARK_MARGIN_PX,
@@ -80,6 +86,7 @@ import {
   weight,
 } from '../ui/theme.js';
 import { LAYER } from '../ui/terms.js';
+import { ExploreFullMap, NextGuide, nextGuide } from './GuideEnding.js';
 import { MapView } from './MapView.js';
 
 export interface GuideProps {
@@ -87,6 +94,21 @@ export interface GuideProps {
   readonly derived: DerivedArtefact;
   readonly trace: TraceArtefact;
   readonly index: AddressIndex;
+  /**
+   * The drainage areas, for the guide that teaches them.
+   *
+   * Null for the other four, which never ask for it, and null while the files
+   * are loading: the drainage-area guide's first chip then draws nothing and
+   * its card says a drainage area could not be identified, which is true.
+   */
+  readonly catchments?: {
+    readonly areas: SubcatchmentsArtefact;
+    readonly assignment: AddressCatchmentsArtefact;
+  } | null;
+  /** The reader's answers about the places near them, for Epic 5's guide. */
+  readonly relevance?: Readonly<Record<number, Relevance>>;
+  readonly onReviewPlace?: ((place: number, relevance: Relevance) => void) | undefined;
+  readonly onResetPlaces?: (() => void) | undefined;
   /** Chosen before the guide starts. The guide has nothing to point at without one. */
   readonly address: SupportedAddress;
   /** Which section is being taught. Its lesson decides everything below. */
@@ -103,9 +125,35 @@ export interface GuideProps {
    * header's small Address control.
    */
   readonly onBack?: () => void;
+  /** Which guides are done, so the end of this one can offer the next. */
+  readonly learned: Learned;
+  /** The sections with a guide written. */
+  readonly guided: readonly SectionId[];
+  /** Start another guide straight from the end of this one (Figma G5). */
+  readonly onStartSection: (section: SectionId) => void;
+  /** Open the full map from the end of a guide (team request, 4 October). */
+  readonly onFullMap: () => void;
 }
 
-export function Guide({ map, derived, trace, index, address, section, onFinish, onLeave, onBack }: GuideProps) {
+export function Guide({
+  map,
+  derived,
+  trace,
+  index,
+  address,
+  section,
+  catchments = null,
+  relevance = {},
+  onReviewPlace,
+  onResetPlaces,
+  onFinish,
+  onLeave,
+  onBack,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
+}: GuideProps) {
   const [now, setNow] = useState<MapNow>(NOTHING_ON_MAP);
   /** How many `read` steps have been pressed past. See `stepIndex`. */
   const [acknowledged, setAcknowledged] = useState(0);
@@ -232,7 +280,15 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
     return <NotWritten section={section} onFinish={onFinish} />;
   }
 
-  const steps = lesson.withGround === undefined ? lesson.steps : lesson.withGround(points);
+  /*
+    Epic 5's guide is written twice: once for an address with places to
+    decide about and once for the 58.6% with none, whose steps two and four
+    would otherwise wait for a Place 1 that was never drawn. See `withPlaces`.
+  */
+  const forPlaces = lesson.withPlaces?.(now.placeCount);
+  const steps =
+    lesson.withGround === undefined ? forPlaces?.steps ?? lesson.steps : lesson.withGround(points);
+  const finishedCopy = forPlaces?.finished ?? lesson.finished;
   const index0 = stepIndex(steps, now, teachingId, acknowledged);
   const done = finished(steps, now, teachingId, acknowledged);
   const intro = lesson.intro !== undefined && !started ? lesson.intro : null;
@@ -283,6 +339,23 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
   */
   const waiting = intro === null && !lookingBack && !done && step !== undefined && !stepDone;
   const pulseChip = waiting && step.kind === 'do' ? chipFor(step.requires) : null;
+  /*
+    The same answer for the controls that live inside a card.
+
+    Reported on 9 October against the step this guide used to have: it said
+    *Now open Why are there different organisations?* and the fold it meant
+    was one small triangle among three, with nothing to say which. A chip
+    pulses; these had no equivalent and now do.
+  */
+  /*
+    What this step marks: what it waits for, or what it says to read.
+
+    A `do` step marks the control it is waiting for and stops marking it the
+    moment it is done. A step with `points` marks that for as long as it is
+    shown, which is what a reading step needs -- there is no press to end it.
+  */
+  const pulsePress =
+    step?.points ?? (waiting && step?.kind === 'do' ? pressFor(step.requires) : null);
   const highlight =
     intro === null && step !== undefined && (step.kind !== 'do' || waiting) ? highlightFor(step, now) : null;
 
@@ -319,6 +392,15 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
         overflowY: 'auto',
       }}
     >
+      {/*
+        The arrow from the instruction to whatever the step is waiting for.
+
+        Mounted once, here, rather than wherever a target happens to be: it
+        is positioned against the window and there is one of them, so a
+        second mount would be a second arrow. It draws nothing until a step
+        rings something. See `GuideArrow`.
+      */}
+      <GuideArrow />
       <div
         style={{
           position: 'relative',
@@ -340,13 +422,19 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
           trace={trace}
           index={index}
           address={address}
+          catchments={catchments}
+          relevance={relevance}
+          onReviewPlace={onReviewPlace}
+          onResetPlaces={onResetPlaces}
           task="follow"
           // Nothing on. Every lesson opens with an empty map and the first
           // instruction turns something on -- and the guided preset had
           // already pressed it. See `openWith` in MapView.
-          openWith={NOTHING_ON}
+          openWith={lesson.opensWith ?? NOTHING_ON}
           chipKeys={lesson.chips(index0, now)}
           pulseChip={pulseChip}
+          pulsePress={pulsePress}
+          reportInGuide={usesReport(steps)}
           highlight={highlight}
           overlay={overlay}
           onViewport={seeView}
@@ -398,11 +486,17 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
       <Coach
         address={address}
         lesson={lesson}
+        finishedCopy={finishedCopy}
         intro={intro}
         step={step}
         stepNumber={shown}
         total={steps.length}
         done={done && !lookingBack}
+        learned={learned}
+        guided={guided}
+        onStartSection={onStartSection}
+        onFullMap={onFullMap}
+        section={section}
         lookingBack={lookingBack}
         stepDone={stepDone}
         groundOff={lesson.withGround !== undefined && !now.terrain}
@@ -429,9 +523,22 @@ export function Guide({ map, derived, trace, index, address, section, onFinish, 
   );
 }
 
+/** The quiet underlined control beside an address that can be changed. */
+const changeLink = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: 'inherit',
+  color: brand.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+} as const;
+
 function Coach({
   address,
   lesson,
+  finishedCopy,
   intro,
   step,
   stepNumber,
@@ -449,9 +556,21 @@ function Coach({
   onNext,
   onPrevious,
   onFinish,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
+  section,
 }: {
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (next: SectionId) => void;
+  readonly onFullMap: () => void;
+  readonly section: SectionId;
   readonly address: SupportedAddress;
   readonly lesson: Lesson;
+  /** The finish page for this address, which Epic 5 picks from its place count. */
+  readonly finishedCopy: Lesson['finished'];
   /** The entry screen's copy, while it is showing. */
   readonly intro: LessonIntro | null;
   readonly step: Step | undefined;
@@ -517,20 +636,17 @@ function Coach({
         gap: space(5),
       }}
     >
+      {/*
+        The address, marked as the design marks it (Figma G1).
+
+        *Change* is `onBack` because that is the one that asks for an address
+        and keeps the section: `onLeave` abandons the guide. The guide used to
+        reach the address screen through a *← Back* on step one only; now that
+        the address is kept across guides, changing it is something a reader
+        may want on any step.
+      */}
       <div>
-        <div
-          style={{
-            font: type(text.small, { weight: weight.medium }),
-            letterSpacing: tracking.caps,
-            textTransform: 'uppercase',
-            color: ink.subtle,
-          }}
-        >
-          Current address
-        </div>
-        <div style={{ font: type(text.body, { weight: weight.medium }), color: ink.strong }}>
-          {address.label}
-        </div>
+        <AddressMark address={address.label} {...(onBack === undefined ? {} : { onChange: onBack })} />
       </div>
 
       {intro !== null ? (
@@ -540,20 +656,40 @@ function Coach({
           <Progress done={done ? total : stepNumber} total={total} />
 
           {done ? (
-            lesson.finished.badge === undefined ? (
+            finishedCopy.badge === undefined ? (
               <Done
-                copy={lesson.finished}
+                copy={finishedCopy}
                 onFinish={onFinish}
+                onPrevious={onPrevious}
                 {...(noPipeShown ? { note: NO_PIPE_NOTE } : {})}
+                next={nextGuide(section, learned, guided)}
+                learned={learned}
+                guided={guided}
+                onStartSection={onStartSection}
+                onFullMap={onFullMap}
               />
             ) : (
-              <Complete copy={lesson.finished} onPrevious={onPrevious} onFinish={onFinish} />
+              <>
+                <Complete copy={finishedCopy} onPrevious={onPrevious} onFinish={onFinish} />
+                <GuideEnd
+                  next={nextGuide(section, learned, guided)}
+                  learned={learned}
+                  guided={guided}
+                  onStartSection={onStartSection}
+                  onFullMap={onFullMap}
+                />
+              </>
             )
           ) : (
             step !== undefined && (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: space(2) }}>
                   <p
+                    /*
+                      Where the arrow sets off from, which is the sentence
+                      that sent the reader looking. See `GuideArrow`.
+                    */
+                    {...{ [GUIDE_SOURCE]: '' }}
                     style={{
                       margin: 0,
                       font: type(text.display, { weight: weight.semibold, leading: 1.25 }),
@@ -690,9 +826,18 @@ function Coach({
                         </button>
                       )}
                     </div>
-                    {stepNumber === 0 && onBack !== undefined && (
-                      <button type="button" onClick={onBack} style={secondary}>
-                        ← Back
+                    {/*
+                      Back to the guides, not to the address screen.
+
+                      Until 4 October a guide was always entered from the
+                      address screen, so back meant that screen. Now it is
+                      entered from the chooser and the address is kept, so
+                      back means the chooser -- and the address has its own
+                      *Change* beside it above.
+                    */}
+                    {stepNumber === 0 && onLeave !== undefined && (
+                      <button type="button" onClick={onLeave} style={secondary}>
+                        ← Guides
                       </button>
                     )}
                     {previous && stepNumber > 0 && (
@@ -926,15 +1071,59 @@ function Progress({ done, total }: { readonly done: number; readonly total: numb
 export const NO_PIPE_NOTE =
   'The drain you chose has no connected pipe in the council records, so no pipe was drawn. The drain with the orange ring has one.';
 
+/**
+ * What every finished guide offers after its own words: the next guide, and
+ * the full map (Figma G5, and the team's request of 4 October).
+ */
+function GuideEnd({
+  next,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
+}: {
+  readonly next: SectionId | null;
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (section: SectionId) => void;
+  readonly onFullMap: () => void;
+}) {
+  return (
+    <>
+      {next !== null && <NextGuide id={next} onStart={onStartSection} />}
+      <ExploreFullMap learned={learned} guided={guided} onOpen={onFullMap} />
+    </>
+  );
+}
+
 function Done({
   copy,
   onFinish,
+  onPrevious,
   note,
+  next,
+  learned,
+  guided,
+  onStartSection,
+  onFullMap,
 }: {
   readonly copy: Finished;
   readonly onFinish: () => void;
+  /** Back to the last step, which every finish page now has (team, 11 October). */
+  readonly onPrevious: () => void;
   readonly note?: string;
+  readonly next: SectionId | null;
+  readonly learned: Learned;
+  readonly guided: readonly SectionId[];
+  readonly onStartSection: (section: SectionId) => void;
+  readonly onFullMap: () => void;
 }) {
+  const back = (
+    <button type="button" onClick={onPrevious} style={secondary}>
+      ← Previous
+    </button>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space(4) }}>
       <h2 style={{ margin: 0, font: type(text.title), color: ink.strong }}>
@@ -961,9 +1150,26 @@ function Done({
       >
         {copy.unlocked}
       </div>
-      <button type="button" onClick={onFinish} style={primary}>
-        Back to guidance page →
-      </button>
+      {next !== null && <NextGuide id={next} onStart={onStartSection} back={back} />}
+      {/*
+        With no next guide there is no card to carry the way back, so it
+        goes here, on the left of the way out, in the same order.
+      */}
+      <div
+        style={{
+          display: 'flex',
+          gap: space(3),
+          alignItems: 'center',
+          justifyContent: next === null ? 'space-between' : 'flex-start',
+          flexWrap: 'wrap',
+        }}
+      >
+        {next === null && back}
+        <button type="button" onClick={onFinish} style={{ ...primary, alignSelf: 'auto' }}>
+          Back to guidance page →
+        </button>
+      </div>
+      <ExploreFullMap learned={learned} guided={guided} onOpen={onFullMap} />
     </div>
   );
 }

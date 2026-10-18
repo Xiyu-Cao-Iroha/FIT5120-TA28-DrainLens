@@ -27,6 +27,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
 import { type Box, caretAt, placeCard, spotlightFor } from '../ui/callout.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
+import { ringProps, useRingIntoView } from '../ui/GuideRing.js';
 import {
   brand,
   ink,
@@ -81,6 +82,8 @@ export interface MapCalloutProps {
   readonly children: ReactNode;
   /** The relevant next action, where there is one — AC 1.1.7.e. */
   readonly action?: { readonly label: string; readonly onPress: () => void };
+  /** A guide step is waiting on that action (17 October's arrow pass). */
+  readonly pulseAction?: boolean;
   /** The rest of what is recorded, opened in place rather than elsewhere. */
   readonly more?: ReactNode;
   /**
@@ -96,6 +99,21 @@ export interface MapCalloutProps {
    * sentences and covers nothing anybody is following.
    */
   readonly onMinimise?: () => void;
+  /**
+   * Which side of the mark to try first, where the caller knows the other
+   * card is on the near side (`ui/callout.ts`).
+   */
+  readonly prefer?: 'below' | 'above';
+  /**
+   * Which card is in front where two are open and the marks are too close for
+   * both to be clear.
+   *
+   * The default is 6, above the map and its chrome. A card carrying a question
+   * passes 7: a card whose buttons are under another card is not a question
+   * anybody can answer, and the one underneath is still readable at its top
+   * and still draggable by its title.
+   */
+  readonly layer?: number;
   readonly onClose: () => void;
 }
 
@@ -106,13 +124,29 @@ export function MapCallout({
   source,
   children,
   action,
+  pulseAction = false,
   more,
   onMinimise,
+  prefer,
+  layer = 6,
   onClose,
 }: MapCalloutProps) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(150);
+  /*
+    Where the reader has dragged the card to, relative to where it was put.
+
+    The card is placed beside the thing it is about, which is right until the
+    thing it is about is behind it: a pit card in the middle of the map is the
+    map, covered, and the change list of 8 October asks for a window that can
+    be moved out of the way. Dragging is by the title, the way a window is
+    dragged by its bar, and `null` means it is still where the placement put
+    it -- which is also when the caret is drawn, because once the card has
+    been moved the caret is pointing at nothing.
+  */
+  const [moved, setMoved] = useState<{ readonly dx: number; readonly dy: number } | null>(null);
+  const dragFrom = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
 
   // Measured rather than guessed, because the card grows by a cross-section
   // when More information is opened and a placement computed against the
@@ -127,7 +161,9 @@ export function MapCallout({
     2,
   );
   const card: Box = { x: 0, y: 0, width: WIDTH, height };
-  const placement = placeCard(spot, card, within);
+  const placement = placeCard(spot, card, within, prefer);
+
+  const actionRef = useRingIntoView<HTMLButtonElement>(pulseAction);
 
   return (
     <div
@@ -136,13 +172,13 @@ export function MapCallout({
       aria-label={title}
       style={{
         position: 'absolute',
-        left: placement.left,
-        top: placement.top,
+        left: placement.left + (moved?.dx ?? 0),
+        top: placement.top + (moved?.dy ?? 0),
         width: WIDTH,
         maxWidth: 'calc(100% - 32px)',
         maxHeight: `min(${String(MAX_HEIGHT)}px, calc(100% - 32px))`,
         overflow: 'auto',
-        zIndex: 6,
+        zIndex: layer,
         padding: space(4),
         background: 'rgba(255, 255, 255, 0.97)',
         backdropFilter: 'blur(8px)',
@@ -151,7 +187,7 @@ export function MapCallout({
         boxShadow: shadow.floating,
       }}
     >
-      {placement.caret !== 'none' && (
+      {placement.caret !== 'none' && moved === null && (
         <span
           aria-hidden
           style={{
@@ -170,10 +206,50 @@ export function MapCallout({
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: space(2) }}>
         <strong
+          onPointerDown={(event) => {
+            // Where the drag started, before anything that can fail. Pointer
+            // capture keeps the drag alive when the pointer leaves the title,
+            // but it throws on a pointer id the browser does not know, and a
+            // card that cannot be dragged at all is a worse outcome than one
+            // that stops when the pointer runs off its handle.
+            dragFrom.current = {
+              x: event.clientX,
+              y: event.clientY,
+              dx: moved?.dx ?? 0,
+              dy: moved?.dy ?? 0,
+            };
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // Nothing to do: the move handler works without it.
+            }
+          }}
+          onPointerMove={(event) => {
+            const from = dragFrom.current;
+            if (from === null) return;
+            setMoved({
+              dx: from.dx + (event.clientX - from.x),
+              dy: from.dy + (event.clientY - from.y),
+            });
+          }}
+          onPointerUp={(event) => {
+            dragFrom.current = null;
+            try {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            } catch {
+              // Never captured; nothing to release.
+            }
+          }}
+          onPointerCancel={() => {
+            dragFrom.current = null;
+          }}
+          title="Drag to move this card"
           style={{
             flex: 1,
             font: type(text.body, { weight: weight.semibold, leading: 1.3 }),
             color: ink.strong,
+            cursor: 'grab',
+            touchAction: 'none',
           }}
         >
           {title}
@@ -220,6 +296,8 @@ export function MapCallout({
       {action && (
         <button
           type="button"
+          ref={actionRef}
+          {...ringProps(pulseAction)}
           onClick={action.onPress}
           style={{
             display: 'block',

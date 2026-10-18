@@ -19,13 +19,19 @@ npm run check                              # typecheck and the whole suite, from
 
 **The scenario** (`src/scenario/`) — scene loading, the Web Worker the engine runs in, and every user-facing sentence held as data in `outcome.ts`.
 
+**The drainage area** (`src/catchment/`) — which Melbourne Water subcatchment an address is in, read from the published lookup rather than decided in the browser, and the four sentences AC 6.1.2 allows about what receives its water. Every one of them is hedged until the classification register is approved, so today each address reads *the receiving drain type has not been confirmed* whatever its name suggests.
+
+**Before heavy rain** (`src/prepare/`) — which published pooling markers become numbered places for an address (200 m, at most three, nearest first), what may be said about one, the general actions quoted from VICSES with their source and the day it was read, and the one-page plan the reader prints. `printable.ts` builds that page as data so what it holds can be tested without a browser; `printing.ts` is the only part that touches the DOM.
+
+**Reporting a problem** (`src/report/`) — the five problem types, and a channel register in which every organisation carries the sentence it came from, the publisher, the page and the date. Nothing here states a response time, an outcome or a repair, and a test holds the whole pathway against all three. `summary.ts` builds the reader's copy for the clipboard or the printer; nothing is submitted, because there is nowhere for it to go.
+
 **The street cross-section** (`src/crosssection/`) — what a section may claim about one pit, which is mostly a question about what the record does *not* hold. No invert level exists for any pit in this area, so the drawing splits itself: horizontal is recorded, vertical is illustrative.
 
-**Screens** (`src/screens/`) — the homepage, the map with its pit detail panel and cross-section, the historical flood board and the flood map of every area beside it, the guide's four-card chooser, and the notice in front of the Full map, which opens at once since the five-second countdown was removed on 14 September. Also the address screen, the task question, the scenario setup and the result.
+**Screens** (`src/screens/`) — the homepage, the map with its pit detail panel and cross-section, the historical flood board and the flood map of every area beside it, the guide chooser with a card per lesson, and the notice in front of the Full map, which opens at once since the five-second countdown was removed on 14 September. Also the address screen, the task question, the scenario setup and the result.
 
 Those last four spent Iteration 1 off every route — the first two replaced by the homepage's cards and the map's own search bar, the last two being the drain-blockage comparison AC 1.1.1 required to be absent. **All four are back**, and putting them back needed more than an entry: `screen: 'task'` is only reached by giving an address with no guide section running, and after the homepage was rebuilt around the guide, every route to the address screen set one. So the homepage's comparison card carries a *pending task* through the address screen, the way a chosen guide section already did, and an address given for nothing in particular still lands on the task question.
 
-**The guided tutorial** (`src/tutorial/`) — three lessons over the real map, one per information mode, held as data: a lesson is a list of steps, each with a requirement the map can satisfy and a chip it unlocks. `lesson.ts` is the machinery, `lessons.ts` the registry, and `GUIDED_SECTIONS` is derived from it so a card cannot offer a lesson nobody wrote. The map was **locked** while a lesson ran — no pan, no zoom, scale bar only — because a step that says *find the low point near you* is not answerable on a map somebody has dragged somewhere else. The review of 14 September found the opposite failure: a small map that cannot be moved reads as a picture of a map, and people concluded it was broken. It now drags and zooms like any other, and the recentre button returns to the address and the pit beside it.
+**The guided tutorial** (`src/tutorial/`) — six lessons over the real map, held as data: a lesson is a list of steps, each with a requirement the map can satisfy and a chip it unlocks. `lesson.ts` is the machinery, `lessons.ts` the registry, and `GUIDED_SECTIONS` is derived from it so a card cannot offer a lesson nobody wrote. The map was **locked** while a lesson ran — no pan, no zoom, scale bar only — because a step that says *find the low point near you* is not answerable on a map somebody has dragged somewhere else. The review of 14 September found the opposite failure: a small map that cannot be moved reads as a picture of a map, and people concluded it was broken. It now drags and zooms like any other, and the recentre button returns to the address and the pit beside it.
 
 **Where an artefact comes from** (`src/data/`) — the API first, the copy in this container second. Since 14 September the footer says so only when the map fell back to the one square kilometre of Kensington (`SMALLER_MAP` in `ui/Shell.tsx`); which server answered is not something a resident can act on. That applies to the map, the derived layers, the trace and the flood history; everything else is read from this container only. `fetchTogether` is the part worth reading: three artefacts describing the same place must all come from the same side, because a council map drawn with a Kensington trace is worse than either alone.
 
@@ -43,9 +49,11 @@ What is still not built: the mobile layouts, and Playwright coverage of the navi
 
 ## Two decisions worth knowing before you change anything
 
-### The address never leaves memory
+### The address is never written down
 
 Address, task and scenario inputs live in one object for the life of the tab. Not `localStorage`, not `sessionStorage`, not the URL, not `history.state`. That follows from AD1 — no accounts, no identity — and an address written to any of those is an identity left on a shared machine after the person has gone.
+
+> **This heading used to read *The address never leaves memory*, and since 9 October that would be read as a promise this product no longer makes.** A submitted search goes to `POST /api/addresses/search`; the suggestions do not, and nothing below this line changed. The rule here was always about *storage* — what is still on a shared machine after somebody walks away — and storage is where it still holds, absolutely. `DECISIONS-PENDING.md` §14 has the rest.
 
 The rule is enforced by behaviour, not by reading the source. `session.test.ts` stubs traps in place of both storages, `history` and `document.cookie`, plays a thirteen-event session through the reducer and asserts nothing was written. **A grep for `localStorage` is a rule a refactor walks around; a trap is not.**
 
@@ -57,7 +65,7 @@ An extent is a rectangle, north-up, and the pipeline ships its geometry as **met
 
 > **One layer has since grown two levels, and it is still ours.** Since 14 September Ground height is drawn from 500 m tiles cut on the point cloud's own grid, with a 4 m overview of the whole council below half a pixel per metre (`terrainTiles.ts`). The switch is one fixed scale, never what happens to be in view; the tiles are images this repository builds and serves, placed by the same transform as everything else. That is a level of detail, not a pyramid, and there is still no tile server.
 
-**It stopped being one square kilometre and the transform did not change.** The map is the whole City of Melbourne — 8.5 by 9 km, 21,113 pits and 17,242 pipes — whenever the database answers, and the Kensington square kilometre in this container when it does not. What the extent grew into instead was a frame problem: every artefact's coordinates are relative to *its own* corner, so the address index built for Kensington put every pin 1.5 km west and 6 km south of the house when it was drawn over the council map. `address/search.ts` now shifts an index into the frame of the map it is drawn on, and refuses if it does not fit.
+**It stopped being one square kilometre and the transform did not change.** The map is the whole City of Melbourne — 8.5 by 9 km, 21,113 pits and 17,242 pipes — whenever the database answers, and the Kensington square kilometre in this container when it does not. What the extent grew into instead was a frame problem: every artefact's coordinates are relative to *its own* corner, so the address index built for Kensington put every pin 1.5 km west and 6 km south of the house when it was drawn over the council map. `packages/address` (`search.ts`, moved out of `apps/web` on 9 October so the API could rank the same way) now shifts an index into the frame of the map it is drawn on, and refuses if it does not fit.
 
 MapLibre is several hundred kilobytes solving problems this product does not have. The streets come from the City's own road-corridor polygons, baked into the artefact, so nothing at runtime depends on a tile server being up, licensed or free.
 
@@ -91,11 +99,14 @@ Everything under `public/data/` is a build product of the Python pipeline, **com
 | `sa2-points.json` | 177 KB | `drainlens_pipeline.area_points` |
 | `flood-events.json` | 7 KB | written by hand, checked by `tools/data/check-events.mjs` |
 | `terrain/address-ground.json` | 456 KB | `drainlens_pipeline.address_ground` |
+| `warnings/` | 2 files, 6 KB | `drainlens_pipeline.low_area_warnings` — the pooling markers, which Epic 5's places are chosen from |
+| `subcatchments.json` | 62 KB | `drainlens_pipeline.subcatchments` — 35 Melbourne Water drainage areas, boundaries whole |
+| `address-catchments.json` | 117 KB | `drainlens_pipeline.address_catchments` — which area each address is in, decided in the pipeline |
 | `terrain-tiles/` | 16.4 MB — 211 tiles and a 4 m overview | `drainlens_pipeline.terrain_tiles` |
 | `scene-tiles/` | 61.0 MB — 211 tiles | `drainlens_pipeline.scene_tiles` |
 | `scene/` | 7.00 MB, 1.33 MB gzipped | `drainlens_pipeline.scene` |
 
-Measured 14 September 2026, in the same binary kilobytes and megabytes as the rest of the table.
+Measured 14 September 2026, except the last three, measured 2 October, in the same binary kilobytes and megabytes as the rest of the table.
 
 **The two tile packs are the outliers, and neither loads on a first visit.** A terrain tile is fetched when its square comes into view at tile scale, and a comparison fetches only the four scenario tiles around the drain it is about, in a worker that starts on the two comparison screens. **`scene/` is no longer read by anything**: it is Kensington's whole scene from before the comparison went council-wide, and the site now reads `scene-tiles/` instead.
 

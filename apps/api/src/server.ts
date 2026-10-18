@@ -21,6 +21,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GoogleAuth } from 'google-auth-library';
 
 import { serve } from '@hono/node-server';
 import { type Context, Hono } from 'hono';
@@ -29,14 +30,62 @@ import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import pg from 'pg';
 
+import { MAX_SUGGESTIONS } from '@drainlens/address';
+
 import {
   NotFound,
   derivedArtefact,
   floodHistoryArtefact,
   loaded,
   mapArtefact,
+  namesAStreet,
+  searchAddresses,
   traceArtefact,
 } from './queries.js';
+
+/**
+ * The extent the address route answers for unless told otherwise.
+ *
+ * The council is what the deployed database holds, and the only extent whose
+ * addresses are loaded at all -- `db/migrations/006_address.sql` says why
+ * Kensington's are not.
+ */
+const API_EXTENT = 'city-of-melbourne';
+
+/**
+ * The Cloud Run services whose pages may read this API from a browser.
+ *
+ * `drainlens-iteration1` is deliberately **not** here. It serves the frozen
+ * Iteration 1 bundle, which asks for `/api/map/kensington` -- an extent this
+ * database no longer holds. Letting it through would give it a 404 and the
+ * same fallback it gets now, by accident instead of on purpose. An archive
+ * should not depend on a live database that has moved on; it holds its own
+ * copies and that is what makes it an archive.
+ */
+export const ALLOWED_SERVICES = ['drainlens', 'drainlens-dev', 'drainlens-iteration2'] as const;
+
+/**
+ * The hash Cloud Run puts in this project's newer URLs.
+ *
+ * One value for the whole project and region -- all five services share it --
+ * so it is a constant rather than something to look up per service.
+ */
+const RUN_HASH = '6et5y2lpgq-ts';
+const googleAuth = new GoogleAuth();
+/**
+ * One service, as both the URLs Cloud Run answers on.
+ *
+ * **A service has two origins and the list kept carrying one.** Cloud Run
+ * used to publish `<service>-<project-number>.<region>.run.app` and now
+ * publishes `<service>-<hash>.a.run.app`; both resolve, `gcloud run services
+ * describe` reports the second, and a browser's `Origin` is whichever one the
+ * reader typed. A list holding only the first allows exactly the readers who
+ * followed an old link.
+ */
+const originsFor = (service: string): string[] => [
+  `https://${service}-205559161217.australia-southeast1.run.app`,
+  `https://${service}-${RUN_HASH}.a.run.app`,
+];
 
 /**
  * The origins allowed to read this from a browser.
@@ -45,52 +94,72 @@ import {
  * so without this the browser refuses every response before the page sees it.
  *
  * **A list rather than `*`.** Everything here is published council data and
- * no request carries a credential, so `*` would leak nothing — but an
+ * no request carries a credential, so `*` would leak nothing -- but an
  * allow-list is a statement about who this is for, and it is the kind of
  * setting that is easy to widen later and impossible to narrow once something
- * unknown depends on it. `ALLOWED_ORIGINS` overrides it for a preview
- * deployment without a code change.
+ * unknown depends on it. `ALLOWED_ORIGINS` adds to it for a preview
+ * deployment without a code change -- it adds rather than replaces, for the
+ * reason `allowedOrigins` gives.
+ *
+ * **This list has now been wrong three times, in the same way each time**, and
+ * it is generated rather than written out for that reason:
+ *
+ * - 11 September. Iteration 2 moved to three URLs and the list did not move
+ *   with them. The dev origin's every response was dropped and the site fell
+ *   back to the square kilometre in its own container. It said so honestly --
+ *   *the wider council map needs the database, which is not answering* -- and
+ *   the sentence was true from where the browser stood.
+ * - 28 September. The Iteration 2 archive was deployed at the freeze and the
+ *   same omission dropped its every response, with the same symptom.
+ * - 8 October. Cloud Run's URL format changed under all five services. The
+ *   list still held the old form, so **the live root, the dev service and the
+ *   archive were all serving one square kilometre** to anybody who used the
+ *   URL the console and `gcloud` report. Found by opening the dev site in a
+ *   browser and reading the footer.
+ *
+ * What each looked like was the council extent being broken. What each was is
+ * this array. **A CORS list is not a feature flag, but it behaves like one**,
+ * so the shape of it is now the fix: name a service and it gets both of its
+ * origins, because the failure every time was one of them missing.
  */
 export const DEFAULT_ORIGINS = [
-  'https://drainlens-205559161217.australia-southeast1.run.app',
-  /*
-    The dev service, and the reason this list is a thing that can be wrong
-    without anybody being told.
-
-    Iteration 2 moved to three URLs on 11 September -- root, archive, dev --
-    and this list was not one of the things that moved. The dev service is a
-    different origin, so the browser dropped every response from this API
-    before the page saw it, and `fetchTogether` did exactly what it is for:
-    fell back to the copy in the container. The footer said so in plain words
-    -- *the wider council map needs the database, which is not answering* --
-    and it was right, from where the browser was standing.
-
-    What it looked like was the council extent not working. What it was is
-    this array. **A CORS list is not a feature flag, but it behaves like one**:
-    the whole Iteration 2 URL had been serving one square kilometre for a day.
-  */
-  'https://drainlens-dev-205559161217.australia-southeast1.run.app',
+  ...ALLOWED_SERVICES.flatMap(originsFor),
   // `npm run dev`, from .claude/launch.json.
   'http://localhost:5183',
   'http://127.0.0.1:5183',
 ];
 
-/*
-  `drainlens-iteration1` is deliberately **not** here.
-
-  It serves the frozen Iteration 1 bundle, which asks for `/api/map/kensington`
-  -- an extent this database no longer holds. Letting it through would give it
-  a 404 and the same fallback it gets now, by accident instead of on purpose.
-  An archive should not depend on a live database that has moved on; it holds
-  its own copies and that is what makes it an archive.
-*/
-
+/**
+ * The default list, plus whatever `ALLOWED_ORIGINS` names.
+ *
+ * **It adds; it does not replace.** Replacing is what it used to do, and on
+ * 8 October that undid a fix without anybody being told: the code had just
+ * been changed to carry both of Cloud Run's URL forms for every service, the
+ * image was deployed at the right commit, and the API went on refusing the
+ * new ones -- because an `ALLOWED_ORIGINS` set at some earlier deploy still
+ * listed the five old ones and silently won. The image was right and the
+ * behaviour was a year-old environment variable.
+ *
+ * Adding is also what the variable is for. Its purpose is a preview
+ * deployment without a code change, and a preview wants its own origin **as
+ * well as** the services that already exist, not instead of them. Nothing is
+ * lost by widening it: the only thing replacing bought was the ability to
+ * take an origin away from a running service without a deploy, which is not
+ * something this project has ever done and is one `gcloud run deploy` away
+ * if it ever needs to.
+ *
+ * Duplicates are dropped, so naming an origin the defaults already carry is
+ * harmless rather than a repeated header.
+ */
 export function allowedOrigins(env: string | undefined = process.env.ALLOWED_ORIGINS): string[] {
-  if (env === undefined || env.trim() === '') return DEFAULT_ORIGINS;
-  return env
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => o !== '');
+  const extra =
+    env === undefined || env.trim() === ''
+      ? []
+      : env
+          .split(',')
+          .map((o) => o.trim())
+          .filter((o) => o !== '');
+  return [...new Set([...DEFAULT_ORIGINS, ...extra])];
 }
 
 /**
@@ -283,6 +352,118 @@ export function createApp(pool: pg.Pool, memo: Memo = createMemo(REBUILT_FOR_MS)
   app.get('/api/flood-history', (c) =>
     answer(c, (client) => floodHistoryArtefact(client), ARTEFACT_CACHE, 'flood-history'),
   );
+
+  /*
+    Finding an address, which until 9 October this API had no route for.
+
+    **POST, with the query in the body, and that is not a REST quibble.** A
+    `GET /api/addresses?q=46+gatehouse+drive` puts somebody's home address in a
+    URL, and URLs go places bodies do not: browser history, the `Referer` on
+    the next request, and the access log of any proxy or CDN between here and
+    them. The Cloud Run request log is excluded at the sink, which covers this
+    hop and no other.
+
+    **No memo key and `no-store`.** `answer`'s cache is keyed by a string, and
+    the only string available here is what a resident typed -- a cache of home
+    addresses held in the process for five minutes. The artefact routes are
+    cached because they are the same council data for everyone; this one is
+    not, and the five minutes it would save is not worth the sentence it would
+    cost.
+  */
+  app.post('/api/addresses/search', async (c) => {
+    let body: { q?: unknown; extent?: unknown; limit?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'the request body is not JSON' }, 400);
+    }
+
+    const typed = typeof body.q === 'string' ? body.q : '';
+    if (typed.trim() === '') return c.json({ error: 'a query is required' }, 400);
+    // Long enough for the longest published label and nothing like a payload.
+    if (typed.length > 200) return c.json({ error: 'the query is too long' }, 400);
+
+    const extent = typeof body.extent === 'string' ? body.extent : API_EXTENT;
+    const limit =
+      typeof body.limit === 'number' && Number.isInteger(body.limit) && body.limit > 0
+        ? Math.min(body.limit, MAX_SUGGESTIONS)
+        : undefined;
+
+    return answer(
+      c,
+      async (client) => {
+        const found = await searchAddresses(client, extent, typed, limit);
+        // The street question is asked only where the verdict turns on it,
+        // which is the branch with no matches. `decide` was handed `false`
+        // for it; this is where the real answer is fetched and the verdict
+        // re-taken, so one round trip is saved on every other query.
+        if (found.kind !== 'not-an-address') return { ...found };
+        return (await namesAStreet(client, extent, typed))
+          ? { kind: 'outside-pilot', typed }
+          : { kind: 'not-an-address', typed };
+      },
+      'no-store',
+    );
+  });
+
+  app.post('/api/chat', async (c) => {
+    const aiServiceUrl = process.env.AI_SERVICE_URL;
+
+    if (!aiServiceUrl || aiServiceUrl.trim() === '') {
+      return c.json(
+        { error: 'AI chat service is not configured.' },
+        503,
+      );
+  }
+
+  let body: { message?: unknown };
+
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(
+      { error: 'Invalid request body.' },
+      400,
+    );
+  }
+
+  if (
+    typeof body.message !== 'string' ||
+    body.message.trim() === ''
+  ) {
+    return c.json(
+      { error: 'A message is required.' },
+      400,
+    );
+  }
+
+  try {
+    const baseUrl = aiServiceUrl.replace(/\/$/, '');
+
+    const client = await googleAuth.getIdTokenClient(baseUrl);
+
+    const response = await client.request({
+      url: `${baseUrl}/chat`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: {
+        message: body.message.trim(),
+      },
+      timeout: 280_000,
+    });
+
+    return c.json(response.data);
+  } catch (error) {
+    console.error('AI chat service request failed', error);
+
+    return c.json(
+      { error: 'The chat assistant is temporarily unavailable.' },
+      502,
+    );
+  }
+});
 
   return app;
 }

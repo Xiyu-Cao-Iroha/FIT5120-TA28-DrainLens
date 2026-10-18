@@ -54,7 +54,7 @@ export const COMPARE_ACCENT = DIFFERENCE_FILL;
 /** The words for the comparison's way in, shared by the homepage and the chooser. */
 export const COMPARE_CARD = {
   title: 'What happens if a drain is blocked?',
-  body: 'Pick a nearby drain and compare it clear and blocked under the same rainfall.',
+  body: 'Compare a drain clear and blocked under the same rain.',
   caption: 'Blocked drain comparison',
 } as const;
 
@@ -127,7 +127,7 @@ export function BlockedDrainFigure() {
           </span>
         </span>
         <span style={{ marginLeft: 'auto', font: type(text.small), color: ink.subtle }}>
-          Same rainfall, two settings
+          Same rain, two examples
         </span>
       </div>
 
@@ -207,7 +207,7 @@ export function BlockedDrainFigure() {
             <path d="M402 226v-22" stroke={basis.assumed.ink} strokeWidth="1.5" />
             <rect x="330" y="170" width="144" height="34" rx="17" fill={basis.assumed.fill} stroke={basis.assumed.ink} strokeOpacity="0.35" />
             <text x="402" y="192" textAnchor="middle" fontSize="14" fontWeight={weight.semibold} fill={basis.assumed.ink}>
-              Blocked (assumed)
+              Drain blocked
             </text>
           </g>
         </svg>

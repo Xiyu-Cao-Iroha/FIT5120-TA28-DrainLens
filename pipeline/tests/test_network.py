@@ -208,3 +208,30 @@ class TestBuild:
         pipes = next(url for url in seen if f"/{nw.PIPES.id}/" in url)
         assert "in_bbox" not in pits
         assert "in_bbox" in pipes
+
+
+class TestWhatIsKeptFromAPipe:
+    """The fields a pipe keeps, and the one that was missing until Iteration 3."""
+
+    def test_a_pipe_keeps_its_operator(self):
+        # AC 6.2.2 asks a selected pipe who operates it. The field was in the
+        # council's export from the start and this list did not keep it, so
+        # every pipe reached the browser with the question unanswerable.
+        assert "operator" in nw.PIPES.keep
+
+    def test_a_pit_keeps_no_operator_because_the_dataset_has_none(self):
+        # The pits dataset carries no operator field, which is why AC 6.2.2
+        # forbids showing one for a pit or inferring it from a joined pipe.
+        assert "operator" not in nw.PITS.keep
+
+    def test_only_the_kept_fields_survive_the_conversion(self):
+        feature = line(
+            [(10.0, 10.0), (40.0, 40.0)],
+            ref=1,
+            operator="City of Melbourne",
+            condition=3.0,
+        )
+        [converted] = nw.convert([feature], nw.PIPES, EXTENT)
+        assert converted.properties.get("operator") == "City of Melbourne"
+        # `condition` is published and not kept: what is not asked for is dropped.
+        assert "condition" not in converted.properties

@@ -15,7 +15,9 @@
  * has a switch of its own — which is the substance those criteria protect,
  * whichever control happens to sit where.
  */
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+
+import { useEffect, useRef, useState } from 'react';
 
 import {
   CHIP_KEYS,
@@ -26,10 +28,14 @@ import {
 import { RAMP, RAMP_GRADIENT } from './terrain.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
 import { LAYER } from '../ui/terms.js';
+import { narrowNow } from '../ui/narrow.js';
+import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
+import { WARNING_EDGE, WARNING_FILL } from './warnings.js';
+import { ringClass, ringProps } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
-type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch';
+type Swatch = 'dot' | 'line' | 'flow' | 'blob' | 'ramp' | 'hatch' | 'outline' | 'levels' | 'check';
 
 export interface LayerSpec {
   readonly key: LayerKey;
@@ -59,6 +65,8 @@ export const LAYERS: readonly LayerSpec[] = [
   { key: 'channel', chip: LAYER.paths, label: LAYER.paths, swatch: 'flow' },
   { key: 'lowPoint', chip: LAYER.lowAreas, label: LAYER.lowAreas, swatch: 'blob' },
   { key: 'unavailable', chip: LAYER.limited, label: LAYER.limited, swatch: 'hatch' },
+  { key: 'catchment', chip: LAYER.catchment, label: LAYER.catchment, swatch: 'outline' },
+  { key: 'beforeRain', chip: LAYER.beforeRain, label: LAYER.beforeRain, swatch: 'check' },
 ];
 
 /** The look-up the controls and the legend both go through. */
@@ -130,6 +138,44 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
           <rect x="1" y="2" width="18" height="8" rx="2" fill="url(#dl-ramp)" />
         </svg>
       );
+    case 'check':
+      // The numbered sign the layer draws, in the sign's own colours.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          <path d="M8 1.5l5.5 9H2.5Z" fill={WARNING_FILL} stroke={WARNING_EDGE} strokeWidth="1.2" strokeLinejoin="round" />
+          <circle cx="15" cy="3.5" r="3.4" fill="#ffffff" stroke={WARNING_EDGE} strokeWidth="1" />
+          <text x="15" y="5.2" fontSize="5" fontWeight="600" textAnchor="middle" fill={WARNING_EDGE}>
+            1
+          </text>
+        </svg>
+      );
+    case 'outline':
+      // The dashed boundary the design draws (Figma D2): a line that reads as
+      // continuing past the map, over a wash light enough for a street name.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          <rect
+            x="1.5"
+            y="2"
+            width="17"
+            height="8"
+            rx="2"
+            fill={BOUNDARY_FILL}
+            stroke={BOUNDARY_STROKE}
+            strokeWidth="1.4"
+            strokeDasharray="3 2"
+          />
+        </svg>
+      );
+    case 'levels':
+      // Three levels of the drainage system, as three stacked bars.
+      return (
+        <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
+          {[2, 5.5, 9].map((y) => (
+            <line key={y} x1="2" y1={y} x2="18" y2={y} stroke={BOUNDARY_STROKE} strokeWidth="1.6" strokeLinecap="round" />
+          ))}
+        </svg>
+      );
     case 'hatch':
       return (
         <svg {...box} viewBox="0 0 20 12" aria-hidden focusable="false">
@@ -147,6 +193,7 @@ function SwatchMark({ kind }: { readonly kind: Swatch }) {
 function Chip({
   label,
   swatch,
+  icon,
   on,
   disabled,
   title,
@@ -156,6 +203,11 @@ function Chip({
 }: {
   readonly label: string;
   readonly swatch: Swatch;
+  /**
+   * A mark to draw instead of the swatch, where a chip has been given a
+   * different face. See `faces` on `LayerChips`.
+   */
+  readonly icon?: ReactNode;
   readonly on: boolean;
   readonly disabled: boolean;
   readonly title: string;
@@ -168,7 +220,7 @@ function Chip({
   return (
     <button
       type="button"
-      className={pulse ? 'chip--pulse' : undefined}
+      {...ringProps(pulse)}
       data-tour={tour}
       onClick={onToggle}
       disabled={disabled}
@@ -200,8 +252,70 @@ function Chip({
           padding: on ? '1px 2px' : 0,
         }}
       >
-        <SwatchMark kind={swatch} />
+        {icon ?? <SwatchMark kind={swatch} />}
       </span>
+      {label}
+    </button>
+  );
+}
+
+/**
+ * A chip for something that is not a layer (Figma D1 to D3).
+ *
+ * Epic 6's guide opens the reporting pathway from the chip row, where every
+ * other guide puts the layer it is about. Reporting draws nothing on the
+ * map, so there is no swatch and no `aria-pressed` state to show beyond
+ * whether the panel is open.
+ *
+ * It borrows `Chip`'s shape deliberately: it sits in that row, and a control
+ * there that looked like something else would read as a different kind of
+ * thing to press.
+ */
+export function PlainChip({
+  label,
+  icon,
+  on,
+  pulse = false,
+  onPress,
+}: {
+  readonly label: string;
+  /**
+   * The mark that goes before the label, where the design draws one.
+   *
+   * Every other chip in this row has a swatch of the thing it draws, and a
+   * chip with nothing in front of its words reads as a different kind of
+   * control. This one is not a layer and has no swatch to show, so the
+   * design gives it an icon instead (Figma D1).
+   */
+  readonly icon?: ReactNode;
+  readonly on: boolean;
+  readonly pulse?: boolean;
+  readonly onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      {...ringProps(pulse)}
+      onClick={onPress}
+      aria-expanded={on}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        // The gap a `Chip`'s swatch leaves, so the row's chips line up
+        // whether the mark is a swatch or an icon.
+        gap: space(2),
+        padding: `${String(space(2))}px ${String(space(3))}px`,
+        border: `1px solid ${on ? brand.base : line.base}`,
+        borderRadius: radius.base,
+        background: on ? brand.base : surface.raised,
+        color: on ? ink.inverse : ink.base,
+        font: type(text.label, { weight: on ? weight.semibold : weight.medium, leading: 1.2 }),
+        transition: 'background-color 120ms ease, border-color 120ms ease',
+        whiteSpace: 'nowrap',
+        cursor: 'pointer',
+      }}
+    >
+      {icon}
       {label}
     </button>
   );
@@ -239,6 +353,42 @@ export interface LayerChipsProps {
   readonly pulsePanelKey?: LayerKey | null;
   /** Told whenever the panel opens or shuts. The guide's first step waits on it. */
   readonly onPanelChange?: (open: boolean) => void;
+  /**
+   * Collapse the row to one button, without taking the chips away.
+   *
+   * Set while the sidebar is open. Eight chips across the top of a map that
+   * has a panel down one side is most of the map's chrome fighting for the
+   * same corner, so the row folds to *Map layers* and unfolds on a press. A
+   * fold, not a lock: the reader opens it again whenever they want it, and
+   * the guide's own pulses still force it open, because a tour that points at
+   * a chip nobody can see is pointing at nothing.
+   */
+  readonly fold?: boolean;
+  /**
+   * Whether to offer the collapse control at all.
+   *
+   * Only the full map has eight chips and a sidebar wanting the same corner.
+   * A guide has one chip, no sidebar, and a step that names it, so a button
+   * whose whole purpose is to hide that chip is noise at best.
+   */
+  readonly collapsible?: boolean;
+  /**
+   * A different face for a chip: the words on it, and the mark before them.
+   *
+   * One chip uses it. *Recorded subcatchment area* is the name of a council
+   * dataset, and on the full map it is the door to the card that says who
+   * looks after which pipe and how to tell them -- which is what a resident
+   * is at that chip for. The team asked on 12 October for the door to be
+   * called what it is for: *Spot a problem?*, with the design's own icon
+   * (Figma D1).
+   *
+   * **The face, and nothing else.** It still toggles the same layer, still
+   * draws the same boundary, still opens the same card, and the layer keeps
+   * its real name in the legend, in the Layers panel, on the card and in the
+   * chip's own tooltip -- so nothing here renames the dataset, which would
+   * be a claim about what was recorded rather than about where to press.
+   */
+  readonly faces?: Readonly<Partial<Record<LayerKey, { readonly label: string; readonly icon: ReactNode }>>>;
 }
 
 /**
@@ -248,6 +398,25 @@ export interface LayerChipsProps {
  * panel are one decision seen at two depths, and a person looking for a layer
  * that is not a chip should find the place it lives without hunting.
  */
+/** The chevrons on the fold button, as glyphs rather than icons. */
+const CHEVRON_LEFT = '‹';
+const CHEVRON_RIGHT = '›';
+
+/** The fold button, which is a chip without a swatch. */
+const foldButton = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: space(1),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.base,
+  background: surface.raised,
+  color: ink.muted,
+  font: type(text.label, { weight: weight.medium, leading: 1.2 }),
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+} as const;
+
 export function LayerChips({
   state,
   onToggle,
@@ -258,8 +427,42 @@ export function LayerChips({
   pulseLayers = false,
   pulsePanelKey = null,
   onPanelChange,
+  fold = false,
+  collapsible = false,
+  faces = {},
 }: LayerChipsProps) {
   const [open, setOpen] = useState(false);
+  /*
+    **Not folded on a phone, which was the first thing tried and was wrong.**
+
+    The six chips wrapped to four rows at 375 px and took the top half of
+    the map, so folding them looked like the fix. Once the row scrolls
+    instead of wrapping it is 36 px, and folding would hide what layers
+    exist behind a button labelled *Map layers*, which is a worse first
+    screen than a row the reader can push sideways: they can see there are
+    drains, pipes and water paths without pressing anything.
+
+    The scroll is `.map-chips` in `base.css`.
+  */
+  const [folded, setFolded] = useState(fold);
+  /*
+    The parent folds the rail when it opens a panel over the map.
+
+    **It skips its first run**, which it did not until 10 October and which
+    cost the phone default above: on mount `fold` is only its own default,
+    and syncing it immediately overwrote the state that had just read the
+    screen width. The prop is for changes, and this now listens for changes.
+  */
+  const synced = useRef(false);
+  useEffect(() => {
+    if (!synced.current) {
+      synced.current = true;
+      return;
+    }
+    setFolded(fold);
+  }, [fold]);
+  // A pulse is the tour pointing at one of these. Unfold for it.
+  const showing = !collapsible || !folded || pulse !== null || pulseLayers || pulsePanelKey !== null;
   useEffect(() => {
     onPanelChange?.(open);
   }, [open, onPanelChange]);
@@ -275,19 +478,77 @@ export function LayerChips({
       // Named for the tour, which points at this row as a whole for its second
       // step and at four of its chips individually after that.
       data-tour="chips"
+      /*
+        One line that scrolls on a phone, a wrapping row above that.
+        `.map-chips` in `base.css`; `flexWrap` stays here because it is the
+        desktop behaviour and the query overrides it.
+      */
+      className="map-chips"
       style={{ display: 'flex', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}
     >
-      {keys.map((key) => {
+      {/*
+        The fold control, at the start of the row.
+
+        It was after the last chip, which put the button that collapses the
+        row and the button that opens it again in two different places: fold
+        from the right-hand end, and the thing to press to get the chips back
+        is at the left. One position for one control, and the row collapses
+        towards it.
+      */}
+      {collapsible && showing && keys.length > 0 && (
+        <button
+          type="button"
+          aria-label="Collapse the map layer buttons"
+          onClick={() => {
+            setFolded(true);
+          }}
+          aria-expanded
+          style={foldButton}
+        >
+          {CHEVRON_LEFT}
+        </button>
+      )}
+
+      {!showing && (
+        <button
+          type="button"
+          onClick={() => {
+            setFolded(false);
+          }}
+          aria-expanded={false}
+          style={foldButton}
+        >
+          {CHEVRON_RIGHT} Map layers
+        </button>
+      )}
+
+      {showing &&
+        keys.map((key) => {
         const spec = specOf(key);
         const disabled = unavailableKeys.includes(key);
+        const face = faces[key];
         return (
           <Chip
             key={key}
-            label={spec.chip}
+            label={face?.label ?? spec.chip}
             swatch={spec.swatch}
+            {...(face === undefined ? {} : { icon: face.icon })}
             on={state[key]}
             disabled={disabled}
-            title={disabled ? `${spec.label} is still loading` : spec.label}
+            /*
+              The tooltip names the layer, so a chip wearing a different
+              face still says what it draws. It leads with the words on the
+              chip: an accessible name that does not contain the visible
+              label is WCAG 2.5.3, and a speech user saying *spot a
+              problem* has to reach the thing that says it.
+            */
+            title={
+              disabled
+                ? `${spec.label} is still loading`
+                : face === undefined
+                  ? spec.label
+                  : `${face.label} · ${spec.label}`
+            }
             tour={`chip-${key}`}
             pulse={pulse === key && !state[key]}
             onToggle={() => {
@@ -297,12 +558,12 @@ export function LayerChips({
         );
       })}
 
-      {layersButton && (
+      {showing && layersButton && (
       <div style={{ position: 'relative' }}>
         <button
           type="button"
           data-tour="layers"
-          className={pulseLayers ? 'chip--pulse' : undefined}
+          {...ringProps(pulseLayers)}
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -365,7 +626,7 @@ export function LayerChips({
                 <label
                   key={key}
                   title={disabled ? `${spec.label} is still loading` : spec.label}
-                  className={pulsePanelKey === key ? 'chip--pulse' : undefined}
+                  {...ringProps(pulsePanelKey === key)}
                   style={{
                     display: 'flex',
                     gap: space(3),
@@ -384,6 +645,19 @@ export function LayerChips({
                     disabled={disabled}
                     onChange={() => {
                       onToggle(key);
+                      /*
+                        And close the panel behind it.
+
+                        The legend is hidden while this is open, because on a
+                        narrow window the panel drops straight onto it. So
+                        turning Ground height on from here switched on the one
+                        layer whose legend is a colour ramp and left the ramp
+                        hidden -- reported on 8 October as *the legend
+                        disappears*. There is one switch in this panel; once it
+                        has been pressed the panel has done its job, and
+                        closing it shows the reader what they just turned on.
+                      */
+                      setOpen(false);
                     }}
                     style={{ marginTop: 3 }}
                   />
@@ -429,6 +703,7 @@ export function LayerChips({
 export function MapLegend({
   state,
   pulseTerrain = false,
+  fold = false,
 }: {
   readonly state: LayerState;
   /**
@@ -437,8 +712,29 @@ export function MapLegend({
    * outlined instead, since the scale is not there to outline.
    */
   readonly pulseTerrain?: boolean;
+  /**
+   * Fold the legend away, without taking it away.
+   *
+   * Set while the sidebar is open. It is a nudge rather than a lock: the
+   * legend collapses when the sidebar appears and the reader can still open
+   * it again, which is the difference between a panel tidying up after itself
+   * and a panel deciding what somebody is allowed to look at.
+   */
+  readonly fold?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  /*
+    Closed on a phone, open above that.
+
+    At 375 px the legend covers about a third of the map, and the map is
+    what the reader opened. Closing it leaves the `› Show` control in
+    the same corner, so nothing is taken away. This is the one decision in
+    the phone layout a stylesheet cannot make, because it is an opening
+    state rather than a style; see `ui/narrow.ts`.
+  */
+  const [open, setOpen] = useState(() => !narrowNow());
+  useEffect(() => {
+    if (fold === true) setOpen(false);
+  }, [fold]);
   const shown = LAYERS.filter((l) => state[l.key]);
   if (shown.length === 0) return null;
 
@@ -475,7 +771,7 @@ export function MapLegend({
             setOpen((v) => !v);
           }}
           aria-expanded={open}
-          className={pulseTerrain && !open && state.terrain ? 'chip--pulse' : undefined}
+          {...ringProps(pulseTerrain && !open && state.terrain)}
           style={{
             marginLeft: 'auto',
             background: 'none',
@@ -543,9 +839,18 @@ export function MapLegend({
  * estimated (AC 1.1.4, 1.3.1). The order within a group is the audit's, not
  * the stacking order. A group with nothing switched on is not drawn.
  */
-const LEGEND_GROUPS: readonly { readonly link: 'recorded' | 'derived'; readonly keys: readonly LayerKey[] }[] = [
+export const LEGEND_GROUPS: readonly {
+  readonly link: 'recorded' | 'derived';
+  readonly keys: readonly LayerKey[];
+}[] = [
   { link: 'recorded', keys: ['pit', 'pipe'] },
-  { link: 'derived', keys: ['channel', 'lowPoint', 'terrain', 'unavailable'] },
+  /*
+    The before-rain markers are in here because they are estimated, and they
+    are in here at all because AC 5.1.1 asks the key to say what they are.
+    They were drawn on the map for a day with no line in the legend, which is
+    the state this module's own opening paragraph says not to be in.
+  */
+  { link: 'derived', keys: ['channel', 'lowPoint', 'terrain', 'unavailable', 'beforeRain'] },
 ];
 
 /**
@@ -564,7 +869,16 @@ function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly puls
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
     <div
-      className={pulse ? 'chip--pulse' : undefined}
+      /*
+        **Outlined, and not pointed at** (team, 18 October).
+
+        The step this belongs to is the ground height guide's question
+        about which marker is higher, and the scale is what answers it.
+        Nobody is being asked to press it, which is what an arrow means
+        everywhere else in the guides, so this one keeps `ringClass` while
+        every other mark moved to `ringProps`.
+      */
+      className={ringClass(pulse)}
       style={{
         marginTop: space(3),
         // Room for the outline without moving the scale: padded by as much as

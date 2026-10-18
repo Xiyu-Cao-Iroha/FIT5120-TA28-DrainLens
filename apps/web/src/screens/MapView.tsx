@@ -21,16 +21,22 @@
 
 import {
   COMPARE_HERE,
+  COMPARE_LOADING,
   type PitSupport,
   type ScenarioSupport,
   UNSUPPORTED_TEXT,
   supportOf,
 } from '../scenario/support.js';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import { addressForEnter, nextActive } from '../address/enter.js';
-import type { AddressIndex, IndexedAddress, Match } from '../address/search.js';
-import { MAX_SUGGESTIONS, search } from '../address/search.js';
+import { addressFrom, nextActive } from '../address/enter.js';
+import { lookupAddress } from '../address/lookup.js';
+import { RECENT_LABEL, recall } from '../address/recent.js';
+import type { AddressIndex, IndexedAddress, Match } from '@drainlens/address';
+import { MAX_SUGGESTIONS, search } from '@drainlens/address';
+import { noMatch } from '../address/noMatch.js';
+import { EDGE_PADDING_PX, NARROW_FRAME_PX, NARROW_PADDING_PX } from '../map/fitBounds.js';
+import { ICON_MIN_SCALE } from '../map/pitIcon.js';
 import type { MapArtefact } from '../map/artefact.js';
 import type { DerivedArtefact } from '../map/derived.js';
 import type { Hit } from '../map/hit.js';
@@ -38,7 +44,7 @@ import { MapCallout, MinimisedCallout } from '../map/MapCallout.js';
 import { PIT_SUMMARY, publicLabelOf, surfaceEntryOf } from '../crosssection/section.js';
 import { MapCanvas, type MapCanvasProps } from '../map/MapCanvas.js';
 import { type Local, type Viewport, toScreen } from '../map/viewport.js';
-import { LayerChips, MapLegend } from '../map/MapLayers.js';
+import { LayerChips, MapLegend, PlainChip } from '../map/MapLayers.js';
 import {
   ALL_ON,
   GUIDED_ON,
@@ -53,10 +59,67 @@ import type { Highlight, MapNow } from '../tutorial/lesson.js';
 import { GuideMarks } from '../map/GuideOverlayView.js';
 import type { GuideOverlay } from '../map/guideMarks.js';
 import { legibility } from '../map/legibility.js';
-import { waterNearby } from '../map/nearby.js';
-import { AddressInsight } from '../map/AddressInsight.js';
+import { cardSentence, waterNearby } from '../map/nearby.js';
+import { boundaryInMapFrame, boundaryInView } from '../map/catchmentBoundary.js';
+import { type Subcatchment, type SubcatchmentsArtefact, areaFor } from '../catchment/artefact.js';
+import { DRAINAGE_AREA } from '../catchment/wording.js';
+import { SPOT_A_PROBLEM_CHIP } from '../report/problems.js';
+import { ReportGlyph } from '../ui/ReportGlyph.js';
+import type { Press } from '../tutorial/lesson.js';
+import { PREPARE_HEADING } from '../prepare/actions.js';
+import { ASK_HEADING, questionForAction } from '../ask/answers.js';
+import { AskAboutGettingReady } from './AskAboutGettingReady.js';
+import {
+  BEFORE_RAIN_CHIP,
+  CHECK_STREET_DRAINS,
+  EVERY_HOME,
+  NO_ADDRESS_FOR_CHECKS,
+  NO_PLACES_IN_RING,
+  NO_PLACES_STILL,
+  PLACE_RADIUS_M,
+  type Place,
+  type Relevance,
+  checkButton,
+  numberOf,
+  placeTitle,
+  placesNear,
+} from '../prepare/places.js';
+import { LAYER } from '../ui/terms.js';
+import { DRAIN_RADIUS_M, type NamedDrain, streetDrains } from '../drains/nearby.js';
+import {
+  DRAIN_BLOCKED_QUESTION,
+  DRAIN_SOURCE,
+  REPORT_THIS_DRAIN,
+  STREET_DRAINS_HEADING,
+} from '../drains/wording.js';
+import { StreetDrains } from './StreetDrains.js';
+import { plainButton, quietButton } from '../ui/controls.js';
+import { SIDEBAR_RAIL, Sidebar, sidebarWidth } from './Sidebar.js';
+import { ringProps } from '../ui/GuideRing.js';
+import { PlaceCard, PreparePlan } from './PrepareForRain.js';
+import { ReportProblem } from './ReportProblem.js';
+import { type ProblemId, REPORT_HEADING } from '../report/problems.js';
+import {
+  PICK_DRAIN,
+  PICK_RADIUS_M,
+  PIN_PLACE,
+  type PickedDrain,
+  type ReportPlace,
+  drainTitle,
+  distanceLine,
+  useDrains,
+} from '../report/place.js';
+import { OPERATOR_LABEL, operatorLine } from '../catchment/help.js';
+import {
+  CARD_WIDTH,
+  DrainageArea,
+  GUIDE_CARD_WIDTH,
+  MapNote,
+  MapNoteStack,
+  WhoCanHelpLevels,
+} from './DrainageArea.js';
+import type { AddressCatchmentsArtefact } from '../catchment/artefact.js';
 import { SourceLink } from '../ui/SourcesPanel.js';
-import { type AddressGroundArtefact, groundAt, loadAddressGround } from '../map/addressGround.js';
 import { type TerrainTiles, loadTerrainTiles } from '../map/terrainTiles.js';
 import {
   WARNING_BODY,
@@ -67,18 +130,7 @@ import {
 } from '../map/warnings.js';
 import type { SupportedAddress, Task } from '../session.js';
 import { type TraceArtefact, traceDownstream } from '../trace/graph.js';
-import {
-  ink,
-  line,
-  radius,
-  shadow,
-  space,
-  surface,
-  text,
-  tracking,
-  type,
-  weight,
-} from '../ui/theme.js';
+import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 import { PitDetail } from './PitDetail.js';
 
 /**
@@ -110,8 +162,26 @@ export interface MapViewProps {
   readonly mode?: MapMode | null;
   /** The side panel is suppressed when the map sits beside another one. */
   readonly panel?: boolean;
+  /**
+   * The drainage areas and which one each address is in, or null.
+   *
+   * Null is the honest state when the files have not loaded: the address card
+   * then offers no drainage area rather than an empty one.
+   */
+  readonly catchments?: { readonly areas: SubcatchmentsArtefact; readonly assignment: AddressCatchmentsArtefact } | null;
+  /**
+   * What the reader has said about each numbered place, and how to say more.
+   *
+   * Held in the session rather than here, because it survives a step back to
+   * the address screen and a return, and dies with the tab (AC 5.4.1).
+   */
+  readonly relevance?: Readonly<Record<number, Relevance>>;
+  readonly onReviewPlace?: ((place: number, relevance: Relevance) => void) | undefined;
+  readonly onResetPlaces?: (() => void) | undefined;
   /** Present only where the map is the whole screen and search makes sense. */
   readonly index?: AddressIndex | undefined;
+  /** The addresses looked up in this tab, newest first. */
+  readonly recent?: readonly SupportedAddress[] | undefined;
   readonly onAddress?: ((address: IndexedAddress) => void) | undefined;
   /**
    * Let the address go again.
@@ -133,6 +203,29 @@ export interface MapViewProps {
   readonly layersButton?: boolean | undefined;
   /** The chip the guide's step is waiting on, outlined. See `LayerChips`. */
   readonly pulseChip?: LayerKey | null | undefined;
+  /**
+   * The control inside a card the current step waits on, outlined.
+   *
+   * `pulseChip`'s counterpart for things that are not chips. See `pressFor`.
+   */
+  readonly pulsePress?: Press | null | undefined;
+  /**
+   * Let a guide reach *Report a problem*, which guides otherwise hide.
+   *
+   * Only Epic 6's does, and only because the design's third and fourth
+   * frames are that flow. See `usesReport`.
+   */
+  readonly reportInGuide?: boolean | undefined;
+  /**
+   * The map tour is running.
+   *
+   * Three of its seven steps point at a chip, and the row can be collapsed
+   * to one button -- so a reader who had folded it was shown *Drain pits are
+   * street drains* over a map with no Drain pits on it. While the tour runs
+   * the row is not collapsible, which both unfolds it and keeps it unfolded
+   * for the steps that come after.
+   */
+  readonly touring?: boolean | undefined;
   /**
    * Something else the guide's step points at: the Layers button, the Ground
    * height switch in its panel, or the legend's ground-height scale.
@@ -224,6 +317,17 @@ export interface MapViewProps {
   readonly onCompare?: ((pitId: string) => void) | undefined;
 }
 
+/**
+ * The four doors into the reporting pathway.
+ *
+ * `area` is the *Recorded subcatchment area* card, which the full map's
+ * *Spot a problem?* chip draws; `plan` is the before-rain plan's own
+ * *Report a drainage problem*; `drain` is *Report this drain* on a drain
+ * picked from the street-drains list; `chip` is Epic 6's guide, whose own
+ * chip opens the report directly.
+ */
+type ReportFrom = 'area' | 'plan' | 'drain' | 'chip';
+
 export function MapView({
   map,
   derived,
@@ -231,13 +335,21 @@ export function MapView({
   address,
   task,
   mode = null,
-  panel = true,
+  panel: panelAllowed = true,
+  catchments = null,
+  relevance = {},
+  onReviewPlace,
+  onResetPlaces,
   index,
+  recent = [],
   onAddress,
   onClearAddress,
   chipKeys,
   layersButton = true,
   pulseChip = null,
+  pulsePress = null,
+  reportInGuide = false,
+  touring = false,
   highlight = null,
   overlay = null,
   onViewport,
@@ -257,6 +369,21 @@ export function MapView({
   const guided = task !== 'full-map';
   const [layers, setLayers] = useState<LayerState>(() => openWith ?? openingState(mode, guided));
   const [hit, setHit] = useState<Hit | null>(null);
+  /*
+    The address's own drainage area, read from the published answer.
+
+    `indexed` is the index's record for this address: the lookup is by street
+    and published position, and the session carries a label and a coordinate.
+    Matching on the label is matching on what the person searched for.
+  */
+
+  const indexed =
+    address === null ? null : (index?.addresses.find((entry) => entry.label === address.label) ?? null);
+  const area: Subcatchment | null = areaFor(catchments?.areas ?? null, catchments?.assignment ?? null, indexed);
+  const catchmentRings =
+    catchments === null || area === null
+      ? null
+      : boundaryInMapFrame(area.rings, catchments.areas.extent, map.extent);
   /**
    * The pit's card is folded away, and the pit is still selected.
    *
@@ -323,6 +450,669 @@ export function MapView({
     the layer is.
   */
   const [warningPoints, setWarningPoints] = useState<readonly WarningPoint[] | null>(null);
+
+  /*
+    Epic 5's places: the published markers near the address, numbered.
+
+    Worked out here rather than in the session, because they are a fact about
+    the map and the address rather than a thing the reader chose — and because
+    the markers arrive asynchronously, so a session that held them would hold
+    them stale.
+  */
+  const addressEastingM = address?.eastingM ?? null;
+  const addressNorthingM = address?.northingM ?? null;
+  /*
+    Held across renders.
+
+    `placesNear` returns a new array every call, and this list is read by the
+    effect that reports the map to a guide. An unheld list made that effect
+    fire on every render, the guide set state, and the two rendered each other
+    until React gave up -- with the map half laid out, which is how it showed.
+  */
+  const places = useMemo(
+    () =>
+      placesNear(
+        addressEastingM === null || addressNorthingM === null
+          ? null
+          : [addressEastingM, addressNorthingM],
+        warningPoints ?? [],
+      ),
+    [addressEastingM, addressNorthingM, warningPoints],
+  );
+  /** The place whose card is open, or null. */
+  const [openPlace, setOpenPlace] = useState<number | null>(null);
+  /** Whether the plan is open. The guide's first step waits on it. */
+  const [planOpen, setPlanOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askOpening, setAskOpening] = useState<string | null>(null);
+  /*
+    The reporting pathway, which is its own thing (AC 6.2.3).
+
+    It carries a drain only where the reader had one selected when they opened
+    it, which is the only way a drain can reach a report: nothing is attached
+    because it happens to be near, and `Remove` takes it off again.
+  */
+  /** A reminder's explanation has been opened, which the guide waits on. */
+  const [whyOpen, setWhyOpen] = useState(false);
+  /*
+    *Why are there different organisations?* has been opened (Figma D3).
+
+    Latched here as well as in `latch`, because the area card is unmounted and
+    remounted whenever the boundary layer is switched off and on: its own
+    `rolesOpen` goes with it, and a step the reader had already done would
+    come undone under them.
+  */
+  /*
+    What Epic 6's last two steps wait on (Figma D3, D4).
+
+    Read off `reportOpen` and `reportProblem` rather than kept beside them,
+    because those already exist and a second copy of a fact is a second
+    thing to forget to update. `latch` in the guide does the latching; this
+    only has to say what is true now.
+  */
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportPlace, setReportPlace] = useState<ReportPlace>(null);
+  /*
+    Which control opened the report, so the one that opened it can take it
+    away again.
+
+    It was a boolean, `reportFromPlan`, for one reason (bug 4, 9 October):
+    the only way back to the plan after a report was report → Close → press
+    a warning sign → *Applies to me*, four presses and two of them
+    accidental, so a report opened from the plan offers the plan.
+
+    **It needs the other three now** (team, 12 October). *Spot a problem?*
+    on the full map is the subcatchment chip, and its card is where the
+    report is opened from; turning the chip off left the report standing
+    there with nothing lit that would close it. The chip should take the
+    pathway with it, the way Drain pits takes its pit card and Low areas
+    takes its sign. But only the pathway it opened: the plan's own route
+    in (*Report a drainage problem*) runs with that chip off and must not
+    be closed by a chip the reader never pressed. A boolean cannot tell
+    those two apart, so this says which door was used.
+  */
+  const [reportFrom, setReportFrom] = useState<ReportFrom | null>(null);
+  /** Whether the report offers a way back to the plan. */
+  const reportFromPlan = reportFrom === 'plan';
+
+  const openReport = (place: ReportPlace, from: ReportFrom) => {
+    setReportPlace(place);
+    setReportFrom(from);
+    setReportOpen(true);
+  };
+  /*
+    The map handed over to a report (Figma R1 and R3).
+
+    While this is set the map is an input rather than something to read: the
+    chrome is gone, only the drains near the address are drawn, and a press
+    answers the question on the banner. `panel` below is how everything else
+    gets out of the way -- every card on this map is already written to it.
+  */
+  const [reportProblem, setReportProblem] = useState<ProblemId | null>(null);
+  const [picking, setPicking] = useState<'drain' | 'pin' | null>(null);
+  const [candidate, setCandidate] = useState<{
+    readonly assetNumber: string;
+    readonly distanceM: number | null;
+  } | null>(null);
+  /*
+    The drains already kept, while another is being tapped (bug 12).
+
+    *Pick another* used to throw the tapped drain away and start again, so a
+    problem at two inlets could only be reported as one of them. It adds to
+    this instead; the card lists what is held, each row with a way to take it
+    off again, and the confirm sends the lot.
+  */
+  const [kept, setKept] = useState<readonly PickedDrain[]>([]);
+  const [pinAt, setPinAt] = useState<Local | null>(null);
+  const [pinNote, setPinNote] = useState('');
+  const panel = panelAllowed && picking === null;
+  /*
+    The sidebar (Figma P1 and AI1), and what the rest of the chrome does
+    about it.
+
+    Its width comes from the canvas's own width, and the canvas is pointedly
+    not resized to make room: the panel is drawn over the map's right edge, so
+    the two cannot end up as inputs to each other. Everything else moves --
+    the controls come in by `panelWidth`, the chips fold to one button and the
+    legend folds itself away -- because a map whose whole chrome is in the one
+    corner the panel wants is the screenshot that asked for this.
+  */
+  /*
+    Where the map's chrome ends, measured.
+
+    The search box and the chips share one row, and on a narrow window the
+    chips wrap under the search box -- so the row is one line tall or two,
+    and the cards below it were drawn at a fixed 64 pixels either way.
+    `ResizeObserver` is what makes this honest: it fires on a wrap, which no
+    window-resize handler would catch when the wrap is caused by the sidebar
+    opening rather than by the window changing.
+  */
+  const chromeRef = useRef<HTMLDivElement | null>(null);
+  const [chromeBottom, setChromeBottom] = useState(64);
+  useEffect(() => {
+    const row = chromeRef.current;
+    const under = row?.offsetParent;
+    if (row === null || under === null || under === undefined) return undefined;
+    /*
+      The lowest edge of anything in the chrome that is over the card column.
+
+      Not the row's own height: the legend is in this row and it is tall, but
+      it is at the right-hand end, and pushing the cards below it would give
+      up 200 pixels of map for a box the cards never touch. Not the chips'
+      height either, because on a narrow window the legend wraps onto a line
+      of its own and then it *is* above them.
+
+      So it is measured per child, against the column's own 300 pixels: only
+      what actually overlaps them counts.
+    */
+    const measure = () => {
+      const top = under.getBoundingClientRect().top;
+      const left = space(3);
+      const right = left + CARD_WIDTH;
+      let lowest = row.getBoundingClientRect().top;
+      for (const child of row.children) {
+        const box = child.getBoundingClientRect();
+        if (box.right > left && box.left < right && box.bottom > lowest) lowest = box.bottom;
+      }
+      setChromeBottom(Math.round(lowest - top + space(3)));
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(row);
+    for (const child of row.children) watch.observe(child);
+    return () => {
+      watch.disconnect();
+    };
+  }, [panel]);
+
+  const panelWidth = viewport === null ? 0 : sidebarWidth(viewport.widthPx);
+  /*
+    The before-rain layer opens something, always (change list, item 11).
+
+    The reason is that it used to open nothing: numbered triangles appeared
+    among the streets and the reader had to work out that one of them was
+    the thing to press. Silence also looks like a layer that did not load.
+
+    **What it opens is the address card, and only that** (11 October). It
+    opened the first place's card where there were places, and the address
+    card where there were none, so a reader who searched an address with the
+    layer on got both at once, overlapping. The address card is the right
+    one either way: with nothing near the address it carries the *none near
+    this address* sentence (Figma A8), and with places near it, it carries
+    *Check before heavy rain (3)*, which is the press the plan and Place 1
+    belong to.
+
+    Once per address and per switch-on: `openedFor` is the key it has
+    already done, so a reader who closes the card is not handed it again on
+    the next render.
+  */
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    /*
+      Never inside a guide. A guide drives its own sequence, and Epic 5's
+      first step is *Click Check before heavy rain* -- a button on the address
+      card, which the place card suppresses. Opening the place card for the
+      reader made the guide's own instruction point at something that was not
+      on the screen.
+    */
+    if (guided || !layers.beforeRain || address === null) {
+      openedFor.current = null;
+      return;
+    }
+    const key = `${address.label}:${String(places.length)}`;
+    if (openedFor.current === key) return;
+    openedFor.current = key;
+    /*
+      The address card, whatever the count.
+
+      With nothing near the address it is the answer (Figma A8). With places
+      near it, it is the thing that *has* the way in: *Check before heavy
+      rain (3)*. It used to open Place 1 here instead, and the two cards
+      then sat on the map at once -- reported on 11 October with a
+      screenshot of one over the other.
+    */
+    setAddressCardOpen(true);
+  }, [guided, layers.beforeRain, address, places]);
+
+  /*
+    The opening view for the before-rain layer: the whole 200 m (item 5).
+
+    An address accepted with this layer on used to leave the map at whatever
+    scale it was at, so a numbered marker 180 m away was off the screen and
+    the reader was asked to decide about a place they could not see. The fit
+    is the square that definitely contains every place, because 200 m is what
+    `placesNear` means by near -- so the radius the product uses and the
+    radius it shows are the same number, read from the same constant.
+
+    Keyed on the address, so it fits once when the address arrives and leaves
+    the reader's own panning alone afterwards.
+  */
+  /*
+    How many times the before-rain layer has been switched on.
+
+    The fit below is keyed on the address, so it ran once and never again --
+    and a reader who had since zoomed out got the layer, the markers and no
+    card, because `warningsVisible` stops drawing a sign over a neighbourhood
+    below 1.25 px/m. Reported on 9 October: pressing the before-rain chip from
+    too far out gives no warning card at all. Counting the switch-ons puts the
+    view back on the 200 m box every time the layer comes on, which is well
+    inside that threshold -- rather than adding a second rule about when to
+    zoom.
+  */
+  /*
+    One definition for "these signs are the checks, not the low areas".
+
+    The canvas, the sign's own callout and a place's card all have to agree,
+    and they agreed by each restating the condition until one of them did
+    not. `warningsVisible` takes it as an argument so there is one place to
+    read it from.
+  */
+  const warningsAnyZoom = layers.beforeRain && !layers.lowPoint && address !== null;
+
+  const [checksOpened, setChecksOpened] = useState(0);
+  const beforeRainOn = layers.beforeRain;
+  useEffect(() => {
+    if (beforeRainOn) setChecksOpened((was) => was + 1);
+  }, [beforeRainOn]);
+
+  /*
+    Where the map goes when the checks are turned on.
+
+    **It fits the places, not a box around the address.** It used to fit a
+    fixed `PLACE_RADIUS_M` square, which is 400 m across whether the nearest
+    place is 30 m away or 190, and on a narrow frame that opened a shade
+    under `WARNING_MIN_SCALE` -- so the signs the panel was talking about
+    were not drawn at all. That is the 9 and 10 October report, twice: *press
+    before rain check and nothing happens*.
+
+    Two halves to the fix and this is one. The other is in `warningsVisible`,
+    which no longer holds these particular signs to a zoom floor; this one
+    makes sure every one of them is on screen rather than just drawable.
+
+    The address goes in with them, because the places are *near your address*
+    and a view of three triangles with no pin is a view of three triangles.
+    With no places, the box around the address is still the right answer: the
+    street drains panel is what opens there, and it is about that street.
+  */
+  const placesFit = useMemo((): MapCanvasProps['fit'] => {
+    if (!layers.beforeRain || address === null) return null;
+    /*
+      The box the ring sits in, which is the box everything this view is
+      about sits in.
+
+      **It fitted the places themselves until 12 October**, which put every
+      sign on screen as large as the frame allowed and left the 200 m the
+      panel keeps talking about mostly outside it. Now that the ring is
+      drawn (item 7, `NEAR_RING`), a view that cuts it in half is a view of
+      an arc going nowhere, and the design draws the whole circle with room
+      around it (Figma S1).
+
+      Fitting the box still puts every place on screen -- they are all
+      within `PLACE_RADIUS_M` by definition, which is what the box is -- so
+      nothing the place fit guaranteed is given up. The signs do not shrink
+      with it: `drawWarnings` draws them at a fixed pixel size, and
+      `warningsVisible` stopped holding them to a zoom floor at the same
+      time, which together were the 9 and 10 October fix for *press before
+      rain check and nothing happens*.
+    */
+    const r = PLACE_RADIUS_M;
+    const points: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
+    return { key: `places:${address.label}:${String(checksOpened)}`, points, reservePanel: false };
+  }, [layers.beforeRain, address, checksOpened]);
+
+  /*
+    A card when the reader turns the checks on (team, 10 October), and it is
+    the address card.
+
+    *And a popup*, in their words. Turning the checks on is asking what to
+    check, and a map of numbered triangles answers that only for somebody who
+    already knows to press one.
+
+    **It put up Place 1 until 11 October, and that was the wrong card.** The
+    report came with a screenshot: the address card and Place 1 open
+    together, overlapping, neither of them asked for. The order the team
+    wants is the one the screens are built for -- the address card, then
+    *Check before heavy rain*, and the plan and Place 1 on that press -- so
+    this opens the card that carries the button and the press does the rest.
+
+    **On the change, not on the state, and not inside a guide.** Both
+    qualifications were found by driving it. Epic 5's guide opens with this
+    layer already on (`opensWith`) and its first step is *Click Check before
+    heavy rain*: an effect reading the state rather than the change put a
+    card up before the reader had pressed anything, and the step then asked
+    them to do a thing that appeared already done. Inside a guide the cards
+    are the guide's to open.
+  */
+  const checksWere = useRef(beforeRainOn);
+  useEffect(() => {
+    const turnedOn = beforeRainOn && !checksWere.current;
+    checksWere.current = beforeRainOn;
+    if (!turnedOn || guided) return;
+    setAddressCardOpen(true);
+  }, [beforeRainOn, guided]);
+
+  /*
+    The plan and an open place card are no longer exclusive.
+
+    They were, and the cost was reported on 8 October: answering a place left
+    the reader on a map with the card gone and no way back to the plan except
+    the address pin. The plan is a sidebar beside the map and the card is
+    anchored on the map, so both fit -- the card is kept clear of the sidebar
+    by `calloutWithin` below.
+  */
+  /*
+    Folded to the rail rather than dismissed (bug 11, 9 October).
+
+    One flag for both panels: only one of them is ever up, and a reader who
+    folded the plan to reach the map does not mean *and keep the drains list
+    open at full width* either. It is cleared when a panel is opened, because
+    opening a panel is asking to see it.
+  */
+  const [panelFolded, setPanelFolded] = useState(false);
+
+  const planShowing = panel && viewport !== null && planOpen;
+  const sidebarOpen = planShowing && panelWidth > 0;
+  /*
+    Whether *a* sidebar is open, which is what the map's own chrome cares about.
+
+    The legend, the zoom controls and the layer chips were all moved aside by
+    `sidebarOpen` -- the plan's. Opening the street-drains list closes the plan
+    (`openDrains`), so the chrome moved back under a panel that was still
+    there: the legend and the zoom buttons ended up behind it, reported on
+    9 October as *legend 失效，缩放图标被遮盖*. A second panel in the same place
+    needs the same room.
+  */
+  /*
+    Too narrow for a sidebar, so the plan goes back in the card it used to
+    live in. Not a good screen -- the design has a sheet for this and the
+    sheet is not built -- but a worse screen than a sidebar is still better
+    than a window where the plan button does nothing.
+  */
+  const planInCard = planShowing && panelWidth === 0 && openPlace === null;
+
+  const askPanel = (
+    <AskAboutGettingReady
+      key={askOpening ?? 'ask'}
+      {...(askOpening === null ? {} : { opening: askOpening })}
+      onBackToPlan={() => {
+        setAskOpen(false);
+        setAskOpening(null);
+      }}
+      {...(places.length === 0
+        ? {}
+        : {
+            onReviewPlaces: () => {
+              setAskOpen(false);
+              setAskOpening(null);
+            },
+          })}
+    />
+  );
+
+
+  const addressId = address?.id ?? null;
+
+  useEffect(() => {
+    setDrainsOpen(false);
+    setDrainPicked(null);
+    setReportPlace(null);
+  }, [addressId]);
+
+  /*
+    Step 3 of the plan, as a list of the drains rather than a layer (Figma S1).
+
+    The button used to switch Drain pits on, which left a reader looking for
+    the drain outside their own house among a few hundred identical circles.
+    The panel names each one from the address it is nearest to and groups them
+    by street, and the layer goes on with it so the list and the map are about
+    the same things.
+  */
+  const [drainsOpen, setDrainsOpen] = useState(false);
+  /** The drain the list picked, which gets a card of its own (Figma S2). */
+  const [drainPicked, setDrainPicked] = useState<NamedDrain | null>(null);
+
+  /**
+   * The reader's address as the index holds it, in parts.
+   *
+   * `indexed` above finds the same record by label; this is by id, which is
+   * what the address carries, and null where the map is running without an
+   * index at all -- inside a guide, where this panel is not offered.
+   *
+   * The panel names the street address rather than the postal label: *within
+   * 200 m of 46 Gatehouse Drive* is the design's sentence, and the suburb on
+   * the end of it is already in the panel's own subtitle.
+   */
+  const yourAddress = useMemo(
+    () => (address === null ? null : (index?.addresses.find((one) => one.id === address.id) ?? null)),
+    [index, address],
+  );
+  const yourStreet = yourAddress?.street ?? null;
+  const streetAddress =
+    yourAddress === null ? (address?.label ?? '') : `${yourAddress.number} ${yourAddress.street}`;
+
+  const drainsNear = useMemo(
+    () =>
+      address === null || index === undefined
+        ? null
+        : streetDrains(map, index, [address.eastingM, address.northingM], yourStreet),
+    [map, index, address, yourStreet],
+  );
+
+  /** The street-drains list, in the same place the plan's sidebar goes. */
+  const drainsSidebarOpen =
+    panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth > 0;
+
+  /**
+   * And in the map, where the window has no room for a sidebar.
+   *
+   * The plan has had this since there were narrow windows (`planInCard`);
+   * the list did not, so opening it under 620 px closed the plan and showed
+   * nothing in its place. A guide's map frame is always under that, which is
+   * where it was found: Figma G6 makes this the guide's fifth step, and the
+   * press turned the drain layer on and left the reader looking at a map.
+   */
+  const drainsInCard =
+    panel && viewport !== null && drainsOpen && drainsNear !== null && address !== null && panelWidth === 0;
+
+  /**
+   * What a panel actually takes from the map.
+   *
+   * Folded it is the rail, which is why the chrome moves by this rather than
+   * by `panelWidth`: the point of folding is that the map gets the rest back.
+   */
+  const panelTakes = panelFolded ? SIDEBAR_RAIL : panelWidth;
+
+  /**
+   * Either of them, which is what the map's own chrome has to move for.
+   *
+   * The legend, the zoom controls and the layer chips were all moved aside by
+   * the plan's `sidebarOpen`. Opening the street-drains list closes the plan,
+   * so the chrome moved back under a panel that was still there and the legend
+   * and zoom buttons ended up behind it (reported 9 October). A second panel in
+   * the same place needs the same room.
+   */
+  const anySidebarOpen = sidebarOpen || drainsSidebarOpen;
+
+  /*
+    How far *near this address* reaches, for the two views that are about a
+    radius (team, 11 October, item 7).
+
+    Both say it in words already -- *within 200 m of 46 Gatehouse Drive*, and
+    *No places to check were found within 200 m of this address* -- and
+    neither drew it, so the reader could see eleven markers and not what had
+    been counted. Figma S1 draws the ring; `NEAR_RING` in `draw.ts` draws it
+    here.
+
+    The two constants are the same number and are still read separately: one
+    is how far the places were looked for, the other how far the drains were,
+    and a ring drawn from the wrong one would be a line in the wrong place
+    the day they stop agreeing.
+
+    Not while the map is being used as an input: a press during picking
+    answers a question about one drain, and a ring around the address is
+    about something else.
+  */
+  /** A guide's map is small, so its cards are narrower. See `GUIDE_CARD_WIDTH`. */
+  const noteWidth = guided ? GUIDE_CARD_WIDTH : CARD_WIDTH;
+
+  /*
+    What the subcatchment chip says on the full map (team, 12 October).
+
+    *Recorded subcatchment area* is the name of a council dataset, and on
+    this map it is the door to the card that says which organisation looks
+    after which part and how to tell them. That is what somebody is at this
+    chip for, so it is called what it is for.
+
+    **Only the face changes.** The same layer, the same boundary, the same
+    card, and the layer keeps its real name in the legend, in the Layers
+    panel, on the card itself and in this chip's tooltip. The dataset is not
+    renamed; the door is labelled.
+
+    Not inside a guide, where no lesson offers this chip today anyway
+    (Epic 6's is three steps about reporting and offers no layer chip at
+    all). It is held to the full map rather than made global because a
+    guide that did offer it would be teaching the layer, and a lesson that
+    says *press Recorded subcatchment area* beside a chip saying something
+    else is the defect this whole list opened with.
+  */
+  const chipFaces = guided
+    ? undefined
+    : { catchment: { label: SPOT_A_PROBLEM_CHIP, icon: <ReportGlyph size={16} /> } };
+
+  const nearRadiusM =
+    address === null || picking !== null
+      ? null
+      : drainsOpen
+        ? DRAIN_RADIUS_M
+        : layers.beforeRain
+          ? PLACE_RADIUS_M
+          : null;
+
+  /*
+    The box a callout may not leave.
+
+    The sidebar is drawn over the canvas rather than beside it -- the map is
+    deliberately not re-fitted when the plan opens, so that what the reader is
+    looking at does not move under them. A card placed against the canvas's
+    full width can therefore end up behind the sidebar, which is how a place
+    card and an open plan used to be impossible to have at once.
+  */
+  const calloutWithin =
+    viewport === null
+      ? { width: 0, height: 0 }
+      : { width: viewport.widthPx - (anySidebarOpen ? panelTakes : 0), height: viewport.heightPx };
+
+  /*
+    The drain the list picked, as the canvas names pits.
+
+    The panel works in asset numbers as strings, because that is what the
+    council's record and the reporting pathway both carry; the canvas keys its
+    ring on a number. A record whose number is not one is drawn as nothing
+    rather than as some other pit.
+  */
+  const pickedPitNumber = useMemo(() => {
+    if (drainPicked === null) return null;
+    const asNumber = Number(drainPicked.id);
+    return Number.isFinite(asNumber) ? asNumber : null;
+  }, [drainPicked]);
+
+  const openDrains = () => {
+    // The layer goes on with the list, so the map and the panel are about the
+    // same drains.
+    setPanelFolded(false);
+    if (!layers.pit) toggle('pit');
+    setAddressCardOpen(false);
+    setPlanOpen(false);
+    setOpenPlace(null);
+    setDrainsOpen(true);
+  };
+
+
+  const drainsList =
+    drainsNear === null || address === null ? null : (
+      <StreetDrains
+        address={streetAddress}
+        found={drainsNear}
+        yourStreet={yourStreet}
+        selected={drainPicked?.id ?? null}
+        onSelect={(drain) => {
+          setDrainPicked(drain);
+        }}
+        onBack={() => {
+          setDrainsOpen(false);
+          setDrainPicked(null);
+          setPlanOpen(true);
+        }}
+      />
+    );
+
+  const planPanel = (
+    <PreparePlan
+      address={address?.label ?? ''}
+      places={places}
+      relevance={relevance}
+      onShowOnMap={(place) => {
+        setOpenPlace(place.number);
+      }}
+      onWhyOpen={() => {
+        setWhyOpen(true);
+      }}
+      {...(onResetPlaces === undefined ? {} : { onReset: onResetPlaces })}
+      /*
+        Step 3's first button, which opens the list (Figma S1).
+
+        In the guide as well, which it was not until 11 October. Figma G6
+        makes the street drain check the guide's fifth step and draws this
+        button ringed inside the plan, and G2z makes it the only press an
+        address with no places has left -- and the plan had no such button
+        while a guide was running, so neither step could be finished.
+      */
+      onCheckDrains={openDrains}
+      {...(guided
+        ? {}
+        : {
+            onReport: () => {
+              setPlanOpen(false);
+              openReport(null, 'plan');
+            },
+
+            
+            onAsk: (actionId?: string) => {
+              setAskOpening(
+                actionId === undefined ? null : questionForAction(actionId),
+              );
+              setAskOpen(true);
+            },
+          })}
+    />
+  );
+  /** Everything the confirm would send: what is held, and what was just tapped. */
+  const pickedSoFar: readonly PickedDrain[] =
+    candidate === null
+      ? kept
+      : [...kept, { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM }];
+
+  const leavePicking = () => {
+    setKept([]);
+    setPicking(null);
+    setCandidate(null);
+    setPinAt(null);
+    setPinNote('');
+  };
+  /*
+    Whether the before-rain callout on the address is showing.
+
+    Its own state rather than the address card's: the full card is suppressed
+    in the guides, and this callout is the only place AC 5.1.1's button can be
+    where it is. Pressing the chip again brings it back.
+  */
+  const [beforeRainCallout, setBeforeRainCallout] = useState(true);
+  useEffect(() => {
+    setBeforeRainCallout(true);
+  }, [address, layers.beforeRain]);
   /** The sign whose card is open. One card on the map at a time, as ever. */
   const [warning, setWarning] = useState<WarningPoint | null>(null);
   const { name: extentName, width_m: extentWidth, height_m: extentHeight } = map.extent;
@@ -342,27 +1132,16 @@ export function MapView({
     };
   }, [extentName, extentWidth, extentHeight]);
 
-  // Which way the ground falls around each address, precomputed. Loaded once;
-  // if it cannot be, the card still says what is near and says nothing about
-  // the ground rather than guessing.
-  const [groundIndex, setGroundIndex] = useState<AddressGroundArtefact | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadAddressGround()
-      .then((artefact) => {
-        if (live) setGroundIndex(artefact);
-      })
-      .catch(() => {
-        if (live) setGroundIndex(null);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-  const groundTrend = useMemo(
-    () => (address === null || groundIndex === null ? null : groundAt(groundIndex, address.id)),
-    [address, groundIndex],
-  );
+  /*
+    The per-address ground fall is no longer fetched here.
+
+    It was loaded once per visit for one line of one card -- the figure's
+    *Steep slope down about 8 m in 150 m* -- and that line went with the figure
+    on 8 October. `map/addressGround.ts` and the artefact behind it are left
+    alone: the pipeline still builds `address-ground.json` and the module is
+    still tested, so there is something to read from if the card or a guide
+    wants the fall again.
+  */
 
   const explanation = useMemo(
     () =>
@@ -402,6 +1181,22 @@ export function MapView({
     }
     // The sign goes with the layer it belongs to, for the same reason.
     if (key === 'lowPoint' && layers.lowPoint) setWarning(null);
+    /*
+      And the report goes with the chip that opened it (team, 12 October).
+
+      On the full map this chip is *Spot a problem?*, and the card it draws
+      is where *Report a problem* is pressed. Turning the chip off used to
+      leave the report standing with nothing lit that would close it.
+
+      **Only the report this chip opened.** The plan's route in runs with
+      this chip off, and closing somebody's report because they pressed a
+      chip they never used to open it would be the worse bug of the two.
+      `reportFrom` is what tells them apart.
+    */
+    if (key === 'catchment' && layers.catchment && reportFrom === 'area') {
+      setReportOpen(false);
+      setReportProblem(null);
+    }
     if (key === 'pipe' && layers.pipe) {
       // The trace is drawn as pipes, so it goes with them even when what is
       // selected is the pit at the top of it.
@@ -425,6 +1220,84 @@ export function MapView({
     rather than reading the zoom, because density is not uniform and any scale
     strict enough for the CBD hides Kensington.
   */
+  /*
+    The drains near the address, and only those (Figma R1).
+
+    The whole council's 21,113 pits on one screen is not a question anybody
+    can answer, and the banner says *only drains near this address are shown*
+    -- so it has to be true. Without an address there is nothing to be near
+    and the reader is sent to the pin instead.
+  */
+  const pickable = useMemo(() => {
+    if (address === null) return [];
+    const pits = map.layers.pit ?? [];
+    return pits.filter(
+      (pit) =>
+        Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM) <= PICK_RADIUS_M,
+    );
+  }, [map, address]);
+  /**
+   * The drain the picker's step points at, which is the closest one.
+   *
+   * Closest rather than any, so the arrow lands near the address the
+   * reader is thinking about and the same address always marks the same
+   * drain. It is an example and the step says so: the product reports
+   * whichever drain they actually tap.
+   */
+  const nearestPickable = useMemo(() => {
+    if (address === null || pickable.length === 0) return null;
+    let best = pickable[0]!;
+    let bestAway = Infinity;
+    for (const pit of pickable) {
+      const away = Math.hypot(pit.c[0] - address.eastingM, pit.c[1] - address.northingM);
+      if (away < bestAway) {
+        bestAway = away;
+        best = pit;
+      }
+    }
+    return best.asset_number ?? null;
+  }, [pickable, address]);
+
+  /**
+   * Close enough to see a grate, as soon as the picker opens.
+   *
+   * The step says *tap the drain marker* and the canvas draws a marker
+   * rather than a dot only from `ICON_MIN_SCALE` (`pitIcon.ts`). A frame
+   * fitted to the whole 150 m pick radius sits under that at every size
+   * this map is drawn in, so the reader was asked to tap an icon the map
+   * had not drawn yet (team, 18 October).
+   *
+   * The radius is whatever puts the scale over that threshold in this
+   * frame, and never more than the radius the banner promises.
+   *
+   * **Measured against the shorter side, less the padding `fitPoints`
+   * leaves.** The first try used the width alone and landed at 1.81 px/m
+   * in a 558 by 480 frame, which is under the threshold and was still
+   * drawing dots: a fit is bound by whichever side runs out first, and in
+   * a guide's map that is the height. The frame's own size does not change
+   * with the zoom, so this does not chase its own tail.
+   */
+  const pickFit = useMemo((): MapCanvasProps['fit'] => {
+    if (picking !== 'drain' || address === null || viewport === null) return null;
+    const shorter = Math.min(viewport.widthPx, viewport.heightPx);
+    const pad = 2 * (shorter < NARROW_FRAME_PX ? NARROW_PADDING_PX : EDGE_PADDING_PX);
+    const widest = Math.max(shorter - pad, 1) / (2 * ICON_MIN_SCALE);
+    const r = Math.min(PICK_RADIUS_M, widest * 0.95);
+    const points: readonly Local[] = [
+      [address.eastingM - r, address.northingM - r],
+      [address.eastingM + r, address.northingM + r],
+    ];
+    return { key: `pick:${address.label}`, points, reservePanel: false };
+    // The width is the frame's, so it is left out: it does not change with
+    // the view, and listing it would refit on every pan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picking, address]);
+
+  const pickingMap = useMemo(
+    () => ({ ...map, layers: { ...map.layers, pit: pickable, pipe: [] } }),
+    [map, pickable],
+  );
+
   const pitPoints = useMemo(
     () => (map.layers.pit ?? []).map((pit) => pit.c),
     [map.layers.pit],
@@ -447,6 +1320,19 @@ export function MapView({
   const unmeasuredOn = layers.unavailable;
   const terrainOn = layers.terrain;
   const selectedId = selected === null ? null : String(selected);
+  // A count rather than the answers themselves: the effect below reports it to
+  // a guide, and a number compares where an object would not.
+  const placesReviewed = places.filter(
+    (place) => (relevance[place.number] ?? null) !== null,
+  ).length;
+  /*
+    How many places this address has, for the guide that is written twice.
+
+    Null while the markers are still loading, which the guide needs kept apart
+    from zero: at an address with none it drops the two steps that are about a
+    place, and *not loaded yet* is not an answer to that question.
+  */
+  const placeCount = warningPoints === null ? null : places.length;
   useEffect(() => {
     onMapNow?.({
       pits: pitsOn,
@@ -461,6 +1347,20 @@ export function MapView({
       // The map says what is true now; the guide latches these (`latch`).
       layersOpened: layersOpen,
       terrainShown: terrainOn,
+      catchment: layers.catchment,
+      planOpen,
+      // The map says what is true now; the guide latches this one too.
+      planOpened: planOpen,
+      placeCount,
+      placesReviewed,
+
+      reportOpened: reportOpen,
+      // Epic 6's three. The map says what is true now and the guide latches
+      // them: each of these is undone by the step after it being satisfied.
+      drainPicking: picking !== null,
+      drainCandidate: candidate !== null || pinAt !== null,
+      drainChosen: reportPlace !== null,
+      problemChosen: reportProblem !== null,
     });
   }, [
     terrainOn,
@@ -472,34 +1372,104 @@ export function MapView({
     unmeasuredOn,
     selectedId,
     following,
+    // Epic 6's chip: the guide waits for the press, so the report has to
+    // run when it changes.
+    layers.catchment,
+    // Epic 5's two, for the same reason.
+    planOpen,
+    placeCount,
+    placesReviewed,
+
+    reportOpen,
+    picking,
+    candidate,
+    pinAt,
+    reportPlace,
+    reportProblem,
     onMapNow,
   ]);
 
   return (
     <>
       <MapCanvas
-        artefact={map}
+        controlsInset={anySidebarOpen ? panelTakes : 0}
+        artefact={picking === 'drain' ? pickingMap : map}
         derived={derived}
-        show={visibilityOf(layers)}
-        selectedPit={selected}
-        // Only while the pits are drawn. A ring around a pit on a map with no
-        // pits on it is a mark with nothing under it.
-        suggestedPit={pitsDrawn ? highlightPit : null}
+        show={visibilityOf(picking === null ? layers : NOTHING_ON)}
+        /*
+          While picking, the drain under the question (bug 12).
+
+          `hit` is not set during picking -- a press answers the banner rather
+          than opening a card -- so nothing was marked and the reader had a
+          card naming a drain they could not find again on the map.
+        */
+        selectedPit={picking === 'drain' && candidate !== null ? Number(candidate.assetNumber) : selected}
+        /*
+          Only while the pits are drawn. A ring around a pit on a map with no
+          pits on it is a mark with nothing under it.
+
+          The drain the street-drains list picked takes the same ring: it was
+          a row in a panel and a card on the map with nothing joining them, so
+          *选的 drain 在地图上没有高亮，找不到是哪个* (9 October).
+        */
+        suggestedPit={pitsDrawn ? (pickedPitNumber ?? highlightPit) : null}
+        /*
+          The mark on a pit the canvas draws, for the three steps that ask
+          for a press on one: the teaching pit in Recorded drainage, the
+          offered drain in the comparison, and a drain to tap in the
+          report's picker.
+
+          The first two are already ringed by the canvas itself, so they
+          take the arrow and nothing else. The picker's drains are drawn
+          plain, so that one takes the box as well.
+        */
+        anchorPit={
+          pulsePress === 'pick-banner'
+            ? nearestPickable
+            : pulsePress === 'pit' || pulsePress === 'drain'
+              ? (pitsDrawn ? (pickedPitNumber ?? highlightPit) : null)
+              : null
+        }
+        anchorRing={pulsePress === 'pick-banner'}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
-        fit={fit}
+        fit={pickFit ?? placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}
         terrainVersion={terrainVersion}
-        showPits={pitsDrawn}
-        showPipes={layers.pipe}
+        showPits={picking === 'drain' ? true : picking === null && pitsDrawn}
+        showPipes={picking === null && layers.pipe}
         address={address === null ? null : [address.eastingM, address.northingM]}
+        nearRadiusM={nearRadiusM}
         trace={followed}
-        warnings={layers.lowPoint ? warningPoints : null}
+        catchment={layers.catchment ? catchmentRings : null}
+        warnings={layers.lowPoint || layers.beforeRain ? warningPoints : null}
+        // The checks near an address are drawn at any zoom; the low areas
+        // layer keeps the floor `WARNING_MIN_SCALE` was measured for.
+        warningsNearAddress={warningsAnyZoom}
+        numberOfWarning={(point) => (layers.beforeRain ? numberOf(places, point) : null)}
         onWarningPress={(sign) => {
           // Pressing a sign lets go of whatever else was open: two cards on
           // one map is one too many.
           setHit(null);
           setFollowing(null);
           setMinimised(false);
+          /*
+            A numbered marker opens its place, which is what the number is
+            for. It used to set `warning` like any other sign, and the card
+            that reads `warning` is gated on the low-areas layer -- so with
+            only before-rain on, pressing a numbered triangle did nothing at
+            all. The guide tells the reader the other places are numbered on
+            the map; pressing one has to reach them.
+          */
+          const numbered = layers.beforeRain ? numberOf(places, sign) : null;
+          if (numbered !== null) {
+            setWarning(null);
+            setOpenPlace(numbered);
+            return;
+          }
+          // An unnumbered sign is a low area like any other, and it says so.
+          // It lets go of an open place for the same reason every other press
+          // here does: two cards on one map is one too many.
+          setOpenPlace(null);
           setWarning(sign);
         }}
         onViewport={setViewport}
@@ -514,7 +1484,32 @@ export function MapView({
           setWarning(null);
           setAddressCardOpen(true);
         }}
+        {...(picking === 'pin'
+          ? {
+              onGround: (point: Local) => {
+                setPinAt(point);
+              },
+            }
+          : {})}
         onSelect={(next) => {
+          if (picking === 'drain') {
+            // A press answers the banner's question and opens nothing else.
+            if (next?.kind === 'pit' && next.feature.asset_number !== undefined) {
+              setCandidate({
+                assetNumber: String(next.feature.asset_number),
+                distanceM:
+                  address === null
+                    ? null
+                    : Math.round(
+                        Math.hypot(
+                          next.feature.c[0] - address.eastingM,
+                          next.feature.c[1] - address.northingM,
+                        ),
+                      ),
+              });
+            }
+            return;
+          }
           setHit(next);
           setWarning(null);
           setMinimised(false);
@@ -528,13 +1523,288 @@ export function MapView({
 
       {viewport !== null && overlay !== null && <GuideMarks overlay={overlay} viewport={viewport} />}
 
+      {/*
+        The map as an input (Figma R1 and R3): a banner saying what to press,
+        a way out, and the card that confirms what was pressed.
+      */}
+      {picking !== null && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: space(4),
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 5,
+              display: 'flex',
+              gap: space(4),
+              alignItems: 'flex-start',
+              maxWidth: 420,
+              padding: `${String(space(2))}px ${String(space(3))}px`,
+              borderRadius: radius.base,
+              background: surface.raised,
+              border: `1px solid ${line.base}`,
+              boxShadow: '0 6px 20px rgba(16, 32, 40, 0.10)',
+            }}
+          >
+            <span>
+              <span
+                style={{
+                  display: 'block',
+                  font: type(text.small, { weight: weight.semibold }),
+                  color: ink.strong,
+                }}
+              >
+                {picking === 'drain' ? PICK_DRAIN.title : PIN_PLACE.title}
+              </span>
+              <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>
+                {picking === 'drain' ? PICK_DRAIN.near(address?.label ?? null) : PIN_PLACE.then}
+              </span>
+            </span>
+            <button type="button" onClick={leavePicking} style={planLinkStyle}>
+              {PICK_DRAIN.cancel}
+            </button>
+          </div>
+
+          {picking === 'drain' && candidate === null && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: space(4),
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                textAlign: 'center',
+              }}
+            >
+              <span style={{ display: 'block', font: type(text.micro), color: ink.muted }}>
+                Your answers stay in this browser.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPicking('pin');
+                }}
+                style={{
+                  marginTop: space(1),
+                  padding: `${String(space(1))}px ${String(space(3))}px`,
+                  borderRadius: radius.pill,
+                  border: `1px solid ${line.base}`,
+                  background: surface.raised,
+                  color: ink.base,
+                  font: type(text.small),
+                  cursor: 'pointer',
+                }}
+              >
+                {PICK_DRAIN.notOnMap}
+              </button>
+            </div>
+          )}
+
+          {picking === 'drain' && candidate !== null && (
+            <div
+              {...ringProps(pulsePress === 'use-drain')}
+              style={{
+                position: 'absolute',
+                bottom: space(4),
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 6,
+                width: 320,
+                maxWidth: 'calc(100% - 32px)',
+                padding: space(4),
+                borderRadius: radius.large,
+                background: surface.raised,
+                border: `1px solid ${line.base}`,
+                boxShadow: shadow.floating,
+              }}
+            >
+              <p style={{ margin: 0, font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {drainTitle({ assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM })}
+              </p>
+              <p style={{ margin: `${String(space(1))}px 0 0`, font: type(text.small), color: ink.muted }}>
+                {distanceLine(
+                  { assetNumber: candidate.assetNumber, street: null, distanceM: candidate.distanceM },
+                  address?.label ?? null,
+                )}
+              </p>
+
+              {/*
+                What is already held, each with a way off again.
+
+                Only once there is something in it: a heading reading
+                SELECTED (0) over nothing is a list that has not started.
+              */}
+              {kept.length > 0 && (
+                <>
+                  <p
+                    style={{
+                      margin: `${String(space(3))}px 0 ${String(space(1))}px`,
+                      font: type(text.micro, { weight: weight.semibold }),
+                      letterSpacing: tracking.caps,
+                      textTransform: 'uppercase',
+                      color: ink.subtle,
+                    }}
+                  >
+                    Selected ({kept.length})
+                  </p>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                    {kept.map((drain) => (
+                      <li
+                        key={drain.assetNumber}
+                        style={{
+                          display: 'flex',
+                          gap: space(2),
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          font: type(text.small),
+                          color: ink.base,
+                        }}
+                      >
+                        <span>
+                          {drainTitle(drain)}
+                          {drain.distanceM !== null && ` \u00b7 ${String(drain.distanceM)} m`}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${drainTitle(drain)}`}
+                          onClick={() => {
+                            setKept((held) => held.filter((one) => one.assetNumber !== drain.assetNumber));
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            width: 24,
+                            height: 24,
+                            border: `1px solid ${line.base}`,
+                            borderRadius: radius.pill,
+                            background: surface.raised,
+                            color: ink.muted,
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          −
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <span style={{ display: 'flex', gap: space(2), flexWrap: 'wrap', marginTop: space(3) }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportPlace({ kind: 'drain', drains: pickedSoFar });
+                    leavePicking();
+                  }}
+                  style={pickFilledStyle}
+                >
+                  {useDrains(pickedSoFar.length)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Kept, not discarded: this is how a second drain is added.
+                    setKept(pickedSoFar);
+                    setCandidate(null);
+                  }}
+                  style={pickOutlineStyle}
+                >
+                  Pick another
+                </button>
+              </span>
+            </div>
+          )}
+
+          {/*
+            Where the pin went, drawn over the canvas rather than in it.
+
+            The card alone confirms the press without showing the place, and
+            a reader who tapped a few metres off has nothing to correct
+            against. The canvas draws the address pin and nothing else that
+            moves, so this is one absolutely positioned mark instead.
+          */}
+          {picking === 'pin' && pinAt !== null && viewport !== null && (
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: toScreen(viewport, pinAt)[0] - 9,
+                top: toScreen(viewport, pinAt)[1] - 22,
+                width: 18,
+                height: 18,
+                borderRadius: '50% 50% 50% 0',
+                transform: 'rotate(-45deg)',
+                background: brand.base,
+                border: `2px solid ${ink.inverse}`,
+                boxShadow: '0 2px 6px rgba(16, 32, 40, 0.35)',
+                zIndex: 5,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {picking === 'pin' && pinAt !== null && (
+            <MapNoteStack at="bottom">
+              <MapNote title={PIN_PLACE.card}>
+                <input
+                  value={pinNote}
+                  onChange={(event) => {
+                    setPinNote(event.target.value);
+                  }}
+                  placeholder={PIN_PLACE.placeholder}
+                  aria-label={PIN_PLACE.then}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: space(2),
+                    borderRadius: radius.small,
+                    border: `1px solid ${line.base}`,
+                    font: type(text.small),
+                    color: ink.base,
+                  }}
+                />
+                <span style={{ display: 'flex', gap: space(2), marginTop: space(2), flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportPlace({
+                        kind: 'pin',
+                        note: pinNote.trim(),
+                        at: { eastingM: pinAt[0] + map.extent.min_e, northingM: pinAt[1] + map.extent.min_n },
+                      });
+                      leavePicking();
+                    }}
+                    style={pickFilledStyle}
+                  >
+                    {PIN_PLACE.use}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinAt(null);
+                    }}
+                    style={pickOutlineStyle}
+                  >
+                    {PIN_PLACE.back}
+                  </button>
+                </span>
+              </MapNote>
+            </MapNoteStack>
+          )}
+        </>
+      )}
+
       {panel && (
         <div
+          ref={chromeRef}
           style={{
             position: 'absolute',
             left: space(4),
-            right: space(4),
+            right: space(4) + (anySidebarOpen ? panelTakes : 0),
             top: space(4),
+            transition: 'right 160ms ease',
             zIndex: 4,
             display: 'flex',
             gap: space(3),
@@ -548,11 +1818,51 @@ export function MapView({
               <MapSearch
                 index={index}
                 address={address}
+                recent={recent}
                 onPick={onAddress}
                 onClear={onClearAddress}
               />
             )}
+            {/*
+              The way into the reporting pathway, as a chip (Figma D1).
+
+              It is not a layer, so it is not in `LayerChips` and not in
+              `CHIP_KEYS`. Epic 6's guide opens the pathway from here, and
+              the other guides hide it because a card taller than the
+              guide's frame over a step about something else teaches
+              nothing -- `usesReport` says which lesson is the exception.
+
+              **Only inside a guide.** The full map had one of these beside
+              the layer chips for a day; it now reaches the same pathway
+              through the chip that was already there, renamed. See
+              `chipFaces`. Two chips with the same words in one row is
+              worse than either of them alone.
+            */}
+            {guided && reportInGuide && (
+              <PlainChip
+                label={SPOT_A_PROBLEM_CHIP}
+                /*
+                  16, which is the design's (Figma D1). A `Chip`'s swatch is
+                  18, so a row holding both would be two pixels out; no
+                  lesson shows both today, and the day one does this is the
+                  number to change.
+                */
+                icon={<ReportGlyph size={16} />}
+                on={reportOpen}
+                pulse={pulsePress === 'report'}
+                onPress={() => {
+                  if (reportOpen) {
+                    setReportOpen(false);
+                    setReportProblem(null);
+                  } else {
+                    openReport(null, 'chip');
+                  }
+                }}
+              />
+            )}
             <LayerChips
+              collapsible={!guided && !touring}
+              fold={anySidebarOpen}
               state={layers}
               onToggle={toggle}
               unavailableKeys={notYet}
@@ -561,8 +1871,10 @@ export function MapView({
               pulseLayers={highlight === 'layers'}
               pulsePanelKey={highlight === 'terrain-toggle' ? 'terrain' : null}
               onPanelChange={panelChanged}
+              {...(chipFaces === undefined ? {} : { faces: chipFaces })}
               {...(chipKeys === undefined ? {} : { keys: chipKeys })}
             />
+
           </div>
 
           {/*
@@ -574,7 +1886,27 @@ export function MapView({
             the right, and if there is no room for both it wraps below the
             chips instead of under them.
           */}
-          {legend && <MapLegend state={layers} pulseTerrain={highlight === 'terrain-legend'} />}
+          {/*
+            Not while the Layers panel is open.
+
+            The panel hangs from a button at the chips' right-hand end and is
+            288 wide; the legend begins just past that end, and on a window
+            narrow enough for the legend to wrap onto its own line the panel
+            drops straight onto it -- two white boxes overlapping, which
+            reads as clipped text rather than as two cards. Folding the
+            legend only made the box it covered smaller.
+
+            Hidden rather than folded, because the panel is the same question
+            answered in more detail: it lists every layer and lets the reader
+            turn them on. It comes back, as it was, the moment they close it.
+          */}
+          {legend && !layersOpen && (
+            <MapLegend
+              state={layers}
+              fold={anySidebarOpen}
+              pulseTerrain={highlight === 'terrain-legend'}
+            />
+          )}
         </div>
       )}
 
@@ -631,7 +1963,7 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && minimised && onScreen(hit.feature.c, viewport) && (
         <MinimisedCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Drain pit ${String(hit.feature.asset_number)}`}
           onExpand={() => {
             setMinimised(false);
@@ -646,8 +1978,10 @@ export function MapView({
       {panel && viewport !== null && hit?.kind === 'pit' && !minimised && onScreen(hit.feature.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, hit.feature.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={publicLabelOf(hit.feature)}
+          // The guide's sixth step asks for the button this card carries.
+          pulseAction={pulsePress === 'trace' && followed === null}
           // A grey source line at the foot, not a badge (copy audit v4, #30).
           source="recorded"
           action={
@@ -688,21 +2022,34 @@ export function MapView({
           }}
         >
           {PIT_SUMMARY[surfaceEntryOf(hit.feature)]}
-          {onCompare !== undefined && scenarioSupport !== null && (
-            <CompareEntry
-              support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
-              onCompare={() => {
-                onCompare(String(hit.feature.asset_number ?? ''));
-              }}
-            />
-          )}
+          {/*
+            The comparison, or why it is not offered yet.
+
+            The index this reads is fetched the first time a drain is pressed
+            and is held by this screen, so every return to the map fetches it
+            again -- and while it is null the card used to render nothing at
+            all. Reported on 8 October as the button not coming back after a
+            comparison: it does, a moment later, and silence in between reads
+            as a button that has been taken away.
+          */}
+          {onCompare !== undefined &&
+            (scenarioSupport === null ? (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#5b6e7e' }}>{COMPARE_LOADING}</p>
+            ) : (
+              <CompareEntry
+                support={supportOf(scenarioSupport, String(hit.feature.asset_number ?? ''))}
+                onCompare={() => {
+                  onCompare(String(hit.feature.asset_number ?? ''));
+                }}
+              />
+            ))}
         </MapCallout>
       )}
 
       {panel && viewport !== null && hit?.kind === 'pipe' && onScreen(midpoint(hit.feature.c), viewport) && (
         <MapCallout
           at={toScreen(viewport, midpoint(hit.feature.c))}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={`Pipe ${String(hit.feature.ref ?? '')}`.trim()}
           // The same source line as the pit card; the pipe card had the badge too.
           source="recorded"
@@ -720,6 +2067,15 @@ export function MapView({
               out for almost every asset here.
             </>
           )}
+          {/*
+            AC 6.2.2: who the record says operates this pipe, in its own three
+            states. 853 of the council's pipes carry a code the portal does not
+            explain, and this says so rather than naming an organisation for
+            them.
+          */}
+          <span style={{ display: 'block', marginTop: space(2), color: ink.muted }}>
+            {OPERATOR_LABEL}: {operatorLine(hit.feature.operator)}
+          </span>
         </MapCallout>
       )}
 
@@ -736,11 +2092,11 @@ export function MapView({
       {panel &&
         viewport !== null &&
         warning !== null &&
-        warningsVisible(layers.lowPoint, viewport.scale) &&
+        warningsVisible(layers.lowPoint || layers.beforeRain, viewport.scale, warningsAnyZoom) &&
         onScreen(warning.c, viewport) && (
         <MapCallout
           at={toScreen(viewport, warning.c)}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={WARNING_TITLE}
           onClose={() => {
             setWarning(null);
@@ -761,42 +2117,686 @@ export function MapView({
         one card too many, and the one somebody just pressed is the one they
         are reading.
       */}
+      {/*
+        Epic 6's two cards, each drawn by its own chip, as the design has them
+        (Figma D2 and D4): a corner of the map rather than a popup anchored on
+        a feature, because neither is about a point — one is about the area the
+        boundary encloses, the other about the system as a whole.
+      */}
+      {/*
+        One card at a time, as the design has it: step four shows Who can help
+        and not the area card behind it. Two stacked cards on a phone-width map
+        is the thing the map chrome was broken up to avoid.
+      */}
+      {/*
+        Not while the report is open: both of these are corner cards and they
+        share the corner. The report is opened from this card, so without the
+        exclusion the report lands exactly on top of the thing it came from --
+        which is the same defect as the one the change list opened with, in
+        the other direction.
+      */}
+      {/*
+        Before-rain with no address: the layer is on, the markers are drawn,
+        and nothing says the checks are about an address nobody has given.
+        The subcatchment card says so; this is the same sentence in the same
+        situation.
+      */}
+      
+
+      
+
+      {/*
+        The map's corner cards, in one column rather than four pins at one
+        spot (reported 8 October, with a screenshot of two of them happening
+        at once).
+
+        `chromeBottom` is measured: the chip row wraps onto a second line on
+        any window narrow enough, and every card was drawn at a fixed 64
+        pixels whether the chrome ended there or not. The order below is the
+        order they stack in, and it is deliberate -- the report is the thing
+        the reader just asked for, so it comes first.
+      */}
+      <MapNoteStack top={chromeBottom}>
+        {panel && viewport !== null && reportOpen && (
+          <MapNote title={REPORT_HEADING}>
+            <ReportProblem
+              /*
+                The street and the suburb, from the index entry rather than
+                from the label. `whereLine` says why the house number does
+                not travel with a report.
+              */
+              where={{
+                street: yourAddress?.street ?? null,
+                suburb: yourAddress?.suburb ?? null,
+                area: area?.displayName ?? null,
+              }}
+              place={reportPlace}
+              chosen={reportProblem}
+              onChoose={setReportProblem}
+              pulse={pulsePress === 'problem'}
+              pulsePick={pulsePress === 'pick-drain'}
+              pulseWhich={pulsePress === 'which-drain'}
+              onPick={() => {
+                // The map takes over. The report card is still open behind it
+                // and comes back with whatever was picked.
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+              onForgetPlace={() => {
+                // *Change* is what the design calls it, so it goes back to the
+                // map rather than just emptying the row.
+                setReportPlace(null);
+                setCandidate(null);
+                setPinAt(null);
+                setPicking(address === null ? 'pin' : 'drain');
+              }}
+            />
+            <span style={{ display: 'flex', gap: space(2), marginTop: space(3) }}>
+              {reportFromPlan && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportOpen(false);
+                    setReportProblem(null);
+                    setPanelFolded(false);
+                    setPlanOpen(true);
+                  }}
+                  style={quietButton}
+                >
+                  ‹ Back to my plan
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setReportOpen(false);
+                  setReportProblem(null);
+                }}
+                style={planLinkStyle}
+              >
+                Close
+              </button>
+            </span>
+          </MapNote>
+        )}
+
+        {/*
+          The plan and the drains list, where the window has no room for a
+          sidebar -- which a guide's map frame never has.
+
+          `fill` keeps the heading and scrolls the body: the column scrolls
+          otherwise, and the first thing out of it is the heading, clipped a
+          few pixels under the layer chip above. `noteWidth` is narrower
+          inside a guide so the card stops short of the address pin the map
+          is centred on. Both reported on 11 October, items 5 and 6.
+        */}
+        {planInCard && (
+          <MapNote
+            fill
+            width={noteWidth}
+            title={askOpen ? ASK_HEADING : PREPARE_HEADING}
+            /*
+              Epic 5's review step points at the plan, and the card is what a
+              reader sees of it: the body scrolls inside this, so marking
+              what is in it marks a box taller than the window.
+            */
+            pulse={!askOpen && pulsePress === 'plan'}
+          >
+            {askOpen ? askPanel : planPanel}
+          </MapNote>
+        )}
+
+        {drainsInCard && (
+          <MapNote fill width={noteWidth} title={STREET_DRAINS_HEADING}>
+            {drainsList}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.catchment && !reportOpen && (
+          <MapNote title={DRAINAGE_AREA}>
+            <DrainageArea
+              area={area}
+              hasAddress={address !== null}
+              onBack={() => {
+                // The chip is what drew this card; taking it off is the way
+                // back, and it takes the boundary with it.
+                toggle('catchment');
+              }}
+
+              {...(guided && !reportInGuide
+                ? {}
+                : {
+                    /*
+                      A guide teaches one thing at a time, and this opens a
+                      card taller than the guide's map frame over a step that
+                      was asking about something else. That is why every
+                      guide hid it.
+
+                      **Epic 6's guide is the one whose subject this is.**
+                      Figma D3 asks the reader to press it and D4 asks them
+                      to choose a problem type, so hiding it there left two
+                      of the design's four frames unbuildable. `usesReport`
+                      says which lesson that is, from its steps.
+                    */
+                    onReport: () => {
+                      openReport(null, 'area');
+                    },
+                  })}
+              pulseReport={pulsePress === 'report'}
+            />
+            {catchmentRings !== null && !boundaryInView(catchmentRings, viewport) && (
+              <span style={{ display: 'block', marginTop: space(2), color: ink.subtle }}>
+                The boundary is outside this view. Zoom out to see it.
+              </span>
+            )}
+          </MapNote>
+        )}
+
+        {panel && viewport !== null && layers.beforeRain && address === null && !planOpen && (
+          <MapNote title={BEFORE_RAIN_CHIP}>{NO_ADDRESS_FOR_CHECKS}</MapNote>
+        )}
+
+      </MapNoteStack>
+
+      {/*
+        The address's own card for this layer, where the map suppresses the
+        full one (Figma G1).
+
+        The guides hide the address card — they are teaching one thing at a
+        time — but AC 5.1.1 puts this button on the address, and the design
+        draws it there in the guide too. So it gets a card of its own: the
+        address, and the way into the plan.
+      */}
+      {panel &&
+        viewport !== null &&
+        address !== null &&
+        !addressCard &&
+        beforeRainCallout &&
+        layers.beforeRain &&
+        !planOpen &&
+        // And not over the street drains list, which takes the plan's place
+        // rather than closing it (Figma G6b). The callout came back the
+        // moment the plan went, on top of the list the reader had just
+        // asked for.
+        !drainsOpen &&
+        openPlace === null &&
+        onScreen([address.eastingM, address.northingM], viewport) && (
+          <MapCallout
+            at={toScreen(viewport, [address.eastingM, address.northingM])}
+            within={calloutWithin}
+            title={address.label}
+            onClose={() => {
+              // Closing it leaves the layer on: the markers are the point, and
+              // the chip is what takes them off.
+              setBeforeRainCallout(false);
+            }}
+          >
+            <button
+              type="button"
+              // Epic 5's first step points here (frame E5/01).
+              {...ringProps(pulsePress === 'check-button')}
+              onClick={() => {
+                setPlanOpen(true);
+                setOpenPlace(places[0]?.number ?? null);
+              }}
+              style={{
+                padding: `${String(space(1))}px ${String(space(3))}px`,
+                borderRadius: radius.pill,
+                border: `1px solid ${brand.tint}`,
+                background: brand.wash,
+                color: brand.ink,
+                font: type(text.small, { weight: weight.semibold }),
+                cursor: 'pointer',
+              }}
+            >
+              {checkButton(places)}
+            </button>
+          </MapCallout>
+        )}
+
+      {/*
+        One place's card (Figma G2). Opened by the button above and by a press
+        on a numbered marker, and closed when its answer sends the reader on.
+      */}
+      {/*
+        The card hides with the marker it points at.
+
+        Zoomed out past `WARNING_MIN_SCALE` the canvas stops drawing the signs
+        -- a sign over a whole neighbourhood is a claim about a street nobody
+        can see -- and the card stayed, anchored to a triangle that was not
+        there. Panned away, the same. `warningsVisible(true, ...)` is the rule
+        the canvas draws by, read from the same function rather than restated,
+        so the two cannot drift. `openPlace` is left alone: zoom back in and
+        the card is where it was, which is how the pit card behaves.
+      */}
+      {panel &&
+        viewport !== null &&
+        openPlace !== null &&
+        warningsVisible(true, viewport.scale, warningsAnyZoom) &&
+        (() => {
+        const place = places.find((candidate) => candidate.number === openPlace);
+        if (place === undefined) return null;
+        if (!onScreen(place.at, viewport)) return null;
+        const next = places.find((candidate) => candidate.number === place.number + 1);
+        // Reported on 9 October: *Next place* had no opposite, so a reader who
+        // moved past one had no way back to it but the plan.
+        const previous = places.find((candidate) => candidate.number === place.number - 1);
+        /*
+          Away from the address card, which is now open beside this one.
+
+          Both cards hang below their own mark by default, so a place a few
+          metres from the address put them on top of each other. The address
+          pin's side is the near side; this one takes the other.
+        */
+        const at = toScreen(viewport, place.at);
+        const pinAt = address === null ? null : toScreen(viewport, [address.eastingM, address.northingM]);
+        const prefer = pinAt !== null && pinAt[1] > at[1] ? 'above' : 'below';
+        return (
+          <MapCallout
+            at={at}
+            within={calloutWithin}
+            prefer={prefer}
+            // In front of the address card where the two cannot both be clear:
+            // this one is asking a question and its buttons have to be
+            // reachable.
+            layer={7}
+            title={placeTitle(place)}
+            onClose={() => {
+              setOpenPlace(null);
+            }}
+          >
+            <PlaceCard
+              pulse={pulsePress === 'place'}
+              place={place}
+              relevance={relevance[place.number] ?? null}
+              onReview={(answer) => {
+                onReviewPlace?.(place.number, answer);
+                /*
+                  The answer sends the reader on, as the design draws it: to
+                  the next numbered place, and to the plan, which is where the
+                  answer has just changed something. Staying on a card whose
+                  question has been answered leaves the reader looking for what
+                  their press did.
+
+                  Both, not one or the other. Until 8 October this only moved
+                  to the next card, and on the last one it closed and left a
+                  bare map: the plan was reachable again only by finding the
+                  address pin and pressing the button on its card.
+                */
+                setPlanOpen(true);
+                setOpenPlace(next?.number ?? null);
+              }}
+              {...(previous === undefined
+                ? {}
+                : {
+                    onPrevious: () => {
+                      setOpenPlace(previous.number);
+                    },
+                  })}
+              {...(next === undefined
+                ? {}
+                : {
+                    // Without answering: a reader may want to read all three
+                    // before deciding any of them.
+                    onNext: () => {
+                      setOpenPlace(next.number);
+                    },
+                  })}
+            />
+            <span style={{ display: 'block', marginTop: space(2) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  // It says the plan, so it opens the plan. It used to only
+                  // close this card, which was true while the card could only
+                  // be reached from a plan that was already open behind it.
+                  setOpenPlace(null);
+                  setPlanOpen(true);
+                }}
+                style={quietButton}
+              >
+                ‹ Back to the plan
+              </button>
+            </span>
+          </MapCallout>
+        );
+      })()}
+
+      {/* Step 3's list of drains (Figma S1–S4), in the plan's own container. */}
+      {drainsSidebarOpen && drainsNear !== null && address !== null && (
+        <Sidebar
+          title={STREET_DRAINS_HEADING}
+          subtitle={address.label}
+          width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
+          onClose={() => {
+            setDrainsOpen(false);
+            setDrainPicked(null);
+          }}
+        >
+          {drainsList}
+        </Sidebar>
+      )}
+
+      {/* The drain the list picked (Figma S2). */}
+      {panel && viewport !== null && drainsOpen && drainPicked !== null && onScreen(drainPicked.at, viewport) && (
+        <MapCallout
+          at={toScreen(viewport, drainPicked.at)}
+          within={calloutWithin}
+          title={drainPicked.label}
+          layer={7}
+          source="recorded"
+          onClose={() => {
+            setDrainPicked(null);
+          }}
+        >
+          {DRAIN_SOURCE}
+          <span style={{ display: 'block', marginTop: space(3), color: ink.strong }}>
+            {DRAIN_BLOCKED_QUESTION}
+          </span>
+          <span style={{ display: 'block', marginTop: space(2) }}>
+            <button
+              type="button"
+              onClick={() => {
+                openReport(
+                  {
+                    kind: 'drain',
+                    drains: [
+                      {
+                        assetNumber: drainPicked.id,
+                        street: drainPicked.street,
+                        distanceM: Math.round(drainPicked.distanceM),
+                      },
+                    ],
+                  },
+                  'drain',
+                );
+              }}
+              style={primaryCardButton}
+            >
+              {REPORT_THIS_DRAIN} ›
+            </button>
+          </span>
+        </MapCallout>
+      )}
+
+      {/* The plan itself (Figma P1), which the place card sits in front of. */}
+      {sidebarOpen && !drainsOpen && askOpen && (
+        <Sidebar
+          title={ASK_HEADING}
+          width={panelWidth}
+          onClose={() => {
+            setAskOpen(false);
+            setAskOpening(null);
+            setPlanOpen(false);
+          }}
+        >
+          {askPanel}
+        </Sidebar>
+      )}
+
+      {sidebarOpen && !drainsOpen && !askOpen && (
+        <Sidebar
+          title={PREPARE_HEADING}
+          {...(address === null ? {} : { subtitle: address.label })}
+          width={panelWidth}
+          collapsed={panelFolded}
+          onCollapse={setPanelFolded}
+          onClose={() => {
+            setPlanOpen(false);
+          }}
+        >
+          {planPanel}
+        </Sidebar>
+      )}
+
+
+      {/* The reporting pathway itself (Epic 6, AC 6.3.1 to 6.3.4). */}
+      
+
       {panel &&
         viewport !== null &&
         address !== null &&
         hit === null &&
         warning === null &&
+        !layers.catchment &&
+        !planOpen &&
         addressCard &&
         addressCardOpen &&
         onScreen([address.eastingM, address.northingM], viewport) && (
         <MapCallout
           at={toScreen(viewport, [address.eastingM, address.northingM])}
-          within={{ width: viewport.widthPx, height: viewport.heightPx }}
+          within={calloutWithin}
           title={address.label}
           onClose={() => {
             setAddressCardOpen(false);
           }}
         >
-          {explanation === null && groundTrend === null ? (
+          {/*
+            Nothing within the ring, said here rather than anywhere else
+            (Figma A8, *map message first, then the plan*).
+
+            It was two lines under the figure, and then — on 8 October — a
+            note of its own in the corner stack. The design puts it in this
+            card, with the two things still worth doing under it, and that is
+            better than either: the reader is looking at the pin, the answer
+            is about the pin, and it offers somewhere to go rather than only
+            reporting an absence.
+
+            No figure above it. A compass of water that is not there is a
+            picture of nothing.
+          */}
+          {layers.beforeRain && places.length === 0 ? (
             <>
-              No place where water may flow or collect was found close to this address.
+              <span style={{ display: 'block', font: type(text.label, { weight: weight.semibold }), color: ink.strong }}>
+                {NO_PLACES_IN_RING}
+              </span>
+              <span style={{ display: 'block', marginTop: space(2) }}>{NO_PLACES_STILL}</span>
+              <button
+                type="button"
+                onClick={openDrains}
+                style={primaryCardButton}
+              >
+                {CHECK_STREET_DRAINS} ›
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  setPlanOpen(true);
+                }}
+                style={cardLinkButton}
+              >
+                {EVERY_HOME} ›
+              </button>
+            </>
+          ) : (
+            <>
+              {/*
+                What was measured near this address, in two sentences
+                (Figma A9).
+
+                It was a small figure: a compass with the ground's fall, the
+                nearest water path and the nearest low area drawn around it.
+                The design replaced it with the sentences on 8 October and the
+                team confirmed the swap. What went with the figure is the
+                ground's fall -- *Steep slope down about 8 m in 150 m* -- which
+                the design does not carry and which nothing else in the product
+                said. The ground-height layer and its guide still do.
+              */}
+              {explanation === null ? (
+                <>No place where water may flow or collect was found close to this address.</>
+              ) : (
+                <>{cardSentence(explanation)}</>
+              )}
               <span style={{ display: 'block', marginTop: space(2) }}>
                 <SourceLink id="derived" />
               </span>
+              {guided && (
+                <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
+                  Select a drain pit or pipe to read what the council recorded about it.
+                </span>
+              )}
+              {/*
+                The places, counted (AC 5.1.1, Figma A9).
+
+                The design makes this the card's one filled button, because of
+                everything on the card it is the thing the reader came for. It
+                was an underlined link under the figure, which read as a
+                footnote to the picture rather than as the way on.
+              */}
+              {layers.beforeRain && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddressCardOpen(false);
+                    setPlanOpen(true);
+                    setOpenPlace(places[0]?.number ?? null);
+                  }}
+                  style={primaryCardButton}
+                >
+                  {checkButton(places)}
+                </button>
+              )}
+
+              {/*
+                The way to the layer the card is already talking about.
+
+                The card says *water may pool about 20 m away* and then leaves
+                the reader to work out that there is a layer which draws
+                exactly that. The change list of 8 October asks for the button,
+                and for it to say which way it goes rather than being a switch
+                with no state: off, it offers to open the layer; on, it says the
+                layer is already open, and pressing it takes the layer off
+                again. Both sentences are the design's own.
+
+                The mark beside it is the legend's own low-areas swatch, so the
+                button and the thing it draws are recognisably the same.
+              */}
+              <button
+                type="button"
+                aria-pressed={layers.lowPoint}
+                onClick={() => {
+                  toggle('lowPoint');
+                }}
+                style={{
+                  ...outlineCardButton,
+                  borderColor: layers.lowPoint ? brand.tint : line.base,
+                  background: layers.lowPoint ? brand.wash : surface.raised,
+                }}
+              >
+                <svg width="20" height="12" viewBox="0 0 20 12" aria-hidden focusable="false" style={{ flexShrink: 0 }}>
+                  <ellipse cx="10" cy="6" rx="7" ry="4.5" fill="#5aa0cd" opacity="0.45" stroke="#5aa0cd" />
+                </svg>
+                <span>{layers.lowPoint ? LOW_AREAS_SHOWN : OPEN_LOW_AREAS}</span>
+              </button>
+
+              {/*
+                The other thing this address has, one press away (Figma A9).
+
+                A layer rather than a screen: switching it on draws the
+                boundary and opens the area's own card, which is where Epic 6
+                answers who looks after which part of it.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressCardOpen(false);
+                  if (!layers.catchment) toggle('catchment');
+                }}
+                style={cardLinkButton}
+              >
+                {LAYER.catchment} ›
+              </button>
             </>
-          ) : (
-            <AddressInsight ground={groundTrend} near={explanation} />
-          )}
-          {guided && (
-            <span style={{ display: 'block', marginTop: 8, color: ink.subtle }}>
-              Select a drain pit or pipe to read what the council recorded about it.
-            </span>
           )}
         </MapCallout>
       )}
     </>
   );
 }
+
+/** The two states of the address card's low-areas button (change list, item 2). */
+const OPEN_LOW_AREAS = 'Open low areas to see where water may pool';
+const LOW_AREAS_SHOWN = 'Low areas already show on map';
+
+/** Filled and outline, for the two choices a picking card offers. */
+const pickFilledStyle = {
+  padding: `${String(space(1))}px ${String(space(3))}px`,
+  borderRadius: radius.small,
+  border: `1px solid ${brand.base}`,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const pickOutlineStyle = {
+  padding: `${String(space(1))}px ${String(space(3))}px`,
+  borderRadius: radius.small,
+  border: `1px solid ${line.base}`,
+  background: surface.raised,
+  color: ink.base,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+/** The map's own underlined link, for the ways between its cards. */
+/**
+ * The address card's buttons, as the design draws them (Figma A9, A8).
+ *
+ * Full width and stacked, because the card is 296 pixels wide and three
+ * controls in a row at that width wrap into something nobody drew. The filled
+ * one is the thing the reader came for; the outlined one is a switch; the last
+ * is a link, and looks like one.
+ */
+const primaryCardButton = {
+  display: 'block',
+  width: '100%',
+  marginTop: space(3),
+  padding: `${String(space(3))}px ${String(space(3))}px`,
+  border: 'none',
+  borderRadius: radius.small,
+  background: brand.base,
+  color: ink.inverse,
+  font: type(text.small, { weight: weight.semibold }),
+  cursor: 'pointer',
+} as const;
+
+const outlineCardButton = {
+  display: 'flex',
+  gap: space(2),
+  alignItems: 'center',
+  width: '100%',
+  marginTop: space(2),
+  padding: `${String(space(2))}px ${String(space(3))}px`,
+  border: `1px solid ${line.base}`,
+  borderRadius: radius.small,
+  background: surface.raised,
+  color: brand.ink,
+  font: type(text.small, { weight: weight.semibold }),
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
+const cardLinkButton = {
+  ...plainButton,
+  marginTop: space(3),
+  paddingLeft: 0,
+  textAlign: 'left',
+} as const;
+
+/**
+ * Was an underlined word; is a control (9 October).
+ *
+ * *Close* on the report card and *Cancel* while picking a drain are not
+ * links: one dismisses a pathway and the other abandons a selection. Both sit
+ * inside cards that already carry an outline, so they take the borderless
+ * weight rather than a box inside a box.
+ */
+const planLinkStyle = plainButton;
 
 /**
  * Is the thing the card points at still on the map?
@@ -835,11 +2835,13 @@ function midpoint(path: readonly Local[]): Local {
 function MapSearch({
   index,
   address,
+  recent,
   onPick,
   onClear,
 }: {
   readonly index: AddressIndex;
   readonly address: SupportedAddress | null;
+  readonly recent: readonly SupportedAddress[];
   readonly onPick: (address: IndexedAddress) => void;
   readonly onClear: () => void;
 }) {
@@ -847,13 +2849,69 @@ function MapSearch({
   const [focused, setFocused] = useState(false);
   // The suggestion the arrow keys are on, or -1 for the typed text itself.
   const [active, setActive] = useState(-1);
+  /*
+    Whether a search is out with the API, and shown rather than kept quiet.
+
+    The timeout is four seconds, and a field that does nothing at all for four
+    seconds after Enter reads as a key that is not wired up -- which is the
+    exact complaint from the 15 September user test that put Enter here in the
+    first place.
+  */
+  const [asking, setAsking] = useState(false);
+  /*
+    What is in the field *now*, for the one question an `await` cannot put to
+    the state variable: a closure holds the text from the render that made it.
+  */
+  const typedRef = useRef(typed);
+  useEffect(() => {
+    typedRef.current = typed;
+  }, [typed]);
   const listId = useId();
 
   const matches: Match[] = useMemo(
     () => (typed.trim().length >= 2 ? search(index, typed, MAX_SUGGESTIONS) : []),
     [index, typed],
   );
-  const highlighted = active >= 0 && active < matches.length ? active : -1;
+
+  /*
+    What was searched for earlier in this tab, minus the one the map is on.
+
+    The current address is named in this field's own placeholder and the map
+    is centred on it, so a row that re-chooses it is a row that does nothing.
+    Memoised on the list and the index, neither of which changes while the map
+    is panned -- which matters here more than on the first screen, because
+    this component re-renders on every frame of a drag.
+  */
+  const recalled = useMemo(
+    () => recall(index, recent, address?.id ?? null),
+    [index, recent, address],
+  );
+
+  /*
+    **Shown on focus with an empty field, and only then.**
+
+    The list below is not gated on focus, deliberately -- the note there says
+    why. This one has to be: a dropdown of addresses hanging over the map
+    whenever nobody is typing is a panel the reader did not open. A press
+    still lands, because the rows cancel the mousedown that would blur the
+    field first.
+  */
+  const showingRecent = focused && typed.trim() === '' && recalled.length > 0;
+
+  /*
+    **One list, from one of two places, so the keyboard does not care which.**
+
+    The field is a combobox over a listbox, and the arrows, `Enter` and
+    `aria-activedescendant` were all written against the suggestions. Putting
+    the recent addresses through the same array is what keeps that true: the
+    reader arrows down into their own addresses exactly as they would into
+    matches, and nothing below had to learn about a second kind of row.
+  */
+  const options: readonly IndexedAddress[] = useMemo(
+    () => (showingRecent ? recalled : matches.map((match) => match.address)),
+    [showingRecent, recalled, matches],
+  );
+  const highlighted = active >= 0 && active < options.length ? active : -1;
   const optionId = (at: number) => `${listId}-option-${String(at)}`;
 
   const pick = (chosen: IndexedAddress) => {
@@ -861,6 +2919,60 @@ function MapSearch({
     setTyped('');
     setActive(-1);
   };
+
+  /*
+    Enter, which asks the API as of 11 October and did not before it.
+
+    **This box was the half of the 9 October decision nobody wired up.** The
+    address search moved to `POST /api/addresses/search` that day and reached
+    the first screen only, so the full map -- where somebody who has used the
+    product before starts -- went on answering every query from the index in
+    the browser. Two fields offering the same search over the same rows should
+    not disagree about where the answer comes from.
+
+    **A highlighted suggestion does not ask.** The arrow keys landed on a row
+    that already *is* an `IndexedAddress`; there is no question left to put to
+    a database, and putting one would send a home address away to be told what
+    is on the screen. The request is for typed text alone, which is the only
+    case where the verdict is not already in hand -- and it is one request on
+    one keypress, not one per character, for the reason `lookup.ts` gives.
+
+    **Nothing on screen changes when the API cannot answer.** `lookupAddress`
+    falls back to the same `resolve` this used to call, so a database that is
+    down is this field behaving exactly as it did last week.
+  */
+  async function choose() {
+    if (asking) return;
+
+    const highlightedAddress = options[highlighted];
+    if (highlightedAddress !== undefined) {
+      pick(highlightedAddress);
+      return;
+    }
+    if (typed.trim() === '') return;
+
+    const query = typed;
+    setAsking(true);
+    const { answer } = await lookupAddress({
+      index,
+      typed: query,
+      onFallback: (reason) => {
+        // The note the first screen leaves, for the same reason: which side
+        // answered is not a thing to put in front of somebody looking for
+        // their street, and the verdict is the same either way.
+        console.warn(`the address search fell back to the bundled index: ${reason}`);
+      },
+    });
+    setAsking(false);
+
+    // Edited while it was away. Four seconds is long enough to type a
+    // different street into, and moving the map to the answer to a question
+    // nobody is asking any more is worse than doing nothing.
+    if (typedRef.current !== query) return;
+
+    const chosen = addressFrom(index, query, answer);
+    if (chosen) pick(chosen);
+  }
 
   return (
     <div data-tour="address" style={{ position: 'relative', width: 268 }}>
@@ -876,10 +2988,36 @@ function MapSearch({
           boxShadow: shadow.floating,
         }}
       >
-        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
-          <circle cx="7" cy="7" r="4.6" fill="none" stroke={ink.subtle} strokeWidth="1.5" />
-          <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
+        {/*
+          The magnifier, or an arc turning in its place.
+
+          Same `spinner` class as the page-level one, so it slows rather than
+          stops under `prefers-reduced-motion` -- the note beside that rule in
+          `base.css` says why, and it applies here for the same reason. Hidden
+          from screen readers because `aria-busy` on the combobox below says
+          the same thing in the place a reader is already listening to.
+        */}
+        {asking ? (
+          <svg className="spinner" width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <circle cx="8" cy="8" r="5.6" fill="none" stroke={line.base} strokeWidth="1.6" />
+            {/* A quarter of the circumference, written as the arithmetic. */}
+            <circle
+              cx="8"
+              cy="8"
+              r="5.6"
+              fill="none"
+              stroke={brand.ink}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeDasharray={`${String(2 * Math.PI * 5.6 * 0.25)} ${String(2 * Math.PI * 5.6 * 0.75)}`}
+            />
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <circle cx="7" cy="7" r="4.6" fill="none" stroke={ink.subtle} strokeWidth="1.5" />
+            <path d="m10.6 10.6 3.4 3.4" stroke={ink.subtle} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        )}
         <input
           value={typed}
           onChange={(event) => {
@@ -888,14 +3026,13 @@ function MapSearch({
           }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              if (matches.length === 0) return;
+              if (options.length === 0) return;
               // Otherwise the caret jumps to the start or end of the text.
               event.preventDefault();
-              setActive(nextActive(highlighted, matches.length, event.key));
+              setActive(nextActive(highlighted, options.length, event.key));
             } else if (event.key === 'Enter') {
               event.preventDefault();
-              const chosen = matches[highlighted]?.address ?? addressForEnter(index, typed);
-              if (chosen) pick(chosen);
+              void choose();
             } else if (event.key === 'Escape' && highlighted >= 0) {
               setActive(-1);
             }
@@ -910,8 +3047,9 @@ function MapSearch({
           aria-label="Search for an address"
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={matches.length > 0}
+          aria-expanded={options.length > 0}
           aria-controls={listId}
+          aria-busy={asking}
           {...(highlighted >= 0 ? { 'aria-activedescendant': optionId(highlighted) } : {})}
           autoComplete="off"
           style={{
@@ -967,11 +3105,40 @@ function MapSearch({
         focus that fired no event -- a list that is sometimes there is worse
         than one that is always there while you are typing.
       */}
-      {matches.length > 0 && (
+      {/*
+        Nothing found, said out loud.
+
+        An empty box that simply shows no list is indistinguishable from a
+        broken one, which is how it was reported on 3 October.
+      */}
+      {noMatch(index, typed, matches.length) !== null && (
+        <p
+          role="status"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 'calc(100% + 4px)',
+            zIndex: 6,
+            margin: 0,
+            padding: space(2),
+            background: surface.raised,
+            border: `1px solid ${line.base}`,
+            borderRadius: radius.base,
+            boxShadow: shadow.lifted,
+            font: type(text.small, { leading: 1.45 }),
+            color: ink.muted,
+          }}
+        >
+          {noMatch(index, typed, matches.length)}
+        </p>
+      )}
+
+      {options.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          aria-label="Matching addresses"
+          aria-label={showingRecent ? RECENT_LABEL : 'Matching addresses'}
           style={{
             position: 'absolute',
             left: 0,
@@ -993,9 +3160,28 @@ function MapSearch({
             A press still chooses, and the pointer moves the highlight so the
             arrows carry on from where it was.
           */}
-          {matches.map((match, at) => (
+          {/*
+            The heading, when these are the reader's own addresses rather than
+            matches for what they typed. `presentation` because a listbox's
+            children are options and this is not one: it is the answer to
+            *why am I being shown these*, which an unlabelled list of five
+            addresses under an empty field does not give.
+          */}
+          {showingRecent && (
             <li
-              key={match.address.id}
+              role="presentation"
+              style={{
+                padding: `${String(space(1))}px ${String(space(2))}px`,
+                font: type(text.small),
+                color: ink.subtle,
+              }}
+            >
+              {RECENT_LABEL}
+            </li>
+          )}
+          {options.map((option, at) => (
+            <li
+              key={option.id}
               id={optionId(at)}
               role="option"
               aria-selected={at === highlighted}
@@ -1008,7 +3194,7 @@ function MapSearch({
                 setActive(at);
               }}
               onClick={() => {
-                pick(match.address);
+                pick(option);
               }}
               style={{
                 padding: `${String(space(2))}px ${String(space(2))}px`,
@@ -1019,7 +3205,7 @@ function MapSearch({
                 cursor: 'pointer',
               }}
             >
-              {match.address.label}
+              {option.label}
             </li>
           ))}
         </ul>

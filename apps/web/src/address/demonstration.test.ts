@@ -15,11 +15,23 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEMONSTRATION_LABEL, demonstrationAddress } from './demonstration.js';
-import type { AddressIndex, IndexedAddress } from './search.js';
+import type { AddressIndex, IndexedAddress } from '@drainlens/address';
 
 const at = (id: string, label: string, e = 500, n = 500): IndexedAddress => {
   const [number = '', ...rest] = label.split(' ');
-  return { id, label, number, street: rest.join(' ').split(',')[0] ?? '', suburb: 'Kensington', e, n };
+  return {
+    id,
+    label,
+    number,
+    street: rest.join(' ').split(',')[0] ?? '',
+    suburb: 'Kensington',
+    e,
+    n,
+  // Published position in the street group. Nothing here reads it; it is
+  // set because `IndexedAddress` requires it, which is what these builders
+  // stopped saying while the tests were outside the type checker.
+  at: 0,
+  };
 };
 
 const index = (addresses: readonly IndexedAddress[]): AddressIndex => ({
@@ -78,7 +90,7 @@ describe('the comparison’s own offer', () => {
   it('names a published address the comparison can show a difference for', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { COMPARE_DEMONSTRATION_LABEL } = await import('./demonstration.js');
     const { comparableNear } = await import('../scenario/eligibility.js');
     const { differingDrains } = await import('../scenario/differences.js');
@@ -102,7 +114,7 @@ describe('the comparison’s own offer', () => {
 
   it('falls back to the guide’s address, then to the first', () => {
     const guide = at('g', DEMONSTRATION_LABEL);
-    expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere').id).toBe('g');
+    expect(demonstrationAddress(index([at('a', '1 Any Street, Kensington'), guide]), 'Nowhere')?.id).toBe('g');
   });
 });
 
@@ -136,7 +148,7 @@ describe('the three example addresses', () => {
   it('offers three guide addresses on the bundled map, each centred and near a pit with a path', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
     const { chooseTeachingPit } = await import('../tutorial/pit.js');
     const data = (name: string): unknown =>
@@ -156,7 +168,7 @@ describe('the three example addresses', () => {
   it('offers three comparison addresses on the council map, each opening on a drain that shows a difference', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
-    const { unpack } = await import('./search.js');
+    const { unpack } = await import('@drainlens/address');
     const { COMPARE_DEMONSTRATION_LABELS, demonstrationAddresses } = await import('./demonstration.js');
     const { comparableNear } = await import('../scenario/eligibility.js');
     const { differingDrains } = await import('../scenario/differences.js');

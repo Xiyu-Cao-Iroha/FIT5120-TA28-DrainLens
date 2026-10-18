@@ -48,10 +48,13 @@ describe('the names the site uses', () => {
     expect(Object.values(LAYER)).toEqual([
       'Drain pits',
       'Drain pipes',
-      'Likely water paths',
+      'Water paths',
       'Low areas',
       'Ground height',
       'Ground data gaps',
+      // Epic 6's layer, from Iteration 3's design.
+      'Recorded subcatchment area',
+      'Before-rain checks',
     ]);
     expect(FULL_MAP).toBe('Full map');
   });

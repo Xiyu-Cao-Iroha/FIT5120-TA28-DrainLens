@@ -7,6 +7,8 @@ Fill it in while doing it. An entry written afterwards from memory is worth less
 > **This describes the build demonstrated on 1 September 2026 and the 27 August criteria**, which is still what the live service serves. `main` has since moved: the map's controls are four modes with the drainage layers behind them, the homepage opens the map in a chosen mode, and the drain-blockage comparison is no longer in the interface. Redeploying makes this sheet out of date in those three places. The current criteria are in [ITERATION-1-ACCEPTANCE.md](./ITERATION-1-ACCEPTANCE.md).
 >
 > **14 September: `develop` has moved well past those three places**, and `drainlens-dev` will show all of it once it is redeployed. The drain-blockage comparison is back, reached from a drain on the *Full map*; the ground height covers the council; the address panel shows which way the ground falls; and the site also stores `drainlens.learned` — guide progress, four `0`/`1` characters and nothing else — which row 1.1.1.e would otherwise mark as a defect. The words this sheet quotes have been brought to the names the copy review settled. **For the Iteration 2 criteria, work from [ITERATION-2-ACCEPTANCE.md](./ITERATION-2-ACCEPTANCE.md)**; there is no click-order sheet for them yet.
+>
+> **3 October: sections 9 and 10 below are the Iteration 3 sheet**, for Epic 5 (before-rain checks and the plan) and Epic 6 (the drainage area, who can help, and reporting). They are written against [ITERATION-3-ACCEPTANCE.md](./ITERATION-3-ACCEPTANCE.md) and against `develop`, so run them on the dev server or on `drainlens-dev` after it is redeployed. The storage check has a second expected key now: `drainlens.learned` holds **six** `0`/`1` characters, one per guide.
 
 ---
 
@@ -227,6 +229,97 @@ Reach an insufficient state — a pit the scene cannot place will do.
 | 1.1.5.a | "Choose a task" returns to the task page | | |
 | 1.1.5.b | The address survives it | | |
 | — | Browser **back** never lands on a screen with lost state | | |
+
+---
+
+## 9 · Epic 5 — before-rain checks and the plan
+
+Start on the **Full map** with `46 Gatehouse Drive` chosen. That address has one place; `11 Neale Street` has none, and both are needed.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| 5.1.1.a | *Before-rain checks* is a chip on the map, and the legend gains a line for it under **Estimated by DrainLens** | | |
+| 5.1.1.b | The markers near the address are **numbered**; markers further away are not | | |
+| 5.1.1.c | The address card offers **Check before heavy rain (1)** — the count in brackets | | |
+| 5.1.1.d | Nothing on screen calls the number risk, severity or priority | | |
+| 5.1.2.a | Pressing it opens **Place 1**, with the action before any explanation | | |
+| 5.1.2.b | The action is conditional: *If you park or leave bins here…* | | |
+| 5.3.1.a | *Why this place?* is folded, and opens to the low-area reason, *Estimated by DrainLens · Not a live warning*, and the sentence that it is the street rather than your property | | |
+| 5.2.2.a | Answering sends you on — to the next place, or to the plan on the last one | | |
+| 5.3.1.b | *Why this place?* is **also** under the reminder in the plan, folded (Figma G3) | | |
+| 5.2.2.b | A reminder appears **only** for *Applies to me*, worded *When heavy rain is forecast: move your car or bins from Place 1* | | |
+| 5.2.3.a | The plan separates **Places near you** from **For every home** | | |
+| 5.2.3.b | No *Who can help* line sits against a nearby place | | |
+| 5.2.3.c | Three general actions, each one sentence, each naming its publisher | | |
+| 5.2.3.d | **Report a drainage problem** is a section of its own, not a fourth action | | |
+| 5.3.3 | The safety boundary is at the foot, unfolded: not a warning, not a forecast, monitor VicEmergency, never enter floodwater, **132 500**, **000** | | |
+| 5.4.1.a | *n of m reviewed* counts both answers, and says it is not a safety or readiness score | | |
+| 5.4.1.b | No *Done* or *Completed* anywhere | | |
+| 5.4.1.c | An answer can be changed, and *Reset my answers* clears them | | |
+| 5.4.2 | Switch to `11 Neale Street` and back. **The answers are gone**, and the plan says no places were marked and that this does not mean the area cannot flood | | |
+| 5.1.3 | At `11 Neale Street` there is no *Places near you* section at all, and the general actions are still offered | | |
+| 5.4.3.a | *Print or save my plan* opens the browser's print dialog with **one page** | | |
+| 5.4.3.b | That page holds the address, the date, only the reminders you marked as applying, the general actions, the sources and the safety boundary | | |
+| 5.4.3.c | It holds **no** reviewed count, no *Doesn't apply*, no *Not reviewed*, and no button | | |
+| 5.4.1.d | DevTools → Application: no address and no answers in `localStorage`, `sessionStorage`, cookies or the URL. Network tab: no request carries either | | |
+
+Then run the guide: **Get ready for heavy rain**, from the guide chooser.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| — | It opens with the markers already drawn — the only guide that opens with a layer on | | |
+| — | Four steps, in the design's order: press the button, decide, read the reminder in the plan, open *Why this place?* on it (Figma G1 to G5) | | |
+| — | The reporting pathway does **not** appear inside the guide | | |
+
+## 10 · Epic 6 — the drainage area, who can help, and reporting
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| 6.1.1.a | *My drainage area* draws the whole boundary, dashed, never clipped to the view | | |
+| 6.1.1.b | The name is plain English: no numeric prefix, `M.D.` written out | | |
+| 6.1.2 | The receiving drain reads **has not been confirmed** until the classification register is approved — if it claims a type, that is a defect today | | |
+| 6.1.3 | The summary gives recorded area, pit count, mapped pipe length and whether low areas are present, with the share of the area those counts cover | | |
+| 6.1.4 | Two dates under *More information*, labelled apart, neither called a survey date | | |
+| 6.2.1 | *Who can help* shows three levels with an example each, and says these are general roles that do not confirm who owns a particular asset | | |
+| 6.2.2.a | Select a pipe: **Operator: City of Melbourne**, or an unidentified code, or nothing — never guessed | | |
+| 6.2.2.b | Select a pit: it is a council stormwater pits record, with **no** operator | | |
+| 6.3.1 | *Report a problem* offers exactly five, **the emergency first and in red** (Figma B3) | | |
+| 6.3.2.a | Each names one organisation and one official channel, and nothing says when somebody will come or what will be done | | |
+| 6.3.2.b | **Drainage problem on my property** goes to a licensed plumber, not to the council | | |
+| 6.3.2.c | *Recommended information for reporting* lists Location (filled in from the address), When, Photos and Which drain, each on a bullet rather than in a box; with none selected the last reads *Not chosen. Nothing is chosen for you* | | |
+| 6.3.2.d | Select a pit first, then open the pathway: **Selected recorded drain: <number>** appears, and *Change* goes back to the map | | |
+| 6.3.2.f | *Pick the drain on the map ›* hands the map over: chrome gone, a banner saying *Tap the drain that is blocked*, only the drains within 150 m drawn, **Cancel** (Figma R1) | | |
+| 6.3.2.g | Tapping one offers *Use this drain* / *Pick another* with its distance from the address (R2) | | |
+| 6.3.2.h | *The drain isn't on the map* switches to *Tap where the drain is*; the pin lands where you press, and a sentence can be added beside it (R3) | | |
+| 6.3.3.b | A pinned report says *Location pinned on the map.* at the head, carries *Drain location · Pinned on the map · <your words>*, and the copied text ends with a map link (B4d) | | |
+| 6.3.2.e | Nothing offers to submit the report | | |
+| 6.3.4 | **Flood or storm emergency** is two call blocks — *Call 000 · If life is in danger*, then *Call VICSES 132 500 · For flood and storm help* — with two safety lines and the VicEmergency link, and **no checklist at all** (Figma B5) | | |
+| 6.3.3 | *Copy details* and *Print* produce the address, the problem, who to contact and the checklist, and say the copy is yours | | |
+
+---
+
+## 11 · The guidance page, the search box and the gaps
+
+Team requests of 4 October. Start from the homepage with no address given.
+
+| | What to look at | Result | Note |
+|---|---|---|---|
+| — | The guide chooser shows **no** address line before one is given | | |
+| — | The first guide asks for an address; the chooser then shows *Current address: … Change* | | |
+| — | A second guide starts at step one **without asking again** | | |
+| — | *Change* beside the address, in the guide and on the chooser, reaches the address screen with the section still chosen | | |
+| 5.4.2 | Changing the address from that screen clears the answers about places | | |
+| — | Step one's back control says **← Guides** and returns to the chooser | | |
+| — | A finished guide offers **Next guide** with the chooser's own description, and *Explore full map* below it | | |
+| — | With guides unread, *Explore full map* asks first, names them, and holds *Continue to full map* for three seconds — then opens the map | | |
+| — | With every guide done, *Explore full map* opens the map with no dialog | | |
+| — | On the full map, typing something with no match says so. On the Kensington fallback it says the full council map is unavailable and names what can be searched | | |
+| — | **Ground data gaps** is not in the Layers panel (which holds Ground height alone), is in the legend, and is drawn on every way in | | |
+| 3.1.2.d | The drain condition carries an **ⓘ**; it opens three drawings of one grate at 100%, 50% and 0% intake, and says they are drawings and not of this drain | | |
+| — | The homepage header carries **one** control: *Flood history* is no longer beside *Get started* | | |
+| — | *Get started* opens a fork with two cards, each naming its scope — *City of Melbourne* for the drains, *Greater Melbourne* for the history | | |
+| — | Each card opens its own screen, and *← Back* from the guide chooser returns to the fork | | |
+| — | The homepage's own guide cards still go straight to the chooser, without being asked again | | |
 
 ---
 

@@ -10,9 +10,17 @@ Read the last section first if you are short of time. Most of this document desc
 
 ## The shape of the system, in one paragraph
 
-**Almost nothing goes to a server.** The map, the terrain, the drainage network and the address index are static files built offline and served as-is. The scenario engine runs in a Web Worker in the browser. The address search runs against an index that ships with the site. A resident can use the entire product — search an address, follow the drainage, run a blockage comparison, read the result — **without a single request that says anything about them**.
+**Almost nothing goes to a server.** The map, the terrain, the drainage network and the address index are static files built offline and served as-is, or the same data from Postgres where the API answers. The scenario engine runs in a Web Worker in the browser. A resident can follow the drainage, run a blockage comparison and read the result **without a single request that says anything about them**.
 
-That is not an optimisation. It is AD1: the product has no accounts and no identity, and the cheapest way to keep a promise about data is to never receive it.
+> **Two exceptions since October 2026, and they are the whole of the list.**
+>
+> **A submitted address search** goes to `POST /api/addresses/search` (9 October). The suggestions under the field do not — they are drawn from the index in memory on every keystroke — and neither does anything else about the session. The paragraph above used to end *search an address* among the things that reach nobody, and it no longer can.
+>
+> **A question typed into the assistant** goes to `POST /api/chat` and on to a retrieval service (8 October, DECISIONS-PENDING.md §10). It carries the question and not the address.
+>
+> Both are decisions the team took and recorded rather than drift. Neither is held: no row, no cache keyed on what was typed, and the Cloud Run request log is excluded at the sink before entries are written.
+
+That is not an optimisation. It is AD1: the product has no accounts and no identity. **AD1 is about what is held, not about what crosses a wire** — the same distinction `DATABASE-DESIGN.md` draws against "no database" — and the two routes above are inside it because nothing survives them. What this contract still forbids is an endpoint that *keeps* something about a resident, and there is none.
 
 ---
 
@@ -22,7 +30,7 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 
 | Path | Size | Built by | Contents |
 |---|---:|---|---|
-| `/data/map.json` | 318 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels |
+| `/data/map.json` | 345 KB | `drainlens_pipeline.network` | Roads, pipes, pits, street labels; a pipe also carries its `operator` since 30 September |
 | `/data/derived.json` | 175 KB | `drainlens_pipeline.derived` | Surface-water paths, low points, unavailable areas |
 | `/data/trace.json` | 37 KB | `drainlens_pipeline.trace` | Downstream links, with a reason at every path end |
 | `/data/addresses.json` | 1.33 MB, 490 KB gzipped | `drainlens_pipeline.addresses` | The address index for the City of Melbourne **and the coverage boundary**; clipped in the browser to the Kensington map when that is the map served |
@@ -37,6 +45,9 @@ All of it static, all of it `GET`, none of it carrying a query about the person.
 | `/data/population.json` | 28 KB | `drainlens_pipeline.population` | Residents per area, and the minimum below which no rate is given |
 | `/data/sa2-points.json` | 181 KB | `drainlens_pipeline.area_points` | Each area's simplified boundary and name point |
 | `/data/flood-events.json` | 7 KB | written by the team | Verified flood events, shown only once checked |
+| `/data/warnings/*.json` | 6 KB | `drainlens_pipeline.low_area_warnings` | The pooling markers, one file per extent; Epic 5's numbered places are chosen from these and from nothing else |
+| `/data/subcatchments.json` | 62 KB | `drainlens_pipeline.subcatchments` | The 35 Melbourne Water drainage areas that reach the extent, boundaries whole, with what is recorded inside each |
+| `/data/address-catchments.json` | 117 KB | `drainlens_pipeline.address_catchments` | Which drainage area each address is in, decided in the pipeline against the service geometry |
 
 > **14 September 2026.** `/data/scene/` (`scene.json` and six `.bin` arrays, 7.3 MB) is still in the container and no longer fetched: the comparison reads `scene-tiles/` and the *Ground height* layer reads `terrain-tiles/`. The single-extent terrain files that briefly sat in `/data/terrain/` are gone; only `address-ground.json` remains there. The last four rows are loaded only when the flood map or the board's ranking per 1,000 residents is opened, and only from the container — the API has no route for them.
 

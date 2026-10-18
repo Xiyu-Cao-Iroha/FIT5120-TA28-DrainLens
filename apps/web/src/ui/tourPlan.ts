@@ -60,15 +60,21 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     target: 'address',
     /*
-      **The second sentence is gone, and it was true.** It said the search runs
-      in the browser and that nothing about the address is sent anywhere. The
-      address screen says it where an address is actually typed, and the
-      homepage says it again under *Find a street*; here it was the longer half
-      of a coach mark that exists to point at a search box.
+      **The second sentence is gone, and cutting it turned out to be the
+      cheapest of the three copies.** It said the search runs in the browser
+      and that nothing about the address is sent anywhere — one promise written
+      down in three places: here, the address screen where an address is
+      actually typed, and the privacy panel in About the data. Here it was the
+      longer half of a coach mark that exists to point at a search box.
 
       A promise repeated in three places is not three times as trusted. It is
-      three copies to keep true, and the two that remain are the ones a person
-      is reading at the moment it matters.
+      three copies to keep true — and on 9 October the first clause stopped
+      being true, when a submitted search moved to
+      `POST /api/addresses/search`. The panel was rewritten that day; the
+      address screen's line was missed and corrected on 11 October
+      (`ADDRESS_STAYS_HERE` in `screens/Landing.tsx`); this copy had been
+      deleted already, and cost nothing to retract.
+      `DECISIONS-PENDING.md` §14 has the decision.
     */
     body: 'Search for an address, then select a result.',
   },
@@ -97,3 +103,20 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: `Open Layers to show ${LAYER.ground} and ${LAYER.limited}.`,
   },
 ];
+
+/**
+ * The steps worth showing this reader.
+ *
+ * **Step one teaches the search box, and from 10 October somebody can arrive
+ * with their address already set.** The full map used to clear it on the way
+ * in; the team reversed that, so a reader who typed an address in a guide and
+ * then opened the full map was met by a coach mark telling them to search for
+ * one. A tour whose first instruction is already done is a tour the reader
+ * learns to dismiss.
+ *
+ * Dropped rather than skipped past, so the count underneath reads *Step 1 of
+ * 6* instead of opening on *Step 2 of 7* and inviting the question of what
+ * step one was.
+ */
+export const tourStepsFor = (hasAddress: boolean): readonly TourStep[] =>
+  hasAddress ? TOUR_STEPS.filter((step) => step.target !== 'address') : TOUR_STEPS;

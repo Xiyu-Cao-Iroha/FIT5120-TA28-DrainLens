@@ -21,12 +21,14 @@ import {
   chipFor,
   highlightFor,
   latch,
+  pressFor,
   satisfied,
   stepBack,
   stepForward,
   stepIndex,
 } from './lesson.js';
 import { GUIDED_SECTIONS, LESSONS, lessonFor } from './lessons.js';
+import { HEAVY_RAIN, heavyRainFor } from './heavyRain.js';
 import { SECTION_ORDER, SECTIONS } from './sections.js';
 import { CHIP_KEYS, PANEL_KEYS } from '../map/modes.js';
 
@@ -42,12 +44,33 @@ const now = (over: Partial<MapNow> = {}): MapNow => ({ ...NOTHING_ON_MAP, ...ove
 const isPressFeedback = (before: Step | undefined): boolean =>
   before?.kind === 'do' && before.done === undefined;
 
-/** The lessons as pairs, so a failure names the section it is in. */
-const written = GUIDED_SECTIONS.map((id) => [id, LESSONS[id]!] as const);
+/**
+ * Every lesson written, so a failure names the section it is in.
+ *
+ * Epic 5's appears twice. Its steps are a function of how many places the
+ * address has (`withPlaces`), and the version for an address with none is a
+ * second list of steps that nothing else here would ever look at. Written
+ * once and never checked is exactly the situation this file exists for.
+ */
+const written = [
+  ...GUIDED_SECTIONS.map((id) => [id as string, LESSONS[id]!, id] as const),
+  [
+    'heavy-rain, at an address with no places',
+    { ...HEAVY_RAIN, ...heavyRainFor(0) },
+    'heavy-rain' as const,
+  ] as const,
+];
 
 describe('which sections are on offer', () => {
   it('offers exactly the sections that have a lesson', () => {
-    expect(GUIDED_SECTIONS).toEqual(['drainage', 'water-flow', 'low-areas', 'terrain']);
+    expect(GUIDED_SECTIONS).toEqual([
+      'drainage',
+      'water-flow',
+      'low-areas',
+      'terrain',
+      'drainage-area',
+      'heavy-rain',
+    ]);
     for (const id of GUIDED_SECTIONS) expect(lessonFor(id)).toBeDefined();
   });
 
@@ -67,7 +90,7 @@ describe('which sections are on offer', () => {
   });
 });
 
-describe.each(written)('%s', (id, lesson) => {
+describe.each(written)('%s', (_label, lesson, id) => {
   it('asks for something at every step that can be acted on', () => {
     for (const step of lesson.steps) {
       if (step.kind === 'do') expect(step.requires).toBeTruthy();
@@ -102,7 +125,19 @@ describe.each(written)('%s', (id, lesson) => {
     // layer is behind the Layers button, which its map shows instead.
     const chips = lesson.chips(0, NOTHING_ON_MAP);
     expect(chips.length).toBeLessThanOrEqual(1);
-    if (chips.length === 0) expect(lesson.mapChrome?.layersButton).toBe(true);
+    /*
+      No chip is allowed only where the first step points somewhere else:
+      the ground height guide's layer is behind the Layers button, and Epic
+      6's first press is the *Spot a problem?* chip, which is not a layer
+      and which `pressFor` rings instead.
+    */
+    if (chips.length === 0) {
+      const first = lesson.steps[0];
+      const elsewhere =
+        (lesson.mapChrome?.layersButton ?? false) ||
+        (first?.kind === 'do' && pressFor(first.requires) !== null);
+      expect(elsewhere).toBe(true);
+    }
   });
 
   it('shows the Layers button exactly when a step asks for something behind it', () => {
@@ -122,7 +157,6 @@ describe.each(written)('%s', (id, lesson) => {
       'pipes-on': 'pipe',
       'water-flow-on': 'channel',
       'low-areas-on': 'lowPoint',
-      'unmeasured-on': 'unavailable',
     };
     lesson.steps.forEach((step, at) => {
       if (step.kind !== 'do') return;
@@ -139,8 +173,25 @@ describe.each(written)('%s', (id, lesson) => {
   it('keeps to the audit writing rules', () => {
     /*
      * Copy audit v2, appendix A: an instruction is one sentence of at most 16
-     * words; the feedback after a correct press starts with praise and stays
-     * within 12 words; no em dashes; the finish page says well done.
+     * words; the feedback after a correct press stays within 13; no em
+     * dashes; the finish page says well done.
+     *
+     * **The praise opener was a rule here until 10 October and is not one
+     * now.** It required `Great`, `Nice` or `Good`, and the comment that
+     * stood here said the drainage-area guide's second step was *the
+     * design's own sentence, Great! Rain inside this line is recorded as
+     * draining to the same place*. That was wrong twice over. Figma D2
+     * reads *Rain inside this line is recorded as draining to the
+     * Kensington West Main Drain*: no praise, and it names the drain. The
+     * opener was mine, this rule enforced it, and this comment credited it
+     * to a design that does not use it.
+     *
+     * The three older guides still open their feedback that way and nothing
+     * here stops them. Whether they should is a question for the wording
+     * audit the team has asked for, not one to settle by regular expression.
+     *
+     * What is still checked is what the cap was for: feedback is short, an
+     * instruction is one sentence, and neither carries an em dash.
      *
      * The ground height guide's finish page is its design's (Figma Terrain
      * Tutorial, frame 10): a *Guide complete* chip and a heading, not the
@@ -152,14 +203,45 @@ describe.each(written)('%s', (id, lesson) => {
       expect(step.body ?? '').not.toContain('—');
       if (step.kind === 'do') {
         expect(words(step.prompt)).toBeLessThanOrEqual(16);
-        expect(step.prompt).not.toMatch(/^Select\b/);
+        /*
+          **`Select` was banned here on 15 September and is not banned now.**
+          The copy audit made `Click` the house verb and this line enforced
+          it. The team's 17 October frames write Epic 5's first instruction
+          as *Select Check before heavy rain* and Epic 6's as *Select Spot a
+          problem*, and the same note says to leave the other guides'
+          wording alone, so the two verbs now stand side by side.
+
+          Nothing replaces the rule. A per-guide version was tried and is
+          wrong: only the steps that name a control open with either verb,
+          and the rest say *Choose*, *Decide*, or state a fact. One verb per
+          guide is not a rule this copy follows, and asserting it would be
+          inventing one. The split is for the wording audit the team has
+          asked for.
+        */
       } else if (isPressFeedback(lesson.steps[at - 1])) {
-        expect(step.prompt).toMatch(/^(Great|Nice|Good)\b/);
-        expect(words(step.prompt)).toBeLessThanOrEqual(12);
+        expect(words(step.prompt)).toBeLessThanOrEqual(13);
+        // Feedback states what happened. A question here is a step still
+        // asking, which is what the `do` step before it was for.
+        expect(step.prompt).not.toMatch(/\?$/);
       }
     });
+    /*
+      The house sentence, with the two the design overrides.
+
+      The ground height guide's finish page is a *Guide complete* chip and a
+      heading (Figma Terrain Tutorial, frame 10), which is what `badge` is
+      for. Epic 6's was *Well done! You finished all 7 guides* (Figma D5)
+      and is *You finished the report guide* in the 17 October frame: the
+      count is gone, and so is the praise that opened it. The house sentence
+      is still the house sentence for the four guides nothing has rewritten.
+
+      What is checked of all of them is what the rule was for: the finish
+      page says the guide is finished, in one sentence, and does not go on
+      to retell it (`body`).
+    */
     if (lesson.finished.badge === undefined) {
-      expect(lesson.finished.headline).toMatch(/^Well done! You finished the .+ guide\.$/);
+      expect(lesson.finished.headline).toMatch(/^(Well done! )?You finished .+\.$/);
+      expect(words(lesson.finished.headline)).toBeLessThanOrEqual(12);
     }
     expect(lesson.finished.body).toBeUndefined();
   });
@@ -179,6 +261,9 @@ describe.each(written)('%s', (id, lesson) => {
       channel: true,
       lowPoints: true,
       unmeasured: true,
+      catchment: true,
+      planOpen: true,
+      placesReviewed: 1,
     });
     const atStart = lesson.chips(0, everything);
     const atEnd = lesson.chips(lesson.steps.length, everything);
@@ -225,8 +310,6 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return { ...state, channel: true };
     case 'low-areas-on':
       return { ...state, lowPoints: true };
-    case 'unmeasured-on':
-      return { ...state, unmeasured: true };
     case 'pit-selected':
       return { ...state, selectedPit: pit };
     case 'trace-following':
@@ -235,6 +318,28 @@ function turnOn(state: MapNow, requires: string, pit: string | null): MapNow {
       return latch(state, { ...state, layersOpen: true });
     case 'terrain-shown':
       return latch(state, { ...state, terrain: true });
+    case 'plan-opened':
+      return latch(state, { ...state, planOpen: true, planOpened: true });
+    case 'places-reviewed':
+      /*
+        Every place answered, which is what the requirement now means. The
+        count is set rather than incremented: a step satisfied by one answer
+        out of three was the defect the team reported on 17 October, and a
+        harness that walked there one at a time would not have caught it.
+      */
+      return latch(state, { ...state, placeCount: 3, placesReviewed: 3 });
+    case 'report-opened':
+      return latch(state, { ...state, reportOpened: true });
+    case 'problem-chosen':
+      return latch(state, { ...state, problemChosen: true });
+    case 'drain-picking':
+      return latch(state, { ...state, drainPicking: true });
+    case 'drain-candidate':
+      return latch(state, { ...state, drainCandidate: true });
+    case 'drain-chosen':
+      return latch(state, { ...state, drainChosen: true });
+    case 'catchment-on':
+      return latch(state, { ...state, catchment: true });
     case 'terrain-off':
       return latch(state, { ...state, terrain: false });
     default:
@@ -339,5 +444,80 @@ describe('what the ground height guide added to every lesson', () => {
     // Reaching the live step lets go of the cursor.
     expect(stepForward(4, 5)).toBeNull();
     expect(stepForward(8, 9)).toBeNull();
+  });
+});
+
+/**
+ * What a step points at, when the thing it waits for is not a chip.
+ *
+ * The team's bug list of 11 October opened with two of these: step five of
+ * the heavy rain guide said *Click Check the street drains near you* with
+ * nothing marked and the button three screens down inside a card, and step
+ * four said *Open Why this place?* with nothing marked at all. Both are
+ * `do` steps whose requirement `chipFor` returns null for, which is the set
+ * this watches: every one of them either has a ring inside a card
+ * (`pressFor`), a map control to outline (`highlightFor`), or is listed here
+ * as answered by something the reader is already looking at.
+ */
+describe('every step has something to point at', () => {
+  /** Waits whose target is the thing the step is already about. */
+  /*
+    Empty since 17 October, and kept so the next exemption has to be written
+    down. Every `do` step that waits on something now marks it: the teaching
+    pit, the button on its card and the one on the address card were all
+    exempt as *answered by what the reader is already looking at*, which the
+    team's arrow pass overturned.
+  */
+  const ANSWERED_ELSEWHERE: Readonly<Record<string, string>> = {};
+
+  it.each(GUIDED_SECTIONS)('%s', (id) => {
+    const lesson = lessonFor(id);
+    if (lesson === null || lesson === undefined) return;
+    for (const step of lesson.steps) {
+      if (step.kind !== 'do') continue;
+      if (chipFor(step.requires) !== null) continue;
+      const marked =
+        pressFor(step.requires) !== null ||
+        highlightFor(step, NOTHING_ON_MAP) !== null ||
+        highlightFor(step, now({ layersOpen: true })) !== null ||
+        step.requires in ANSWERED_ELSEWHERE;
+      expect(marked, `${step.id} waits on ${step.requires} with nothing marked`).toBe(true);
+    }
+  });
+
+  it('marks the pit and the button on its card, which were exempt until 17 October', () => {
+    /*
+      Both were listed above as answered by what the reader is already
+      looking at: a ring round the teaching pit, and a card with one button
+      on it. The team's arrow pass says every map control a step asks to be
+      pressed gets an arrow, and a ring round one dot among forty is the
+      ambiguity the mentor reported.
+    */
+    expect(pressFor('pit-selected')).toBe('pit');
+    expect(pressFor('trace-following')).toBe('trace');
+    expect(pressFor('plan-opened')).toBe('check-button');
+  });
+
+  it('marks the four things Epic 6 asks for, none of them a map marker', () => {
+    /*
+      The drains are drawn on the canvas, so the step that asks for one is
+      marked by the picker's banner: there is no element to ring and nothing
+      for the arrow to measure.
+    */
+    expect(pressFor('drain-picking')).toBe('pick-drain');
+    expect(pressFor('drain-candidate')).toBe('pick-banner');
+    expect(pressFor('drain-chosen')).toBe('use-drain');
+  });
+
+  it('rings the controls that live inside a card', () => {
+    /*
+      It rang the fold under the reminder and the button under the plan
+      until 17 October, when the two steps that asked for those presses were
+      removed from Epic 5. What is left is the pair of answers on the place
+      card, and Epic 6's two.
+    */
+    expect(pressFor('places-reviewed')).toBe('place');
+    expect(pressFor('report-opened')).toBe('report');
+    expect(pressFor('problem-chosen')).toBe('problem');
   });
 });

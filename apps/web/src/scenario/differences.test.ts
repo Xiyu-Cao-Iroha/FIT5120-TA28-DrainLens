@@ -51,10 +51,22 @@ describe('the differences file', () => {
     expect(differenceSettings(FILE, null)).toEqual([]);
   });
 
-  it('writes the hint in the model’s terms, or nothing', () => {
+  it('warns that some choices show nothing, without listing them', () => {
+    /*
+      **It used to list the combinations** and read *In this model, a
+      blockage at this drain shows a difference with: Partly blocked at
+      60 mm; Fully blocked at 40 mm or 60 mm*, which is two nested lists a
+      reader has to decode before choosing anything.
+
+      The census still decides whether to say anything at all, which is the
+      half of this that matters: a drain the model separates under no
+      combination gets null rather than a sentence implying there is
+      something to find.
+    */
     expect(differenceHint(FILE, '11')).toBe(
-      'In this model, a blockage at this drain shows a difference with: Partly blocked at 60 mm; Fully blocked at 40 mm or 60 mm.',
+      'Some choices may show no visible difference in this model.',
     );
+    expect(differenceHint(FILE, '13')).toBeNull();
     expect(differenceHint(FILE, '99')).toBeNull();
     expect(differenceHint(null, '11')).toBeNull();
   });
