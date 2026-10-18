@@ -472,7 +472,6 @@ export type Press =
     coordinate would be wrong the moment the map moved.
   */
   | 'trace'
-  | 'zoom-in'
   /** Epic 5's first step: the button on the address card. */
   | 'check-button'
   | 'pit'

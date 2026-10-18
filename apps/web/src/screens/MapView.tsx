@@ -1360,7 +1360,6 @@ export function MapView({
           the offered drain in the comparison.
         */
         pulseSuggested={pulsePress === 'pit' || pulsePress === 'drain'}
-        pulseZoomIn={pulsePress === 'zoom-in'}
         {...(openAcrossM === undefined ? {} : { openAcrossM })}
         fit={placesFit ?? fit}
         terrain={layers.terrain ? terrain : null}

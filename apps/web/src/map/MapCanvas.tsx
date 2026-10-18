@@ -65,8 +65,6 @@ export interface MapCanvasProps {
    * canvas's own hit testing alone (`pointer-events: none`).
    */
   readonly pulseSuggested?: boolean;
-  /** The low areas guide's third step points at Zoom in (17 October). */
-  readonly pulseZoomIn?: boolean;
   /** Drains a comparison can be calculated for, ringed on the map. */
   readonly comparablePits?: ReadonlySet<string> | null;
   /**
@@ -232,7 +230,6 @@ export function MapCanvas({
   selectedPit = null,
   suggestedPit = null,
   pulseSuggested = false,
-  pulseZoomIn = false,
   comparablePits = null,
   comparison = null,
   fit: fitTo = null,
@@ -623,7 +620,6 @@ export function MapCanvas({
       {viewport && (
           <MapControls
             inset={controlsInset}
-            pulseZoomIn={pulseZoomIn}
             scale={viewport.scale}
             canZoomIn={viewport.scale < MAX_SCALE - 1e-6}
             canZoomOut={viewport.scale > minScale + 1e-6}

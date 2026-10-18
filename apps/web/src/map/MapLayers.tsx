@@ -31,7 +31,7 @@ import { LAYER } from '../ui/terms.js';
 import { narrowNow } from '../ui/narrow.js';
 import { BOUNDARY_FILL, BOUNDARY_STROKE } from './catchmentBoundary.js';
 import { WARNING_EDGE, WARNING_FILL } from './warnings.js';
-import { ringProps } from '../ui/GuideRing.js';
+import { ringClass, ringProps } from '../ui/GuideRing.js';
 import { brand, ink, line, radius, shadow, space, surface, text, tracking, type, weight } from '../ui/theme.js';
 
 /** How a layer marks the map, drawn from the same colours the canvas uses. */
@@ -869,7 +869,16 @@ function TerrainScale({ spec, pulse }: { readonly spec: LayerSpec; readonly puls
   const micro = { margin: 0, font: type(text.micro, { leading: 1.4 }), color: ink.subtle } as const;
   return (
     <div
-      {...ringProps(pulse)}
+      /*
+        **Outlined, and not pointed at** (team, 18 October).
+
+        The step this belongs to is the ground height guide's question
+        about which marker is higher, and the scale is what answers it.
+        Nobody is being asked to press it, which is what an arrow means
+        everywhere else in the guides, so this one keeps `ringClass` while
+        every other mark moved to `ringProps`.
+      */
+      className={ringClass(pulse)}
       style={{
         marginTop: space(3),
         // Room for the outline without moving the scale: padded by as much as
